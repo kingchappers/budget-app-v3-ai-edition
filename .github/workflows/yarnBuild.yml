@@ -1,0 +1,90 @@
+# This workflow will do a clean installation of node dependencies, cache/restore them, build the source code and run tests across different versions of node
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-nodejs
+
+name: Node.js CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+permissions:
+  id-token: write
+
+jobs:
+  build_package:
+    env:
+      TF_VAR_auth0_client_id: ${{ secrets.AUTH0_CLIENT_ID }}
+      TF_VAR_auth0_domain: ${{ secrets.AUTH0_DOMAIN }}
+      TF_VAR_auth0_audience: ${{ secrets.AUTH0_AUDIENCE }}
+    name: Build Package
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [24.x]
+        # See supported Node.js release schedule at https://nodejs.org/en/about/releases/
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'yarn'
+    - run: yarn install
+    - name: Build app with Auth0 config
+      env:
+        VITE_AUTH0_DOMAIN: ${{ secrets.AUTH0_DOMAIN }}
+        VITE_AUTH0_CLIENT_ID: ${{ secrets.AUTH0_CLIENT_ID }}
+        VITE_AUTH0_AUDIENCE: ${{ secrets.AUTH0_AUDIENCE }}
+      run: yarn run build
+    # - run: yarn test
+
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v5.1.1
+      with:
+        role-to-assume: arn:aws:iam::192350001975:role/github-actions
+        aws-region: eu-west-2
+
+    - name: Install OpenTofu
+      uses: opentofu/setup-opentofu@v1
+      with:
+        tofu_version: 1.11.2
+
+    - name: OpenTofu init & plan
+      working-directory: infra
+      env:
+        TF_INPUT: 'false'
+        TF_IN_AUTOMATION: 'true'
+        TF_LOG: 'DEBUG'
+        TF_LOG_PATH: 'infra/opentofu.init.log'
+      timeout-minutes: 15
+      run: |
+        echo "=== pre-init diagnostics ==="
+        tofu version
+        curl -I https://registry.opentofu.org || true
+        curl -I https://releases.opentofu.org || true
+        echo "=== run init and plan ==="
+        tofu init
+        tofu plan -out=tfplan
+  
+    - name: Upload debug logs
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: tofu-logs
+        path: infra/opentofu.init.log
+
+    - name: Upload tfplan (artifact)
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: tfplan
+        path: infra/tfplan
+
+    - name: OpenTofu apply (only on main)
+      if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+      working-directory: infra
+      run: |
+        tofu apply -auto-approve tfplan

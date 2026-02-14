@@ -1,0 +1,5 @@
+aws_region     = "eu-west-2"
+state_bucket   = "kingchappers-terraform-state-bucket"
+app_name       = "auth-starter-app"
+environment    = "production"
+auth0_audience = "https://dev-xf4mizgda1uv0xvb.uk.auth0.com/api/v2/"
