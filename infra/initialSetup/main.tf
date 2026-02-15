@@ -141,6 +141,7 @@ resource "aws_iam_role" "github_actions_role" {
 
 data "aws_iam_policy_document" "github_iam_policy_document" {
   # Lambda function management
+  # TEMPORARY: Includes both old (budget-app) and new (budget-app-v3-ai-edition) names for migration
   statement {
     sid    = "LambdaFunctionManagement"
     effect = "Allow"
@@ -156,6 +157,8 @@ data "aws_iam_policy_document" "github_iam_policy_document" {
       "lambda:UntagResource",
     ]
     resources = [
+      "arn:aws:lambda:${var.aws_region}:${data.aws_caller_identity.current.account_id}:function:budget-app",
+      "arn:aws:lambda:${var.aws_region}:${data.aws_caller_identity.current.account_id}:function:budget-app-*",
       "arn:aws:lambda:${var.aws_region}:${data.aws_caller_identity.current.account_id}:function:${var.app_name}",
       "arn:aws:lambda:${var.aws_region}:${data.aws_caller_identity.current.account_id}:function:${var.app_name}-*"
     ]
@@ -171,12 +174,15 @@ data "aws_iam_policy_document" "github_iam_policy_document" {
       "lambda:GetPolicy",
     ]
     resources = [
+      "arn:aws:lambda:${var.aws_region}:${data.aws_caller_identity.current.account_id}:function:budget-app",
+      "arn:aws:lambda:${var.aws_region}:${data.aws_caller_identity.current.account_id}:function:budget-app-*",
       "arn:aws:lambda:${var.aws_region}:${data.aws_caller_identity.current.account_id}:function:${var.app_name}",
       "arn:aws:lambda:${var.aws_region}:${data.aws_caller_identity.current.account_id}:function:${var.app_name}-*"
     ]
   }
 
   # IAM role management for Lambda execution
+  # TEMPORARY: Includes both old and new names for migration
   statement {
     sid    = "IAMRoleManagement"
     effect = "Allow"
@@ -192,11 +198,13 @@ data "aws_iam_policy_document" "github_iam_policy_document" {
       "iam:UntagRole",
     ]
     resources = [
+      "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/budget-app-*",
       "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${var.app_name}-*"
     ]
   }
 
   # IAM policy attachment for Lambda execution role
+  # TEMPORARY: Includes both old and new names for migration
   statement {
     sid    = "IAMPolicyAttachment"
     effect = "Allow"
@@ -205,6 +213,7 @@ data "aws_iam_policy_document" "github_iam_policy_document" {
       "iam:DetachRolePolicy",
     ]
     resources = [
+      "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/budget-app-*",
       "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${var.app_name}-*"
     ]
     # Only allow attaching AWS managed Lambda execution policy
@@ -216,6 +225,7 @@ data "aws_iam_policy_document" "github_iam_policy_document" {
   }
 
   # PassRole for Lambda to assume execution role
+  # TEMPORARY: Includes both old and new names for migration
   statement {
     sid    = "PassRoleToLambda"
     effect = "Allow"
@@ -223,6 +233,7 @@ data "aws_iam_policy_document" "github_iam_policy_document" {
       "iam:PassRole"
     ]
     resources = [
+      "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/budget-app-*",
       "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${var.app_name}-*"
     ]
     condition {
@@ -252,6 +263,7 @@ data "aws_iam_policy_document" "github_iam_policy_document" {
   }
 
   # CloudWatch Logs for Lambda and API Gateway (resource-specific)
+  # TEMPORARY: Includes both old and new names for migration
   statement {
     sid    = "CloudWatchLogsManagement"
     effect = "Allow"
@@ -265,6 +277,8 @@ data "aws_iam_policy_document" "github_iam_policy_document" {
       "logs:UntagResource",
     ]
     resources = [
+      "arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/lambda/budget-app*",
+      "arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/apigateway/budget-app*",
       "arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/lambda/${var.app_name}*",
       "arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/apigateway/${var.app_name}*"
     ]
