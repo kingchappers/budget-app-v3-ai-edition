@@ -14,14 +14,8 @@ resource "aws_iam_role" "lambda_role" {
       }
     ]
   })
-  # Explicit attributes to match provider planned/defaults and avoid
-  # legacy-plugin SDK warnings about non-computed attributes appearing
-  description          = "Role for the Lambda function of the auth-starter-app"
-  max_session_duration = 3600
-  force_detach_policies = false
-  path                 = "/"
-  permissions_boundary = ""
-  tags                 = {}
+
+  description = "Role for the Lambda function of the budget-app"
 }
 
 # Attach basic Lambda execution policy
@@ -65,7 +59,7 @@ resource "aws_lambda_function" "app" {
 # API Gateway REST API
 resource "aws_apigatewayv2_api" "app" {
   name          = "${var.app_name}-api"
-  description = "API for the authentication starter application"
+  description = "API for the budget application"
   protocol_type = "HTTP"
 
   cors_configuration {
@@ -167,64 +161,4 @@ data "aws_region" "current" {}
 output "api_endpoint" {
   value       = aws_apigatewayv2_stage.default.invoke_url
   description = "API Gateway endpoint URL"
-}
-
-####################################################################
-#### NEXT STEPS:  ##################################################
-######## 1. Create a CI/CD pipeline to build the react package to auth-app/build #
-######## 2. Set auth0_domain and auth0_client_id variables as secrets in AWS and collected by the pipeline #
-####################################################################
-
-### API Gateway CloudWatch role (conditional)
-# Create the role only when `var.create_apigw_cloudwatch_role` is true.
-resource "aws_iam_role" "apigateway_cloudwatch_role" {
-  name = "${var.app_name}-apigw-cw-logs-role"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17",
-    Statement = [
-      {
-        Effect = "Allow",
-        Principal = {
-          Service = "apigateway.amazonaws.com"
-        },
-        Action = "sts:AssumeRole"
-      }
-    ]
-  })
-}
-
-resource "aws_iam_role_policy_attachment" "apigateway_push_logs" {
-  role       = aws_iam_role.apigateway_cloudwatch_role.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs"
-}
-
-# Configure API Gateway account to use either the created role ARN or an
-# existing role ARN supplied in `var.apigw_cloudwatch_role_arn`.
-resource "aws_api_gateway_account" "account" {
-  cloudwatch_role_arn = aws_iam_role.apigateway_cloudwatch_role.arn
-}
-
-data "aws_iam_policy_document" "apiGateway_iam_policy_document" {
-  statement {
-    actions = [
-      "apigateway:GET",
-      "apigateway:UpdateAccount",
-      "iam:GetRole",
-      "iam:PassRole"
-    ]
-    effect    = "Allow"
-    resources = ["*"]
-  }
-}
-
-resource "aws_iam_policy" "apiGateway_iam_policy" {
-  name        = "apiGateway-iam-policy"
-  description = "A policy to allow API Gateway to access AWS resources for the auth-app project."
-  policy      = data.aws_iam_policy_document.apiGateway_iam_policy_document.json
-}
-
-resource "aws_iam_role_policy_attachment" "apiGateway_role_policy_attach" {
-  role       = aws_iam_role.apigateway_cloudwatch_role.name
-  policy_arn = aws_iam_policy.apiGateway_iam_policy.arn
 }

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Authentication template app: React SPA + Auth0 + AWS Lambda. Two Lambda functions serve the app — one for static files (public), one for protected API endpoints (JWT-validated). Infrastructure managed with OpenTofu.
+Budget tracking app: React SPA + Auth0 + AWS Lambda. Two Lambda functions serve the app — one for static files (public), one for protected API endpoints (JWT-validated). Infrastructure managed with OpenTofu.
 
 ## Commands
 
