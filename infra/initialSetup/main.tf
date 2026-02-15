@@ -243,7 +243,7 @@ data "aws_iam_policy_document" "github_iam_policy_document" {
     }
   }
 
-  # API Gateway management
+  # API Gateway management (v1 REST APIs and v2 HTTP APIs)
   statement {
     sid    = "APIGatewayManagement"
     effect = "Allow"
@@ -258,7 +258,10 @@ data "aws_iam_policy_document" "github_iam_policy_document" {
     ]
     resources = [
       "arn:aws:apigateway:${var.aws_region}::/apis",
-      "arn:aws:apigateway:${var.aws_region}::/apis/*"
+      "arn:aws:apigateway:${var.aws_region}::/apis/*",
+      "arn:aws:apigateway:${var.aws_region}::/v2/apis",
+      "arn:aws:apigateway:${var.aws_region}::/v2/apis/*",
+      "arn:aws:apigateway:${var.aws_region}::/tags/*"
     ]
   }
 
