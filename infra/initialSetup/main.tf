@@ -115,7 +115,7 @@ data "aws_iam_policy_document" "github_iam_policy_document" {
 
 resource "aws_iam_policy" "github_actions_iam_policy" {
   name        = "github-actions-iam-policy"
-  description = "A policy to allow GitHub Actions to deploy to AWS for the auth-app project."
+  description = "A policy to allow GitHub Actions to deploy to AWS for the budget-app project."
   policy      = data.aws_iam_policy_document.github_iam_policy_document.json
 }
 
