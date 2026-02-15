@@ -6,13 +6,8 @@ terraform {
     }
   }
 
-  # Backend configuration should be provided via backend.hcl file or CLI flags
-  # Example: tofu init -backend-config=backend.hcl
-  # backend.hcl should contain:
-  #   bucket       = "your-state-bucket"
-  #   key          = "budget-app/terraform.tfstate"
-  #   region       = "eu-west-2"
-  #   use_lockfile = true
+  # Backend configuration is provided via backend.hcl file
+  # Usage: tofu init -backend-config=backend.hcl
   backend "s3" {}
 }
 

@@ -62,7 +62,7 @@ jobs:
         TF_INPUT: 'false'
         TF_IN_AUTOMATION: 'true'
         TF_LOG: 'DEBUG'
-        TF_LOG_PATH: 'infra/opentofu.init.log'
+        TF_LOG_PATH: 'opentofu.init.log'
       timeout-minutes: 15
       run: |
         echo "=== pre-init diagnostics ==="
@@ -70,7 +70,7 @@ jobs:
         curl -I https://registry.opentofu.org || true
         curl -I https://releases.opentofu.org || true
         echo "=== run init and plan ==="
-        tofu init
+        tofu init -backend-config=backend.hcl
         tofu plan -out=tfplan
   
     - name: Upload debug logs
@@ -79,6 +79,7 @@ jobs:
       with:
         name: tofu-logs
         path: infra/opentofu.init.log
+        if-no-files-found: warn
 
     - name: Upload tfplan (artifact)
       if: always()
@@ -86,6 +87,7 @@ jobs:
       with:
         name: tfplan
         path: infra/tfplan
+        if-no-files-found: warn
 
     - name: OpenTofu apply (only on main)
       if: github.ref == 'refs/heads/main' && github.event_name == 'push'
