@@ -6,36 +6,114 @@ terraform {
     }
   }
 
-  backend "s3" {
-    bucket       = var.state_bucket
-    key          = "${var.app_name}-infra-setup/terraform.tfstate"
-    region       = var.aws_region
-    use_lockfile = true
-  }
+  # Backend configuration is provided via backend.hcl file
+  # Usage: tofu init -backend-config=backend.hcl
+  backend "s3" {}
 }
 
 provider "aws" {
   region = var.aws_region
 }
 
+# Get current AWS account ID for scoped permissions
+data "aws_caller_identity" "current" {}
+
+# ============================================================================
+# S3 Bucket for Terraform State (INFRA-03, SEC-04)
+# ============================================================================
+
+resource "aws_s3_bucket" "terraform_state" {
+  bucket = var.state_bucket
+
+  tags = {
+    Name        = "Terraform State Bucket"
+    Environment = var.environment
+    ManagedBy   = "terraform"
+    Application = var.app_name
+  }
+}
+
+# Enable versioning for state recovery (SEC-04)
+resource "aws_s3_bucket_versioning" "terraform_state" {
+  bucket = aws_s3_bucket.terraform_state.id
+
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+# Enable server-side encryption (INFRA-03, SEC-04)
+resource "aws_s3_bucket_server_side_encryption_configuration" "terraform_state" {
+  bucket = aws_s3_bucket.terraform_state.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
+    bucket_key_enabled = true
+  }
+}
+
+# Block public access (INFRA-03)
+resource "aws_s3_bucket_public_access_block" "terraform_state" {
+  bucket = aws_s3_bucket.terraform_state.id
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+# Lifecycle policy to clean up old state versions after 30 days
+resource "aws_s3_bucket_lifecycle_configuration" "terraform_state" {
+  bucket = aws_s3_bucket.terraform_state.id
+
+  rule {
+    id     = "expire-old-versions"
+    status = "Enabled"
+
+    noncurrent_version_expiration {
+      noncurrent_days = 30
+    }
+  }
+}
+
+# ============================================================================
+# GitHub OIDC Provider (INFRA-01)
+# ============================================================================
+
+resource "aws_iam_openid_connect_provider" "github_actions" {
+  url             = "https://token.actions.githubusercontent.com"
+  client_id_list  = ["sts.amazonaws.com"]
+  thumbprint_list = ["6938fd4d98bab03faadb97b34396831e3780aea1"]
+
+  tags = {
+    Environment = var.environment
+    ManagedBy   = "terraform"
+    Application = var.app_name
+  }
+}
+
+# ============================================================================
+# IAM Role for GitHub Actions (INFRA-01)
+# ============================================================================
+
 data "aws_iam_policy_document" "assume_role" {
   statement {
-    actions = [
-      "sts:AssumeRoleWithWebIdentity",
-    ]
-    effect = "Allow"
+    actions = ["sts:AssumeRoleWithWebIdentity"]
+    effect  = "Allow"
 
     principals {
       type        = "Federated"
       identifiers = [aws_iam_openid_connect_provider.github_actions.arn]
     }
 
+    # SECURITY: Restrict to main branch only to prevent PR/fork abuse
+    # Change to allow PRs if needed: "repo:kingchappers/${var.app_name}:pull_request"
     condition {
-      test     = "StringLike"
+      test     = "StringEquals"
       variable = "token.actions.githubusercontent.com:sub"
-      # Allow workflows from this repo (branches and PRs). Tighten if you only
-      # want a specific branch (e.g. ref:refs/heads/main).
-      values = ["repo:kingchappers/${var.app_name}:*"]
+      values   = ["repo:kingchappers/${var.app_name}:ref:refs/heads/main"]
     }
 
     condition {
@@ -46,90 +124,234 @@ data "aws_iam_policy_document" "assume_role" {
   }
 }
 
+resource "aws_iam_role" "github_actions_role" {
+  name               = "github-actions"
+  assume_role_policy = data.aws_iam_policy_document.assume_role.json
+
+  tags = {
+    Environment = var.environment
+    ManagedBy   = "terraform"
+    Application = var.app_name
+  }
+}
+
+# ============================================================================
+# IAM Policy for GitHub Actions (INFRA-01 - Least Privilege)
+# ============================================================================
+
 data "aws_iam_policy_document" "github_iam_policy_document" {
+  # Lambda function management
   statement {
+    sid    = "LambdaFunctionManagement"
+    effect = "Allow"
     actions = [
-      "apigateway:GET",
-      "apigateway:UpdateAccount",
-      "apigateway:POST",
-      "apigateway:PATCH",
-      "apigateway:TagResource",
-      "iam:AttachRolePolicy",
+      "lambda:CreateFunction",
+      "lambda:DeleteFunction",
+      "lambda:GetFunction",
+      "lambda:GetFunctionCodeSigningConfig",
+      "lambda:ListVersionsByFunction",
+      "lambda:UpdateFunctionCode",
+      "lambda:UpdateFunctionConfiguration",
+      "lambda:TagResource",
+      "lambda:UntagResource",
+    ]
+    resources = [
+      "arn:aws:lambda:${var.aws_region}:${data.aws_caller_identity.current.account_id}:function:${var.app_name}",
+      "arn:aws:lambda:${var.aws_region}:${data.aws_caller_identity.current.account_id}:function:${var.app_name}-*"
+    ]
+  }
+
+  # Lambda permissions management
+  statement {
+    sid    = "LambdaPermissions"
+    effect = "Allow"
+    actions = [
+      "lambda:AddPermission",
+      "lambda:RemovePermission",
+      "lambda:GetPolicy",
+    ]
+    resources = [
+      "arn:aws:lambda:${var.aws_region}:${data.aws_caller_identity.current.account_id}:function:${var.app_name}",
+      "arn:aws:lambda:${var.aws_region}:${data.aws_caller_identity.current.account_id}:function:${var.app_name}-*"
+    ]
+  }
+
+  # IAM role management for Lambda execution
+  statement {
+    sid    = "IAMRoleManagement"
+    effect = "Allow"
+    actions = [
       "iam:CreateRole",
-      "iam:DeleteRolePolicy",
-      "iam:DetachRolePolicy",
+      "iam:DeleteRole",
       "iam:GetRole",
       "iam:ListAttachedRolePolicies",
       "iam:ListRolePolicies",
-      "iam:PassRole",
-      "iam:PutRolePolicy",
-      "iam:CreatePolicy",
-      "iam:GetPolicy",
-      "iam:GetPolicyVersion",
-      "iam:DeletePolicy",
-      "iam:ListPolicyVersions",
-      "iam:CreateServiceLinkedRole",
-      "iam:ListInstanceProfilesForRole",
+      "iam:UpdateRole",
       "iam:UpdateRoleDescription",
-      "iam:UpdateRoleDescription",
-      "lambda:CreateFunction",
-      "lambda:DeleteFunction",
-      "lambda:UpdateFunction",
-      "lambda:GetFunction",
-      "lambda:GetPolicy",
-      "lambda:UpdateFunctionConfiguration",
-      "lambda:TagResource",
-      "lambda:ListVersionsByFunction",
-      "lambda:GetFunctionCodeSigningConfig",
-      "lambda:AddPermission",
-      "lambda:RemovePermission",
-      "lambda:UpdateFunctionCode",
+      "iam:TagRole",
+      "iam:UntagRole",
+    ]
+    resources = [
+      "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${var.app_name}-*"
+    ]
+  }
+
+  # IAM policy attachment for Lambda execution role
+  statement {
+    sid    = "IAMPolicyAttachment"
+    effect = "Allow"
+    actions = [
+      "iam:AttachRolePolicy",
+      "iam:DetachRolePolicy",
+    ]
+    resources = [
+      "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${var.app_name}-*"
+    ]
+    # Only allow attaching AWS managed Lambda execution policy
+    condition {
+      test     = "ArnEquals"
+      variable = "iam:PolicyARN"
+      values   = ["arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"]
+    }
+  }
+
+  # PassRole for Lambda to assume execution role
+  statement {
+    sid    = "PassRoleToLambda"
+    effect = "Allow"
+    actions = [
+      "iam:PassRole"
+    ]
+    resources = [
+      "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${var.app_name}-*"
+    ]
+    condition {
+      test     = "StringEquals"
+      variable = "iam:PassedToService"
+      values   = ["lambda.amazonaws.com"]
+    }
+  }
+
+  # API Gateway management
+  statement {
+    sid    = "APIGatewayManagement"
+    effect = "Allow"
+    actions = [
+      "apigateway:DELETE",
+      "apigateway:GET",
+      "apigateway:PATCH",
+      "apigateway:POST",
+      "apigateway:PUT",
+      "apigateway:TagResource",
+      "apigateway:UntagResource",
+    ]
+    resources = [
+      "arn:aws:apigateway:${var.aws_region}::/apis",
+      "arn:aws:apigateway:${var.aws_region}::/apis/*"
+    ]
+  }
+
+  # CloudWatch Logs for Lambda and API Gateway
+  statement {
+    sid    = "CloudWatchLogsManagement"
+    effect = "Allow"
+    actions = [
       "logs:CreateLogGroup",
-      "logs:CreateLogDelivery",
-      "logs:CreateLogStream",
       "logs:DeleteLogGroup",
-      "logs:DeleteRetentionPolicy",
       "logs:DescribeLogGroups",
-      "logs:DescribeLogStreams",
       "logs:ListTagsForResource",
       "logs:PutRetentionPolicy",
-      "logs:PutLogEvents",
-      "logs:GetLogEvents",
-      "logs:FilterLogEvents",
+      "logs:DeleteRetentionPolicy",
       "logs:TagResource",
+      "logs:UntagResource",
+    ]
+    resources = [
+      "arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/lambda/${var.app_name}*",
+      "arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/apigateway/${var.app_name}*"
+    ]
+  }
+
+  # CloudWatch Logs resource policies for API Gateway
+  statement {
+    sid    = "CloudWatchLogsResourcePolicy"
+    effect = "Allow"
+    actions = [
       "logs:PutResourcePolicy",
-      "logs:DescribeResourcePolicies",
       "logs:DeleteResourcePolicy",
-      "s3:CreateBucket",
-      "s3:DeleteBucket",
-      "s3:DeleteObject",
+      "logs:DescribeResourcePolicies",
+    ]
+    resources = ["*"]
+  }
+
+  # CloudWatch Logs delivery (required for API Gateway logging)
+  statement {
+    sid    = "CloudWatchLogsDelivery"
+    effect = "Allow"
+    actions = [
+      "logs:ListLogDeliveries",
+      "logs:CreateLogDelivery",
+      "logs:DeleteLogDelivery",
+    ]
+    resources = ["*"]
+  }
+
+  # S3 state bucket access (read state, write plan/apply results)
+  statement {
+    sid    = "TerraformStateAccess"
+    effect = "Allow"
+    actions = [
       "s3:GetObject",
       "s3:PutObject",
+      "s3:DeleteObject",
       "s3:ListBucket",
-      "s3:HeadObject"
     ]
+    resources = [
+      "arn:aws:s3:::${var.state_bucket}",
+      "arn:aws:s3:::${var.state_bucket}/*"
+    ]
+  }
+
+  # STS GetCallerIdentity for data sources
+  statement {
+    sid       = "STSGetCallerIdentity"
     effect    = "Allow"
+    actions   = ["sts:GetCallerIdentity"]
     resources = ["*"]
   }
 }
 
 resource "aws_iam_policy" "github_actions_iam_policy" {
   name        = "github-actions-iam-policy"
-  description = "A policy to allow GitHub Actions to deploy to AWS for the budget-app project."
+  description = "Scoped policy for GitHub Actions to deploy ${var.app_name} infrastructure"
   policy      = data.aws_iam_policy_document.github_iam_policy_document.json
-}
 
-resource "aws_iam_openid_connect_provider" "github_actions" {
-  url            = "https://token.actions.githubusercontent.com"
-  client_id_list = ["sts.amazonaws.com"]
-}
-
-resource "aws_iam_role" "github_actions_role" {
-  name               = "github-actions"
-  assume_role_policy = data.aws_iam_policy_document.assume_role.json
+  tags = {
+    Environment = var.environment
+    ManagedBy   = "terraform"
+    Application = var.app_name
+  }
 }
 
 resource "aws_iam_role_policy_attachment" "github_actions_role_policy_attach" {
   role       = aws_iam_role.github_actions_role.name
   policy_arn = aws_iam_policy.github_actions_iam_policy.arn
+}
+
+# ============================================================================
+# Outputs
+# ============================================================================
+
+output "github_actions_role_arn" {
+  value       = aws_iam_role.github_actions_role.arn
+  description = "ARN of the GitHub Actions IAM role"
+}
+
+output "oidc_provider_arn" {
+  value       = aws_iam_openid_connect_provider.github_actions.arn
+  description = "ARN of the GitHub OIDC provider"
+}
+
+output "state_bucket_name" {
+  value       = aws_s3_bucket.terraform_state.id
+  description = "Name of the Terraform state bucket"
 }
