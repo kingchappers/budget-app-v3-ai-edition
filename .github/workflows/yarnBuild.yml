@@ -11,6 +11,7 @@ on:
 
 permissions:
   id-token: write
+  contents: read
 
 jobs:
   build_package:
@@ -25,14 +26,17 @@ jobs:
         node-version: [24.x]
         # See supported Node.js release schedule at https://nodejs.org/en/about/releases/
     steps:
-    - uses: actions/checkout@v4
-    
+    - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
+
     - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4.4.0
       with:
         node-version: ${{ matrix.node-version }}
         cache: 'yarn'
     - run: yarn install
+
+    - name: Audit dependencies
+      run: yarn audit --level high
     - name: Build app with Auth0 config
       env:
         VITE_AUTH0_DOMAIN: ${{ secrets.AUTH0_DOMAIN }}
@@ -42,13 +46,13 @@ jobs:
     # - run: yarn test
 
     - name: Configure AWS Credentials
-      uses: aws-actions/configure-aws-credentials@v5.1.1
+      uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7  # v6.0.0
       with:
         role-to-assume: arn:aws:iam::192350001975:role/github-actions
         aws-region: eu-west-2
 
     - name: Install OpenTofu
-      uses: opentofu/setup-opentofu@v1
+      uses: opentofu/setup-opentofu@9d84900f3238fab8cd84ce47d658d25dd008be2f  # v1.0.8
       with:
         tofu_version: 1.11.2
 
@@ -58,7 +62,7 @@ jobs:
         TF_INPUT: 'false'
         TF_IN_AUTOMATION: 'true'
         TF_LOG: 'DEBUG'
-        TF_LOG_PATH: 'infra/opentofu.init.log'
+        TF_LOG_PATH: 'opentofu.init.log'
       timeout-minutes: 15
       run: |
         echo "=== pre-init diagnostics ==="
@@ -66,22 +70,24 @@ jobs:
         curl -I https://registry.opentofu.org || true
         curl -I https://releases.opentofu.org || true
         echo "=== run init and plan ==="
-        tofu init
+        tofu init -backend-config=backend.hcl
         tofu plan -out=tfplan
   
     - name: Upload debug logs
       if: always()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
       with:
         name: tofu-logs
         path: infra/opentofu.init.log
+        if-no-files-found: warn
 
     - name: Upload tfplan (artifact)
       if: always()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
       with:
         name: tfplan
         path: infra/tfplan
+        if-no-files-found: warn
 
     - name: OpenTofu apply (only on main)
       if: github.ref == 'refs/heads/main' && github.event_name == 'push'

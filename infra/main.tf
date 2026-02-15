@@ -6,12 +6,9 @@ terraform {
     }
   }
 
-  backend "s3" {
-    bucket       = var.state_bucket
-    key          = "${var.app_name}/terraform.tfstate"
-    region       = var.aws_region
-    use_lockfile = true
-  }
+  # Backend configuration is provided via backend.hcl file
+  # Usage: tofu init -backend-config=backend.hcl
+  backend "s3" {}
 }
 
 provider "aws" {

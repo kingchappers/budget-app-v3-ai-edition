@@ -19,6 +19,13 @@ const MIME_TYPES = {
   '.woff2': 'font/woff2',
 };
 
+const SECURITY_HEADERS = {
+  'X-Content-Type-Options': 'nosniff',
+  'X-Frame-Options': 'DENY',
+  'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
+  'Referrer-Policy': 'strict-origin-when-cross-origin',
+};
+
 exports.handler = async (event) => {
   try {
     let filePath = event.rawPath || '/';
@@ -38,6 +45,7 @@ exports.handler = async (event) => {
     if (!normalizedPath.startsWith(__dirname)) {
       return {
         statusCode: 403,
+        headers: SECURITY_HEADERS,
         body: 'Forbidden',
       };
     }
@@ -47,26 +55,27 @@ exports.handler = async (event) => {
       const ext = path.extname(normalizedPath).toLowerCase();
       const contentType = MIME_TYPES[ext] || 'application/octet-stream';
       const content = fs.readFileSync(normalizedPath, 'utf8');
-      
+
       return {
         statusCode: 200,
-        headers: { 'Content-Type': contentType },
+        headers: { 'Content-Type': contentType, ...SECURITY_HEADERS },
         body: content,
       };
     }
-    
+
     // File not found, serve index.html for SPA routing
     const indexPath = path.join(__dirname, 'index.html');
     const indexContent = fs.readFileSync(indexPath, 'utf8');
     return {
       statusCode: 200,
-      headers: { 'Content-Type': 'text/html' },
+      headers: { 'Content-Type': 'text/html', ...SECURITY_HEADERS },
       body: indexContent,
     };
   } catch (error) {
     console.error('Error:', error);
     return {
       statusCode: 500,
+      headers: { 'Content-Type': 'application/json', ...SECURITY_HEADERS },
       body: JSON.stringify({ error: 'Internal Server Error' }),
     };
   }
