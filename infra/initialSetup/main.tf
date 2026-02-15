@@ -251,14 +251,13 @@ data "aws_iam_policy_document" "github_iam_policy_document" {
     ]
   }
 
-  # CloudWatch Logs for Lambda and API Gateway
+  # CloudWatch Logs for Lambda and API Gateway (resource-specific)
   statement {
     sid    = "CloudWatchLogsManagement"
     effect = "Allow"
     actions = [
       "logs:CreateLogGroup",
       "logs:DeleteLogGroup",
-      "logs:DescribeLogGroups",
       "logs:ListTagsForResource",
       "logs:PutRetentionPolicy",
       "logs:DeleteRetentionPolicy",
@@ -269,6 +268,14 @@ data "aws_iam_policy_document" "github_iam_policy_document" {
       "arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/lambda/${var.app_name}*",
       "arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/apigateway/${var.app_name}*"
     ]
+  }
+
+  # CloudWatch Logs list operations (require wildcard resource)
+  statement {
+    sid       = "CloudWatchLogsListOperations"
+    effect    = "Allow"
+    actions   = ["logs:DescribeLogGroups"]
+    resources = ["*"]
   }
 
   # CloudWatch Logs resource policies for API Gateway
