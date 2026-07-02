@@ -108,12 +108,15 @@ data "aws_iam_policy_document" "assume_role" {
       identifiers = [aws_iam_openid_connect_provider.github_actions.arn]
     }
 
-    # SECURITY: Restrict to main branch only to prevent PR/fork abuse
-    # Change to allow PRs if needed: "repo:kingchappers/${var.app_name}:pull_request"
+    # SECURITY: Allow main branch and pull requests from this repository
+    # Prevents fork abuse by restricting to repo owner
     condition {
-      test     = "StringEquals"
+      test     = "StringLike"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = ["repo:kingchappers/${var.app_name}:ref:refs/heads/main"]
+      values   = [
+        "repo:kingchappers/${var.app_name}:ref:refs/heads/main",
+        "repo:kingchappers/${var.app_name}:pull_request"
+      ]
     }
 
     condition {
