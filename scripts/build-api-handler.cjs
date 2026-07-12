@@ -29,7 +29,9 @@ const packageJson = {
   version: '1.0.0',
   dependencies: {
     'jsonwebtoken': '^9.0.3',
-    'jwks-rsa': '^3.2.1'
+    'jwks-rsa': '^3.2.1',
+    '@aws-sdk/client-dynamodb': '^3.0.0',
+    '@aws-sdk/lib-dynamodb': '^3.0.0',
   }
 };
 fs.writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2));
