@@ -25,6 +25,7 @@ resource "aws_lambda_function" "api" {
       NODE_ENV         = "production"
       AUTH0_DOMAIN     = var.auth0_domain
       AUTH0_AUDIENCE   = var.auth0_audience
+      DYNAMODB_TABLE   = aws_dynamodb_table.budget_data.name
     }
   }
 
