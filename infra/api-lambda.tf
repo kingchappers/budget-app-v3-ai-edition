@@ -58,6 +58,18 @@ resource "aws_apigatewayv2_route" "api_get" {
   target    = "integrations/${aws_apigatewayv2_integration.api_lambda.id}"
 }
 
+resource "aws_apigatewayv2_route" "api_delete" {
+  api_id    = aws_apigatewayv2_api.app.id
+  route_key = "DELETE /api/{proxy+}"
+  target    = "integrations/${aws_apigatewayv2_integration.api_lambda.id}"
+}
+
+resource "aws_apigatewayv2_route" "api_put" {
+  api_id    = aws_apigatewayv2_api.app.id
+  route_key = "PUT /api/{proxy+}"
+  target    = "integrations/${aws_apigatewayv2_integration.api_lambda.id}"
+}
+
 # Lambda permission for API Gateway to invoke API Lambda
 resource "aws_lambda_permission" "api_gateway_api" {
   statement_id  = "AllowAPIGatewayInvokeApi"
