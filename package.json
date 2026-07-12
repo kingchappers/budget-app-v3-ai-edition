@@ -6,7 +6,9 @@
     "build": "react-router build && node scripts/inject-handler.cjs && node scripts/build-api-handler.cjs",
     "dev": "react-router dev",
     "start": "react-router-serve ./build/server/index.js",
-    "typecheck": "react-router typegen && tsc"
+    "typecheck": "react-router typegen && tsc",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@auth0/auth0-react": "^2.8.0",
@@ -33,13 +35,15 @@
     "@types/node": "^22",
     "@types/react": "^19.1.13",
     "@types/react-dom": "^19.1.9",
+    "@vitest/coverage-v8": "^4.1.10",
     "postcss": "^8.5.16",
     "postcss-preset-mantine": "^1.18.0",
     "postcss-simple-vars": "^7.0.1",
     "tailwindcss": "^4.1.13",
     "typescript": "^5.9.2",
     "vite": "^7.3.6",
-    "vite-tsconfig-paths": "^5.1.4"
+    "vite-tsconfig-paths": "^5.1.4",
+    "vitest": "^4.1.10"
   },
   "resolutions": {
     "lodash": "^4.18.0",
