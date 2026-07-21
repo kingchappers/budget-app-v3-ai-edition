@@ -35,8 +35,21 @@ jobs:
         cache: 'yarn'
     - run: yarn install
 
-    - name: Audit dependencies
-      run: yarn audit --level high
+    - name: Audit dependencies (fail on high/critical)
+      run: |
+        set -uo pipefail
+        # yarn v1's `audit` exit code is a severity bitmask that ignores
+        # `--level`, so any low/moderate advisory fails a `--level high` gate.
+        # Parse the JSON summary instead and gate only on high/critical.
+        audit_json=$(yarn audit --json 2>/dev/null || true)
+        echo "$audit_json" | jq -r 'select(.type=="auditAdvisory") | .data.advisory | "\(.severity)\t\(.module_name)\t\(.title)"'
+        high=$(echo "$audit_json" | jq -r 'select(.type=="auditSummary") | .data.vulnerabilities.high // 0')
+        critical=$(echo "$audit_json" | jq -r 'select(.type=="auditSummary") | .data.vulnerabilities.critical // 0')
+        echo "High: ${high:-0}, Critical: ${critical:-0}"
+        if [ "${high:-0}" -gt 0 ] || [ "${critical:-0}" -gt 0 ]; then
+          echo "::error::Found ${high} high and ${critical} critical severity vulnerabilities"
+          exit 1
+        fi
     - name: Build app with Auth0 config
       env:
         VITE_AUTH0_DOMAIN: ${{ secrets.AUTH0_DOMAIN }}
