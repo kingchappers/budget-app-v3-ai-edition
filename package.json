@@ -6,7 +6,9 @@
     "build": "react-router build && node scripts/inject-handler.cjs && node scripts/build-api-handler.cjs",
     "dev": "react-router dev",
     "start": "react-router-serve ./build/server/index.js",
-    "typecheck": "react-router typegen && tsc"
+    "typecheck": "react-router typegen && tsc",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@auth0/auth0-react": "^2.8.0",
@@ -27,19 +29,23 @@
     "react-router": "^7.18.1"
   },
   "devDependencies": {
+    "@aws-sdk/client-dynamodb": "^3.1085.0",
+    "@aws-sdk/lib-dynamodb": "^3.1085.0",
     "@react-router/dev": "^7.18.1",
     "@tailwindcss/vite": "^4.1.13",
     "@types/aws-lambda": "^8.10.159",
     "@types/node": "^22",
     "@types/react": "^19.1.13",
     "@types/react-dom": "^19.1.9",
+    "@vitest/coverage-v8": "^4.1.10",
     "postcss": "^8.5.16",
     "postcss-preset-mantine": "^1.18.0",
     "postcss-simple-vars": "^7.0.1",
     "tailwindcss": "^4.1.13",
     "typescript": "^5.9.2",
     "vite": "^7.3.6",
-    "vite-tsconfig-paths": "^5.1.4"
+    "vite-tsconfig-paths": "^5.1.4",
+    "vitest": "^4.1.10"
   },
   "resolutions": {
     "lodash": "^4.18.0",
@@ -47,7 +53,9 @@
     "minimatch": "^9.0.9",
     "picomatch": "^4.0.4",
     "rollup": "^4.59.0",
-    "brace-expansion": "^2.0.3",
+    "brace-expansion": "^2.1.2",
+    "morgan": "^1.11.0",
+    "body-parser": "^1.20.6",
     "path-to-regexp": "^0.1.13",
     "@babel/core": "^7.29.6",
     "vite": "^7.3.6",

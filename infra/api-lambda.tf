@@ -25,6 +25,7 @@ resource "aws_lambda_function" "api" {
       NODE_ENV         = "production"
       AUTH0_DOMAIN     = var.auth0_domain
       AUTH0_AUDIENCE   = var.auth0_audience
+      DYNAMODB_TABLE   = aws_dynamodb_table.budget_data.name
     }
   }
 
@@ -54,6 +55,18 @@ resource "aws_apigatewayv2_route" "api" {
 resource "aws_apigatewayv2_route" "api_get" {
   api_id    = aws_apigatewayv2_api.app.id
   route_key = "GET /api/{proxy+}"
+  target    = "integrations/${aws_apigatewayv2_integration.api_lambda.id}"
+}
+
+resource "aws_apigatewayv2_route" "api_delete" {
+  api_id    = aws_apigatewayv2_api.app.id
+  route_key = "DELETE /api/{proxy+}"
+  target    = "integrations/${aws_apigatewayv2_integration.api_lambda.id}"
+}
+
+resource "aws_apigatewayv2_route" "api_put" {
+  api_id    = aws_apigatewayv2_api.app.id
+  route_key = "PUT /api/{proxy+}"
   target    = "integrations/${aws_apigatewayv2_integration.api_lambda.id}"
 }
 
