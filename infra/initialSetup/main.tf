@@ -322,6 +322,30 @@ data "aws_iam_policy_document" "github_iam_policy_document" {
     resources = ["*"]
   }
 
+  # DynamoDB table management for the application data store (INFRA-01)
+  # Scoped to the app table; covers create/update/delete plus the describe
+  # calls the AWS provider makes on read-back (PITR, TTL, tags).
+  statement {
+    sid    = "DynamoDBTableManagement"
+    effect = "Allow"
+    actions = [
+      "dynamodb:CreateTable",
+      "dynamodb:DeleteTable",
+      "dynamodb:DescribeTable",
+      "dynamodb:UpdateTable",
+      "dynamodb:DescribeContinuousBackups",
+      "dynamodb:UpdateContinuousBackups",
+      "dynamodb:DescribeTimeToLive",
+      "dynamodb:UpdateTimeToLive",
+      "dynamodb:ListTagsOfResource",
+      "dynamodb:TagResource",
+      "dynamodb:UntagResource",
+    ]
+    resources = [
+      "arn:aws:dynamodb:${var.aws_region}:${data.aws_caller_identity.current.account_id}:table/${var.app_name}-*"
+    ]
+  }
+
   # S3 state bucket access (read state, write plan/apply results)
   statement {
     sid    = "TerraformStateAccess"
