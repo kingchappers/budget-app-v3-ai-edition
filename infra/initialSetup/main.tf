@@ -229,6 +229,22 @@ data "aws_iam_policy_document" "github_iam_policy_document" {
     }
   }
 
+  # Inline role policies on the Lambda execution role (e.g. DynamoDB data access)
+  # TEMPORARY: Includes both old and new names for migration
+  statement {
+    sid    = "IAMInlineRolePolicy"
+    effect = "Allow"
+    actions = [
+      "iam:PutRolePolicy",
+      "iam:GetRolePolicy",
+      "iam:DeleteRolePolicy",
+    ]
+    resources = [
+      "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/budget-app-*",
+      "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${var.app_name}-*"
+    ]
+  }
+
   # PassRole for Lambda to assume execution role
   # TEMPORARY: Includes both old and new names for migration
   statement {
