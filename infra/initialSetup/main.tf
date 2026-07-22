@@ -51,6 +51,8 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "terraform_state" 
       sse_algorithm = "AES256"
     }
     bucket_key_enabled = true
+    # Keep SSE-C uploads blocked (matches live state; avoids provider-6.x drift)
+    blocked_encryption_types = ["SSE-C"]
   }
 }
 
