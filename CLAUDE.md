@@ -13,6 +13,8 @@ yarn install          # Install dependencies
 yarn dev              # Start dev server with hot reload
 yarn build            # Three-stage build: react-router build → inject static handler → compile API handler
 yarn typecheck        # Generate route types + run tsc
+yarn test             # Run Vitest suite (API handlers)
+yarn test:watch       # Vitest in watch mode
 ```
 
 **Build requires Auth0 env vars** (set in `.env` or exported):
@@ -23,7 +25,7 @@ yarn typecheck        # Generate route types + run tsc
 cd infra && tofu apply
 ```
 
-No test framework is configured yet.
+Tests use **Vitest** (`src/api/__tests__/`), covering the API router and handlers. CI runs `yarn test` before the build.
 
 ## Architecture
 

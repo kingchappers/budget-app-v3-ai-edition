@@ -50,13 +50,15 @@ jobs:
           echo "::error::Found ${high} high and ${critical} critical severity vulnerabilities"
           exit 1
         fi
+    - name: Run tests
+      run: yarn test
+
     - name: Build app with Auth0 config
       env:
         VITE_AUTH0_DOMAIN: ${{ secrets.AUTH0_DOMAIN }}
         VITE_AUTH0_CLIENT_ID: ${{ secrets.AUTH0_CLIENT_ID }}
         VITE_AUTH0_AUDIENCE: ${{ secrets.AUTH0_AUDIENCE }}
       run: yarn run build
-    # - run: yarn test
 
     - name: Configure AWS Credentials
       uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7  # v6.0.0
