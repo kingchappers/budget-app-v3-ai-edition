@@ -15,7 +15,7 @@ vi.mock('@aws-sdk/lib-dynamodb', () => ({
   DeleteCommand: vi.fn(function(i: unknown) { return i; }),
 }));
 
-import { getTransactions, createTransaction, deleteTransaction } from '../transactions';
+import { getTransactions, createTransaction, deleteTransaction, validateTransactionInput } from '../transactions';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 
 function makeEvent(opts: {
@@ -136,6 +136,43 @@ describe('createTransaction', () => {
       body: { amount: 480, type: 'EXPENSE', categoryId: 'cat-dining', description: 'x'.repeat(201), date: '2026-07-15' },
     }), 'user-1', {});
     expect(res.statusCode).toBe(400);
+  });
+});
+
+describe('validateTransactionInput', () => {
+  const valid = { amount: 480, type: 'EXPENSE', categoryId: 'cat-dining', description: 'Pret', date: '2026-07-15' };
+
+  it('accepts a valid body', () => {
+    const res = validateTransactionInput(valid);
+    expect(res.ok).toBe(true);
+    if (res.ok) expect(res.value.amount).toBe(480);
+  });
+
+  it('rejects a non-integer amount', () => {
+    const res = validateTransactionInput({ ...valid, amount: 4.8 });
+    expect(res.ok).toBe(false);
+  });
+
+  it('rejects a zero amount', () => {
+    const res = validateTransactionInput({ ...valid, amount: 0 });
+    expect(res.ok).toBe(false);
+  });
+
+  it('rejects an unknown type', () => {
+    const res = validateTransactionInput({ ...valid, type: 'NOPE' });
+    expect(res.ok).toBe(false);
+  });
+
+  it('rejects a malformed date', () => {
+    const res = validateTransactionInput({ ...valid, date: '15-07-2026' });
+    expect(res.ok).toBe(false);
+  });
+
+  it('defaults a missing description to empty string', () => {
+    const { description, ...noDesc } = valid;
+    const res = validateTransactionInput(noDesc);
+    expect(res.ok).toBe(true);
+    if (res.ok) expect(res.value.description).toBe('');
   });
 });
 
