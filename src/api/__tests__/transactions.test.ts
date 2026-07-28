@@ -121,6 +121,22 @@ describe('createTransaction', () => {
     expect(res.statusCode).toBe(400);
     expect(mockSend).not.toHaveBeenCalled();
   });
+
+  it('creates a transaction with no description', async () => {
+    mockSend.mockResolvedValueOnce({});
+    const res = await createTransaction(makeEvent({
+      body: { amount: 480, type: 'EXPENSE', categoryId: 'cat-dining', date: '2026-07-15' },
+    }), 'user-1', {});
+    expect(res.statusCode).toBe(201);
+    expect(JSON.parse(res.body).transaction.description).toBe('');
+  });
+
+  it('still rejects a description longer than 200 characters', async () => {
+    const res = await createTransaction(makeEvent({
+      body: { amount: 480, type: 'EXPENSE', categoryId: 'cat-dining', description: 'x'.repeat(201), date: '2026-07-15' },
+    }), 'user-1', {});
+    expect(res.statusCode).toBe(400);
+  });
 });
 
 describe('deleteTransaction', () => {

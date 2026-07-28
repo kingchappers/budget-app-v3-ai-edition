@@ -57,8 +57,10 @@ export async function createTransaction(
   if (!categoryId || typeof categoryId !== 'string' || categoryId.length > 100) {
     return err(400, 'categoryId is required');
   }
-  if (!description || typeof description !== 'string' || description.trim().length === 0 || description.length > 200) {
-    return err(400, 'description must be a non-empty string of at most 200 characters');
+  if (description !== undefined && description !== null) {
+    if (typeof description !== 'string' || description.length > 200) {
+      return err(400, 'description must be a string of at most 200 characters');
+    }
   }
   if (!date || typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
     return err(400, 'date must be in YYYY-MM-DD format');
@@ -73,7 +75,7 @@ export async function createTransaction(
     amount,
     type: type as Transaction['type'],
     categoryId: categoryId as string,
-    description: description.trim(),
+    description: typeof description === 'string' ? description.trim() : '',
     date,
     createdAt: new Date().toISOString(),
   };
