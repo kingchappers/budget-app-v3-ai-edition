@@ -3,14 +3,7 @@ import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { docClient, TABLE, pk, targetSk } from './db';
 import { SECURITY_HEADERS, VALID_PERIODS } from './constants';
 import type { CategoryTarget, ApiResponse } from './types';
-
-function ok(body: object): ApiResponse {
-  return { statusCode: 200, headers: SECURITY_HEADERS, body: JSON.stringify(body) };
-}
-
-function err(status: number, message: string): ApiResponse {
-  return { statusCode: status, headers: SECURITY_HEADERS, body: JSON.stringify({ error: message }) };
-}
+import { ok, err } from './http';
 
 export async function getTargets(
   _event: APIGatewayProxyEventV2,

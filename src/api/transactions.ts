@@ -3,14 +3,7 @@ import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { docClient, TABLE, pk, txnSk } from './db';
 import { SECURITY_HEADERS, VALID_TRANSACTION_TYPES } from './constants';
 import type { Transaction, ApiResponse } from './types';
-
-function ok(body: object): ApiResponse {
-  return { statusCode: 200, headers: SECURITY_HEADERS, body: JSON.stringify(body) };
-}
-
-function err(status: number, message: string): ApiResponse {
-  return { statusCode: status, headers: SECURITY_HEADERS, body: JSON.stringify({ error: message }) };
-}
+import { ok, err } from './http';
 
 export async function getTransactions(
   event: APIGatewayProxyEventV2,
