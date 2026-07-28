@@ -56,4 +56,26 @@ describe('router', () => {
     const res = await router.dispatch(makeEvent('POST', '/api/categories'), 'user-1');
     expect(res.statusCode).toBe(404);
   });
+
+  it('routes PUT /api/transactions/{yearMonth}/{transactionId} with both params', async () => {
+    const router = createRouter();
+    let captured: Record<string, string> | null = null;
+    router.put('/api/transactions/{yearMonth}/{transactionId}', async (_e, _u, p) => {
+      captured = p;
+      return { statusCode: 200, headers: {}, body: '' };
+    });
+    await router.dispatch(makeEvent('PUT', '/api/transactions/2026-07/txn-1'), 'user-1');
+    expect(captured).toEqual({ yearMonth: '2026-07', transactionId: 'txn-1' });
+  });
+
+  it('routes POST /api/categories/{categoryId}/reassign', async () => {
+    const router = createRouter();
+    let captured: Record<string, string> | null = null;
+    router.post('/api/categories/{categoryId}/reassign', async (_e, _u, p) => {
+      captured = p;
+      return { statusCode: 200, headers: {}, body: '' };
+    });
+    await router.dispatch(makeEvent('POST', '/api/categories/cat-custom/reassign'), 'user-1');
+    expect(captured).toEqual({ categoryId: 'cat-custom' });
+  });
 });

@@ -1,16 +1,9 @@
-import { QueryCommand, PutCommand, DeleteCommand } from '@aws-sdk/lib-dynamodb';
+import { QueryCommand, PutCommand, DeleteCommand, GetCommand, TransactWriteCommand } from '@aws-sdk/lib-dynamodb';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { docClient, TABLE, pk, txnSk } from './db';
 import { SECURITY_HEADERS, VALID_TRANSACTION_TYPES } from './constants';
 import type { Transaction, ApiResponse } from './types';
-
-function ok(body: object): ApiResponse {
-  return { statusCode: 200, headers: SECURITY_HEADERS, body: JSON.stringify(body) };
-}
-
-function err(status: number, message: string): ApiResponse {
-  return { statusCode: status, headers: SECURITY_HEADERS, body: JSON.stringify({ error: message }) };
-}
+import { ok, err } from './http';
 
 export async function getTransactions(
   event: APIGatewayProxyEventV2,
@@ -41,6 +34,49 @@ export async function getTransactions(
   return ok({ transactions: result.Items || [] });
 }
 
+export interface ValidTransactionInput {
+  amount: number;
+  type: Transaction['type'];
+  categoryId: string;
+  description: string;
+  date: string;
+}
+
+export function validateTransactionInput(
+  body: Record<string, unknown>,
+): { ok: true; value: ValidTransactionInput } | { ok: false; message: string } {
+  const { amount, type, categoryId, description, date } = body;
+
+  if (typeof amount !== 'number' || !Number.isInteger(amount) || amount <= 0) {
+    return { ok: false, message: 'amount must be a positive integer representing pence/cents' };
+  }
+  if (!type || !VALID_TRANSACTION_TYPES.has(type as string)) {
+    return { ok: false, message: 'type must be EXPENSE, INCOME, INVESTMENT_IN, or INVESTMENT_OUT' };
+  }
+  if (!categoryId || typeof categoryId !== 'string' || categoryId.length > 100) {
+    return { ok: false, message: 'categoryId is required' };
+  }
+  if (description !== undefined && description !== null) {
+    if (typeof description !== 'string' || description.length > 200) {
+      return { ok: false, message: 'description must be a string of at most 200 characters' };
+    }
+  }
+  if (!date || typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    return { ok: false, message: 'date must be in YYYY-MM-DD format' };
+  }
+
+  return {
+    ok: true,
+    value: {
+      amount,
+      type: type as Transaction['type'],
+      categoryId,
+      description: typeof description === 'string' ? description.trim() : '',
+      date,
+    },
+  };
+}
+
 export async function createTransaction(
   event: APIGatewayProxyEventV2,
   userId: string,
@@ -53,23 +89,11 @@ export async function createTransaction(
     return err(400, 'Invalid JSON body');
   }
 
-  const { amount, type, categoryId, description, date } = body;
-
-  if (typeof amount !== 'number' || !Number.isInteger(amount) || amount <= 0) {
-    return err(400, 'amount must be a positive integer representing pence/cents');
+  const validation = validateTransactionInput(body);
+  if (validation.ok === false) {
+    return err(400, validation.message);
   }
-  if (!type || !VALID_TRANSACTION_TYPES.has(type as string)) {
-    return err(400, 'type must be EXPENSE, INCOME, INVESTMENT_GAIN, or INVESTMENT_LOSS');
-  }
-  if (!categoryId || typeof categoryId !== 'string' || categoryId.length > 100) {
-    return err(400, 'categoryId is required');
-  }
-  if (!description || typeof description !== 'string' || description.trim().length === 0 || description.length > 200) {
-    return err(400, 'description must be a non-empty string of at most 200 characters');
-  }
-  if (!date || typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-    return err(400, 'date must be in YYYY-MM-DD format');
-  }
+  const { amount, type, categoryId, description, date } = validation.value;
 
   const yearMonth = date.slice(0, 7);
   const transactionId = crypto.randomUUID();
@@ -78,9 +102,9 @@ export async function createTransaction(
     transactionId,
     yearMonth,
     amount,
-    type: type as Transaction['type'],
-    categoryId: categoryId as string,
-    description: description.trim(),
+    type,
+    categoryId,
+    description,
     date,
     createdAt: new Date().toISOString(),
   };
@@ -113,4 +137,70 @@ export async function deleteTransaction(
   }));
 
   return { statusCode: 204, headers: SECURITY_HEADERS, body: '' };
+}
+
+export async function updateTransaction(
+  event: APIGatewayProxyEventV2,
+  userId: string,
+  params: Record<string, string>,
+): Promise<ApiResponse> {
+  const { yearMonth, transactionId } = params;
+
+  if (!yearMonth || !/^\d{4}-\d{2}$/.test(yearMonth)) {
+    return err(400, 'yearMonth must be in YYYY-MM format');
+  }
+  if (!transactionId) {
+    return err(400, 'transactionId is required');
+  }
+
+  let body: Record<string, unknown>;
+  try {
+    body = JSON.parse(event.body || '{}');
+  } catch {
+    return err(400, 'Invalid JSON body');
+  }
+
+  const validation = validateTransactionInput(body);
+  if (validation.ok === false) {
+    return err(400, validation.message);
+  }
+  const { amount, type, categoryId, description, date } = validation.value;
+
+  const existingResult = await docClient.send(new GetCommand({
+    TableName: TABLE,
+    Key: { PK: pk(userId), SK: txnSk(yearMonth, transactionId) },
+  }));
+
+  const existing = existingResult.Item as Transaction | undefined;
+  if (!existing) {
+    return err(404, 'Transaction not found');
+  }
+
+  const newYearMonth = date.slice(0, 7);
+  const transaction: Transaction = {
+    transactionId,
+    yearMonth: newYearMonth,
+    amount,
+    type,
+    categoryId,
+    description,
+    date,
+    createdAt: existing.createdAt,
+  };
+
+  if (newYearMonth === yearMonth) {
+    await docClient.send(new PutCommand({
+      TableName: TABLE,
+      Item: { PK: pk(userId), SK: txnSk(yearMonth, transactionId), ...transaction },
+    }));
+  } else {
+    await docClient.send(new TransactWriteCommand({
+      TransactItems: [
+        { Delete: { TableName: TABLE, Key: { PK: pk(userId), SK: txnSk(yearMonth, transactionId) } } },
+        { Put: { TableName: TABLE, Item: { PK: pk(userId), SK: txnSk(newYearMonth, transactionId), ...transaction } } },
+      ],
+    }));
+  }
+
+  return ok({ transaction });
 }

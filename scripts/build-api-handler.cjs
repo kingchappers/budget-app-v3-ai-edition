@@ -11,7 +11,7 @@ if (!fs.existsSync(apiBuildDir)) {
 // Compile TypeScript handler to JavaScript
 console.log('Compiling API handler...');
 execSync(
-  'tsc api-handler.ts --outDir build/api --module commonjs --skipLibCheck --target es2020 --resolveJsonModule --esModuleInterop',
+  'tsc api-handler.ts --outDir build/api --module commonjs --skipLibCheck --strict --target es2020 --resolveJsonModule --esModuleInterop',
   { cwd: path.join(__dirname, '..'), stdio: 'inherit' }
 );
 

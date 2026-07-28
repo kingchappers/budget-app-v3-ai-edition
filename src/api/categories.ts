@@ -4,14 +4,7 @@ import { docClient, TABLE, pk, catSk } from './db';
 import { DEFAULT_CATEGORIES, DEFAULT_CATEGORY_IDS } from './defaults';
 import { SECURITY_HEADERS, VALID_CATEGORY_TYPES } from './constants';
 import type { Category, ApiResponse } from './types';
-
-function ok(body: object): ApiResponse {
-  return { statusCode: 200, headers: SECURITY_HEADERS, body: JSON.stringify(body) };
-}
-
-function err(status: number, message: string): ApiResponse {
-  return { statusCode: status, headers: SECURITY_HEADERS, body: JSON.stringify({ error: message }) };
-}
+import { ok, err } from './http';
 
 export async function getCategories(
   _event: APIGatewayProxyEventV2,

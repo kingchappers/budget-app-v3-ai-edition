@@ -8,7 +8,7 @@ export const SECURITY_HEADERS: Record<string, string> = {
 };
 
 export const VALID_TRANSACTION_TYPES = new Set([
-  'EXPENSE', 'INCOME', 'INVESTMENT_GAIN', 'INVESTMENT_LOSS',
+  'EXPENSE', 'INCOME', 'INVESTMENT_IN', 'INVESTMENT_OUT',
 ]);
 
 export const VALID_CATEGORY_TYPES = new Set(['EXPENSE', 'INCOME', 'INVESTMENT']);
