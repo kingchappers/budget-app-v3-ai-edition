@@ -90,7 +90,7 @@ export async function createTransaction(
   }
 
   const validation = validateTransactionInput(body);
-  if (!validation.ok) {
+  if (validation.ok === false) {
     return err(400, validation.message);
   }
   const { amount, type, categoryId, description, date } = validation.value;
@@ -161,7 +161,7 @@ export async function updateTransaction(
   }
 
   const validation = validateTransactionInput(body);
-  if (!validation.ok) {
+  if (validation.ok === false) {
     return err(400, validation.message);
   }
   const { amount, type, categoryId, description, date } = validation.value;

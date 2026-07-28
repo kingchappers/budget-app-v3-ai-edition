@@ -4,8 +4,9 @@ import type { APIGatewayProxyHandlerV2 } from 'aws-lambda';
 import { createRouter } from './src/api/router';
 import { SECURITY_HEADERS } from './src/api/constants';
 import { getCategories, createCategory, deleteCategory } from './src/api/categories';
-import { getTransactions, createTransaction, deleteTransaction } from './src/api/transactions';
+import { getTransactions, createTransaction, deleteTransaction, updateTransaction } from './src/api/transactions';
 import { getTargets, upsertTarget, deleteTarget } from './src/api/targets';
+import { reassignCategory } from './src/api/reassign';
 
 const AUTH0_DOMAIN = process.env.AUTH0_DOMAIN || '';
 const AUTH0_AUDIENCE = process.env.AUTH0_AUDIENCE || '';
@@ -25,11 +26,13 @@ function getKey(header: any, callback: any) {
 
 const router = createRouter();
 router.get('/api/categories', getCategories);
+router.post('/api/categories/{categoryId}/reassign', reassignCategory);
 router.post('/api/categories', createCategory);
 router.delete('/api/categories/{categoryId}', deleteCategory);
 router.get('/api/transactions', getTransactions);
 router.post('/api/transactions', createTransaction);
 router.delete('/api/transactions/{yearMonth}/{transactionId}', deleteTransaction);
+router.put('/api/transactions/{yearMonth}/{transactionId}', updateTransaction);
 router.get('/api/targets', getTargets);
 router.put('/api/targets/{categoryId}', upsertTarget);
 router.delete('/api/targets/{categoryId}', deleteTarget);
