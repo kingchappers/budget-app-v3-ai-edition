@@ -1,4 +1,4 @@
-import { QueryCommand, PutCommand, DeleteCommand } from '@aws-sdk/lib-dynamodb';
+import { QueryCommand, PutCommand, DeleteCommand, GetCommand, TransactWriteCommand } from '@aws-sdk/lib-dynamodb';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { docClient, TABLE, pk, txnSk } from './db';
 import { SECURITY_HEADERS, VALID_TRANSACTION_TYPES } from './constants';
@@ -137,4 +137,70 @@ export async function deleteTransaction(
   }));
 
   return { statusCode: 204, headers: SECURITY_HEADERS, body: '' };
+}
+
+export async function updateTransaction(
+  event: APIGatewayProxyEventV2,
+  userId: string,
+  params: Record<string, string>,
+): Promise<ApiResponse> {
+  const { yearMonth, transactionId } = params;
+
+  if (!yearMonth || !/^\d{4}-\d{2}$/.test(yearMonth)) {
+    return err(400, 'yearMonth must be in YYYY-MM format');
+  }
+  if (!transactionId) {
+    return err(400, 'transactionId is required');
+  }
+
+  let body: Record<string, unknown>;
+  try {
+    body = JSON.parse(event.body || '{}');
+  } catch {
+    return err(400, 'Invalid JSON body');
+  }
+
+  const validation = validateTransactionInput(body);
+  if (!validation.ok) {
+    return err(400, validation.message);
+  }
+  const { amount, type, categoryId, description, date } = validation.value;
+
+  const existingResult = await docClient.send(new GetCommand({
+    TableName: TABLE,
+    Key: { PK: pk(userId), SK: txnSk(yearMonth, transactionId) },
+  }));
+
+  const existing = existingResult.Item as Transaction | undefined;
+  if (!existing) {
+    return err(404, 'Transaction not found');
+  }
+
+  const newYearMonth = date.slice(0, 7);
+  const transaction: Transaction = {
+    transactionId,
+    yearMonth: newYearMonth,
+    amount,
+    type,
+    categoryId,
+    description,
+    date,
+    createdAt: existing.createdAt,
+  };
+
+  if (newYearMonth === yearMonth) {
+    await docClient.send(new PutCommand({
+      TableName: TABLE,
+      Item: { PK: pk(userId), SK: txnSk(yearMonth, transactionId), ...transaction },
+    }));
+  } else {
+    await docClient.send(new TransactWriteCommand({
+      TransactItems: [
+        { Delete: { TableName: TABLE, Key: { PK: pk(userId), SK: txnSk(yearMonth, transactionId) } } },
+        { Put: { TableName: TABLE, Item: { PK: pk(userId), SK: txnSk(newYearMonth, transactionId), ...transaction } } },
+      ],
+    }));
+  }
+
+  return ok({ transaction });
 }

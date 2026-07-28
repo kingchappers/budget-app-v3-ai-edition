@@ -13,9 +13,11 @@ vi.mock('@aws-sdk/lib-dynamodb', () => ({
   QueryCommand: vi.fn(function(i: unknown) { return i; }),
   PutCommand: vi.fn(function(i: unknown) { return i; }),
   DeleteCommand: vi.fn(function(i: unknown) { return i; }),
+  GetCommand: vi.fn(function(i: unknown) { return i; }),
+  TransactWriteCommand: vi.fn(function(i: unknown) { return i; }),
 }));
 
-import { getTransactions, createTransaction, deleteTransaction, validateTransactionInput } from '../transactions';
+import { getTransactions, createTransaction, deleteTransaction, updateTransaction, validateTransactionInput } from '../transactions';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 
 function makeEvent(opts: {
@@ -194,6 +196,68 @@ describe('deleteTransaction', () => {
 
   it('returns 400 when transactionId is missing', async () => {
     const res = await deleteTransaction(makeEvent(), 'user-1', { yearMonth: '2025-01' });
+    expect(res.statusCode).toBe(400);
+  });
+});
+
+describe('updateTransaction', () => {
+  beforeEach(() => { mockSend.mockReset(); });
+
+  const existing = {
+    transactionId: 'txn-1', yearMonth: '2026-07', amount: 480, type: 'EXPENSE',
+    categoryId: 'cat-dining', description: 'Pret', date: '2026-07-15',
+    createdAt: '2026-07-15T09:00:00.000Z',
+  };
+  const params = { yearMonth: '2026-07', transactionId: 'txn-1' };
+
+  it('updates a transaction within the same month', async () => {
+    mockSend.mockResolvedValueOnce({ Item: existing });
+    mockSend.mockResolvedValueOnce({});
+    const res = await updateTransaction(makeEvent({
+      body: { amount: 520, type: 'EXPENSE', categoryId: 'cat-dining', description: 'Pret coffee', date: '2026-07-16' },
+    }), 'user-1', params);
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.transaction.amount).toBe(520);
+    expect(body.transaction.transactionId).toBe('txn-1');
+    expect(body.transaction.createdAt).toBe('2026-07-15T09:00:00.000Z');
+  });
+
+  it('returns 404 when the transaction does not exist', async () => {
+    mockSend.mockResolvedValueOnce({});
+    const res = await updateTransaction(makeEvent({
+      body: { amount: 520, type: 'EXPENSE', categoryId: 'cat-dining', description: 'x', date: '2026-07-16' },
+    }), 'user-1', params);
+    expect(res.statusCode).toBe(404);
+  });
+
+  it('moves the item transactionally when the month changes', async () => {
+    mockSend.mockResolvedValueOnce({ Item: existing });
+    mockSend.mockResolvedValueOnce({});
+    const res = await updateTransaction(makeEvent({
+      body: { amount: 480, type: 'EXPENSE', categoryId: 'cat-dining', description: 'Pret', date: '2026-08-02' },
+    }), 'user-1', params);
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body).transaction.yearMonth).toBe('2026-08');
+
+    const writeArg = mockSend.mock.calls[1][0];
+    expect(writeArg.TransactItems).toHaveLength(2);
+    expect(writeArg.TransactItems[0].Delete.Key.SK).toBe('TXN#2026-07#txn-1');
+    expect(writeArg.TransactItems[1].Put.Item.SK).toBe('TXN#2026-08#txn-1');
+  });
+
+  it('returns 400 for an invalid amount', async () => {
+    const res = await updateTransaction(makeEvent({
+      body: { amount: -5, type: 'EXPENSE', categoryId: 'cat-dining', description: 'x', date: '2026-07-16' },
+    }), 'user-1', params);
+    expect(res.statusCode).toBe(400);
+    expect(mockSend).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for a malformed yearMonth param', async () => {
+    const res = await updateTransaction(makeEvent({
+      body: { amount: 480, type: 'EXPENSE', categoryId: 'cat-dining', description: 'x', date: '2026-07-16' },
+    }), 'user-1', { yearMonth: '07-2026', transactionId: 'txn-1' });
     expect(res.statusCode).toBe(400);
   });
 });
