@@ -105,6 +105,22 @@ describe('createTransaction', () => {
     );
     expect(res.statusCode).toBe(400);
   });
+
+  it('accepts INVESTMENT_IN as a transaction type', async () => {
+    mockSend.mockResolvedValueOnce({});
+    const res = await createTransaction(makeEvent({
+      body: { amount: 30000, type: 'INVESTMENT_IN', categoryId: 'cat-stocks', description: 'Monthly contribution', date: '2026-07-15' },
+    }), 'user-1', {});
+    expect(res.statusCode).toBe(201);
+  });
+
+  it('rejects the old INVESTMENT_GAIN type', async () => {
+    const res = await createTransaction(makeEvent({
+      body: { amount: 30000, type: 'INVESTMENT_GAIN', categoryId: 'cat-stocks', description: 'Old type', date: '2026-07-15' },
+    }), 'user-1', {});
+    expect(res.statusCode).toBe(400);
+    expect(mockSend).not.toHaveBeenCalled();
+  });
 });
 
 describe('deleteTransaction', () => {

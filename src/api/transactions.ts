@@ -52,7 +52,7 @@ export async function createTransaction(
     return err(400, 'amount must be a positive integer representing pence/cents');
   }
   if (!type || !VALID_TRANSACTION_TYPES.has(type as string)) {
-    return err(400, 'type must be EXPENSE, INCOME, INVESTMENT_GAIN, or INVESTMENT_LOSS');
+    return err(400, 'type must be EXPENSE, INCOME, INVESTMENT_IN, or INVESTMENT_OUT');
   }
   if (!categoryId || typeof categoryId !== 'string' || categoryId.length > 100) {
     return err(400, 'categoryId is required');

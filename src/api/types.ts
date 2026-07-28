@@ -1,4 +1,4 @@
-export type TransactionType = 'EXPENSE' | 'INCOME' | 'INVESTMENT_GAIN' | 'INVESTMENT_LOSS';
+export type TransactionType = 'EXPENSE' | 'INCOME' | 'INVESTMENT_IN' | 'INVESTMENT_OUT';
 
 export type CategoryType = 'EXPENSE' | 'INCOME' | 'INVESTMENT';
 
