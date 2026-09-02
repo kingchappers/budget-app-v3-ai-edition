@@ -13,6 +13,13 @@ import type { Route } from "./+types/root";
 import "./app.css";
 
 import { ColorSchemeScript, MantineProvider, mantineHtmlProps, createTheme, virtualColor } from '@mantine/core';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: { staleTime: 30_000, retry: 1 },
+  },
+});
 
 const theme = createTheme({
   colors: {
@@ -101,7 +108,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <Links />
       </head>
       <body>
-        <MantineProvider defaultColorScheme="auto" theme={theme}>{children}</MantineProvider>
+        <QueryClientProvider client={queryClient}>
+          <MantineProvider defaultColorScheme="auto" theme={theme}>{children}</MantineProvider>
+        </QueryClientProvider>
         <ScrollRestoration />
         <Scripts />
       </body>
