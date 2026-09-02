@@ -1,0 +1,30 @@
+export type TransactionType = 'EXPENSE' | 'INCOME' | 'INVESTMENT_IN' | 'INVESTMENT_OUT';
+export type CategoryType = 'EXPENSE' | 'INCOME' | 'INVESTMENT';
+export type TargetPeriod = 'MONTHLY' | 'WEEKLY';
+
+export interface Category {
+  categoryId: string;
+  name: string;
+  type: CategoryType;
+  icon: string;
+  isDefault: boolean;
+  createdAt: string;
+}
+
+export interface Transaction {
+  transactionId: string;
+  yearMonth: string;
+  amount: number;
+  type: TransactionType;
+  categoryId: string;
+  description: string;
+  date: string;
+  createdAt: string;
+}
+
+export interface CategoryTarget {
+  categoryId: string;
+  targetAmount: number;
+  period: TargetPeriod;
+  updatedAt: string;
+}

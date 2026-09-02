@@ -22,7 +22,9 @@ export function useProtectedApi() {
           throw new Error(`API error: ${response.status} ${response.statusText}`);
         }
 
-        return await response.json();
+        if (response.status === 204) return null;
+        const text = await response.text();
+        return text ? JSON.parse(text) : null;
       } catch (error) {
         console.error('Protected API request failed:', error);
         throw error;
