@@ -4,7 +4,7 @@ import { ActionIcon, AppShell, Burger, Flex, Text, NavLink, Group, Paper } from 
 import { Auth0Provider } from '@auth0/auth0-react';
 import Authentication from "../authentication/Authentication";
 import { ApiTest } from '../api/ApiTest';
-import { IconHome2, IconSettings, IconHome, IconList, IconTarget, IconPlus } from '@tabler/icons-react';
+import { IconHome2, IconSettings, IconHome, IconList, IconTarget, IconPlus, IconTag } from '@tabler/icons-react';
 import { NavLink as RouterNavLink, useLocation } from 'react-router';
 import { TransactionSheet } from '../transactions/TransactionSheet';
 import { currentYearMonth } from '~/lib/months';
@@ -88,6 +88,9 @@ export function DefaultLayout({ children }: { children: React.ReactNode }) {
           <NavLink href="/"
             label="Home"
             leftSection={<IconHome2 size={16} stroke={1.5} />} />
+          <NavLink href="/categories"
+            label="Categories"
+            leftSection={<IconTag size={16} stroke={1.5} />} />
           <NavLink href="/test"
             label="Test"
             leftSection={<IconSettings size={16} stroke={1.5} />} />
