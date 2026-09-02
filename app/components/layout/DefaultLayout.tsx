@@ -1,10 +1,42 @@
 import { useDisclosure } from '@mantine/hooks';
-import { AppShell, Burger, Flex, Text, NavLink } from '@mantine/core';
+import { AppShell, Burger, Flex, Text, NavLink, Group, Paper } from '@mantine/core';
 import { Auth0Provider } from '@auth0/auth0-react';
 import Authentication from "../authentication/Authentication";
 import { ApiTest } from '../api/ApiTest';
-import { IconHome2, IconSettings } from '@tabler/icons-react';
-// import { NavLink } from "react-router";
+import { IconHome2, IconSettings, IconHome, IconList, IconTarget } from '@tabler/icons-react';
+import { NavLink as RouterNavLink, useLocation } from 'react-router';
+
+const TABS = [
+  { to: '/', label: 'Home', Icon: IconHome },
+  { to: '/transactions', label: 'Transactions', Icon: IconList },
+  { to: '/targets', label: 'Targets', Icon: IconTarget },
+];
+
+function BottomTabs() {
+  const { pathname } = useLocation();
+  return (
+    <Paper
+      component="nav"
+      withBorder
+      style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 100 }}
+      p="xs"
+    >
+      <Group justify="space-around">
+        {TABS.map(({ to, label, Icon }) => {
+          const active = to === '/' ? pathname === '/' : pathname.startsWith(to);
+          return (
+            <RouterNavLink key={to} to={to} style={{ textDecoration: 'none' }} aria-label={label}>
+              <Group gap={2} justify="center" style={{ flexDirection: 'column' }}>
+                <Icon size={22} stroke={active ? 2.4 : 1.6} />
+                <Text size="xs" fw={active ? 700 : 400}>{label}</Text>
+              </Group>
+            </RouterNavLink>
+          );
+        })}
+      </Group>
+    </Paper>
+  );
+}
 
 export function DefaultLayout({ children }: { children: React.ReactNode }) {
   const [mobileOpened, { toggle: toggleMobile }] = useDisclosure();
@@ -57,12 +89,13 @@ export function DefaultLayout({ children }: { children: React.ReactNode }) {
             leftSection={<IconSettings size={16} stroke={1.5} />} />
         </AppShell.Navbar>
 
-        <AppShell.Main>
+        <AppShell.Main pb={80}>
           {children}
           <div style={{ marginTop: '2rem' }}>
             <ApiTest />
           </div>
         </AppShell.Main>
+        <BottomTabs />
       </AppShell>
     </Auth0Provider>
   );
