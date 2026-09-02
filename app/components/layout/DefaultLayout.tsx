@@ -1,10 +1,13 @@
+import { useState } from 'react';
 import { useDisclosure } from '@mantine/hooks';
-import { AppShell, Burger, Flex, Text, NavLink, Group, Paper } from '@mantine/core';
+import { ActionIcon, AppShell, Burger, Flex, Text, NavLink, Group, Paper } from '@mantine/core';
 import { Auth0Provider } from '@auth0/auth0-react';
 import Authentication from "../authentication/Authentication";
 import { ApiTest } from '../api/ApiTest';
-import { IconHome2, IconSettings, IconHome, IconList, IconTarget } from '@tabler/icons-react';
+import { IconHome2, IconSettings, IconHome, IconList, IconTarget, IconPlus } from '@tabler/icons-react';
 import { NavLink as RouterNavLink, useLocation } from 'react-router';
+import { TransactionSheet } from '../transactions/TransactionSheet';
+import { currentYearMonth } from '~/lib/months';
 
 const TABS = [
   { to: '/', label: 'Home', Icon: IconHome },
@@ -41,6 +44,7 @@ function BottomTabs() {
 export function DefaultLayout({ children }: { children: React.ReactNode }) {
   const [mobileOpened, { toggle: toggleMobile }] = useDisclosure();
   const [desktopOpened, { toggle: toggleDesktop }] = useDisclosure(true);
+  const [addOpen, setAddOpen] = useState(false);
 
   return (
     <Auth0Provider
@@ -95,6 +99,14 @@ export function DefaultLayout({ children }: { children: React.ReactNode }) {
             <ApiTest />
           </div>
         </AppShell.Main>
+        <ActionIcon
+          size={56} radius="xl" variant="filled" aria-label="Add transaction"
+          onClick={() => setAddOpen(true)}
+          style={{ position: 'fixed', right: 16, bottom: 84, zIndex: 101 }}
+        >
+          <IconPlus size={26} />
+        </ActionIcon>
+        <TransactionSheet opened={addOpen} onClose={() => setAddOpen(false)} yearMonth={currentYearMonth()} />
         <BottomTabs />
       </AppShell>
     </Auth0Provider>
