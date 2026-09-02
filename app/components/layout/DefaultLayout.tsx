@@ -3,7 +3,6 @@ import { useDisclosure } from '@mantine/hooks';
 import { ActionIcon, AppShell, Burger, Flex, Text, NavLink, Group, Paper } from '@mantine/core';
 import { Auth0Provider } from '@auth0/auth0-react';
 import Authentication from "../authentication/Authentication";
-import { ApiTest } from '../api/ApiTest';
 import { IconHome2, IconSettings, IconHome, IconList, IconTarget, IconPlus, IconTag } from '@tabler/icons-react';
 import { NavLink as RouterNavLink, useLocation } from 'react-router';
 import { TransactionSheet } from '../transactions/TransactionSheet';
@@ -98,9 +97,6 @@ export function DefaultLayout({ children }: { children: React.ReactNode }) {
 
         <AppShell.Main pb={80}>
           {children}
-          <div style={{ marginTop: '2rem' }}>
-            <ApiTest />
-          </div>
         </AppShell.Main>
         <ActionIcon
           size={56} radius="xl" variant="filled" aria-label="Add transaction"
