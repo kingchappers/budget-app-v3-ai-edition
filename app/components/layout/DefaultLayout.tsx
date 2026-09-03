@@ -49,9 +49,16 @@ export function DefaultLayout({ children }: { children: React.ReactNode }) {
     <Auth0Provider
       domain={import.meta.env.VITE_AUTH0_DOMAIN}
       clientId={import.meta.env.VITE_AUTH0_CLIENT_ID}
+      // The default in-memory cache forces a silent-auth iframe on every reload,
+      // which browsers block as a third-party cookie. Persist instead and renew
+      // with a rotating refresh token.
+      cacheLocation="localstorage"
+      useRefreshTokens
+      useRefreshTokensFallback={false}
       authorizationParams={{
         redirect_uri: window.location.origin,
         audience: import.meta.env.VITE_AUTH0_AUDIENCE,
+        scope: 'openid profile email offline_access',
       }}
     >
       <AppShell

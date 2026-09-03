@@ -20,7 +20,7 @@ const TYPE_OPTIONS: { label: string; value: TransactionType }[] = [
 ];
 
 export function TransactionSheet({ opened, onClose, yearMonth, editing }: TransactionSheetProps) {
-  const { data: categories = [] } = useCategories();
+  const { data: categories = [], isLoading: categoriesLoading, error: categoriesError } = useCategories();
   const create = useCreateTransaction(yearMonth);
   const update = useUpdateTransaction(yearMonth);
 
@@ -108,11 +108,13 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing }: Transa
         />
         <Select
           label="Category"
-          placeholder="Choose"
+          placeholder={categoriesLoading ? 'Loading categories…' : 'Choose'}
           searchable
+          disabled={categoriesLoading}
           data={options}
           value={categoryId}
           onChange={setCategoryId}
+          error={categoriesError ? 'Could not load categories' : null}
         />
         <TextInput
           label="Note (optional)"

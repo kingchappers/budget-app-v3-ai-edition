@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo } from 'react';
+import { useAuth0 } from '@auth0/auth0-react';
 import { useProtectedApi } from '~/hooks/useProtectedApi';
 import { createApi, type TransactionInput } from './api';
 import type { Category, TargetPeriod } from './types';
@@ -15,25 +16,40 @@ function useApi() {
   return useMemo(() => createApi(request), [request]);
 }
 
+// Every endpoint needs a bearer token, so a query fired before Auth0 has finished
+// restoring the session rejects and parks in an error state that nothing retries.
+function useAuthReady() {
+  return useAuth0().isAuthenticated;
+}
+
 export function useCategories() {
   const api = useApi();
+  const enabled = useAuthReady();
   return useQuery({
     queryKey: queryKeys.categories,
     queryFn: () => api.getCategories(),
     staleTime: 5 * 60_000,
+    enabled,
   });
 }
 
 export function useTargets() {
   const api = useApi();
-  return useQuery({ queryKey: queryKeys.targets, queryFn: () => api.getTargets() });
+  const enabled = useAuthReady();
+  return useQuery({
+    queryKey: queryKeys.targets,
+    queryFn: () => api.getTargets(),
+    enabled,
+  });
 }
 
 export function useTransactions(yearMonth: string) {
   const api = useApi();
+  const enabled = useAuthReady();
   return useQuery({
     queryKey: queryKeys.transactions(yearMonth),
     queryFn: () => api.getTransactions(yearMonth),
+    enabled,
   });
 }
 
