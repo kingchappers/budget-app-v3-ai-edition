@@ -19,3 +19,6 @@ export function CategoryProgressRow({ progress }: { progress: CategoryProgress }
     </Stack>
   );
 }
+
+
+// adding comment for redeloy
