@@ -19,6 +19,9 @@ function TransactionsContent() {
   const nameFor = (id: string) =>
     categories.data?.find(c => c.categoryId === id)?.name ?? 'Unknown category';
 
+  const iconFor = (id: string) =>
+    categories.data?.find(c => c.categoryId === id)?.icon ?? 'tag';
+
   if (transactions.error) {
     return (
       <Alert color="red" title="Could not load transactions">
@@ -57,6 +60,7 @@ function TransactionsContent() {
               key={t.transactionId}
               transaction={t}
               categoryName={nameFor(t.categoryId)}
+              categoryIcon={iconFor(t.categoryId)}
               onEdit={setEditing}
               onDelete={(item) => remove.mutate(item.transactionId)}
             />
