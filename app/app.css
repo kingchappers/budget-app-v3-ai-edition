@@ -7,10 +7,6 @@
 
 html,
 body {
-  @apply bg-white dark:bg-slate-900;
-  @apply text-slate-950 dark:text-slate-100;
-
-  @media (prefers-color-scheme: dark) {
-    color-scheme: dark;
-  }
+  background-color: var(--mantine-color-body);
+  color: var(--mantine-color-text);
 }
