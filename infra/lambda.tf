@@ -62,13 +62,10 @@ resource "aws_apigatewayv2_api" "app" {
   description = "API for the budget application"
   protocol_type = "HTTP"
 
-  cors_configuration {
-    allow_origins  = ["*"]
-    allow_methods  = ["GET", "HEAD", "OPTIONS", "POST", "PUT", "PATCH", "DELETE"]
-    allow_headers  = ["*"]
-    expose_headers = ["*"]
-    max_age        = 300
-  }
+  # No cors_configuration block: the SPA and the API share this same gateway
+  # origin, so browser calls are same-origin and need no CORS grant. Adding
+  # allow_origins = ["*"] here would let any external site call the API
+  # cross-origin (HTTP-SECURITY, INFRA-05 review, 2026-09-12).
 
   api_key_selection_expression = "$request.header.x-api-key"
   version = 0.1

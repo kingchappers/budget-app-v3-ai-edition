@@ -14,6 +14,11 @@
 *.tfstate
 *.tfstate.*
 
+# tfvars can hold environment-specific or sensitive values; keep example
+# templates tracked, not the real files (SEC-01)
+*.tfvars
+!*.tfvars.example
+
 # Crash log files
 crash.log
 crash.*.log

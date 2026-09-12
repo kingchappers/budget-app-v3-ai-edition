@@ -19,6 +19,9 @@ jobs:
       TF_VAR_auth0_client_id: ${{ secrets.AUTH0_CLIENT_ID }}
       TF_VAR_auth0_domain: ${{ secrets.AUTH0_DOMAIN }}
       TF_VAR_auth0_audience: ${{ secrets.AUTH0_AUDIENCE }}
+      TF_VAR_state_bucket: kingchappers-terraform-state-bucket
+      TF_VAR_app_name: budget-app-v3-ai-edition
+      TF_VAR_environment: production
     name: Build Package
     runs-on: ubuntu-latest
     strategy:
@@ -76,8 +79,6 @@ jobs:
       env:
         TF_INPUT: 'false'
         TF_IN_AUTOMATION: 'true'
-        TF_LOG: 'DEBUG'
-        TF_LOG_PATH: 'opentofu.init.log'
       timeout-minutes: 15
       run: |
         echo "=== pre-init diagnostics ==="
@@ -87,14 +88,6 @@ jobs:
         echo "=== run init and plan ==="
         tofu init -backend-config=backend.hcl
         tofu plan -out=tfplan
-  
-    - name: Upload debug logs
-      if: always()
-      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
-      with:
-        name: tofu-logs
-        path: infra/opentofu.init.log
-        if-no-files-found: warn
 
     - name: Upload tfplan (artifact)
       if: always()
