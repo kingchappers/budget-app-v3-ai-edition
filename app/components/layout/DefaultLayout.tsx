@@ -1,19 +1,23 @@
 import { useState } from 'react';
-import { useDisclosure } from '@mantine/hooks';
-import { ActionIcon, AppShell, Burger, Flex, Text, NavLink, Group, Paper } from '@mantine/core';
+import { ActionIcon, AppShell, Flex, Text, NavLink, Group, Paper } from '@mantine/core';
 import { Auth0Provider } from '@auth0/auth0-react';
 import Authentication from "../authentication/Authentication";
 import { ColorSchemeToggle } from './ColorSchemeToggle';
-import { IconHome2, IconSettings, IconHome, IconList, IconTarget, IconPlus, IconTag } from '@tabler/icons-react';
+import { IconHome, IconList, IconTarget, IconPlus, IconTag } from '@tabler/icons-react';
 import { NavLink as RouterNavLink, useLocation } from 'react-router';
 import { TransactionSheet } from '../transactions/TransactionSheet';
 import { currentYearMonth } from '~/lib/months';
 
-const TABS = [
+const NAV_ITEMS = [
   { to: '/', label: 'Home', Icon: IconHome },
   { to: '/transactions', label: 'Transactions', Icon: IconList },
   { to: '/targets', label: 'Targets', Icon: IconTarget },
+  { to: '/categories', label: 'Categories', Icon: IconTag },
 ];
+
+function isNavItemActive(pathname: string, to: string) {
+  return to === '/' ? pathname === '/' : pathname.startsWith(to);
+}
 
 function BottomTabs() {
   const { pathname } = useLocation();
@@ -21,12 +25,13 @@ function BottomTabs() {
     <Paper
       component="nav"
       withBorder
+      hiddenFrom="sm"
       style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 100 }}
       p="xs"
     >
       <Group justify="space-around">
-        {TABS.map(({ to, label, Icon }) => {
-          const active = to === '/' ? pathname === '/' : pathname.startsWith(to);
+        {NAV_ITEMS.map(({ to, label, Icon }) => {
+          const active = isNavItemActive(pathname, to);
           return (
             <RouterNavLink key={to} to={to} style={{ textDecoration: 'none' }} aria-label={label}>
               <Group gap={2} justify="center" style={{ flexDirection: 'column' }}>
@@ -41,9 +46,25 @@ function BottomTabs() {
   );
 }
 
+function SidebarNav() {
+  const { pathname } = useLocation();
+  return (
+    <>
+      {NAV_ITEMS.map(({ to, label, Icon }) => (
+        <NavLink
+          key={to}
+          component={RouterNavLink}
+          to={to}
+          label={label}
+          active={isNavItemActive(pathname, to)}
+          leftSection={<Icon size={16} stroke={1.5} />}
+        />
+      ))}
+    </>
+  );
+}
+
 export function DefaultLayout({ children }: { children: React.ReactNode }) {
-  const [mobileOpened, { toggle: toggleMobile }] = useDisclosure();
-  const [desktopOpened, { toggle: toggleDesktop }] = useDisclosure(true);
   const [addOpen, setAddOpen] = useState(false);
 
   return (
@@ -65,43 +86,19 @@ export function DefaultLayout({ children }: { children: React.ReactNode }) {
       <AppShell
         padding="md"
         header={{ height: 60 }}
-        navbar={{
-          width: 300,
-          breakpoint: 'sm',
-          collapsed: { mobile: !mobileOpened, desktop: !desktopOpened },
-        }}
+        navbar={{ width: 260, breakpoint: 'sm', collapsed: { mobile: true, desktop: false } }}
       >
-        <AppShell.Header bg="menu">
-          <Flex mih={50}
-            gap="md"
-            justify="space-between"
-            align="center"
-            direction="row"
-            wrap="wrap"
-            p="md">
-            <div className="flex gap-2 items-center">
-              <Burger opened={mobileOpened} onClick={toggleMobile} hiddenFrom="sm" size="md" />
-              <Burger opened={desktopOpened} onClick={toggleDesktop} visibleFrom="sm" size="md" />
-              <Text>Menu</Text>
-            </div>
-
+        <AppShell.Header>
+          <Flex h="100%" px="md" justify="space-between" align="center">
+            <Text fw={700}>Budget</Text>
             <Group gap="sm">
               <ColorSchemeToggle />
               <Authentication />
             </Group>
           </Flex>
-
         </AppShell.Header>
-        <AppShell.Navbar p="md" bg="menu">
-          <NavLink href="/"
-            label="Home"
-            leftSection={<IconHome2 size={16} stroke={1.5} />} />
-          <NavLink href="/categories"
-            label="Categories"
-            leftSection={<IconTag size={16} stroke={1.5} />} />
-          <NavLink href="/test"
-            label="Test"
-            leftSection={<IconSettings size={16} stroke={1.5} />} />
+        <AppShell.Navbar p="md">
+          <SidebarNav />
         </AppShell.Navbar>
 
         <AppShell.Main pb={80}>
