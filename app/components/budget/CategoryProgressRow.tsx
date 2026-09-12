@@ -12,7 +12,7 @@ export function CategoryProgressRow({ progress }: { progress: CategoryProgress }
           {formatPence(spent)} / {formatPence(target)} · {percent}%
         </Text>
       </Group>
-      <Progress value={Math.min(percent, 100)} color={isOver ? 'red' : 'teal'} aria-label={`${name} progress`} />
+      <Progress value={Math.min(percent, 100)} color={isOver ? 'danger' : 'primary'} aria-label={`${name} progress`} />
       {period === 'WEEKLY' && (
         <Text size="xs" c="dimmed">{formatPence(rawTarget)}/wk (≈{formatPence(target)}/mo)</Text>
       )}

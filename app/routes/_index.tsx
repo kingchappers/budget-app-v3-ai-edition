@@ -34,7 +34,7 @@ function HomeContent() {
 
   if (error) {
     return (
-      <Alert color="red" title="Could not load your budget">
+      <Alert color="danger" title="Could not load your budget">
         <Text mb="sm">Something went wrong fetching this month.</Text>
         <Button onClick={() => { categories.refetch(); targets.refetch(); transactions.refetch(); }}>
           Try again
