@@ -3,6 +3,7 @@ import { useDisclosure } from '@mantine/hooks';
 import { ActionIcon, AppShell, Burger, Flex, Text, NavLink, Group, Paper } from '@mantine/core';
 import { Auth0Provider } from '@auth0/auth0-react';
 import Authentication from "../authentication/Authentication";
+import { ColorSchemeToggle } from './ColorSchemeToggle';
 import { IconHome2, IconSettings, IconHome, IconList, IconTarget, IconPlus, IconTag } from '@tabler/icons-react';
 import { NavLink as RouterNavLink, useLocation } from 'react-router';
 import { TransactionSheet } from '../transactions/TransactionSheet';
@@ -84,9 +85,10 @@ export function DefaultLayout({ children }: { children: React.ReactNode }) {
               <Text>Menu</Text>
             </div>
 
-            <div className=''>
+            <Group gap="sm">
+              <ColorSchemeToggle />
               <Authentication />
-            </div>
+            </Group>
           </Flex>
 
         </AppShell.Header>
