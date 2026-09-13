@@ -1,5 +1,5 @@
 import { useAuth0 } from "@auth0/auth0-react";
-import { Group, Avatar, Menu, UnstyledButton } from '@mantine/core';
+import { Box, Group, Avatar, Menu, UnstyledButton } from '@mantine/core';
 import { IconChevronRight, IconLogout, IconUser } from '@tabler/icons-react';
 import { forwardRef } from 'react';
 
@@ -69,19 +69,24 @@ export const Profile = () => {
                     }}
                   />
                 )}
-                <div style={{ textAlign: 'center' }}>
+                {/* The name/email pair has no width limit and a real
+                    Auth0 identifier can run 40+ characters -- on a phone-
+                    width header that overflows past the toggle and title.
+                    Full detail is still one tap away via the dropdown. */}
+                <Box visibleFrom="sm" style={{ textAlign: 'center' }}>
                   <div className="profile-name" style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--mantine-color-text)', marginBottom: '0.1rem' }}>
                     {user.name}
                   </div>
                   <div className="profile-email" style={{ fontSize: '0.6rem', color: 'var(--mantine-color-dimmed)' }}>
                     {user.email}
                   </div>
-                </div>
+                </Box>
               </div>
             </UnstyledButton>
           </Menu.Target>
 
           <Menu.Dropdown>
+            <Menu.Label hiddenFrom="sm">{user.email}</Menu.Label>
             <Menu.Label>Application</Menu.Label>
             <Menu.Item leftSection={<IconUser size={14} />}>
               Profile
