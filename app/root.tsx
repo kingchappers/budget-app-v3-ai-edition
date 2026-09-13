@@ -23,7 +23,17 @@ const queryClient = new QueryClient({
 
 const theme = createTheme({
   primaryColor: 'primary',
-  primaryShade: { light: 6, dark: 8 },
+  // Mantine's autoContrast text-color decision for a color used without an
+  // explicit shade (e.g. color="primary") always reads primaryShade.light's
+  // luminance, even when the button is actually rendering in dark mode —
+  // it does not re-check colorScheme. Shade 6 (luminance ~0.23-0.28 across
+  // primary/danger/warning/success) sits under the default 0.3 threshold,
+  // so autoContrast picks white text — but white-on-shade-6 only reaches
+  // ~3.2-3.8:1 contrast, below WCAG AA's 4.5:1 for normal text. Shade 7
+  // (luminance ~0.11-0.16) keeps white text correctly chosen by the same
+  // scheme-blind check while actually passing contrast at ~5.0-6.5:1, and
+  // leaves dark mode (which uses primaryShade.dark's own shade 8) untouched.
+  primaryShade: { light: 7, dark: 8 },
   autoContrast: true,
   colors: {
     // Deepened/completed version of the app's existing teal — same hue,
