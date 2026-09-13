@@ -51,8 +51,8 @@ function CategoriesContent() {
       {error && <Alert color="danger" onClose={() => setError(null)} withCloseButton>{error}</Alert>}
 
       <Card withBorder>
-        <Group align="flex-end" wrap="nowrap">
-          <TextInput label="New category" placeholder="e.g. Padel" style={{ flex: 1 }}
+        <Group align="flex-end">
+          <TextInput label="New category" placeholder="e.g. Padel" style={{ flex: 1, minWidth: 160 }}
             value={name} onChange={e => setName(e.currentTarget.value)} />
           <Select label="Type" data={TYPES} value={type}
             onChange={v => setType(v as CategoryType)} allowDeselect={false} />

@@ -34,9 +34,9 @@ function TargetRow({ category, amountPence, period }: {
           </Button>
         )}
       </Group>
-      <Group align="flex-end" wrap="nowrap">
+      <Group align="flex-end">
         <TextInput
-          label="Target" placeholder="0.00" inputMode="decimal" style={{ flex: 1 }}
+          label="Target" placeholder="0.00" inputMode="decimal" style={{ flex: 1, minWidth: 100 }}
           value={value} onChange={e => setValue(e.currentTarget.value)} error={error}
           aria-label={`Target for ${category.name}`}
         />
