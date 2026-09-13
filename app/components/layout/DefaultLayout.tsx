@@ -101,7 +101,10 @@ export function DefaultLayout({ children }: { children: React.ReactNode }) {
           <SidebarNav />
         </AppShell.Navbar>
 
-        <AppShell.Main pb={80}>
+        {/* The floating "Add transaction" button sits at bottom:84 with a
+            56px diameter, so its top edge reaches bottom:140 — pb must
+            clear that or the last card on a page renders underneath it. */}
+        <AppShell.Main pb={150}>
           {children}
         </AppShell.Main>
         <ActionIcon

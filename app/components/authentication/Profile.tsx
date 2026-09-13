@@ -65,15 +65,15 @@ export const Profile = () => {
                       height: '2.2rem',
                       borderRadius: '50%',
                       objectFit: 'cover',
-                      border: '3px solid #63b3ed'
+                      border: '3px solid var(--mantine-color-primary-6)'
                     }}
                   />
                 )}
                 <div style={{ textAlign: 'center' }}>
-                  <div className="profile-name" style={{ fontSize: '0.75rem', fontWeight: '600', color: '#f7fafc', marginBottom: '0.1rem' }}>
+                  <div className="profile-name" style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--mantine-color-text)', marginBottom: '0.1rem' }}>
                     {user.name}
                   </div>
-                  <div className="profile-email" style={{ fontSize: '0.6rem', color: '#a0aec0' }}>
+                  <div className="profile-email" style={{ fontSize: '0.6rem', color: 'var(--mantine-color-dimmed)' }}>
                     {user.email}
                   </div>
                 </div>
