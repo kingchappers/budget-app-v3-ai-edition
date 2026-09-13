@@ -8,7 +8,7 @@ export function CategoryProgressRow({ progress }: { progress: CategoryProgress }
     <Stack gap={4} mb="sm">
       <Group justify="space-between" wrap="nowrap">
         <Text fw={500}>{isOver ? `⚠ ${name}` : name}</Text>
-        <Text size="sm" c={isOver ? 'red' : undefined}>
+        <Text size="sm" c={isOver ? 'danger' : undefined}>
           {formatPence(spent)} / {formatPence(target)} · {percent}%
         </Text>
       </Group>
@@ -19,6 +19,3 @@ export function CategoryProgressRow({ progress }: { progress: CategoryProgress }
     </Stack>
   );
 }
-
-
-// adding comment for redeloy
