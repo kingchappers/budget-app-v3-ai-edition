@@ -1,6 +1,7 @@
 {
   "name": "budget-app",
   "private": true,
+  "license": "AGPL-3.0-or-later",
   "type": "module",
   "scripts": {
     "build": "react-router build && node scripts/inject-handler.cjs && node scripts/build-api-handler.cjs",
