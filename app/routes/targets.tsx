@@ -28,7 +28,7 @@ function TargetRow({ category, amountPence, period }: {
       <Group justify="space-between" mb="xs">
         <Text fw={500}>{category.name}</Text>
         {amountPence !== null && (
-          <Button size="compact-xs" variant="subtle" color="red"
+          <Button size="compact-xs" variant="subtle" color="danger"
             onClick={() => { setValue(''); clearTarget.mutate(category.categoryId); }}>
             Clear
           </Button>
@@ -57,7 +57,7 @@ function TargetsContent() {
 
   if (categories.error || targets.error) {
     return (
-      <Alert color="red" title="Could not load targets">
+      <Alert color="danger" title="Could not load targets">
         <Button onClick={() => { categories.refetch(); targets.refetch(); }}>Try again</Button>
       </Alert>
     );

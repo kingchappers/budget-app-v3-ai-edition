@@ -29,9 +29,12 @@ function HomeContent() {
   const nameFor = (id: string) =>
     categories.data?.find(c => c.categoryId === id)?.name ?? 'Unknown category';
 
+  const iconFor = (id: string) =>
+    categories.data?.find(c => c.categoryId === id)?.icon ?? 'tag';
+
   if (error) {
     return (
-      <Alert color="red" title="Could not load your budget">
+      <Alert color="danger" title="Could not load your budget">
         <Text mb="sm">Something went wrong fetching this month.</Text>
         <Button onClick={() => { categories.refetch(); targets.refetch(); transactions.refetch(); }}>
           Try again
@@ -79,7 +82,7 @@ function HomeContent() {
         {summary.recent.length === 0
           ? <Text c="dimmed" size="sm">Nothing logged yet this month.</Text>
           : summary.recent.map(t => (
-              <TransactionRow key={t.transactionId} transaction={t} categoryName={nameFor(t.categoryId)} />
+              <TransactionRow key={t.transactionId} transaction={t} categoryName={nameFor(t.categoryId)} categoryIcon={iconFor(t.categoryId)} />
             ))}
         <Button component={Link} to="/transactions" variant="subtle" mt="xs">See all</Button>
       </div>

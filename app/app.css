@@ -7,10 +7,11 @@
 
 html,
 body {
-  @apply bg-white dark:bg-slate-900;
-  @apply text-slate-950 dark:text-slate-100;
+  background-color: var(--mantine-color-body);
+  color: var(--mantine-color-text);
+}
 
-  @media (prefers-color-scheme: dark) {
-    color-scheme: dark;
-  }
+:focus-visible {
+  outline: 2px solid var(--mantine-color-primary-6);
+  outline-offset: 2px;
 }

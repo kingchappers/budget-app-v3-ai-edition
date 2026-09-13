@@ -36,7 +36,7 @@ function CategoriesContent() {
 
   if (categories.error) {
     return (
-      <Alert color="red" title="Could not load categories">
+      <Alert color="danger" title="Could not load categories">
         <Button onClick={() => categories.refetch()}>Try again</Button>
       </Alert>
     );
@@ -48,7 +48,7 @@ function CategoriesContent() {
   return (
     <Stack>
       <Title order={3}>Categories</Title>
-      {error && <Alert color="red" onClose={() => setError(null)} withCloseButton>{error}</Alert>}
+      {error && <Alert color="danger" onClose={() => setError(null)} withCloseButton>{error}</Alert>}
 
       <Card withBorder>
         <Group align="flex-end" wrap="nowrap">
@@ -79,7 +79,7 @@ function CategoriesContent() {
                 {c.isDefault && <Badge size="xs" variant="light">default</Badge>}
               </Group>
               {!c.isDefault && (
-                <Button size="compact-xs" variant="subtle" color="red"
+                <Button size="compact-xs" variant="subtle" color="danger"
                   onClick={() => setPendingDelete(c)}>
                   Delete
                 </Button>

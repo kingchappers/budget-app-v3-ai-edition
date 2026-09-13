@@ -31,7 +31,7 @@ export function ReassignDialog({
         />
         <Group justify="flex-end">
           <Button variant="subtle" onClick={onCancel}>Cancel</Button>
-          <Button color="red" disabled={!target} loading={pending}
+          <Button color="danger" disabled={!target} loading={pending}
             onClick={() => target && onConfirm(target)}>
             Move and delete
           </Button>

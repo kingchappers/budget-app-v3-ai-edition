@@ -12,7 +12,7 @@ import {
 import type { Route } from "./+types/root";
 import "./app.css";
 
-import { ColorSchemeScript, MantineProvider, mantineHtmlProps, createTheme, virtualColor } from '@mantine/core';
+import { ColorSchemeScript, MantineProvider, mantineHtmlProps, createTheme } from '@mantine/core';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 const queryClient = new QueryClient({
@@ -22,65 +22,33 @@ const queryClient = new QueryClient({
 });
 
 const theme = createTheme({
+  primaryColor: 'primary',
+  primaryShade: { light: 6, dark: 8 },
+  autoContrast: true,
   colors: {
-    'teal-900': [
-      "#134e4a",
-      "#134e4a",
-      "#134e4a",
-      "#134e4a",
-      "#134e4a",
-      "#134e4a",
-      "#134e4a",
-      "#134e4a",
-      "#134e4a",
-      "#134e4a"
+    // Deepened/completed version of the app's existing teal — same hue,
+    // now a real 10-shade ramp so hover/active/dark-mode states resolve
+    // to different shades instead of one flat repeated hex.
+    primary: [
+      '#f0fdfa', '#ccfbf1', '#99f6e4', '#5eead4', '#2dd4bf',
+      '#14b8a6', '#0d9488', '#0f766e', '#115e59', '#134e4a',
     ],
-    'teal-200': [
-      "#99f6e4",
-      "#99f6e4",
-      "#99f6e4",
-      "#99f6e4",
-      "#99f6e4",
-      "#99f6e4",
-      "#99f6e4",
-      "#99f6e4",
-      "#99f6e4",
-      "#99f6e4"
+    danger: [
+      '#fef2f2', '#fee2e2', '#fecaca', '#fca5a5', '#f87171',
+      '#ef4444', '#dc2626', '#b91c1c', '#991b1b', '#7f1d1d',
     ],
-    'slate-950': [
-      "#020617",
-      "#020617",
-      "#020617",
-      "#020617",
-      "#020617",
-      "#020617",
-      "#020617",
-      "#020617",
-      "#020617",
-      "#020617"
+    warning: [
+      '#fffbeb', '#fef3c7', '#fde68a', '#fcd34d', '#fbbf24',
+      '#f59e0b', '#d97706', '#b45309', '#92400e', '#78350f',
     ],
-    'slate-100': [
-      "#f1f5f9",
-      "#f1f5f9",
-      "#f1f5f9",
-      "#f1f5f9",
-      "#f1f5f9",
-      "#f1f5f9",
-      "#f1f5f9",
-      "#f1f5f9",
-      "#f1f5f9",
-      "#f1f5f9"
+    success: [
+      '#f0fdf4', '#dcfce7', '#bbf7d0', '#86efac', '#4ade80',
+      '#22c55e', '#16a34a', '#15803d', '#166534', '#14532d',
     ],
-    menu: virtualColor({
-      name: 'menu',
-      dark: 'teal-900',
-      light: 'teal-200',
-    }),
-    text: virtualColor({
-      name: 'text',
-      dark: 'slate-100',
-      light: 'slate-950',
-    }),
+    gray: [
+      '#f8fafc', '#f1f5f9', '#e2e8f0', '#cbd5e1', '#94a3b8',
+      '#64748b', '#475569', '#334155', '#1e293b', '#0f172a',
+    ],
   },
 });
 
