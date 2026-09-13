@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Button, Drawer, Group, SegmentedControl, Select, Stack, TextInput } from '@mantine/core';
+import { DateInput } from '@mantine/dates';
 import { parsePounds, formatPencePlain } from '~/lib/money';
 import { todayIso } from '~/lib/months';
 import { useCategories, useCreateTransaction, useUpdateTransaction } from '~/lib/queries';
@@ -122,11 +123,11 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing }: Transa
           onChange={e => setDescription(e.currentTarget.value)}
           maxLength={200}
         />
-        <TextInput
+        <DateInput
           label="Date"
-          type="date"
+          valueFormat="DD/MM/YYYY"
           value={date}
-          onChange={e => setDate(e.currentTarget.value)}
+          onChange={value => setDate(value ?? '')}
         />
         <Group justify="flex-end">
           <Button variant="subtle" onClick={onClose}>Cancel</Button>

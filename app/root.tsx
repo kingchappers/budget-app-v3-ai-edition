@@ -1,4 +1,5 @@
 import '@mantine/core/styles.css';
+import '@mantine/dates/styles.css';
 
 import {
   isRouteErrorResponse,
@@ -13,6 +14,7 @@ import type { Route } from "./+types/root";
 import "./app.css";
 
 import { ColorSchemeScript, MantineProvider, mantineHtmlProps, createTheme } from '@mantine/core';
+import { DatesProvider } from '@mantine/dates';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 const queryClient = new QueryClient({
@@ -87,7 +89,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
       </head>
       <body>
         <QueryClientProvider client={queryClient}>
-          <MantineProvider defaultColorScheme="auto" theme={theme}>{children}</MantineProvider>
+          <MantineProvider defaultColorScheme="auto" theme={theme}>
+            <DatesProvider settings={{ locale: 'en-gb' }}>{children}</DatesProvider>
+          </MantineProvider>
         </QueryClientProvider>
         <ScrollRestoration />
         <Scripts />
