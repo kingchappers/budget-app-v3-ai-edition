@@ -126,7 +126,10 @@ async function syncConnection(
 
       const syncedAt = toIso(deps.now());
       const accounts = connection.accounts.map(a => (a.accountUid === account.accountUid ? { ...a, lastSyncedAt: syncedAt } : a));
-      const saved = await save({ accounts, status: 'ACTIVE', consecutiveFailures: 0, lastError: undefined });
+      const patch: ConnectionPatch = failureRecorded
+        ? { accounts }
+        : { accounts, status: 'ACTIVE', consecutiveFailures: 0, lastError: undefined };
+      const saved = await save(patch);
       if (!saved) return;
     } catch (error) {
       const type = classifyProviderError(error);
@@ -141,7 +144,7 @@ async function syncConnection(
 
       if (!failureRecorded) {
         failureRecorded = true;
-        const consecutiveFailures = connection.consecutiveFailures + 1;
+        const consecutiveFailures = initial.consecutiveFailures + 1;
         const status: ConnectionStatus = consecutiveFailures >= ERROR_THRESHOLD ? 'ERROR' : connection.status;
         const saved = await save({ consecutiveFailures, status, lastError });
         if (!saved) return;

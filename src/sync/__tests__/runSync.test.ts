@@ -111,6 +111,36 @@ describe('runSync failures', () => {
     expect(saved.lastError).toEqual({ type: 'TRANSIENT', at: iso(NOW) });
   });
 
+  it('does not let a later successful account erase an earlier failure in the same run (fail then success)', async () => {
+    await store.putConnection(USER, makeConnection({
+      consecutiveFailures: 2,
+      accounts: [makeAccount({ accountUid: 'acc-1' }), makeAccount({ accountUid: 'acc-2' })],
+    }));
+    provider.script('acc-1', new ProviderError('TRANSIENT', 'down')).script('acc-2', [makeTxn()]);
+
+    await runSync(deps(), [USER]);
+    const saved = store.connectionFor(USER, makeConnection().connectionId)!;
+
+    expect(saved.consecutiveFailures).toBe(3);
+    expect(saved.status).toBe('ERROR');
+    expect(saved.accounts.find(a => a.accountUid === 'acc-2')?.lastSyncedAt).toBe(iso(NOW));
+  });
+
+  it('does not let a later successful account erase an earlier failure in the same run (success then fail)', async () => {
+    await store.putConnection(USER, makeConnection({
+      consecutiveFailures: 2,
+      accounts: [makeAccount({ accountUid: 'acc-1' }), makeAccount({ accountUid: 'acc-2' })],
+    }));
+    provider.script('acc-1', [makeTxn()]).script('acc-2', new ProviderError('TRANSIENT', 'down'));
+
+    await runSync(deps(), [USER]);
+    const saved = store.connectionFor(USER, makeConnection().connectionId)!;
+
+    expect(saved.consecutiveFailures).toBe(3);
+    expect(saved.status).toBe('ERROR');
+    expect(saved.accounts.find(a => a.accountUid === 'acc-1')?.lastSyncedAt).toBe(iso(NOW));
+  });
+
   it('resets an ERROR connection after a successful account sync', async () => {
     await store.putConnection(USER, makeConnection({ status: 'ERROR', consecutiveFailures: 3, lastError: { type: 'TRANSIENT', at: 'x' } }));
     provider.script('acc-1', []);
