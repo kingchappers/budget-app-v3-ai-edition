@@ -17,7 +17,7 @@ function raw(overrides: Record<string, unknown> = {}) {
 
 describe('sanitiseDescription', () => {
   it('strips control characters, collapses whitespace and trims', () => {
-    expect(sanitiseDescription('  TESCO \n  STORES\t ')).toBe('TESCO STORES');
+    expect(sanitiseDescription('  TESCO \u0007\n  STORES\t\u007F ')).toBe('TESCO STORES');
   });
 
   it('caps length at 200 characters', () => {
