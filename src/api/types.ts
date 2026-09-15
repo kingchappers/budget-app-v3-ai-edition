@@ -22,6 +22,8 @@ export interface Transaction {
   description: string;
   date: string;
   createdAt: string;
+  source?: 'MANUAL' | 'BANK';
+  bankRef?: { connectionId: string; accountUid: string; txnKey: string };
 }
 
 export interface CategoryTarget {
