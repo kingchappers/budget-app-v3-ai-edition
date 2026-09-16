@@ -7,6 +7,7 @@ import { IconHome, IconList, IconTarget, IconPlus, IconTag } from '@tabler/icons
 import { NavLink as RouterNavLink, useLocation } from 'react-router';
 import { TransactionSheet } from '../transactions/TransactionSheet';
 import { currentYearMonth } from '~/lib/months';
+import { BANK_CALLBACK_PATH, safeReturnTo } from '~/lib/bankCallback';
 
 const NAV_ITEMS = [
   { to: '/', label: 'Home', Icon: IconHome },
@@ -81,6 +82,17 @@ export function DefaultLayout({ children }: { children: React.ReactNode }) {
         redirect_uri: window.location.origin,
         audience: import.meta.env.VITE_AUTH0_AUDIENCE,
         scope: 'openid profile email offline_access',
+      }}
+      // The bank redirect can also land on this path; without this Auth0 tries
+      // to treat it as its own login callback.
+      skipRedirectCallback={window.location.pathname === BANK_CALLBACK_PATH}
+      onRedirectCallback={appState => {
+        const returnTo = safeReturnTo(appState?.returnTo);
+        if (returnTo) {
+          window.location.replace(returnTo);
+          return;
+        }
+        window.history.replaceState({}, document.title, window.location.pathname);
       }}
     >
       <AppShell
