@@ -46,7 +46,7 @@ export function InboxRow({ item, accountLabel, categories, onConfirm, onIgnore, 
             <Text fw={500} truncate>{item.description}</Text>
             <Text size="xs" c="dimmed">{accountLabel}</Text>
           </div>
-          <Text fw={600} c={item.direction === 'IN' ? 'success' : undefined}>{sign}{formatPence(item.amount)}</Text>
+          <Text fw={600} c={item.direction === 'IN' ? 'success' : 'danger'}>{sign}{formatPence(item.amount)}</Text>
         </Group>
         <SegmentedControl size="xs" fullWidth value={type} onChange={changeType} data={TYPE_OPTIONS} />
         <Group align="flex-end" wrap="wrap" gap="xs">

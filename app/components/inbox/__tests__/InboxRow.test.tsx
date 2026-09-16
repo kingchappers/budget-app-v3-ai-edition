@@ -1,9 +1,19 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MantineProvider } from '@mantine/core';
+import { createTheme, MantineProvider } from '@mantine/core';
 import { InboxRow } from '../InboxRow';
 import type { Category, InboxItem } from '~/lib/types';
+
+// A minimal stand-in for the app's real theme (app/root.tsx) so that the
+// `danger`/`success` color names InboxRow uses actually resolve to something,
+// letting the amount-color test assert on the rendered CSS variable.
+const theme = createTheme({
+  colors: {
+    danger: Array(10).fill('#ef4444') as [string, string, string, string, string, string, string, string, string, string],
+    success: Array(10).fill('#22c55e') as [string, string, string, string, string, string, string, string, string, string],
+  },
+});
 
 const categories: Category[] = [
   { categoryId: 'cat-groceries', name: 'Groceries', type: 'EXPENSE', icon: 'x', isDefault: true, createdAt: '' },
@@ -22,7 +32,7 @@ function renderRow(overrides: Partial<Parameters<typeof InboxRow>[0]> = {}) {
   render(
     // env="test" makes Mantine's Popover skip its floating-ui "hide when detached" check, which
     // otherwise keeps the Select dropdown at display:none under jsdom's zero-size layout.
-    <MantineProvider env="test">
+    <MantineProvider env="test" theme={theme}>
       <InboxRow item={item} accountLabel="Lloyds Bank · Current Account ••1234" categories={categories}
         onConfirm={onConfirm} onIgnore={onIgnore} {...overrides} />
     </MantineProvider>,
@@ -35,6 +45,14 @@ describe('InboxRow', () => {
     renderRow();
     expect(screen.getByText('<script>TESCO</script>')).toBeInTheDocument();
     expect(screen.getByText('−£12.34')).toBeInTheDocument();
+  });
+
+  it('colors an outgoing amount red and an incoming amount green', () => {
+    renderRow();
+    expect(screen.getByText('−£12.34')).toHaveStyle({ color: 'var(--mantine-color-danger-text)' });
+
+    renderRow({ item: { ...item, direction: 'IN' } });
+    expect(screen.getByText('+£12.34')).toHaveStyle({ color: 'var(--mantine-color-success-text)' });
   });
 
   it('disables confirm until a category is chosen', () => {
