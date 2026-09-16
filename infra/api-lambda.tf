@@ -49,10 +49,11 @@ resource "aws_lambda_function" "api" {
 
   environment {
     variables = {
-      NODE_ENV         = "production"
-      AUTH0_DOMAIN     = var.auth0_domain
-      AUTH0_AUDIENCE   = var.auth0_audience
-      DYNAMODB_TABLE   = aws_dynamodb_table.budget_data.name
+      NODE_ENV             = "production"
+      AUTH0_DOMAIN         = var.auth0_domain
+      AUTH0_AUDIENCE       = var.auth0_audience
+      DYNAMODB_TABLE       = aws_dynamodb_table.budget_data.name
+      WORKER_FUNCTION_NAME = aws_lambda_function.worker.function_name
     }
   }
 
