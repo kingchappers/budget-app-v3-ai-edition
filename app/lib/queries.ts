@@ -3,7 +3,8 @@ import { useMemo } from 'react';
 import { useAuth0 } from '@auth0/auth0-react';
 import { useProtectedApi } from '~/hooks/useProtectedApi';
 import { createApi, type ConfirmInboxInput, type ConnectBankInput, type TransactionInput } from './api';
-import type { Category, InboxItem, InboxPage, TargetPeriod } from './types';
+import { shouldPollSync } from './sync';
+import type { Category, InboxItem, InboxPage, PendingSync, TargetPeriod } from './types';
 
 export const queryKeys = {
   categories: ['categories'] as const,
@@ -189,6 +190,19 @@ export function useDisconnectBank() {
 export function useTriggerSync() {
   const api = useApi();
   return useMutation({ mutationFn: () => api.triggerSync() });
+}
+
+const SYNC_POLL_MS = 3000;
+
+export function useSyncStatus(pending: PendingSync | null = null) {
+  const api = useApi();
+  const enabled = useAuthReady();
+  return useQuery({
+    queryKey: queryKeys.syncStatus,
+    queryFn: () => api.getSyncStatus(),
+    enabled,
+    refetchInterval: query => (shouldPollSync(query.state.data, pending, Date.now()) ? SYNC_POLL_MS : false),
+  });
 }
 
 export function useInbox() {
