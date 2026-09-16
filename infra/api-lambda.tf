@@ -2,6 +2,33 @@
 # API Lambda Function (separate from static file serving)
 # ============================================================================
 
+# API Lambda execution role (INFRA-01): DynamoDB access and worker invoke only
+resource "aws_iam_role" "api_role" {
+  name        = "${var.app_name}-api-role"
+  description = "Execution role for the protected API Lambda"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action    = "sts:AssumeRole"
+        Effect    = "Allow"
+        Principal = { Service = "lambda.amazonaws.com" }
+      }
+    ]
+  })
+
+  tags = {
+    Environment = var.environment
+    ManagedBy   = "OpenTofu"
+  }
+}
+
+resource "aws_iam_role_policy_attachment" "api_basic_execution" {
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+  role       = aws_iam_role.api_role.name
+}
+
 # Archive the API handler
 data "archive_file" "api_lambda_zip" {
   type        = "zip"
@@ -13,7 +40,7 @@ data "archive_file" "api_lambda_zip" {
 resource "aws_lambda_function" "api" {
   filename         = data.archive_file.api_lambda_zip.output_path
   function_name    = "${var.app_name}-api"
-  role             = aws_iam_role.lambda_role.arn
+  role             = aws_iam_role.api_role.arn
   handler          = "index.handler"
   runtime          = "nodejs24.x"
   timeout          = 30
@@ -27,6 +54,11 @@ resource "aws_lambda_function" "api" {
       AUTH0_AUDIENCE   = var.auth0_audience
       DYNAMODB_TABLE   = aws_dynamodb_table.budget_data.name
     }
+  }
+
+  logging_config {
+    log_format = "Text"
+    log_group  = aws_cloudwatch_log_group.api_lambda.name
   }
 
   tags = {
