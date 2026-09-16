@@ -71,6 +71,20 @@
     "@smithy/types" "^4.16.0"
     tslib "^2.6.2"
 
+"@aws-sdk/client-lambda@^3.1085.0":
+  version "3.1133.0"
+  resolved "https://registry.yarnpkg.com/@aws-sdk/client-lambda/-/client-lambda-3.1133.0.tgz#d574358cbfb0a08cc1feb64e61e3600bfad8c012"
+  integrity sha512-VLA/lEVPGdWUJuvQT7bU7OHk2b51ud3sPnoMV+pv8PiiCU6PYJV6tQ+GBMeSnnHNnuWGDKkBddr/bMVoHoeGQA==
+  dependencies:
+    "@aws-sdk/core" "^3.978.0"
+    "@aws-sdk/credential-provider-node" "^3.972.83"
+    "@aws-sdk/types" "^3.974.5"
+    "@smithy/core" "^3.33.3"
+    "@smithy/fetch-http-handler" "^5.7.2"
+    "@smithy/node-http-handler" "^4.11.3"
+    "@smithy/types" "^4.17.2"
+    tslib "^2.6.2"
+
 "@aws-sdk/client-secrets-manager@^3.1133.0":
   version "3.1133.0"
   resolved "https://registry.yarnpkg.com/@aws-sdk/client-secrets-manager/-/client-secrets-manager-3.1133.0.tgz#70681204ba18e7c94244567236fc9a6537ff5ecf"

@@ -13,6 +13,7 @@ const LAMBDAS = [
       'jwks-rsa': '^3.2.1',
       '@aws-sdk/client-dynamodb': '^3.0.0',
       '@aws-sdk/lib-dynamodb': '^3.0.0',
+      '@aws-sdk/client-lambda': '^3.0.0',
     },
   },
   {
