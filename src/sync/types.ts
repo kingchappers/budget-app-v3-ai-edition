@@ -84,10 +84,9 @@ export interface InboxItem {
 
 export interface PendingAuth {
   state: string;
-  aspspName: string;
-  aspspCountry: string;
   startDate: string;
   connectionId?: string;
+  providerConnectionId?: string;
   expiresAt: number;
 }
 
