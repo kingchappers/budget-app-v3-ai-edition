@@ -1,4 +1,14 @@
-import type { Category, CategoryTarget, TargetPeriod, Transaction, TransactionType } from './types';
+import type {
+  BankConnection,
+  Category,
+  CategoryTarget,
+  InboxItem,
+  InboxPage,
+  SyncStatus,
+  TargetPeriod,
+  Transaction,
+  TransactionType,
+} from './types';
 
 type Request = (endpoint: string, options?: RequestInit) => Promise<unknown>;
 
@@ -9,6 +19,25 @@ export interface TransactionInput {
   description: string;
   date: string;
 }
+
+export interface ConnectBankInput {
+  startDate: string;
+  connectionId?: string;
+}
+
+export type CompleteBankCallbackResult =
+  | { status: 'READY'; connection: BankConnection }
+  | { status: 'PENDING' };
+
+export interface ConfirmInboxInput {
+  type: TransactionType;
+  categoryId: string;
+  description?: string;
+}
+
+type InboxRef = Pick<InboxItem, 'bookingDate' | 'txnKey'>;
+const inboxPath = (item: InboxRef, action: 'confirm' | 'ignore') =>
+  `/api/inbox/${item.bookingDate}/${encodeURIComponent(item.txnKey)}/${action}`;
 
 export function createApi(request: Request) {
   return {
@@ -70,6 +99,51 @@ export function createApi(request: Request) {
     },
     deleteTarget: async (categoryId: string): Promise<void> => {
       await request(`/api/targets/${encodeURIComponent(categoryId)}`, { method: 'DELETE' });
+    },
+
+    connectBank: async (input: ConnectBankInput): Promise<string> => {
+      const res = await request('/api/banks/connect', { method: 'POST', body: JSON.stringify(input) }) as { url: string };
+      return res.url;
+    },
+    completeBankCallback: async (state: string): Promise<CompleteBankCallbackResult> => {
+      const res = await request('/api/banks/callback', {
+        method: 'POST',
+        body: JSON.stringify({ state }),
+      }) as { connection: BankConnection } | { status: 'PENDING' };
+      if ('connection' in res) return { status: 'READY', connection: res.connection };
+      return { status: 'PENDING' };
+    },
+    clearBankAuth: async (state: string): Promise<void> => {
+      await request(`/api/banks/auth/${encodeURIComponent(state)}`, { method: 'DELETE' });
+    },
+    getConnections: async (): Promise<BankConnection[]> => {
+      const res = await request('/api/banks/connections') as { connections: BankConnection[] };
+      return res.connections;
+    },
+    disconnectBank: async (connectionId: string): Promise<void> => {
+      await request(`/api/banks/connections/${encodeURIComponent(connectionId)}`, { method: 'DELETE' });
+    },
+    triggerSync: async (): Promise<void> => {
+      await request('/api/sync', { method: 'POST' });
+    },
+    getSyncStatus: async (): Promise<SyncStatus> => {
+      const res = await request('/api/sync/status') as { status: SyncStatus };
+      return res.status;
+    },
+    getInbox: async (cursor?: string): Promise<InboxPage> => {
+      const path = cursor ? `/api/inbox?cursor=${encodeURIComponent(cursor)}` : '/api/inbox';
+      return await request(path) as InboxPage;
+    },
+    getInboxCount: async (): Promise<number> => {
+      const res = await request('/api/inbox/count') as { count: number };
+      return res.count;
+    },
+    confirmInboxItem: async (item: InboxRef, input: ConfirmInboxInput): Promise<Transaction> => {
+      const res = await request(inboxPath(item, 'confirm'), { method: 'POST', body: JSON.stringify(input) }) as { transaction: Transaction };
+      return res.transaction;
+    },
+    ignoreInboxItem: async (item: InboxRef): Promise<void> => {
+      await request(inboxPath(item, 'ignore'), { method: 'POST' });
     },
   };
 }

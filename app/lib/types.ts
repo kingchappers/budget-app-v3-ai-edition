@@ -28,3 +28,65 @@ export interface CategoryTarget {
   period: TargetPeriod;
   updatedAt: string;
 }
+
+export type ConnectionStatus = 'ACTIVE' | 'EXPIRED' | 'ERROR';
+
+export interface ConnectedAccount {
+  accountUid: string;
+  dedupeId: string;
+  displayName: string;
+  last4: string;
+  currency: string;
+  startDate: string;
+  lastSyncedAt?: string;
+}
+
+export interface BankConnection {
+  connectionId: string;
+  provider: 'truelayer';
+  displayName: string;
+  status: ConnectionStatus;
+  consecutiveFailures: number;
+  lastError?: { type: string; at: string };
+  accounts: ConnectedAccount[];
+  createdAt: string;
+  updatedAt: string;
+  needsAttention: boolean;
+}
+
+export interface InboxItem {
+  txnKey: string;
+  amount: number;
+  direction: 'IN' | 'OUT';
+  suggestedType: 'INCOME' | 'EXPENSE';
+  description: string;
+  bookingDate: string;
+  connectionId: string;
+  accountUid: string;
+  importedAt: string;
+  suggestion?: { type: TransactionType; categoryId: string; ruleId: string };
+}
+
+export interface InboxPage {
+  items: InboxItem[];
+  cursor?: string;
+}
+
+export interface SyncResult {
+  imported: number;
+  skipped: number;
+  failedAccounts: number;
+  partial: boolean;
+}
+
+export interface SyncStatus {
+  state: 'IDLE' | 'RUNNING';
+  startedAt?: string;
+  finishedAt?: string;
+  lastResult?: SyncResult;
+}
+
+export interface PendingSync {
+  baselineFinishedAt: string | null;
+  requestedAt: number;
+}

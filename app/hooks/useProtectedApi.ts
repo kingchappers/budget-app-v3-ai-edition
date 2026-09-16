@@ -1,5 +1,6 @@
 import { useAuth0 } from '@auth0/auth0-react';
 import { useCallback } from 'react';
+import { ApiError } from '~/lib/apiError';
 
 export function useProtectedApi() {
   const { getAccessTokenSilently } = useAuth0();
@@ -19,7 +20,7 @@ export function useProtectedApi() {
         });
 
         if (!response.ok) {
-          throw new Error(`API error: ${response.status} ${response.statusText}`);
+          throw new ApiError(response.status, response.statusText);
         }
 
         if (response.status === 204) return null;
