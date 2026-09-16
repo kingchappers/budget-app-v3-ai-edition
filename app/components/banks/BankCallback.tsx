@@ -32,6 +32,10 @@ export function BankCallback({ storage = window.sessionStorage }: { storage?: St
   const [stashed] = useState(() => readStashedBankCallback(storage));
   const [status, setStatus] = useState<Status>({ kind: 'loading' });
   const [attempt, setAttempt] = useState(0);
+  // Bumped on every Retry click so the polling effect always re-runs, even when
+  // a first-attempt error (attempt === 1) means setAttempt(1) alone would be a
+  // same-value update React bails out of.
+  const [retryToken, setRetryToken] = useState(0);
   const started = useRef(false);
 
   useEffect(() => {
@@ -98,12 +102,14 @@ export function BankCallback({ storage = window.sessionStorage }: { storage?: St
       });
 
     return () => { cancelled = true; };
-    // Intentionally only re-runs on attempt; stashed/complete/navigate/storage are stable for a given mount.
-  }, [attempt]);
+    // Intentionally re-runs on attempt or retryToken; stashed/complete/navigate/storage
+    // are stable for a given mount. retryToken guarantees a re-run even when a Retry
+    // click resets attempt to a value it already held (e.g. a first-attempt error).
+  }, [attempt, retryToken]);
 
   if (status.kind === 'error') {
     const onRetry = status.canRetry
-      ? () => { setStatus({ kind: 'loading' }); setAttempt(1); }
+      ? () => { setStatus({ kind: 'loading' }); setAttempt(1); setRetryToken(t => t + 1); }
       : undefined;
     return <CallbackAlert title="Bank not connected" message={status.message} onRetry={onRetry} />;
   }

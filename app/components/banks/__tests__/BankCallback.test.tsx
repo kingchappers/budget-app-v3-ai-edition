@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { StrictMode } from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
 import { MantineProvider } from '@mantine/core';
 import { MemoryRouter } from 'react-router';
 
@@ -19,7 +19,7 @@ vi.mock('react-router', async importOriginal => ({
   useNavigate: () => navigate,
 }));
 
-import { BankCallback } from '../BankCallback';
+import { BankCallback, MAX_POLL_ATTEMPTS, POLL_INTERVAL_MS } from '../BankCallback';
 
 function renderAt(search: string) {
   window.history.pushState({}, '', `/banks/callback${search}`);
@@ -87,6 +87,7 @@ describe('BankCallback', () => {
   });
 
   it('polls again while the connection is pending, then completes on ready', async () => {
+    vi.useFakeTimers();
     window.sessionStorage.setItem('budget.bankCallback', JSON.stringify({ state: 's1' }));
     complete.mutateAsync
       .mockResolvedValueOnce({ status: 'PENDING' })
@@ -95,25 +96,36 @@ describe('BankCallback', () => {
 
     renderAt('');
 
-    await waitFor(() => expect(complete.mutateAsync).toHaveBeenCalledTimes(1));
-    await vi.waitFor(() => expect(complete.mutateAsync).toHaveBeenCalledTimes(2), { timeout: 3000, interval: 50 });
-    await vi.waitFor(() => expect(complete.mutateAsync).toHaveBeenCalledTimes(3), { timeout: 3000, interval: 50 });
-    await waitFor(() => expect(navigate).toHaveBeenCalledWith('/banks', { replace: true }));
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+    expect(complete.mutateAsync).toHaveBeenCalledTimes(1);
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(POLL_INTERVAL_MS); });
+    expect(complete.mutateAsync).toHaveBeenCalledTimes(2);
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(POLL_INTERVAL_MS); });
+    expect(complete.mutateAsync).toHaveBeenCalledTimes(3);
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+    expect(navigate).toHaveBeenCalledWith('/banks', { replace: true });
   });
 
   it('gives up after the poll times out and shows an error with retry', async () => {
+    vi.useFakeTimers();
     window.sessionStorage.setItem('budget.bankCallback', JSON.stringify({ state: 's1' }));
     complete.mutateAsync.mockResolvedValue({ status: 'PENDING' });
 
     renderAt('');
 
-    await waitFor(
-      () => expect(screen.getByText('This is taking longer than expected. Please try again shortly.')).toBeInTheDocument(),
-      { timeout: 6000 },
-    );
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+    for (let i = 1; i < MAX_POLL_ATTEMPTS; i += 1) {
+      await act(async () => { await vi.advanceTimersByTimeAsync(POLL_INTERVAL_MS); });
+    }
+
+    expect(complete.mutateAsync).toHaveBeenCalledTimes(MAX_POLL_ATTEMPTS);
+    expect(screen.getByText('This is taking longer than expected. Please try again shortly.')).toBeInTheDocument();
     expect(navigate).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
-  }, 8000);
+  });
 
   it('explains an expired attempt', async () => {
     const { ApiError } = await import('~/lib/apiError');
@@ -129,5 +141,23 @@ describe('BankCallback', () => {
     complete.mutateAsync.mockRejectedValueOnce(new ApiError(500, 'Server Error'));
     renderAt('');
     expect(await screen.findByText('We could not finish connecting your bank. Please try again.')).toBeInTheDocument();
+  });
+
+  it('retries after a first-attempt error', async () => {
+    const { ApiError } = await import('~/lib/apiError');
+    window.sessionStorage.setItem('budget.bankCallback', JSON.stringify({ state: 's1' }));
+    complete.mutateAsync
+      .mockRejectedValueOnce(new ApiError(500, 'Server Error'))
+      .mockResolvedValueOnce({ status: 'READY', connection: {} });
+
+    renderAt('');
+
+    expect(await screen.findByText('We could not finish connecting your bank. Please try again.')).toBeInTheDocument();
+    expect(complete.mutateAsync).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+
+    await waitFor(() => expect(complete.mutateAsync).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith('/banks', { replace: true }));
   });
 });
