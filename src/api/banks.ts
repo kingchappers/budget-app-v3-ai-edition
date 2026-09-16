@@ -63,7 +63,7 @@ export async function connectBank(event: APIGatewayProxyEventV2, userId: string,
     return err(400, 'connectionId must be a UUID');
   }
 
-  const result = await invokeWorker<{ url: string }>({
+  const result = await invokeWorker<{ url: string; state: string }>({
     command: 'createConnection',
     userId,
     startDate: startDate as string,
@@ -71,7 +71,7 @@ export async function connectBank(event: APIGatewayProxyEventV2, userId: string,
     psu: psuFrom(event),
   });
   if (!result.ok) return err(WORKER_ERROR_STATUS[result.error], result.message);
-  return ok({ url: result.value.url });
+  return ok({ url: result.value.url, state: result.value.state });
 }
 
 export async function completeBankCallback(event: APIGatewayProxyEventV2, userId: string, _params: Params): Promise<ApiResponse> {

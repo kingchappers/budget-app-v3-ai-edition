@@ -13,17 +13,17 @@ describe('bank and inbox API client', () => {
     expect(request).toHaveBeenCalledWith('/api/banks/connections/a%2Fb', { method: 'DELETE' });
   });
 
-  it('posts the connect request and returns the url', async () => {
-    const { request, api } = setup({ url: 'https://auth.truelayer.com/x' });
-    const url = await api.connectBank({ startDate: '2026-09-01' });
-    expect(url).toBe('https://auth.truelayer.com/x');
+  it('posts the connect request and returns the url and state', async () => {
+    const { request, api } = setup({ url: 'https://auth.truelayer.com/x', state: 'state-1' });
+    const result = await api.connectBank({ startDate: '2026-09-01' });
+    expect(result).toEqual({ url: 'https://auth.truelayer.com/x', state: 'state-1' });
     expect(request).toHaveBeenCalledWith('/api/banks/connect', {
       method: 'POST', body: JSON.stringify({ startDate: '2026-09-01' }),
     });
   });
 
   it('includes connectionId when reconnecting an existing connection', async () => {
-    const { request, api } = setup({ url: 'https://auth.truelayer.com/x' });
+    const { request, api } = setup({ url: 'https://auth.truelayer.com/x', state: 'state-1' });
     await api.connectBank({ startDate: '2026-09-01', connectionId: 'conn-1' });
     expect(request).toHaveBeenCalledWith('/api/banks/connect', {
       method: 'POST', body: JSON.stringify({ startDate: '2026-09-01', connectionId: 'conn-1' }),

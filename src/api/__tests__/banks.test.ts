@@ -77,17 +77,17 @@ describe('connectBank', () => {
   const body = { startDate: '2026-09-01' };
 
   it('forwards to createConnection with the JWT user and PSU context', async () => {
-    mockInvoke.mockResolvedValueOnce({ ok: true, value: { url: 'https://auth.truelayer.com/x' } });
+    mockInvoke.mockResolvedValueOnce({ ok: true, value: { url: 'https://auth.truelayer.com/x', state: STATE } });
     const res = await connectBank(makeEvent({ body }), USER, {});
     expect(res.statusCode).toBe(200);
-    expect(JSON.parse(res.body)).toEqual({ url: 'https://auth.truelayer.com/x' });
+    expect(JSON.parse(res.body)).toEqual({ url: 'https://auth.truelayer.com/x', state: STATE });
     expect(mockInvoke).toHaveBeenCalledWith({
       command: 'createConnection', userId: USER, ...body, psu: { ipAddress: '203.0.113.5', userAgent: 'Firefox' },
     });
   });
 
   it('forwards a valid connectionId', async () => {
-    mockInvoke.mockResolvedValueOnce({ ok: true, value: { url: 'https://auth.truelayer.com/x' } });
+    mockInvoke.mockResolvedValueOnce({ ok: true, value: { url: 'https://auth.truelayer.com/x', state: STATE } });
     await connectBank(makeEvent({ body: { ...body, connectionId: CONNECTION_ID } }), USER, {});
     expect(mockInvoke).toHaveBeenCalledWith({
       command: 'createConnection', userId: USER, startDate: body.startDate, connectionId: CONNECTION_ID,

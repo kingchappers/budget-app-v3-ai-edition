@@ -75,7 +75,7 @@ describe('createConnection', () => {
   it('stores a pending auth with the returned providerConnectionId and returns the hosted page url', async () => {
     const result = await executeWorkerCommand(deps(), { command: 'createConnection', userId: USER, startDate: '2026-09-01', psu });
 
-    expect(result).toEqual({ ok: true, value: { url: 'https://payment.truelayer.com/start' } });
+    expect(result).toEqual({ ok: true, value: { url: 'https://payment.truelayer.com/start', state: STATE } });
     expect(await store.getPendingAuth(USER, STATE, NOW)).toMatchObject({
       startDate: '2026-09-01', providerConnectionId: 'tl-conn-new',
     });

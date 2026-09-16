@@ -25,6 +25,11 @@ export interface ConnectBankInput {
   connectionId?: string;
 }
 
+export interface ConnectBankResult {
+  url: string;
+  state: string;
+}
+
 export type CompleteBankCallbackResult =
   | { status: 'READY'; connection: BankConnection }
   | { status: 'PENDING' };
@@ -101,9 +106,8 @@ export function createApi(request: Request) {
       await request(`/api/targets/${encodeURIComponent(categoryId)}`, { method: 'DELETE' });
     },
 
-    connectBank: async (input: ConnectBankInput): Promise<string> => {
-      const res = await request('/api/banks/connect', { method: 'POST', body: JSON.stringify(input) }) as { url: string };
-      return res.url;
+    connectBank: async (input: ConnectBankInput): Promise<ConnectBankResult> => {
+      return await request('/api/banks/connect', { method: 'POST', body: JSON.stringify(input) }) as ConnectBankResult;
     },
     completeBankCallback: async (state: string): Promise<CompleteBankCallbackResult> => {
       const res = await request('/api/banks/callback', {

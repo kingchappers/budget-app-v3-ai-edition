@@ -87,7 +87,7 @@ export function parseWorkerCommand(input: unknown): WorkerCommand | null {
   }
 }
 
-async function createConnection(deps: WorkerDeps, command: CommandOf<'createConnection'>): Promise<WorkerResult<{ url: string }>> {
+async function createConnection(deps: WorkerDeps, command: CommandOf<'createConnection'>): Promise<WorkerResult<{ url: string; state: string }>> {
   if (command.connectionId && !(await deps.store.getConnection(command.userId, command.connectionId))) {
     return failure('NOT_FOUND', 'Connection not found');
   }
@@ -108,7 +108,7 @@ async function createConnection(deps: WorkerDeps, command: CommandOf<'createConn
     expiresAt: Math.floor(now / 1000) + PENDING_AUTH_TTL_S,
   });
 
-  return success({ url: hostedPageUrl });
+  return success({ url: hostedPageUrl, state });
 }
 
 async function completeConnection(deps: WorkerDeps, command: CommandOf<'completeConnection'>): Promise<WorkerResult<CompleteConnectionResult>> {
