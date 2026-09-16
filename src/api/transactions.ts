@@ -186,6 +186,8 @@ export async function updateTransaction(
     description,
     date,
     createdAt: existing.createdAt,
+    ...(existing.source ? { source: existing.source } : {}),
+    ...(existing.bankRef ? { bankRef: existing.bankRef } : {}),
   };
 
   if (newYearMonth === yearMonth) {
