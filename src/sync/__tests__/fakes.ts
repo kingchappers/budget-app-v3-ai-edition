@@ -1,7 +1,8 @@
 import type { SyncStore } from '../store';
 import type {
-  BankProvider, ConnectedAccount, Connection, EnableBankingConnection, FetchContext, InboxItem,
+  BankProvider, ConnectedAccount, Connection, FetchContext, InboxItem,
   PendingAuth, ProviderTransaction, PsuContext, SeenOutcome, SyncResult, SyncStatus, SyncWindow,
+  TrueLayerConnection,
 } from '../types';
 
 const key = (userId: string, id: string) => `${userId}|${id}`;
@@ -102,7 +103,7 @@ export class FakeSyncStore implements SyncStore {
 export type ScriptedResponse = ProviderTransaction[] | Error;
 
 export class FakeProvider implements BankProvider {
-  readonly id = 'enable-banking' as const;
+  readonly id = 'truelayer' as const;
   readonly calls: { accountUid: string; window: SyncWindow; psu?: PsuContext }[] = [];
   private readonly scripts = new Map<string, ScriptedResponse[]>();
 
@@ -135,15 +136,15 @@ export function makeAccount(overrides: Partial<ConnectedAccount> = {}): Connecte
   };
 }
 
-export function makeConnection(overrides: Partial<EnableBankingConnection> = {}): EnableBankingConnection {
+export function makeConnection(overrides: Partial<TrueLayerConnection> = {}): TrueLayerConnection {
   return {
     connectionId: '11111111-1111-4111-8111-111111111111',
-    provider: 'enable-banking',
+    provider: 'truelayer',
     displayName: 'Lloyds Bank',
     status: 'ACTIVE',
     consecutiveFailures: 0,
     accounts: [makeAccount()],
-    auth: { sessionId: 'session-1', consentValidUntil: '2027-03-01T00:00:00.000Z' },
+    auth: { providerConnectionId: 'tl-conn-1' },
     createdAt: '2026-09-01T00:00:00.000Z',
     updatedAt: '2026-09-01T00:00:00.000Z',
     ...overrides,

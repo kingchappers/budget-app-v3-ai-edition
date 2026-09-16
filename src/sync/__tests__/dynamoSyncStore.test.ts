@@ -109,9 +109,9 @@ describe('dynamoSyncStore', () => {
 
   describe('replaceConnectionIfUnchanged', () => {
     const connection = {
-      connectionId: 'c1', provider: 'enable-banking' as const, displayName: 'Lloyds', status: 'ACTIVE' as const,
+      connectionId: 'c1', provider: 'truelayer' as const, displayName: 'Lloyds', status: 'ACTIVE' as const,
       consecutiveFailures: 0, accounts: [], createdAt: 't0', updatedAt: 't2',
-      auth: { sessionId: 's', consentValidUntil: '2027-01-01T00:00:00.000Z' }, lastError: undefined,
+      auth: { providerConnectionId: 'tl-conn-1' }, lastError: undefined,
     };
 
     it('puts conditionally on the previous updatedAt and drops undefined fields', async () => {

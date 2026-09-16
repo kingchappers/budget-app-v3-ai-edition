@@ -104,11 +104,6 @@ async function syncConnection(
     return saved;
   };
 
-  if (Date.parse(connection.auth.consentValidUntil) <= deps.now()) {
-    await save({ status: 'EXPIRED' });
-    return;
-  }
-
   const provider = deps.providers[connection.provider];
 
   for (const account of initial.accounts) {

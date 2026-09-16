@@ -14,7 +14,7 @@ let clock: number;
 
 function deps(overrides: Partial<RunSyncDeps> = {}): RunSyncDeps {
   return {
-    store, providers: { 'enable-banking': provider }, now: () => clock,
+    store, providers: { truelayer: provider }, now: () => clock,
     deadline: clock + 300_000, log: vi.fn(), ...overrides,
   };
 }
@@ -184,15 +184,6 @@ describe('runSync failures', () => {
     await runSync(deps(), [USER]);
 
     expect(provider.calls).toHaveLength(1);
-  });
-
-  it('expires a connection whose consent has passed without calling the provider', async () => {
-    await store.putConnection(USER, makeConnection({ auth: { sessionId: 's', consentValidUntil: iso(NOW - 1) } }));
-
-    await runSync(deps(), [USER]);
-
-    expect(store.connectionFor(USER, makeConnection().connectionId)?.status).toBe('EXPIRED');
-    expect(provider.calls).toHaveLength(0);
   });
 
   it('skips connections that are already EXPIRED', async () => {

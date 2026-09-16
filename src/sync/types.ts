@@ -1,7 +1,7 @@
 import type { TransactionType } from '../api/types';
 import type { ProviderErrorType } from './errors';
 
-export type ProviderId = 'enable-banking';
+export type ProviderId = 'truelayer';
 export type Direction = 'IN' | 'OUT';
 export type ConnectionStatus = 'ACTIVE' | 'EXPIRED' | 'ERROR';
 export type SeenOutcome = 'PENDING' | 'CONFIRMED' | 'IGNORED';
@@ -32,12 +32,12 @@ interface ConnectionBase {
   updatedAt: string;
 }
 
-export interface EnableBankingConnection extends ConnectionBase {
-  provider: 'enable-banking';
-  auth: { sessionId: string; consentValidUntil: string };
+export interface TrueLayerConnection extends ConnectionBase {
+  provider: 'truelayer';
+  auth: { providerConnectionId: string };
 }
 
-export type Connection = EnableBankingConnection;
+export type Connection = TrueLayerConnection;
 
 export interface ProviderTransaction {
   entryReference: string | null;
