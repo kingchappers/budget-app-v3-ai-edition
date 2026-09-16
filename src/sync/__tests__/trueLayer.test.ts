@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { createTrueLayerProvider, isAllowedHostedPageUrl, MAX_TRANSACTION_PAGES } from '../providers/trueLayer';
+import { createTrueLayerProvider, isAllowedHostedPageUrl, STATUS_POLL_INTERVAL_MS } from '../providers/trueLayer';
 import type { TlClient } from '../providers/trueLayerClient';
 import type { ConnectedAccount, Connection } from '../types';
 
@@ -106,7 +106,8 @@ describe('fetchTransactions', () => {
       .mockResolvedValueOnce({ status: 'pending' })
       .mockResolvedValueOnce({ status: 'completed', results: [settled('t1')], pagination: { next_cursor: 'p2' } })
       .mockResolvedValueOnce({ status: 'completed', results: [settled('t2')], pagination: { next_cursor: null } });
-    const provider = createTrueLayerProvider(fakeClient({ post, get }));
+    const sleep = vi.fn(async () => {});
+    const provider = createTrueLayerProvider(fakeClient({ post, get }), { sleep });
     const result = await provider.fetchTransactions(connection, account, { from: '2026-09-01', to: '2026-09-13' }, { psu, deadline: Date.now() + 60_000 });
     expect(result.map(t => t.entryReference)).toEqual(['t1', 't2']);
     expect(post).toHaveBeenCalledWith('/v3/connected-accounts/acc-1/transactions/requests', { from: '2026-09-01', to: '2026-09-13' }, { 'Connection-Id': 'tl-conn-1' });
@@ -148,11 +149,26 @@ describe('fetchTransactions', () => {
   it('throws TRANSIENT if the request never completes within the poll budget', async () => {
     const post = vi.fn(async () => ({ id: 'req-1', status: 'pending' }));
     const get = vi.fn(async () => ({ status: 'pending' }));
-    const provider = createTrueLayerProvider(fakeClient({ post, get }));
+    const sleep = vi.fn(async () => {});
+    const provider = createTrueLayerProvider(fakeClient({ post, get }), { sleep });
     await expect(provider.fetchTransactions(connection, account, { from: 'a', to: 'b' }, { deadline: Date.now() + 60_000 }))
       .rejects.toMatchObject({ type: 'TRANSIENT' });
     expect(get).toHaveBeenCalledTimes(10); // MAX_STATUS_POLLS
-  }, 20_000); // real STATUS_POLL_INTERVAL_MS delays between polls exceed the default test timeout
+  });
+
+  it('stops polling early once the deadline is exhausted, without waiting out the full poll budget', async () => {
+    const post = vi.fn(async () => ({ id: 'req-1', status: 'pending' }));
+    const get = vi.fn(async () => ({ status: 'pending' }));
+    let t = 0;
+    const now = () => t;
+    const sleep = vi.fn(async () => { t += STATUS_POLL_INTERVAL_MS; });
+    const provider = createTrueLayerProvider(fakeClient({ post, get }), { sleep, now });
+    // Allows two poll cycles' worth of sleeping before the deadline is too close to risk a third.
+    await expect(provider.fetchTransactions(connection, account, { from: 'a', to: 'b' }, { deadline: 2 * STATUS_POLL_INTERVAL_MS + 500 }))
+      .rejects.toMatchObject({ type: 'TRANSIENT' });
+    expect(get).toHaveBeenCalledTimes(3); // stopped well short of MAX_STATUS_POLLS (10)
+    expect(sleep).toHaveBeenCalledTimes(2);
+  });
 
   it('fails rather than silently truncating after the page cap', async () => {
     const post = vi.fn(async () => ({ id: 'req-1', status: 'pending' }));

@@ -2,12 +2,18 @@ import { isRecord } from '../../api/body';
 import type { SessionAccount } from '../accounts';
 import { ProviderError } from '../errors';
 import type { BankProvider, PsuContext, ProviderTransaction } from '../types';
-import type { TlClient } from './trueLayerClient';
+import type { TlClient, TlEnvironment } from './trueLayerClient';
 
 export const MAX_TRANSACTION_PAGES = 50;
 export const MAX_STATUS_POLLS = 10;
 export const STATUS_POLL_INTERVAL_MS = 2000;
-const HOSTED_PAGE_HOST = 'truelayer.com';
+// Unconfirmed item 9: the sandbox hosted-page host is inferred from the
+// confirmed api/auth sandbox host naming pattern, not directly verified —
+// confirm during the Phase 0.3 sandbox walkthrough.
+const HOSTED_PAGE_HOSTS: Record<TlEnvironment, string> = {
+  live: 'truelayer.com',
+  sandbox: 'truelayer-sandbox.com',
+};
 // Unconfirmed item 4: placeholder terminal status name — confirm during
 // Task 26 Step 1 against the sandbox and adjust the check below.
 const CONNECTION_PENDING_STATUSES = new Set(['authorization_required', 'authorizing']);
@@ -31,10 +37,19 @@ export interface TrueLayerApi extends BankProvider {
   getAccounts(providerConnectionId: string): Promise<TlAccount[]>;
 }
 
-export function isAllowedHostedPageUrl(value: string): boolean {
+export interface TrueLayerProviderOptions {
+  /** Selects the hosted-page host allowlist. Defaults to 'live'. */
+  environment?: TlEnvironment;
+  /** Injectable poll delay, mirroring TlClientOptions.sleep — defaults to a real setTimeout-based sleep. */
+  sleep?: (ms: number) => Promise<void>;
+  /** Injectable clock used for the fetchTransactions deadline check — defaults to Date.now. */
+  now?: () => number;
+}
+
+export function isAllowedHostedPageUrl(value: string, host: string = HOSTED_PAGE_HOSTS.live): boolean {
   try {
     const url = new URL(value);
-    return url.protocol === 'https:' && (url.hostname === HOSTED_PAGE_HOST || url.hostname.endsWith(`.${HOSTED_PAGE_HOST}`));
+    return url.protocol === 'https:' && (url.hostname === host || url.hostname.endsWith(`.${host}`));
   } catch {
     return false;
   }
@@ -73,7 +88,7 @@ function parseTlAccount(raw: unknown): TlAccount {
   };
 }
 
-function sleep(ms: number): Promise<void> {
+function defaultSleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
@@ -112,7 +127,11 @@ function normaliseTlTransaction(raw: unknown, startDate: string): ProviderTransa
   };
 }
 
-export function createTrueLayerProvider(client: TlClient): TrueLayerApi {
+export function createTrueLayerProvider(client: TlClient, options: TrueLayerProviderOptions = {}): TrueLayerApi {
+  const hostedPageHost = HOSTED_PAGE_HOSTS[options.environment ?? 'live'];
+  const sleep = options.sleep ?? defaultSleep;
+  const now = options.now ?? Date.now;
+
   return {
     id: 'truelayer',
 
@@ -127,7 +146,7 @@ export function createTrueLayerProvider(client: TlClient): TrueLayerApi {
       if (!isRecord(response) || typeof response.id !== 'string' || !isRecord(response.hosted_page) || typeof response.hosted_page.uri !== 'string') {
         throw invalid('connection response');
       }
-      if (!isAllowedHostedPageUrl(response.hosted_page.uri)) throw invalid('hosted page url');
+      if (!isAllowedHostedPageUrl(response.hosted_page.uri, hostedPageHost)) throw invalid('hosted page url');
 
       return { providerConnectionId: response.id, hostedPageUrl: response.hosted_page.uri };
     },
@@ -176,6 +195,9 @@ export function createTrueLayerProvider(client: TlClient): TrueLayerApi {
           if (statusResponse.status === 'failed') throw invalid('transactions-request (failed)');
           pollCount += 1;
           if (pollCount >= MAX_STATUS_POLLS) throw new ProviderError('TRANSIENT', 'TrueLayer transactions request did not complete in time');
+          if (ctx.deadline - now() < STATUS_POLL_INTERVAL_MS) {
+            throw new ProviderError('TRANSIENT', 'TrueLayer transactions request would exceed the sync deadline');
+          }
           await sleep(STATUS_POLL_INTERVAL_MS);
         }
 
