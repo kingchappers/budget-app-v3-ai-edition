@@ -58,6 +58,15 @@ during the relevant task and record findings in the spec-update task):
   as a proactive countdown.
 - Numeric rate-limit thresholds (only error codes are confirmed, not
   requests/second or requests/day figures).
+- The sandbox hosted-page host: implementation uses a placeholder value
+  (`truelayer-sandbox.com`, inferred from the confirmed api/auth sandbox host
+  naming pattern in `src/sync/providers/trueLayer.ts`'s
+  `HOSTED_PAGE_HOSTS.sandbox`) that has not itself been directly verified
+  against a real sandbox `hosted_page.uri` response. Confirm during the
+  Phase 0.3 sandbox walkthrough and correct the constant if wrong — the
+  allowlist check (`isAllowedHostedPageUrl`) fails closed (throws
+  `INVALID_RESPONSE`) if it's wrong, so this is safely self-detecting rather
+  than a silent security gap.
 
 ## Goal
 
@@ -272,7 +281,17 @@ Unchanged from the Enable Banking version except where noted.
 | User registry | `SYSTEM` / `CONNUSER#{sub}` | `createdAt` | Written on first connection; deleted when the user's last connection is removed |
 
 `status: ERROR` is set when `consecutiveFailures ≥ 3` and reset to `ACTIVE` on
-the next successful account sync.
+the next successful account sync. `consecutiveFailures` increments **at most
+once per connection per run**, regardless of how many of the connection's
+accounts fail in that run: a run counts as failed for this purpose if *any*
+account in it failed. Concretely, a later account's success in the same run
+must not reset `consecutiveFailures`/`status`/`lastError` if an earlier
+account in that run already failed — the reset reads from the run's
+`initial.consecutiveFailures` value rather than a running per-account
+mutation, so the outcome is independent of account iteration order. Without
+this, a connection with one permanently-broken account alongside otherwise
+healthy accounts could never reach `ERROR`, since a healthy account's success
+each run would keep resetting the counter.
 
 ### Dedupe key
 
@@ -314,7 +333,7 @@ Unchanged — already applied by the merged Task 5/11.
  │                                                                      data_access_type: "recurring",
  │                                                                      authorization_flow.redirect.return_uri: .../banks/callback,
  │                                                                      user_consent: {...} }
- │◄─────────────── { url } (hosted_page.uri, host allowlisted) ◄───────┘
+ │◄─────────────── { url, state } (hosted_page.uri, host allowlisted) ◄─┘
  │ window.location = url ──────────────────────────────────────────────────────► SCA + bank picker
  │◄──────────── /banks/callback?<TrueLayer's own redirect params> ◄─────────────────┘
 /banks/callback
@@ -341,6 +360,15 @@ Unchanged — already applied by the merged Task 5/11.
   there is no bank-picker step. `startDate` `YYYY-MM-DD`, not in the future,
   not more than 2 years ago. On `/callback`: `state` UUID format (no `code`
   field).
+- **`/connect`'s response includes `state`** alongside `url` (extended from
+  an initial `{ url }`-only contract, commit `1146b15`): the frontend must
+  stash `state` client-side (`sessionStorage`) before `window.location`
+  navigates away, since it needs to send `state` back on `/callback` and
+  deliberately never reads it from TrueLayer's own (unconfirmed-shape)
+  redirect query params. `state` here is the same server-generated value
+  already written to `BANKAUTH#state`, just relayed back to the same
+  authenticated caller that requested it — not a new value and not sourced
+  from an untrusted redirect.
 - **`providerConnectionId` stored** on `BANKAUTH#state` immediately after
   `createConnection` returns, so `/callback` knows which TrueLayer
   connection to poll without needing anything from the redirect itself.
@@ -414,11 +442,19 @@ For each user:
         with `{ from, to }` → `{ id: requestId, status: "pending" }`.
       - Poll `GET
         /v3/connected-accounts/{account_id}/transactions/requests/{requestId}`
-        until `status: "completed"` (bounded retry count/backoff within the
-        account's remaining deadline budget; treat `status: "failed"` as a
-        `TRANSIENT` or `INVALID_RESPONSE` `ProviderError` depending on the
-        failure detail, and a poll timeout before `completed` as
-        `TRANSIENT`).
+        until `status: "completed"` (bounded by both a max poll count,
+        `MAX_STATUS_POLLS = 10`, and `ctx.deadline`: each loop iteration
+        checks `ctx.deadline - now() < STATUS_POLL_INTERVAL_MS` before
+        sleeping again and throws a `TRANSIENT` `ProviderError` immediately
+        once insufficient time remains, rather than sleeping past the
+        account's remaining budget and letting `runSync`'s outer
+        `MIN_ACCOUNT_BUDGET_MS` check catch it after the fact; treat
+        `status: "failed"` as a `TRANSIENT` or `INVALID_RESPONSE`
+        `ProviderError` depending on the failure detail, and exhausting
+        `MAX_STATUS_POLLS` before `completed` as `TRANSIENT`). The poll
+        delay (`sleep`) and clock (`now`) are both injectable options on
+        `createTrueLayerProvider`, mirroring `trueLayerClient`'s existing
+        injectable `sleep`, so tests don't wait on real timers.
       - Follow `pagination.next_cursor` on the completed result until
         `null`.
    4. Normalise: skip non-GBP; skip `status !== "settled"`; skip
@@ -478,7 +514,7 @@ Unchanged from the Enable Banking design except `/banks/aspsps` is removed
 
 | Route | Behaviour | Responses |
 |---|---|---|
-| `POST /api/banks/connect` | Start/reconnect auth (`{ startDate, connectionId? }`, no bank selection) | 200 `{ url }` / 400 / 404 (unknown `connectionId`) |
+| `POST /api/banks/connect` | Start/reconnect auth (`{ startDate, connectionId? }`, no bank selection) | 200 `{ url, state }` / 400 / 404 (unknown `connectionId`) |
 | `POST /api/banks/callback` | Complete connection (`{ state }`, no `code`) | 201 `{ connection }` / 400 / 404 |
 | `DELETE /api/banks/auth/{state}` | Clear failed attempt | 204 |
 | `GET /api/banks/connections` | Connections with derived `needsAttention`; `auth` stripped; no `expiresInDays` (unconfirmed expiry timing, see Provider Change Log) | 200 |
