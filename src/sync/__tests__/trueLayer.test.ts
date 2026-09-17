@@ -44,7 +44,7 @@ describe('createConnection', () => {
     expect(client.post).toHaveBeenCalledWith('/v3/data-connections', expect.objectContaining({
       scopes: ['info', 'accounts', 'balance', 'transactions'],
       data_access_type: 'recurring',
-    }), undefined);
+    }), { 'Tl-User-IP': psu.ipAddress });
   });
 
   it('rejects a malformed response', async () => {
@@ -96,6 +96,17 @@ describe('getAccounts', () => {
       { accountUid: 'a2', displayName: 'Savings Account', last4: '5555', currency: 'GBP' },
       { accountUid: 'a3', displayName: 'Current Account', last4: '', currency: 'EUR' },
     ]);
+    expect(client.get).toHaveBeenCalledWith('/v3/connected-accounts', undefined, { 'Connection-Id': 'tl-conn-1' });
+  });
+
+  it('throws INVALID_RESPONSE rather than silently truncating when a second page exists', async () => {
+    const client = fakeClient({
+      get: vi.fn(async () => ({
+        items: [{ id: 'a1', currency: 'GBP', account_type: 'current', account_identifiers: [] }],
+        pagination: { next_cursor: 'more' },
+      })),
+    });
+    await expect(createTrueLayerProvider(client).getAccounts('tl-conn-1')).rejects.toMatchObject({ type: 'INVALID_RESPONSE' });
   });
 });
 
@@ -110,7 +121,29 @@ describe('fetchTransactions', () => {
     const provider = createTrueLayerProvider(fakeClient({ post, get }), { sleep });
     const result = await provider.fetchTransactions(connection, account, { from: '2026-09-01', to: '2026-09-13' }, { psu, deadline: Date.now() + 60_000 });
     expect(result.map(t => t.entryReference)).toEqual(['t1', 't2']);
-    expect(post).toHaveBeenCalledWith('/v3/connected-accounts/acc-1/transactions/requests', { from: '2026-09-01', to: '2026-09-13' }, { 'Connection-Id': 'tl-conn-1' });
+    expect(post).toHaveBeenCalledWith(
+      '/v3/connected-accounts/acc-1/transactions/requests',
+      { from: '2026-09-01', to: '2026-09-13' },
+      { 'Connection-Id': 'tl-conn-1', 'Tl-User-IP': psu.ipAddress },
+    );
+  });
+
+  it('sends Tl-User-IP when a psu context is present (manual sync)', async () => {
+    const post = vi.fn(async () => ({ id: 'req-1', status: 'completed', results: [], pagination: { next_cursor: null } }));
+    const get = vi.fn(async () => ({ status: 'completed', results: [], pagination: { next_cursor: null } }));
+    const provider = createTrueLayerProvider(fakeClient({ post, get }));
+    await provider.fetchTransactions(connection, account, { from: 'a', to: 'b' }, { psu, deadline: Date.now() + 60_000 });
+    expect(post).toHaveBeenCalledWith(expect.any(String), expect.anything(), { 'Connection-Id': 'tl-conn-1', 'Tl-User-IP': psu.ipAddress });
+    expect(get).toHaveBeenCalledWith(expect.any(String), undefined, { 'Connection-Id': 'tl-conn-1', 'Tl-User-IP': psu.ipAddress });
+  });
+
+  it('omits Tl-User-IP when no psu context is present (scheduled sync)', async () => {
+    const post = vi.fn(async () => ({ id: 'req-1', status: 'completed', results: [], pagination: { next_cursor: null } }));
+    const get = vi.fn(async () => ({ status: 'completed', results: [], pagination: { next_cursor: null } }));
+    const provider = createTrueLayerProvider(fakeClient({ post, get }));
+    await provider.fetchTransactions(connection, account, { from: 'a', to: 'b' }, { deadline: Date.now() + 60_000 });
+    expect(post).toHaveBeenCalledWith(expect.any(String), expect.anything(), { 'Connection-Id': 'tl-conn-1' });
+    expect(get).toHaveBeenCalledWith(expect.any(String), undefined, { 'Connection-Id': 'tl-conn-1' });
   });
 
   it('skips pending (unsettled) transactions', async () => {

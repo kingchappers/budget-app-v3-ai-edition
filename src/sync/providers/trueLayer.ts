@@ -63,6 +63,13 @@ function connectionIdHeader(providerConnectionId: string): Record<string, string
   return { 'Connection-Id': providerConnectionId };
 }
 
+// Unconfirmed item: `X-Device-User-Agent` is not sent — only `Tl-User-IP` is
+// confirmed supported (see spec's Sync Algorithm section). Confirm the exact
+// user-agent header name during the Phase 0.3 sandbox walkthrough before adding it.
+function psuHeaders(psu: PsuContext | undefined): Record<string, string> {
+  return psu ? { 'Tl-User-IP': psu.ipAddress } : {};
+}
+
 function lastFour(identifiers: unknown): string {
   if (!Array.isArray(identifiers)) return '';
   for (const raw of identifiers) {
@@ -141,7 +148,7 @@ export function createTrueLayerProvider(client: TlClient, options: TrueLayerProv
         data_access_type: 'recurring',
         authorization_flow: { redirect: { return_uri: input.returnUri } },
         user_consent: { state: input.state },
-      }, undefined);
+      }, psuHeaders(input.psu));
 
       if (!isRecord(response) || typeof response.id !== 'string' || !isRecord(response.hosted_page) || typeof response.hosted_page.uri !== 'string') {
         throw invalid('connection response');
@@ -155,7 +162,13 @@ export function createTrueLayerProvider(client: TlClient, options: TrueLayerProv
       const response = await client.get(`/v3/data-connections/${encodeURIComponent(providerConnectionId)}`, undefined, connectionIdHeader(providerConnectionId));
       if (!isRecord(response) || typeof response.status !== 'string') throw invalid('connection status response');
       if (response.status === 'failed') return 'FAILED';
-      return CONNECTION_PENDING_STATUSES.has(response.status) ? 'PENDING' : 'READY';
+      if (CONNECTION_PENDING_STATUSES.has(response.status)) return 'PENDING';
+      // Unconfirmed item 2 (see spec): this is the one item that fails *open*, not
+      // closed — any status we don't recognise as pending is treated as READY. Log
+      // the raw value (not sensitive) so an unexpected terminal status surfaces
+      // immediately during the sandbox walkthrough instead of silently 502ing.
+      console.log('TrueLayer connection status not recognised as pending; treating as READY', { status: response.status });
+      return 'READY';
     },
 
     async getUserInfo(providerConnectionId) {
@@ -167,12 +180,18 @@ export function createTrueLayerProvider(client: TlClient, options: TrueLayerProv
     async getAccounts(providerConnectionId) {
       const response = await client.get('/v3/connected-accounts', undefined, connectionIdHeader(providerConnectionId));
       if (!isRecord(response) || !Array.isArray(response.items)) throw invalid('connected accounts response');
+      // Matches the transactions path's throw-don't-truncate convention: a second
+      // page of connected accounts would otherwise be silently dropped, and a
+      // dropped account means silently missing transactions forever.
+      if (isRecord(response.pagination) && typeof response.pagination.next_cursor === 'string') {
+        throw new ProviderError('INVALID_RESPONSE', 'TrueLayer connected accounts response is paginated, which is not supported');
+      }
       return response.items.map(parseTlAccount);
     },
 
     async fetchTransactions(connection, account, window, ctx) {
       if (connection.provider !== 'truelayer') throw invalid('connection (not a TrueLayer connection)');
-      const headers = connectionIdHeader(connection.auth.providerConnectionId);
+      const headers = { ...connectionIdHeader(connection.auth.providerConnectionId), ...psuHeaders(ctx.psu) };
 
       const createResponse = await client.post(`/v3/connected-accounts/${encodeURIComponent(account.accountUid)}/transactions/requests`, {
         from: window.from,
