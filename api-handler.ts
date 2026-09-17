@@ -53,7 +53,10 @@ router.post('/api/inbox/{bookingDate}/{txnKey}/ignore', ignoreInboxItem);
 export const handler: APIGatewayProxyHandlerV2 = async (event) => {
   try {
     console.log('Request:', {
-      path: event.rawPath,
+      // Log the templated route, not the raw path — some routes (e.g. DELETE
+      // /api/banks/auth/{state}) carry a sensitive value (`state`) as a path
+      // segment, and the spec's Logging section says it must never be logged.
+      route: event.requestContext.routeKey,
       method: event.requestContext.http.method,
       sourceIp: event.requestContext.http.sourceIp,
     });
