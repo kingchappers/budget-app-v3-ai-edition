@@ -5,11 +5,13 @@ import { ConnectBankModal } from '~/components/banks/ConnectBankModal';
 import { ConnectionCard } from '~/components/banks/ConnectionCard';
 import { SyncNowButton } from '~/components/banks/SyncNowButton';
 import { useConnections, useDisconnectBank } from '~/lib/queries';
+import type { BankConnection } from '~/lib/types';
 
 function BanksContent() {
   const connections = useConnections();
   const disconnect = useDisconnectBank();
   const [connectOpen, setConnectOpen] = useState(false);
+  const [reconnecting, setReconnecting] = useState<BankConnection | null>(null);
   const nowMs = Date.now();
 
   return (
@@ -32,12 +34,15 @@ function BanksContent() {
           key={connection.connectionId}
           connection={connection}
           nowMs={nowMs}
-          onReconnect={() => setConnectOpen(true)}
+          onReconnect={() => setReconnecting(connection)}
           onDisconnect={() => disconnect.mutate(connection.connectionId)}
         />
       ))}
 
       <ConnectBankModal opened={connectOpen} onClose={() => setConnectOpen(false)} />
+      {reconnecting && (
+        <ConnectBankModal opened reconnect={reconnecting} onClose={() => setReconnecting(null)} />
+      )}
     </Stack>
   );
 }

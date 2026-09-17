@@ -68,4 +68,14 @@ describe('ConnectBankModal', () => {
     expect(onClose).toHaveBeenCalledOnce();
     expect(connect.mutateAsync).not.toHaveBeenCalled();
   });
+
+  it('includes the connectionId when reconnecting an existing connection', async () => {
+    const user = userEvent.setup();
+    const reconnect = { connectionId: 'c1', displayName: 'Lloyds Bank' };
+    const { redirect } = renderModal({ reconnect });
+    expect(screen.getByText('Reconnect Lloyds Bank')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /connect/i }));
+    await waitFor(() => expect(redirect).toHaveBeenCalledWith('https://truelayer.com/connect/x'));
+    expect(connect.mutateAsync).toHaveBeenCalledWith({ startDate: todayIso(), connectionId: 'c1' });
+  });
 });
