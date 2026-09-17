@@ -45,7 +45,12 @@ during the relevant task and record findings in the spec-update task):
   redirect params.
 - The exact terminal `status` value `GET /v3/data-connections/{id}` returns
   once a connection is ready to use (only `authorization_required` and
-  `authorizing` are confirmed as pending states from the docs).
+  `authorizing` are confirmed as pending states from the docs). **This item
+  fails open, not closed**: `pollConnectionStatus` treats any status other
+  than the two confirmed pending ones as `READY` (unlike every other
+  Unconfirmed item below, which fails closed). An unrecognised status value
+  is logged (the status string is not sensitive) so this surfaces immediately
+  during the Phase 0.3 sandbox walkthrough rather than staying a silent gap.
 - Whether `return_uri`'s domain must be pre-allowlisted in the TrueLayer
   console ahead of time (Enable Banking required console redirect-URL
   registration; TrueLayer's `return_uri` is a per-request field, but
@@ -584,8 +589,12 @@ to the rule. The worker has no API Gateway integration.
 
 - OpenTofu creates an empty secret `${app_name}/truelayer` (no
   `aws_secretsmanager_secret_version` resource). The deployer sets
-  `{ "clientId": "…", "clientSecret": "…" }` with `aws secretsmanager
-  put-secret-value`, so the credential never enters tfvars or state.
+  `{ "clientId": "…", "clientSecret": "…", "environment": "sandbox" | "live" }`
+  with `aws secretsmanager put-secret-value`, so the credential never enters
+  tfvars or state. `environment` selects both the API/auth hosts and the
+  hosted-page host allowlist (`HOSTED_PAGE_HOSTS` in
+  `src/sync/providers/trueLayer.ts`); the worker throws on startup if it's
+  missing or not one of the two allowed values.
 - Worker caches the `client_credentials` bearer token per warm container;
   tokens are reused until 5 minutes before their `expires_in` elapses (same
   caching pattern as Enable Banking's JWT cache, applied to a fetched token
