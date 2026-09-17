@@ -19,7 +19,7 @@ vi.mock('react-router', async importOriginal => ({
   useNavigate: () => navigate,
 }));
 
-import { BankCallback, MAX_POLL_ATTEMPTS, POLL_INTERVAL_MS } from '../BankCallback';
+import { BankCallback, MAX_POLL_ATTEMPTS, pollDelayMs } from '../BankCallback';
 
 function renderAt(search: string) {
   window.history.pushState({}, '', `/banks/callback${search}`);
@@ -80,10 +80,12 @@ describe('BankCallback', () => {
     expect(complete.mutateAsync).not.toHaveBeenCalled();
   });
 
-  it('shows the bank error as text', async () => {
+  it('shows the bank error as text and clears the server-side pending auth row', async () => {
+    window.sessionStorage.setItem('budget.bankCallback', JSON.stringify({ state: 's1' }));
     renderAt('?error=access_denied&error_description=%3Cb%3EUser%20cancelled%3C%2Fb%3E');
     expect(await screen.findByText('<b>User cancelled</b>')).toBeInTheDocument();
     expect(complete.mutateAsync).not.toHaveBeenCalled();
+    expect(clear.mutate).toHaveBeenCalledWith('s1');
   });
 
   it('polls again while the connection is pending, then completes on ready', async () => {
@@ -99,10 +101,10 @@ describe('BankCallback', () => {
     await act(async () => { await vi.advanceTimersByTimeAsync(0); });
     expect(complete.mutateAsync).toHaveBeenCalledTimes(1);
 
-    await act(async () => { await vi.advanceTimersByTimeAsync(POLL_INTERVAL_MS); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(pollDelayMs(1)); });
     expect(complete.mutateAsync).toHaveBeenCalledTimes(2);
 
-    await act(async () => { await vi.advanceTimersByTimeAsync(POLL_INTERVAL_MS); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(pollDelayMs(2)); });
     expect(complete.mutateAsync).toHaveBeenCalledTimes(3);
 
     await act(async () => { await vi.advanceTimersByTimeAsync(0); });
@@ -118,7 +120,7 @@ describe('BankCallback', () => {
 
     await act(async () => { await vi.advanceTimersByTimeAsync(0); });
     for (let i = 1; i < MAX_POLL_ATTEMPTS; i += 1) {
-      await act(async () => { await vi.advanceTimersByTimeAsync(POLL_INTERVAL_MS); });
+      await act(async () => { await vi.advanceTimersByTimeAsync(pollDelayMs(i)); });
     }
 
     expect(complete.mutateAsync).toHaveBeenCalledTimes(MAX_POLL_ATTEMPTS);
@@ -127,20 +129,22 @@ describe('BankCallback', () => {
     expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
   });
 
-  it('explains an expired attempt', async () => {
+  it('explains an expired attempt and clears the server-side pending auth row', async () => {
     const { ApiError } = await import('~/lib/apiError');
     window.sessionStorage.setItem('budget.bankCallback', JSON.stringify({ state: 's1' }));
     complete.mutateAsync.mockRejectedValueOnce(new ApiError(404, 'Not Found'));
     renderAt('');
     expect(await screen.findByText('This connection attempt has expired. Please start again.')).toBeInTheDocument();
+    expect(clear.mutate).toHaveBeenCalledWith('s1');
   });
 
-  it('shows a generic failure message and allows retry for other errors', async () => {
+  it('shows a generic failure message, allows retry, and does not clear the pending auth row for other errors', async () => {
     const { ApiError } = await import('~/lib/apiError');
     window.sessionStorage.setItem('budget.bankCallback', JSON.stringify({ state: 's1' }));
     complete.mutateAsync.mockRejectedValueOnce(new ApiError(500, 'Server Error'));
     renderAt('');
     expect(await screen.findByText('We could not finish connecting your bank. Please try again.')).toBeInTheDocument();
+    expect(clear.mutate).not.toHaveBeenCalled();
   });
 
   it('retries after a first-attempt error', async () => {

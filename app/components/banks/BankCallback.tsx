@@ -6,7 +6,7 @@ import { ApiError } from '~/lib/apiError';
 import {
   BANK_CALLBACK_PATH, clearStashedBankCallback, readBankCallback, readStashedBankCallback, stashBankCallback,
 } from '~/lib/bankCallback';
-import { useCompleteBankCallback } from '~/lib/queries';
+import { useClearBankAuth, useCompleteBankCallback } from '~/lib/queries';
 
 const EXPIRED_MESSAGE = 'This connection attempt has expired. Please start again.';
 const FAILED_MESSAGE = 'We could not finish connecting your bank. Please try again.';
@@ -14,13 +14,19 @@ const MISSING_STATE_MESSAGE = 'Start the bank connection again from the Banks pa
 const TIMEOUT_MESSAGE = 'This is taking longer than expected. Please try again shortly.';
 
 // The backend resolves a connection from `state` alone (no code exchange), and
-// may still be finishing the handshake with the bank when we first ask. We poll
-// a bounded number of times rather than treating "not ready yet" as failure —
-// (MAX_POLL_ATTEMPTS - 1) * POLL_INTERVAL_MS = 3.2s of total wait, comfortably
-// more than the backend's own single-shot pollConnectionStatus call (Task 27)
-// needs to settle, without leaving the user staring at a spinner for long.
-export const POLL_INTERVAL_MS = 800;
-export const MAX_POLL_ATTEMPTS = 5;
+// may still be finishing the handshake with the *bank* when we first ask — this
+// budgets the bank-side consent handshake (which routinely takes longer than our
+// own API round-trip), not just our single-shot pollConnectionStatus call. We
+// poll a bounded number of times with a growing, capped interval rather than
+// treating "not ready yet" as failure: 1s, 2s, 4s, 4s, ... up to
+// MAX_POLL_ATTEMPTS, giving ~39s of total wait before giving up.
+export const POLL_INTERVAL_BASE_MS = 1000;
+export const POLL_INTERVAL_MAX_MS = 4000;
+export const MAX_POLL_ATTEMPTS = 12;
+
+export function pollDelayMs(attempt: number): number {
+  return Math.min(POLL_INTERVAL_BASE_MS * 2 ** (attempt - 1), POLL_INTERVAL_MAX_MS);
+}
 
 type Status = { kind: 'loading' } | { kind: 'error'; message: string; canRetry: boolean };
 
@@ -28,6 +34,7 @@ export function BankCallback({ storage = window.sessionStorage }: { storage?: St
   const { isLoading, isAuthenticated, loginWithRedirect } = useAuth0();
   const navigate = useNavigate();
   const complete = useCompleteBankCallback();
+  const clearBankAuth = useClearBankAuth();
   const [errorParams] = useState(() => readBankCallback(window.location.search));
   const [stashed] = useState(() => readStashedBankCallback(storage));
   const [status, setStatus] = useState<Status>({ kind: 'loading' });
@@ -49,6 +56,7 @@ export function BankCallback({ storage = window.sessionStorage }: { storage?: St
 
     if (errorParams.kind === 'error') {
       clearStashedBankCallback(storage);
+      if (stashed) clearBankAuth.mutate(stashed.state);
       setStatus({ kind: 'error', message: errorParams.message, canRetry: false });
       return;
     }
@@ -89,15 +97,20 @@ export function BankCallback({ storage = window.sessionStorage }: { storage?: St
         }
         setTimeout(() => {
           if (!cancelled) setAttempt(a => a + 1);
-        }, POLL_INTERVAL_MS);
+        }, pollDelayMs(attempt));
       })
       .catch((error: unknown) => {
         if (cancelled) return;
+        const expired = error instanceof ApiError && error.status === 404;
         clearStashedBankCallback(storage);
+        // Only clean up the server-side row on a definite, non-retryable failure.
+        // Other errors are retry-eligible (Retry re-polls the same state), so the
+        // row must survive for that retry rather than being deleted here.
+        if (expired) clearBankAuth.mutate(stashed.state);
         setStatus({
           kind: 'error',
-          message: error instanceof ApiError && error.status === 404 ? EXPIRED_MESSAGE : FAILED_MESSAGE,
-          canRetry: !(error instanceof ApiError && error.status === 404),
+          message: expired ? EXPIRED_MESSAGE : FAILED_MESSAGE,
+          canRetry: !expired,
         });
       });
 
