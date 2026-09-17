@@ -39,6 +39,10 @@ export function ConnectionCard({ connection, nowMs, onReconnect, onDisconnect }:
             Disconnect {connection.displayName}? Unreviewed inbox items from this bank are removed.
             Transactions you have already confirmed stay in your budget.
           </Text>
+          <Text size="sm">
+            This removes the connection from this app. To fully revoke access, also remove it in your
+            bank&apos;s app or via TrueLayer.
+          </Text>
           <Group justify="flex-end">
             <Button variant="default" onClick={() => setConfirming(false)}>Cancel</Button>
             <Button color="danger" onClick={() => { setConfirming(false); onDisconnect(); }}>

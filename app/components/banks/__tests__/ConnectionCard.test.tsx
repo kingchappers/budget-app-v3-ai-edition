@@ -56,6 +56,7 @@ describe('ConnectionCard', () => {
 
     await user.click(screen.getByRole('button', { name: 'Disconnect' }));
     expect(onDisconnect).not.toHaveBeenCalled();
+    expect(await screen.findByText(/fully revoke access/i)).toBeInTheDocument();
     await user.click(await screen.findByRole('button', { name: 'Confirm disconnect' }));
     expect(onDisconnect).toHaveBeenCalledOnce();
   });
