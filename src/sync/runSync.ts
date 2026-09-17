@@ -11,6 +11,13 @@ import { syncWindow } from './window';
 export const LOCK_STALE_MS = 10 * 60_000;
 export const MIN_ACCOUNT_BUDGET_MS = 60_000;
 export const ERROR_THRESHOLD = 3;
+// A large first-time backfill can issue thousands of per-transaction TransactWrites
+// in importTransactions' loop; MIN_ACCOUNT_BUDGET_MS is only checked once, before
+// the account starts. Check the deadline periodically inside the loop too, so a
+// busy account can't run the worker past its Lambda timeout with zero forward
+// progress recorded (the SEEN markers already written stay durable either way).
+export const IMPORT_DEADLINE_CHECK_EVERY = 25;
+export const IMPORT_DEADLINE_BUFFER_MS = 5_000;
 
 export interface RunSyncDeps {
   store: SyncStore;
@@ -119,6 +126,11 @@ async function syncConnection(
       result.imported += counts.imported;
       result.skipped += counts.skipped;
 
+      if (counts.partial) {
+        result.partial = true;
+        return;
+      }
+
       const syncedAt = toIso(deps.now());
       const accounts = connection.accounts.map(a => (a.accountUid === account.accountUid ? { ...a, lastSyncedAt: syncedAt } : a));
       const patch: ConnectionPatch = failureRecorded
@@ -156,7 +168,7 @@ async function importTransactions(
   connection: Connection,
   account: ConnectedAccount,
   transactions: ProviderTransaction[],
-): Promise<{ imported: number; skipped: number }> {
+): Promise<{ imported: number; skipped: number; partial: boolean }> {
   const keys = deriveTxnKeys(connection.provider, account.dedupeId, transactions);
   const unseen = await deps.store.filterUnseen(userId, keys);
   const importedAt = toIso(deps.now());
@@ -164,6 +176,14 @@ async function importTransactions(
   let skipped = 0;
 
   for (const [index, transaction] of transactions.entries()) {
+    if (
+      index > 0
+      && index % IMPORT_DEADLINE_CHECK_EVERY === 0
+      && deps.deadline - deps.now() < IMPORT_DEADLINE_BUFFER_MS
+    ) {
+      return { imported, skipped, partial: true };
+    }
+
     const txnKey = keys[index];
     if (!unseen.has(txnKey)) {
       skipped += 1;
@@ -175,5 +195,5 @@ async function importTransactions(
     else skipped += 1;
   }
 
-  return { imported, skipped };
+  return { imported, skipped, partial: false };
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { runSync, LOCK_STALE_MS } from '../runSync';
+import { runSync, LOCK_STALE_MS, IMPORT_DEADLINE_CHECK_EVERY } from '../runSync';
 import type { RunSyncDeps } from '../runSync';
 import { ProviderError } from '../errors';
 import { FakeProvider, FakeSyncStore, makeAccount, makeConnection, makeTxn } from './fakes';
@@ -67,6 +67,31 @@ describe('runSync imports', () => {
     await runSync(deps(), [USER], psu);
 
     expect(provider.calls[0].psu).toEqual(psu);
+  });
+
+  it('stops partway through a long import when the deadline runs out mid-loop', async () => {
+    await store.putConnection(USER, makeConnection());
+    const txns = Array.from({ length: IMPORT_DEADLINE_CHECK_EVERY + 5 }, (_, i) => makeTxn({ entryReference: `t${i}` }));
+    provider.script('acc-1', txns);
+
+    let calls = 0;
+    const originalImportItem = store.importItem.bind(store);
+    vi.spyOn(store, 'importItem').mockImplementation(async (userId, item) => {
+      calls += 1;
+      // Blow past the deadline right after the checkpoint-th item, so the loop's
+      // periodic deadline check catches it before starting the next item.
+      if (calls === IMPORT_DEADLINE_CHECK_EVERY) clock += 400_000;
+      return originalImportItem(userId, item);
+    });
+
+    const results = await runSync(deps({ deadline: clock + 300_000 }), [USER]);
+
+    expect(results[USER]).toMatchObject({ imported: IMPORT_DEADLINE_CHECK_EVERY, partial: true });
+    expect(store.inboxFor(USER)).toHaveLength(IMPORT_DEADLINE_CHECK_EVERY);
+    const saved = store.connectionFor(USER, makeConnection().connectionId)!;
+    // Interrupted mid-import: lastSyncedAt is not written, so a re-run picks up
+    // where the SEEN markers (already durable) left off.
+    expect(saved.accounts[0].lastSyncedAt).toBeUndefined();
   });
 
   it('counts a seen-marker conflict from a concurrent run as skipped', async () => {
