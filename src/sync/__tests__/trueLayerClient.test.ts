@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import {
-  createTlClient, createTlTokenSource, classifyTlError, extractTlErrorCode, TL_AUTH_BASE,
+  createTlClient, createTlTokenSource, classifyTlError, extractTlErrorCode, TL_AUTH_BASE, TOKEN_SCOPE,
 } from '../providers/trueLayerClient';
 import { ProviderError } from '../errors';
 
@@ -13,7 +13,7 @@ function tokenResponse(status: number, body?: unknown): Response {
 describe('createTlTokenSource', () => {
   it('exchanges client credentials for a bearer token and caches it', async () => {
     const now = 1_760_000_000_000;
-    const fetchImpl = vi.fn(async () => tokenResponse(200, { access_token: 'tok-1', expires_in: 3600, token_type: 'Bearer', scope: 'data' }));
+    const fetchImpl = vi.fn(async () => tokenResponse(200, { access_token: 'tok-1', expires_in: 3600, token_type: 'Bearer', scope: TOKEN_SCOPE }));
     const source = createTlTokenSource(credentials, () => now, fetchImpl);
 
     await expect(source()).resolves.toBe('tok-1');
@@ -21,7 +21,14 @@ describe('createTlTokenSource', () => {
     expect(String(url)).toBe(`${TL_AUTH_BASE.sandbox}/connect/token`);
     expect(init.method).toBe('POST');
     expect(init.headers).toMatchObject({ 'Content-Type': 'application/x-www-form-urlencoded' });
-    expect(init.body).toBe('grant_type=client_credentials&client_id=client-1&client_secret=secret-1&scope=data');
+    expect(init.body).toBe(
+      new URLSearchParams({
+        grant_type: 'client_credentials',
+        client_id: 'client-1',
+        client_secret: 'secret-1',
+        scope: TOKEN_SCOPE,
+      }).toString(),
+    );
 
     await source();
     expect(fetchImpl).toHaveBeenCalledTimes(1); // cached, not re-fetched
