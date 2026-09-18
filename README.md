@@ -173,3 +173,7 @@ Backend uses:
 - **AWS Lambda** - Serverless compute
 - **jsonwebtoken** - JWT verification
 - **jwks-rsa** - Auth0 public key fetching
+
+## Decisions
+
+Notable architecture/product decisions — including things that were tried and reverted — are recorded in [`docs/DECISIONS.md`](docs/DECISIONS.md). Check there before re-attempting something that looks unbuilt but was actually tried before (e.g. automatic bank sync).

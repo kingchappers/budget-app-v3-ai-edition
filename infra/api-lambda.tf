@@ -2,7 +2,7 @@
 # API Lambda Function (separate from static file serving)
 # ============================================================================
 
-# API Lambda execution role (INFRA-01): DynamoDB access and worker invoke only
+# API Lambda execution role (INFRA-01): DynamoDB access only
 resource "aws_iam_role" "api_role" {
   name        = "${var.app_name}-api-role"
   description = "Execution role for the protected API Lambda"
@@ -49,11 +49,10 @@ resource "aws_lambda_function" "api" {
 
   environment {
     variables = {
-      NODE_ENV             = "production"
-      AUTH0_DOMAIN         = var.auth0_domain
-      AUTH0_AUDIENCE       = var.auth0_audience
-      DYNAMODB_TABLE       = aws_dynamodb_table.budget_data.name
-      WORKER_FUNCTION_NAME = aws_lambda_function.worker.function_name
+      NODE_ENV       = "production"
+      AUTH0_DOMAIN   = var.auth0_domain
+      AUTH0_AUDIENCE = var.auth0_audience
+      DYNAMODB_TABLE = aws_dynamodb_table.budget_data.name
     }
   }
 
