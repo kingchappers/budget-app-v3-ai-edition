@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { filterTransactions } from '../transactions';
+import { filterTransactions, topCategories } from '../transactions';
 import type { Category, Transaction } from '../types';
 
 const categories: Category[] = [
@@ -68,5 +68,39 @@ describe('filterTransactions', () => {
     const items = [txn({ transactionId: 't1', description: 'Weekly Shop' })];
     const result = filterTransactions(items, categories, { ...noFilter, query: 'nonexistent' });
     expect(result).toEqual([]);
+  });
+});
+
+function cat(categoryId: string, type: Category['type'] = 'EXPENSE'): Category {
+  return { categoryId, name: categoryId, type, icon: 'x', isDefault: true, createdAt: '' };
+}
+
+describe('topCategories', () => {
+  const list = [cat('a'), cat('b'), cat('c'), cat('salary', 'INCOME'), cat('stocks', 'INVESTMENT')];
+
+  it('ranks categories by transaction count, most used first', () => {
+    const items = [txn({ categoryId: 'c' }), txn({ categoryId: 'c' }), txn({ categoryId: 'b' })];
+    const result = topCategories(items, list, 'EXPENSE', 5);
+    expect(result.map(c => c.categoryId)).toEqual(['c', 'b', 'a']);
+  });
+
+  it('keeps default category order when counts are equal, including with no history', () => {
+    const result = topCategories([], list, 'EXPENSE', 5);
+    expect(result.map(c => c.categoryId)).toEqual(['a', 'b', 'c']);
+  });
+
+  it('only returns categories of the matching category type', () => {
+    expect(topCategories([], list, 'INCOME', 5).map(c => c.categoryId)).toEqual(['salary']);
+  });
+
+  it('maps both investment transaction types to investment categories', () => {
+    expect(topCategories([], list, 'INVESTMENT_IN', 5).map(c => c.categoryId)).toEqual(['stocks']);
+    expect(topCategories([], list, 'INVESTMENT_OUT', 5).map(c => c.categoryId)).toEqual(['stocks']);
+  });
+
+  it('respects the limit', () => {
+    const items = [txn({ categoryId: 'c' }), txn({ categoryId: 'b' })];
+    const result = topCategories(items, list, 'EXPENSE', 2);
+    expect(result.map(c => c.categoryId)).toEqual(['b', 'c']);
   });
 });
