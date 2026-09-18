@@ -22,6 +22,14 @@ export const TL_API_BASE: Record<TlEnvironment, string> = {
 const TOKEN_LIFETIME_REFRESH_MARGIN_S = 300;
 const RETRY_DELAYS_MS = [1000, 4000];
 
+// `scope=data` (the original assumption) does not exist and is rejected with
+// `invalid_scope` — confirmed against a real sandbox app during the Phase 0.3
+// walkthrough. TrueLayer's client-credentials scopes are granular: `connections:create`
+// authorises the connections-management calls this app makes (create/poll a
+// connection), and the four product scopes authorise reading data via an
+// established connection (used for get-user-info/get-accounts/fetchTransactions).
+export const TOKEN_SCOPE = 'connections:create accounts balance info transactions';
+
 const EXPIRED_CODES = new Set(['invalid_grant', 'access_denied', 'unauthorized', 'invalid_token']);
 const RATE_LIMITED_CODES = new Set(['provider_too_many_requests', 'provider_request_limit_exceeded']);
 const TRANSIENT_CODES = new Set([
@@ -70,7 +78,7 @@ export function createTlTokenSource(
       grant_type: 'client_credentials',
       client_id: credentials.clientId,
       client_secret: credentials.clientSecret,
-      scope: 'data',
+      scope: TOKEN_SCOPE,
     }).toString();
 
     const response = await fetchImpl(`${TL_AUTH_BASE[credentials.environment]}/connect/token`, {
