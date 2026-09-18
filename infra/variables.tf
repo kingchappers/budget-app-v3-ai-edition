@@ -10,9 +10,15 @@ variable "state_bucket" {
 }
 
 variable "app_name" {
+  # No default (matches state_bucket): this names/tags every resource in the
+  # stack. A generic placeholder default here previously let a local
+  # `tofu plan`/`apply` run without TF_VAR_app_name silently target "my-app"
+  # instead of the real app, producing a plan that renamed and replaced the
+  # entire production stack (Lambda functions, DynamoDB table, IAM roles).
+  # CI always sets TF_VAR_app_name explicitly and was never at risk; this
+  # only protected against that path, not local runs.
   description = "The name of the application."
   type        = string
-  default     = "my-app"
 }
 
 variable "environment" {
