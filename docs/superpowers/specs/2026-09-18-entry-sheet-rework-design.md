@@ -48,14 +48,16 @@ Deferred to other sub-projects or explicitly excluded: category memory and other
 
 The chip ranking is a pure function `topCategories(transactions, categories, type, n)` in `app/lib/transactions.ts`. It is fed by `useTransactions(currentYearMonth())` called inside the sheet, using data the app already fetches. Sub-project B may later extend the history window.
 
+The ranking input is **frozen while the sheet is open** (`useSnapshotWhileOpen`), so saving an entry does not re-rank the chips under the user's finger during batch entry. It refreshes when the sheet is closed.
+
 ### 2. Optimistic save and Undo
 
 The API derives `yearMonth = date.slice(0, 7)` and generates `transactionId` and `createdAt` server-side (`src/api/transactions.ts:98-109`), so the client can compute the cache key but cannot know the real ID up front.
 
 **`useCreateTransaction` (`app/lib/queries.ts`)**, standard React Query optimistic flow. It no longer needs a `yearMonth` parameter.
 
-- `onMutate`: cancel in-flight fetches for the target month, snapshot the cache, then append a temporary row (`transactionId: "temp-<uuid>"`, client timestamp). The target month is `input.date.slice(0, 7)`, so backdated entries land in the correct month.
-- `onError`: restore the snapshot, so the row disappears.
+- `onMutate`: cancel in-flight fetches for the target month, then append a temporary row (`transactionId: "temp-<uuid>"`, client timestamp). The target month is `input.date.slice(0, 7)`, so backdated entries land in the correct month. If that month is not in the cache, nothing is written (a partial cache holding only the temp row would be wrong until the refetch).
+- `onError`: remove only the temp row. Restoring a snapshot would also discard a second in-flight entry when several are added quickly.
 - `onSettled`: invalidate that month's query (existing behaviour), which replaces the temp row with the real one.
 - The Home summary and Transactions list read the same query key and update immediately.
 
@@ -85,6 +87,8 @@ The API derives `yearMonth = date.slice(0, 7)` and generates `transactionId` and
 | File | Change |
 |---|---|
 | `app/lib/transactions.ts` | New pure `topCategories(...)`, unit tested |
+| `app/lib/months.ts` | New `yesterdayIso` and `dateChoiceFor` for the Today/Yesterday/Other quick-pick |
+| `app/hooks/useSnapshotWhileOpen.ts` | New: holds a value steady while the sheet is open (chip ranking input) |
 | `app/lib/queries.ts` | Optimistic `useCreateTransaction`; `useDeleteTransaction` takes `{ transactionId, yearMonth }` |
 | `app/routes/transactions.tsx` | Update the one existing delete caller |
 | `app/components/transactions/CategoryChips.tsx` | New: chip group plus "More…" reveal |
