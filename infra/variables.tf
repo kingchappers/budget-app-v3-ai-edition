@@ -47,9 +47,3 @@ variable "auth0_audience" {
   description = "Auth0 API audience identifier"
   sensitive   = true
 }
-
-variable "app_base_url" {
-  type        = string
-  description = "Public base URL of the app (e.g. https://budget.example.com). Empty uses the API Gateway invoke URL. Used for the bank redirect URL."
-  default     = ""
-}

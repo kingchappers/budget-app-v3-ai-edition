@@ -186,20 +186,6 @@ data "aws_iam_policy_document" "github_iam_policy_document" {
     ]
   }
 
-  # Async invoke configuration (INFRA-04: worker Lambda's maximum_retry_attempts = 0)
-  statement {
-    sid    = "LambdaEventInvokeConfig"
-    effect = "Allow"
-    actions = [
-      "lambda:PutFunctionEventInvokeConfig",
-      "lambda:GetFunctionEventInvokeConfig",
-      "lambda:DeleteFunctionEventInvokeConfig",
-    ]
-    resources = [
-      "arn:aws:lambda:${var.aws_region}:${data.aws_caller_identity.current.account_id}:function:${var.app_name}-*"
-    ]
-  }
-
   # IAM role management for Lambda execution
   # TEMPORARY: Includes both old and new names for migration
   statement {
@@ -319,8 +305,8 @@ data "aws_iam_policy_document" "github_iam_policy_document" {
       "arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/apigateway/budget-app*",
       "arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/lambda/${var.app_name}*",
       "arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/apigateway/${var.app_name}*",
-      # Bank sync's custom-named log groups (/${app_name}/lambda/{static,api,worker}),
-      # distinct from the AWS-default /aws/lambda/* naming pattern above.
+      # Custom-named log groups (/${app_name}/lambda/{static,api}), distinct
+      # from the AWS-default /aws/lambda/* naming pattern above.
       "arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:/${var.app_name}/lambda/*"
     ]
   }
@@ -378,45 +364,6 @@ data "aws_iam_policy_document" "github_iam_policy_document" {
     ]
     resources = [
       "arn:aws:dynamodb:${var.aws_region}:${data.aws_caller_identity.current.account_id}:table/${var.app_name}-*"
-    ]
-  }
-
-  # Secrets Manager management for the bank worker's TrueLayer credentials.
-  # No GetSecretValue/PutSecretValue here — the deploy role only manages the
-  # (empty) secret's lifecycle; the value is set out-of-band by the deployer,
-  # and only the worker Lambda's own role can read it (SEC-02/SEC-04).
-  statement {
-    sid    = "SecretsManagerManagement"
-    effect = "Allow"
-    actions = [
-      "secretsmanager:CreateSecret",
-      "secretsmanager:DeleteSecret",
-      "secretsmanager:DescribeSecret",
-      "secretsmanager:TagResource",
-      "secretsmanager:UntagResource",
-    ]
-    resources = [
-      "arn:aws:secretsmanager:${var.aws_region}:${data.aws_caller_identity.current.account_id}:secret:${var.app_name}/truelayer*"
-    ]
-  }
-
-  # EventBridge rule management for the bank sync schedule.
-  statement {
-    sid    = "EventBridgeManagement"
-    effect = "Allow"
-    actions = [
-      "events:PutRule",
-      "events:DeleteRule",
-      "events:DescribeRule",
-      "events:PutTargets",
-      "events:RemoveTargets",
-      "events:TagResource",
-      "events:UntagResource",
-      "events:ListTagsForResource",
-      "events:ListTargetsByRule",
-    ]
-    resources = [
-      "arn:aws:events:${var.aws_region}:${data.aws_caller_identity.current.account_id}:rule/${var.app_name}-bank-sync"
     ]
   }
 

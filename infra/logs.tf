@@ -23,13 +23,3 @@ resource "aws_cloudwatch_log_group" "api_lambda" {
     ManagedBy   = "OpenTofu"
   }
 }
-
-resource "aws_cloudwatch_log_group" "worker_lambda" {
-  name              = "/${var.app_name}/lambda/worker"
-  retention_in_days = local.lambda_log_retention_days
-
-  tags = {
-    Environment = var.environment
-    ManagedBy   = "OpenTofu"
-  }
-}

@@ -260,21 +260,4 @@ describe('updateTransaction', () => {
     }), 'user-1', { yearMonth: '07-2026', transactionId: 'txn-1' });
     expect(res.statusCode).toBe(400);
   });
-
-  it('keeps source and bankRef from the existing bank-imported transaction', async () => {
-    const bankRef = { connectionId: 'c1', accountUid: 'acc-1', txnKey: 'a'.repeat(32) };
-    mockSend
-      .mockResolvedValueOnce({ Item: { transactionId: 'a'.repeat(32), createdAt: '2026-09-01T00:00:00.000Z', source: 'BANK', bankRef } })
-      .mockResolvedValueOnce({});
-
-    const res = await updateTransaction(
-      makeEvent({ body: { amount: 500, type: 'EXPENSE', categoryId: 'cat-1', description: 'Edited', date: '2026-09-10' } }),
-      'user-1',
-      { yearMonth: '2026-09', transactionId: 'a'.repeat(32) },
-    );
-
-    expect(res.statusCode).toBe(200);
-    const put = mockSend.mock.calls[1][0];
-    expect(put.Item).toMatchObject({ source: 'BANK', bankRef, description: 'Edited' });
-  });
 });
