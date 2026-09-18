@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { currentYearMonth, shiftMonth, formatMonthLabel, todayIso } from '../months';
+import { currentYearMonth, shiftMonth, formatMonthLabel, todayIso, yesterdayIso, dateChoiceFor } from '../months';
 
 describe('currentYearMonth', () => {
   it('formats the given date as YYYY-MM', () => {
@@ -38,5 +38,32 @@ describe('formatMonthLabel', () => {
 describe('todayIso', () => {
   it('formats the given date as YYYY-MM-DD', () => {
     expect(todayIso(new Date(2026, 6, 5))).toBe('2026-07-05');
+  });
+});
+
+describe('yesterdayIso', () => {
+  it('returns the previous day', () => {
+    expect(yesterdayIso(new Date(2026, 6, 5))).toBe('2026-07-04');
+  });
+
+  it('crosses month and year boundaries', () => {
+    expect(yesterdayIso(new Date(2026, 6, 1))).toBe('2026-06-30');
+    expect(yesterdayIso(new Date(2026, 0, 1))).toBe('2025-12-31');
+  });
+});
+
+describe('dateChoiceFor', () => {
+  const now = new Date(2026, 6, 5);
+
+  it('recognises today', () => {
+    expect(dateChoiceFor('2026-07-05', now)).toBe('today');
+  });
+
+  it('recognises yesterday', () => {
+    expect(dateChoiceFor('2026-07-04', now)).toBe('yesterday');
+  });
+
+  it('treats any other date as other', () => {
+    expect(dateChoiceFor('2026-06-30', now)).toBe('other');
   });
 });
