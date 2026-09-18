@@ -20,6 +20,16 @@ resource "aws_dynamodb_table" "budget_data" {
     enabled = true
   }
 
+  ttl {
+    attribute_name = "expiresAt"
+    enabled        = true
+  }
+
+  # INFRA-03: AWS-managed KMS key; key usage is visible in CloudTrail
+  server_side_encryption {
+    enabled = true
+  }
+
   tags = {
     Environment = var.environment
     ManagedBy   = "OpenTofu"
@@ -27,10 +37,15 @@ resource "aws_dynamodb_table" "budget_data" {
   }
 }
 
-# IAM policy granting the Lambda role least-privilege DynamoDB access (INFRA-01)
-resource "aws_iam_role_policy" "lambda_dynamodb" {
-  name = "${var.app_name}-lambda-dynamodb"
-  role = aws_iam_role.lambda_role.id
+moved {
+  from = aws_iam_role_policy.lambda_dynamodb
+  to   = aws_iam_role_policy.api_dynamodb
+}
+
+# IAM policy granting the API Lambda role least-privilege DynamoDB access (INFRA-01)
+resource "aws_iam_role_policy" "api_dynamodb" {
+  name = "${var.app_name}-api-dynamodb"
+  role = aws_iam_role.api_role.id
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -43,6 +58,7 @@ resource "aws_iam_role_policy" "lambda_dynamodb" {
           "dynamodb:DeleteItem",
           "dynamodb:Query",
           "dynamodb:UpdateItem",
+          "dynamodb:ConditionCheckItem",
         ]
         Resource = aws_dynamodb_table.budget_data.arn
       }

@@ -7,6 +7,8 @@ import { getCategories, createCategory, deleteCategory } from './src/api/categor
 import { getTransactions, createTransaction, deleteTransaction, updateTransaction } from './src/api/transactions';
 import { getTargets, upsertTarget, deleteTarget } from './src/api/targets';
 import { reassignCategory } from './src/api/reassign';
+import { connectBank, completeBankCallback, clearPendingAuth, listBankConnections, disconnectBank, triggerSync, getSyncStatus } from './src/api/banks';
+import { confirmInboxItem, getInbox, getInboxCount, ignoreInboxItem } from './src/api/inbox';
 
 const AUTH0_DOMAIN = process.env.AUTH0_DOMAIN || '';
 const AUTH0_AUDIENCE = process.env.AUTH0_AUDIENCE || '';
@@ -36,11 +38,25 @@ router.put('/api/transactions/{yearMonth}/{transactionId}', updateTransaction);
 router.get('/api/targets', getTargets);
 router.put('/api/targets/{categoryId}', upsertTarget);
 router.delete('/api/targets/{categoryId}', deleteTarget);
+router.post('/api/banks/connect', connectBank);
+router.post('/api/banks/callback', completeBankCallback);
+router.delete('/api/banks/auth/{state}', clearPendingAuth);
+router.get('/api/banks/connections', listBankConnections);
+router.delete('/api/banks/connections/{connectionId}', disconnectBank);
+router.post('/api/sync', triggerSync);
+router.get('/api/sync/status', getSyncStatus);
+router.get('/api/inbox/count', getInboxCount);
+router.get('/api/inbox', getInbox);
+router.post('/api/inbox/{bookingDate}/{txnKey}/confirm', confirmInboxItem);
+router.post('/api/inbox/{bookingDate}/{txnKey}/ignore', ignoreInboxItem);
 
 export const handler: APIGatewayProxyHandlerV2 = async (event) => {
   try {
     console.log('Request:', {
-      path: event.rawPath,
+      // Log the templated route, not the raw path — some routes (e.g. DELETE
+      // /api/banks/auth/{state}) carry a sensitive value (`state`) as a path
+      // segment, and the spec's Logging section says it must never be logged.
+      route: event.requestContext.routeKey,
       method: event.requestContext.http.method,
       sourceIp: event.requestContext.http.sourceIp,
     });

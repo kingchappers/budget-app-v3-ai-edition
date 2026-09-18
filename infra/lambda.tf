@@ -1,4 +1,4 @@
-# Lambda execution role
+# Static file Lambda execution role (logs only — no data access)
 resource "aws_iam_role" "lambda_role" {
   name = "${var.app_name}-lambda-role"
   
@@ -48,6 +48,11 @@ resource "aws_lambda_function" "app" {
       VITE_AUTH0_DOMAIN    = var.auth0_domain
       VITE_AUTH0_CLIENT_ID = var.auth0_client_id
     }
+  }
+
+  logging_config {
+    log_format = "Text"
+    log_group  = aws_cloudwatch_log_group.static_lambda.name
   }
 
   tags = {

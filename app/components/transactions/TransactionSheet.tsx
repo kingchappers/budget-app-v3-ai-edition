@@ -4,6 +4,7 @@ import { DateInput } from '@mantine/dates';
 import { parsePounds, formatPencePlain } from '~/lib/money';
 import { todayIso } from '~/lib/months';
 import { useCategories, useCreateTransaction, useUpdateTransaction } from '~/lib/queries';
+import { TYPE_OPTIONS, categoryTypeFor } from '~/lib/transactionTypes';
 import type { Transaction, TransactionType } from '~/lib/types';
 
 export interface TransactionSheetProps {
@@ -12,13 +13,6 @@ export interface TransactionSheetProps {
   yearMonth: string;
   editing?: Transaction | null;
 }
-
-const TYPE_OPTIONS: { label: string; value: TransactionType }[] = [
-  { label: 'Spend', value: 'EXPENSE' },
-  { label: 'Income', value: 'INCOME' },
-  { label: 'Invest in', value: 'INVESTMENT_IN' },
-  { label: 'Invest out', value: 'INVESTMENT_OUT' },
-];
 
 export function TransactionSheet({ opened, onClose, yearMonth, editing }: TransactionSheetProps) {
   const { data: categories = [], isLoading: categoriesLoading, error: categoriesError } = useCategories();
@@ -50,8 +44,7 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing }: Transa
     setError(null);
   }, [opened, editing]);
 
-  const expectedCategoryType =
-    type === 'EXPENSE' ? 'EXPENSE' : type === 'INCOME' ? 'INCOME' : 'INVESTMENT';
+  const expectedCategoryType = categoryTypeFor(type);
 
   const options = categories
     .filter(c => c.type === expectedCategoryType)
