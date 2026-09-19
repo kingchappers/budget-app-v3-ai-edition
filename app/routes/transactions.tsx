@@ -21,6 +21,7 @@ const TYPE_OPTIONS: { value: TransactionType; label: string }[] = [
 function TransactionsContent() {
   const [yearMonth, setYearMonth] = useState(currentYearMonth());
   const [editing, setEditing] = useState<Transaction | null>(null);
+  const [duplicating, setDuplicating] = useState<Transaction | null>(null);
   const [filter, setFilter] = useState<TransactionFilter>({ query: '', categoryId: null, type: null });
   const categories = useCategories();
   const transactions = useTransactions(yearMonth);
@@ -70,7 +71,10 @@ function TransactionsContent() {
           </ActionIcon>
         )}
         value={filter.query}
-        onChange={e => setFilter(f => ({ ...f, query: e.currentTarget.value }))}
+        onChange={e => {
+          const query = e.currentTarget.value;
+          setFilter(f => ({ ...f, query }));
+        }}
       />
       <Group grow>
         <Select
@@ -109,6 +113,7 @@ function TransactionsContent() {
               categoryName={nameFor(t.categoryId)}
               categoryIcon={iconFor(t.categoryId)}
               onEdit={setEditing}
+              onDuplicate={setDuplicating}
               onDelete={(item) => remove.mutate({ transactionId: item.transactionId, yearMonth: item.yearMonth })}
             />
           ))}
@@ -116,10 +121,14 @@ function TransactionsContent() {
       ))}
 
       <TransactionSheet
-        opened={editing !== null}
-        onClose={() => setEditing(null)}
+        opened={editing !== null || duplicating !== null}
+        onClose={() => {
+          setEditing(null);
+          setDuplicating(null);
+        }}
         yearMonth={yearMonth}
         editing={editing}
+        template={duplicating}
       />
     </Stack>
   );

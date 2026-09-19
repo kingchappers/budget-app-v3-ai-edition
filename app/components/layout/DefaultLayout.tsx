@@ -4,6 +4,7 @@ import { useHotkeys } from '@mantine/hooks';
 import { Auth0Provider } from '@auth0/auth0-react';
 import Authentication from "../authentication/Authentication";
 import { ColorSchemeToggle } from './ColorSchemeToggle';
+import { QuickEntryTips } from './QuickEntryTips';
 import { IconHome, IconList, IconTarget, IconPlus, IconTag } from '@tabler/icons-react';
 import { NavLink as RouterNavLink, useLocation } from 'react-router';
 import { TransactionSheet } from '../transactions/TransactionSheet';
@@ -98,6 +99,7 @@ export function DefaultLayout({ children }: { children: React.ReactNode }) {
           <Flex h="100%" px="md" justify="space-between" align="center">
             <Text fw={700}>Budget</Text>
             <Group gap="sm">
+              <QuickEntryTips />
               <ColorSchemeToggle />
               <Authentication />
             </Group>

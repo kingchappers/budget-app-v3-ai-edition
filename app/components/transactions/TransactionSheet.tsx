@@ -3,10 +3,13 @@ import { Button, Drawer, Group, Modal, SegmentedControl, Stack, Text, TextInput,
 import { useMediaQuery } from '@mantine/hooks';
 import { DateInput } from '@mantine/dates';
 import { notifications } from '@mantine/notifications';
+import { useNoteHistory } from '~/hooks/useNoteHistory';
 import { useSnapshotWhileOpen } from '~/hooks/useSnapshotWhileOpen';
 import type { TransactionInput } from '~/lib/api';
 import { formatPence, formatPencePlain, parsePounds } from '~/lib/money';
 import { currentYearMonth, dateChoiceFor, todayIso, yesterdayIso, type DateChoice } from '~/lib/months';
+import { categoryForNote } from '~/lib/noteMemory';
+import { parseQuickAdd } from '~/lib/quickAdd';
 import {
   useCategories,
   useCreateTransaction,
@@ -29,12 +32,14 @@ const DATE_OPTIONS: { label: string; value: DateChoice }[] = [
 ];
 
 type SaveMode = 'close' | 'addAnother';
+type CategorySource = 'none' | 'memory' | 'user';
 
 export interface TransactionSheetProps {
   opened: boolean;
   onClose: () => void;
   yearMonth: string;
   editing?: Transaction | null;
+  template?: Transaction | null;
 }
 
 interface ToastActionProps {
@@ -52,16 +57,20 @@ function ToastAction({ text, actionLabel, onAction }: ToastActionProps) {
   );
 }
 
-export function TransactionSheet({ opened, onClose, yearMonth, editing }: TransactionSheetProps) {
+export function TransactionSheet({ opened, onClose, yearMonth, editing, template }: TransactionSheetProps) {
   const theme = useMantineTheme();
   const isDesktop = useMediaQuery(`(min-width: ${theme.breakpoints.sm})`);
   const { data: categories = [], isLoading: categoriesLoading, error: categoriesError } = useCategories();
   const monthTransactions = useSnapshotWhileOpen(useTransactions(currentYearMonth(), opened).data, opened);
+  const noteIndex = useNoteHistory(opened);
   const create = useCreateTransaction();
   const update = useUpdateTransaction(yearMonth);
   const remove = useDeleteTransaction();
   const amountRef = useRef<HTMLInputElement>(null);
   const createSubmittedRef = useRef(false);
+  const saveAnotherRef = useRef<HTMLButtonElement>(null);
+  const chipsRef = useRef<HTMLDivElement>(null);
+  const focusChipsAfterRenderRef = useRef(false);
 
   const [amount, setAmount] = useState('');
   const [type, setType] = useState<TransactionType>('EXPENSE');
@@ -71,6 +80,9 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing }: Transa
   const [dateChoice, setDateChoice] = useState<DateChoice>('today');
   const [noteOpen, setNoteOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [categorySource, setCategorySource] = useState<CategorySource>('none');
+  const [quickAdd, setQuickAdd] = useState('');
+  const [quickAddError, setQuickAddError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!opened) return;
@@ -82,6 +94,15 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing }: Transa
       setDescription(editing.description);
       setDate(editing.date);
       setDateChoice(dateChoiceFor(editing.date));
+      setCategorySource('none');
+    } else if (template) {
+      setAmount(formatPencePlain(template.amount));
+      setType(template.type);
+      setCategoryId(template.categoryId);
+      setDescription(template.description);
+      setDate(todayIso());
+      setDateChoice('today');
+      setCategorySource('user');
     } else {
       setAmount('');
       setType('EXPENSE');
@@ -89,10 +110,19 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing }: Transa
       setDescription('');
       setDate(todayIso());
       setDateChoice('today');
+      setCategorySource('none');
     }
-    setNoteOpen(false);
+    setNoteOpen(!editing && template != null && template.description !== '');
     setError(null);
-  }, [opened, editing]);
+    setQuickAdd('');
+    setQuickAddError(null);
+  }, [opened, editing, template]);
+
+  useEffect(() => {
+    if (!focusChipsAfterRenderRef.current) return;
+    focusChipsAfterRenderRef.current = false;
+    chipsRef.current?.querySelector<HTMLInputElement>('input[type="radio"]')?.focus();
+  });
 
   const eligible = categories.filter(c => c.type === categoryTypeFor(type));
   const chips = topCategories(monthTransactions ?? [], categories, type, CHIP_LIMIT);
@@ -101,6 +131,67 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing }: Transa
     setDateChoice(choice);
     if (choice === 'today') setDate(todayIso());
     if (choice === 'yesterday') setDate(yesterdayIso());
+  }
+
+  function handleCategoryChange(id: string): void {
+    setCategoryId(id);
+    setCategorySource('user');
+  }
+
+  function handleNoteChange(note: string): void {
+    setDescription(note);
+    if (editing || categorySource === 'user') return;
+
+    const recalled = categoryForNote(noteIndex, note, type, categories);
+    if (recalled) {
+      setCategoryId(recalled);
+      setCategorySource('memory');
+      return;
+    }
+    if (categorySource === 'memory') {
+      setCategoryId(null);
+      setCategorySource('none');
+    }
+  }
+
+  function handleTypeChange(next: TransactionType): void {
+    setType(next);
+    const recalled = editing ? null : categoryForNote(noteIndex, description, next, categories);
+    setCategoryId(recalled);
+    setCategorySource(recalled ? 'memory' : 'none');
+  }
+
+  function handleQuickAddChange(value: string): void {
+    setQuickAdd(value);
+    setQuickAddError(null);
+  }
+
+  function handleQuickAddKeyDown(event: React.KeyboardEvent<HTMLInputElement>): void {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+
+    const parsed = parseQuickAdd(quickAdd);
+    if (!parsed.ok) {
+      setQuickAddError(parsed.message);
+      return;
+    }
+
+    const recalled = categoryForNote(noteIndex, parsed.note, parsed.type, categories);
+    setAmount(formatPencePlain(parsed.amount));
+    setType(parsed.type);
+    setDescription(parsed.note);
+    if (parsed.note !== '') setNoteOpen(true);
+    setCategoryId(recalled);
+    setCategorySource(recalled ? 'memory' : 'none');
+    setError(null);
+    setQuickAdd('');
+    setQuickAddError(null);
+
+    if (recalled) {
+      saveAnotherRef.current?.focus();
+      return;
+    }
+    focusChipsAfterRenderRef.current = true;
   }
 
   function validate(): TransactionInput | null {
@@ -181,8 +272,11 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing }: Transa
     createSubmittedRef.current = false;
     setAmount('');
     setCategoryId(null);
+    setCategorySource('none');
     setDescription('');
     setNoteOpen(false);
+    setQuickAdd('');
+    setQuickAddError(null);
     setError(null);
     amountRef.current?.focus();
   }
@@ -214,6 +308,17 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing }: Transa
   const form = (
     <form onSubmit={e => { e.preventDefault(); void handleSubmit(editing ? 'close' : 'addAnother'); }}>
       <Stack>
+        {!editing && (
+          <TextInput
+            label="Quick add"
+            description="e.g. coffee 3.50 · 3.50 coffee · +2400 salary (income)"
+            placeholder="coffee 3.50"
+            value={quickAdd}
+            error={quickAddError}
+            onChange={e => handleQuickAddChange(e.currentTarget.value)}
+            onKeyDown={handleQuickAddKeyDown}
+          />
+        )}
         <TextInput
           ref={amountRef}
           label="Amount"
@@ -228,17 +333,22 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing }: Transa
         <SegmentedControl
           fullWidth
           value={type}
-          onChange={value => { setType(value as TransactionType); setCategoryId(null); }}
+          onChange={value => handleTypeChange(value as TransactionType)}
           data={TYPE_OPTIONS}
         />
-        <CategoryChips
-          chips={chips}
-          all={eligible}
-          value={categoryId}
-          onChange={setCategoryId}
-          loading={categoriesLoading}
-          error={categoriesError ? 'Could not load categories' : null}
-        />
+        <div ref={chipsRef}>
+          <CategoryChips
+            chips={chips}
+            all={eligible}
+            value={categoryId}
+            onChange={handleCategoryChange}
+            loading={categoriesLoading}
+            error={categoriesError ? 'Could not load categories' : null}
+          />
+        </div>
+        {categorySource === 'memory' && description.trim() !== '' && (
+          <Text size="xs" c="dimmed" role="status">Suggested from your earlier '{description.trim()}'</Text>
+        )}
         {editing ? (
           <DateInput
             label="Date"
@@ -269,7 +379,7 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing }: Transa
           <TextInput
             label="Note (optional)"
             value={description}
-            onChange={e => setDescription(e.currentTarget.value)}
+            onChange={e => handleNoteChange(e.currentTarget.value)}
             maxLength={200}
           />
         ) : (
@@ -283,7 +393,7 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing }: Transa
             <Button type="submit" loading={update.isPending}>Save</Button>
           ) : (
             <>
-              <Button type="submit" variant="light">Save & add another</Button>
+              <Button ref={saveAnotherRef} type="submit" variant="light">Save & add another</Button>
               <Button onClick={() => void handleSubmit('close')}>Save</Button>
             </>
           )}
