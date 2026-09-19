@@ -5,7 +5,7 @@ Bank sync was dropped (see `DECISIONS.md`), so manual entry is the core interact
 | # | Sub-project | Status |
 |---|---|---|
 | A | Entry sheet rework | Implemented on `feat/entry-sheet-rework` ([PR #29](https://github.com/kingchappers/budget-app-v3-ai-edition/pull/29)). Spec: `superpowers/specs/2026-09-18-entry-sheet-rework-design.md`, plan: `superpowers/plans/2026-09-18-entry-sheet-rework.md` |
-| B | Smart prefill | Not started |
+| B | Smart prefill | Implemented on `feat/smart-prefill` (stacked on A, PR #29). Spec: `superpowers/specs/2026-09-19-smart-prefill-design.md`, plan: `superpowers/plans/2026-09-19-smart-prefill.md` |
 | C | Recurring templates | Not started |
 | D | PWA and add shortcut | Not started |
 | E | CSV/OFX import | Not started |
