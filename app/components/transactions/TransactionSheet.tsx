@@ -61,6 +61,7 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing }: Transa
   const update = useUpdateTransaction(yearMonth);
   const remove = useDeleteTransaction();
   const amountRef = useRef<HTMLInputElement>(null);
+  const createSubmittedRef = useRef(false);
 
   const [amount, setAmount] = useState('');
   const [type, setType] = useState<TransactionType>('EXPENSE');
@@ -73,6 +74,7 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing }: Transa
 
   useEffect(() => {
     if (!opened) return;
+    createSubmittedRef.current = false;
     if (editing) {
       setAmount(formatPencePlain(editing.amount));
       setType(editing.type);
@@ -173,6 +175,7 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing }: Transa
   }
 
   function resetForNextEntry(): void {
+    createSubmittedRef.current = false;
     setAmount('');
     setCategoryId(null);
     setDescription('');
@@ -195,6 +198,8 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing }: Transa
       return;
     }
 
+    if (createSubmittedRef.current) return;
+    createSubmittedRef.current = true;
     submitNew(input);
     if (mode === 'addAnother') {
       resetForNextEntry();

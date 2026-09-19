@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MantineProvider } from '@mantine/core';
 import { Notifications, notifications } from '@mantine/notifications';
@@ -168,6 +168,33 @@ describe('TransactionSheet', () => {
     await user.click(screen.getByRole('radio', { name: 'Dining' }));
     await user.click(screen.getByRole('button', { name: /^save$/i }));
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it('ignores a second Save click while the sheet is closing', async () => {
+    const user = userEvent.setup();
+    renderSheet();
+    await user.type(screen.getByLabelText(/amount/i), '4.80');
+    await user.click(screen.getByRole('radio', { name: 'Dining' }));
+    const save = screen.getByRole('button', { name: /^save$/i });
+
+    fireEvent.click(save);
+    fireEvent.click(save);
+
+    expect(mockCreate).toHaveBeenCalledTimes(1);
+  });
+
+  it('accepts the next entry after Save & add another', async () => {
+    const user = userEvent.setup();
+    renderSheet();
+    await user.type(screen.getByLabelText(/amount/i), '4.80');
+    await user.click(screen.getByRole('radio', { name: 'Dining' }));
+    await user.click(screen.getByRole('button', { name: /save & add another/i }));
+
+    await user.type(screen.getByLabelText(/amount/i), '2.00');
+    await user.click(screen.getByRole('radio', { name: 'Groceries' }));
+    await user.click(screen.getByRole('button', { name: /save & add another/i }));
+
+    expect(mockCreate).toHaveBeenCalledTimes(2);
   });
 
   it('keeps the sheet open on Save & add another, clearing amount, note and category', async () => {
