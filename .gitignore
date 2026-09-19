@@ -11,6 +11,9 @@
 # Local .terraform directories
 .terraform/
 
+# Lambda packages OpenTofu builds from /build via archive_file at plan/apply time
+infra/*.zip
+
 # .tfstate files
 *.tfstate
 *.tfstate.*
