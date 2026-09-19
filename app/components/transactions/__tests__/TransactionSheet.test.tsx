@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MantineProvider } from '@mantine/core';
 import { Notifications, notifications } from '@mantine/notifications';
@@ -285,7 +285,7 @@ describe('TransactionSheet', () => {
     expect(mockCreate).toHaveBeenLastCalledWith(mockCreate.mock.calls[0][0]);
   });
 
-  it('does nothing on Undo when the create failed', async () => {
+  it('stays silent when the create fails after the user pressed Undo', async () => {
     const user = userEvent.setup();
     const pending = deferred<never>();
     mockCreate.mockReturnValue(pending.promise.then(() => { throw new Error('boom'); }));
@@ -296,7 +296,10 @@ describe('TransactionSheet', () => {
     await user.click(await screen.findByRole('button', { name: 'Undo' }));
 
     pending.resolve(undefined as never);
-    await screen.findByRole('button', { name: 'Retry' });
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 50)); });
+
+    expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/couldn't save/i)).not.toBeInTheDocument();
     expect(mockRemove).not.toHaveBeenCalled();
   });
 

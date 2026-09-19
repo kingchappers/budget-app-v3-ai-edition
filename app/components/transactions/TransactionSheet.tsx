@@ -146,11 +146,13 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing }: Transa
 
   function submitNew(input: TransactionInput): void {
     const toastId = `saved-${crypto.randomUUID()}`;
+    let undone = false;
     const outcome = create.mutateAsync(input).then(
       created => created,
       () => {
         notifications.hide(toastId);
-        showFailureToast(input);
+        // A cancelled entry must not offer Retry, or one tap would re-create it.
+        if (!undone) showFailureToast(input);
         return null;
       },
     );
@@ -163,6 +165,7 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing }: Transa
           text={`Saved ${describeInput(input)}`}
           actionLabel="Undo"
           onAction={() => {
+            undone = true;
             notifications.hide(toastId);
             void outcome.then(created => {
               if (!created) return;
