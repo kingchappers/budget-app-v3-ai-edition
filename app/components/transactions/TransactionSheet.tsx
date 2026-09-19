@@ -56,7 +56,7 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing }: Transa
   const theme = useMantineTheme();
   const isDesktop = useMediaQuery(`(min-width: ${theme.breakpoints.sm})`);
   const { data: categories = [], isLoading: categoriesLoading, error: categoriesError } = useCategories();
-  const monthTransactions = useSnapshotWhileOpen(useTransactions(currentYearMonth()).data, opened);
+  const monthTransactions = useSnapshotWhileOpen(useTransactions(currentYearMonth(), opened).data, opened);
   const create = useCreateTransaction();
   const update = useUpdateTransaction(yearMonth);
   const remove = useDeleteTransaction();

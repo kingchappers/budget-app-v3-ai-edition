@@ -43,13 +43,13 @@ export function useTargets() {
   });
 }
 
-export function useTransactions(yearMonth: string) {
+export function useTransactions(yearMonth: string, enabled: boolean = true) {
   const api = useApi();
-  const enabled = useAuthReady();
+  const authReady = useAuthReady();
   return useQuery({
     queryKey: queryKeys.transactions(yearMonth),
     queryFn: () => api.getTransactions(yearMonth),
-    enabled,
+    enabled: authReady && enabled,
   });
 }
 

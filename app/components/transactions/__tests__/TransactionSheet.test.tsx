@@ -10,6 +10,7 @@ import type { Transaction } from '~/lib/types';
 const mockCreate = vi.fn();
 const mockUpdate = vi.fn();
 const mockRemove = vi.fn();
+const mockUseTransactions = vi.hoisted(() => vi.fn());
 let mockTransactions: Transaction[] = [];
 
 vi.mock('~/lib/queries', () => ({
@@ -21,7 +22,7 @@ vi.mock('~/lib/queries', () => ({
     ],
     isLoading: false,
   }),
-  useTransactions: () => ({ data: mockTransactions }),
+  useTransactions: mockUseTransactions,
   useCreateTransaction: () => ({ mutateAsync: mockCreate, isPending: false }),
   useUpdateTransaction: () => ({ mutateAsync: mockUpdate, isPending: false }),
   useDeleteTransaction: () => ({ mutate: mockRemove }),
@@ -32,15 +33,16 @@ import { TransactionSheet, type TransactionSheetProps } from '../TransactionShee
 function renderSheet(props: Partial<TransactionSheetProps> = {}) {
   const onClose = vi.fn();
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  render(
+  const tree = (extra: Partial<TransactionSheetProps>) => (
     <QueryClientProvider client={client}>
       <MantineProvider>
         <Notifications />
-        <TransactionSheet opened onClose={onClose} yearMonth="2026-07" {...props} />
+        <TransactionSheet opened onClose={onClose} yearMonth="2026-07" {...props} {...extra} />
       </MantineProvider>
-    </QueryClientProvider>,
+    </QueryClientProvider>
   );
-  return { onClose };
+  const { rerender } = render(tree({}));
+  return { onClose, setProps: (extra: Partial<TransactionSheetProps>) => rerender(tree(extra)) };
 }
 
 function deferred<T>() {
@@ -66,9 +68,21 @@ describe('TransactionSheet', () => {
     mockUpdate.mockReset();
     mockRemove.mockReset();
     mockTransactions = [];
+    mockUseTransactions.mockReset();
+    mockUseTransactions.mockImplementation(() => ({ data: mockTransactions }));
   });
 
   afterEach(() => { notifications.clean(); });
+
+  it('only enables the ranking query while the sheet is open', () => {
+    const { setProps } = renderSheet({ opened: false });
+    const currentMonth = mockUseTransactions.mock.calls[0][0];
+    expect(mockUseTransactions.mock.calls.every(([, enabled]) => enabled === false)).toBe(true);
+
+    mockUseTransactions.mockClear();
+    setProps({ opened: true });
+    expect(mockUseTransactions).toHaveBeenCalledWith(currentMonth, true);
+  });
 
   it('shows a validation message for an invalid amount', async () => {
     const user = userEvent.setup();
