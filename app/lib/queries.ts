@@ -3,7 +3,7 @@ import { useMemo } from 'react';
 import { useAuth0 } from '@auth0/auth0-react';
 import { useProtectedApi } from '~/hooks/useProtectedApi';
 import { createApi, type TransactionInput } from './api';
-import type { Category, TargetPeriod } from './types';
+import type { Category, TargetPeriod, Transaction } from './types';
 
 export const queryKeys = {
   categories: ['categories'] as const,
@@ -43,26 +43,47 @@ export function useTargets() {
   });
 }
 
-export function useTransactions(yearMonth: string) {
+export function useTransactions(yearMonth: string, enabled: boolean = true) {
   const api = useApi();
-  const enabled = useAuthReady();
+  const authReady = useAuthReady();
   return useQuery({
     queryKey: queryKeys.transactions(yearMonth),
     queryFn: () => api.getTransactions(yearMonth),
-    enabled,
+    enabled: authReady && enabled,
   });
 }
 
-export function useCreateTransaction(yearMonth: string) {
+interface CreateContext {
+  yearMonth: string;
+  tempId: string;
+}
+
+export function useCreateTransaction() {
   const api = useApi();
   const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (input: TransactionInput) => api.createTransaction(input),
-    onSuccess: (created) => {
-      qc.invalidateQueries({ queryKey: queryKeys.transactions(yearMonth) });
-      if (created.yearMonth !== yearMonth) {
-        qc.invalidateQueries({ queryKey: queryKeys.transactions(created.yearMonth) });
+  return useMutation<Transaction, Error, TransactionInput, CreateContext>({
+    mutationFn: (input) => api.createTransaction(input),
+    onMutate: async (input) => {
+      const yearMonth = input.date.slice(0, 7);
+      const key = queryKeys.transactions(yearMonth);
+      const tempId = `temp-${crypto.randomUUID()}`;
+      await qc.cancelQueries({ queryKey: key });
+      const previous = qc.getQueryData<Transaction[]>(key);
+      if (previous !== undefined) {
+        const temp: Transaction = { ...input, transactionId: tempId, yearMonth, createdAt: new Date().toISOString() };
+        qc.setQueryData<Transaction[]>(key, [...previous, temp]);
       }
+      return { yearMonth, tempId };
+    },
+    onError: (_error, _input, context) => {
+      if (!context) return;
+      qc.setQueryData<Transaction[]>(
+        queryKeys.transactions(context.yearMonth),
+        (rows) => rows?.filter(t => t.transactionId !== context.tempId),
+      );
+    },
+    onSettled: (_created, _error, input) => {
+      qc.invalidateQueries({ queryKey: queryKeys.transactions(input.date.slice(0, 7)) });
     },
   });
 }
@@ -82,12 +103,14 @@ export function useUpdateTransaction(yearMonth: string) {
   });
 }
 
-export function useDeleteTransaction(yearMonth: string) {
+export function useDeleteTransaction() {
   const api = useApi();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (transactionId: string) => api.deleteTransaction(yearMonth, transactionId),
-    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.transactions(yearMonth) }),
+    mutationFn: (vars: { transactionId: string; yearMonth: string }) =>
+      api.deleteTransaction(vars.yearMonth, vars.transactionId),
+    onSuccess: (_data, vars) =>
+      qc.invalidateQueries({ queryKey: queryKeys.transactions(vars.yearMonth) }),
   });
 }
 

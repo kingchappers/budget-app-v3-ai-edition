@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { ActionIcon, AppShell, Flex, Text, NavLink, Group, Paper } from '@mantine/core';
+import { ActionIcon, AppShell, Flex, Text, NavLink, Group, Paper, Tooltip } from '@mantine/core';
+import { useHotkeys } from '@mantine/hooks';
 import { Auth0Provider } from '@auth0/auth0-react';
 import Authentication from "../authentication/Authentication";
 import { ColorSchemeToggle } from './ColorSchemeToggle';
@@ -67,6 +68,11 @@ function SidebarNav() {
 export function DefaultLayout({ children }: { children: React.ReactNode }) {
   const [addOpen, setAddOpen] = useState(false);
 
+  useHotkeys([['n', () => {
+    if (document.querySelector('[role="dialog"]')) return;
+    setAddOpen(true);
+  }]]);
+
   return (
     <Auth0Provider
       domain={import.meta.env.VITE_AUTH0_DOMAIN}
@@ -107,13 +113,15 @@ export function DefaultLayout({ children }: { children: React.ReactNode }) {
         <AppShell.Main pb={150}>
           {children}
         </AppShell.Main>
-        <ActionIcon
-          size={56} radius="xl" variant="filled" aria-label="Add transaction"
-          onClick={() => setAddOpen(true)}
-          style={{ position: 'fixed', right: 16, bottom: 84, zIndex: 101 }}
-        >
-          <IconPlus size={26} />
-        </ActionIcon>
+        <Tooltip label="Add transaction (N)" events={{ hover: true, focus: true, touch: false }}>
+          <ActionIcon
+            size={56} radius="xl" variant="filled" aria-label="Add transaction"
+            onClick={() => setAddOpen(true)}
+            style={{ position: 'fixed', right: 16, bottom: 84, zIndex: 101 }}
+          >
+            <IconPlus size={26} />
+          </ActionIcon>
+        </Tooltip>
         <TransactionSheet opened={addOpen} onClose={() => setAddOpen(false)} yearMonth={currentYearMonth()} />
         <BottomTabs />
       </AppShell>

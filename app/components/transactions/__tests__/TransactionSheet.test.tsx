@@ -1,43 +1,94 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MantineProvider } from '@mantine/core';
+import { Notifications, notifications } from '@mantine/notifications';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { todayIso, yesterdayIso } from '~/lib/months';
+import type { Transaction } from '~/lib/types';
 
 const mockCreate = vi.fn();
+const mockUpdate = vi.fn();
+const mockRemove = vi.fn();
+const mockUseTransactions = vi.hoisted(() => vi.fn());
+let mockTransactions: Transaction[] = [];
 
 vi.mock('~/lib/queries', () => ({
   useCategories: () => ({
     data: [
       { categoryId: 'cat-dining', name: 'Dining', type: 'EXPENSE', icon: 'x', isDefault: true, createdAt: '' },
+      { categoryId: 'cat-food', name: 'Groceries', type: 'EXPENSE', icon: 'x', isDefault: true, createdAt: '' },
+      { categoryId: 'cat-salary', name: 'Salary', type: 'INCOME', icon: 'x', isDefault: true, createdAt: '' },
     ],
     isLoading: false,
   }),
+  useTransactions: mockUseTransactions,
   useCreateTransaction: () => ({ mutateAsync: mockCreate, isPending: false }),
-  useUpdateTransaction: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useUpdateTransaction: () => ({ mutateAsync: mockUpdate, isPending: false }),
+  useDeleteTransaction: () => ({ mutate: mockRemove }),
 }));
 
-import { TransactionSheet } from '../TransactionSheet';
+import { TransactionSheet, type TransactionSheetProps } from '../TransactionSheet';
 
-function renderSheet() {
+function renderSheet(props: Partial<TransactionSheetProps> = {}) {
+  const onClose = vi.fn();
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(
+  const tree = (extra: Partial<TransactionSheetProps>) => (
     <QueryClientProvider client={client}>
       <MantineProvider>
-        <TransactionSheet opened onClose={() => {}} yearMonth="2026-07" />
+        <Notifications />
+        <TransactionSheet opened onClose={onClose} yearMonth="2026-07" {...props} {...extra} />
       </MantineProvider>
-    </QueryClientProvider>,
+    </QueryClientProvider>
   );
+  const { rerender } = render(tree({}));
+  return { onClose, setProps: (extra: Partial<TransactionSheetProps>) => rerender(tree(extra)) };
 }
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>(res => { resolve = res; });
+  return { promise, resolve };
+}
+
+function chipNames(): (string | undefined)[] {
+  const group = screen.getByRole('radiogroup', { name: 'Category' });
+  return within(group).getAllByRole('radio').map(r => (r as HTMLInputElement).labels?.[0]?.textContent ?? undefined);
+}
+
+const editing: Transaction = {
+  transactionId: 't1', yearMonth: '2026-07', amount: 480, type: 'EXPENSE', categoryId: 'cat-dining',
+  description: 'Lunch', date: '2026-07-03', createdAt: '',
+};
+
 describe('TransactionSheet', () => {
-  beforeEach(() => { mockCreate.mockReset(); mockCreate.mockResolvedValue({}); });
+  beforeEach(() => {
+    mockCreate.mockReset();
+    mockCreate.mockResolvedValue({ transactionId: 't-real', yearMonth: '2026-07' });
+    mockUpdate.mockReset();
+    mockRemove.mockReset();
+    mockTransactions = [];
+    mockUseTransactions.mockReset();
+    mockUseTransactions.mockImplementation(() => ({ data: mockTransactions }));
+  });
+
+  afterEach(() => { notifications.clean(); });
+
+  it('only enables the ranking query while the sheet is open', () => {
+    const { setProps } = renderSheet({ opened: false });
+    const currentMonth = mockUseTransactions.mock.calls[0][0];
+    expect(mockUseTransactions.mock.calls.every(([, enabled]) => enabled === false)).toBe(true);
+
+    mockUseTransactions.mockClear();
+    setProps({ opened: true });
+    expect(mockUseTransactions).toHaveBeenCalledWith(currentMonth, true);
+  });
 
   it('shows a validation message for an invalid amount', async () => {
     const user = userEvent.setup();
     renderSheet();
     await user.type(screen.getByLabelText(/amount/i), 'abc');
-    await user.click(screen.getByRole('button', { name: /save/i }));
+    await user.click(screen.getByRole('button', { name: /^save$/i }));
     expect(await screen.findByText(/enter a valid amount/i)).toBeInTheDocument();
     expect(mockCreate).not.toHaveBeenCalled();
   });
@@ -46,7 +97,7 @@ describe('TransactionSheet', () => {
     const user = userEvent.setup();
     renderSheet();
     await user.type(screen.getByLabelText(/amount/i), '4.805');
-    await user.click(screen.getByRole('button', { name: /save/i }));
+    await user.click(screen.getByRole('button', { name: /^save$/i }));
     expect(await screen.findByText(/two decimal places/i)).toBeInTheDocument();
     expect(mockCreate).not.toHaveBeenCalled();
   });
@@ -55,7 +106,7 @@ describe('TransactionSheet', () => {
     const user = userEvent.setup();
     renderSheet();
     await user.type(screen.getByLabelText(/amount/i), '4.80');
-    await user.click(screen.getByRole('button', { name: /save/i }));
+    await user.click(screen.getByRole('button', { name: /^save$/i }));
     expect(await screen.findByText(/choose a category/i)).toBeInTheDocument();
     expect(mockCreate).not.toHaveBeenCalled();
   });
@@ -64,12 +115,227 @@ describe('TransactionSheet', () => {
     const user = userEvent.setup();
     renderSheet();
     await user.type(screen.getByLabelText(/amount/i), '4.80');
-    const categoryInput = screen.getByPlaceholderText('Choose');
-    await user.click(categoryInput);
-    await user.keyboard('{ArrowDown}{Enter}');
-    await user.click(screen.getByRole('button', { name: /save/i }));
+    await user.click(screen.getByRole('radio', { name: 'Dining' }));
+    await user.click(screen.getByRole('button', { name: /^save$/i }));
     expect(mockCreate).toHaveBeenCalledWith(
       expect.objectContaining({ amount: 480, type: 'EXPENSE', categoryId: 'cat-dining' }),
     );
+  });
+
+  it('lists the most-used categories first', () => {
+    mockTransactions = [
+      { ...editing, transactionId: 'a', categoryId: 'cat-food' },
+      { ...editing, transactionId: 'b', categoryId: 'cat-food' },
+      { ...editing, transactionId: 'c', categoryId: 'cat-dining' },
+    ];
+    renderSheet();
+    expect(chipNames()).toEqual(['Groceries', 'Dining']);
+  });
+
+  it('only offers categories that match the chosen type', async () => {
+    const user = userEvent.setup();
+    renderSheet();
+    await user.click(screen.getByRole('radio', { name: 'Income' }));
+    expect(chipNames()).toEqual(['Salary']);
+  });
+
+  it('defaults the date to today and lets you pick yesterday', async () => {
+    const user = userEvent.setup();
+    renderSheet();
+    await user.type(screen.getByLabelText(/amount/i), '4.80');
+    await user.click(screen.getByRole('radio', { name: 'Dining' }));
+    await user.click(screen.getByRole('radio', { name: 'Yesterday' }));
+    await user.click(screen.getByRole('button', { name: /^save$/i }));
+    expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({ date: yesterdayIso() }));
+  });
+
+  it('saves with today\'s date when no date is chosen', async () => {
+    const user = userEvent.setup();
+    renderSheet();
+    await user.type(screen.getByLabelText(/amount/i), '4.80');
+    await user.click(screen.getByRole('radio', { name: 'Dining' }));
+    await user.click(screen.getByRole('button', { name: /^save$/i }));
+    expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({ date: todayIso() }));
+  });
+
+  it('hides the note until asked for', async () => {
+    const user = userEvent.setup();
+    renderSheet();
+    expect(screen.queryByLabelText(/note/i)).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /add note/i }));
+    expect(screen.getByLabelText(/note/i)).toBeInTheDocument();
+  });
+
+  it('shows every field when editing', () => {
+    renderSheet({ editing });
+    expect(screen.getByLabelText(/note/i)).toHaveValue('Lunch');
+    expect(screen.getByLabelText(/^date/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /add note/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('radio', { name: 'Yesterday' })).not.toBeInTheDocument();
+  });
+
+  it('closes immediately without waiting for the create to finish', async () => {
+    const user = userEvent.setup();
+    mockCreate.mockReturnValue(new Promise(() => {}));
+    const { onClose } = renderSheet();
+    await user.type(screen.getByLabelText(/amount/i), '4.80');
+    await user.click(screen.getByRole('radio', { name: 'Dining' }));
+    await user.click(screen.getByRole('button', { name: /^save$/i }));
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it('ignores a second Save click while the sheet is closing', async () => {
+    const user = userEvent.setup();
+    renderSheet();
+    await user.type(screen.getByLabelText(/amount/i), '4.80');
+    await user.click(screen.getByRole('radio', { name: 'Dining' }));
+    const save = screen.getByRole('button', { name: /^save$/i });
+
+    fireEvent.click(save);
+    fireEvent.click(save);
+
+    expect(mockCreate).toHaveBeenCalledTimes(1);
+  });
+
+  it('accepts the next entry after Save & add another', async () => {
+    const user = userEvent.setup();
+    renderSheet();
+    await user.type(screen.getByLabelText(/amount/i), '4.80');
+    await user.click(screen.getByRole('radio', { name: 'Dining' }));
+    await user.click(screen.getByRole('button', { name: /save & add another/i }));
+
+    await user.type(screen.getByLabelText(/amount/i), '2.00');
+    await user.click(screen.getByRole('radio', { name: 'Groceries' }));
+    await user.click(screen.getByRole('button', { name: /save & add another/i }));
+
+    expect(mockCreate).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps the sheet open on Save & add another, clearing amount, note and category', async () => {
+    const user = userEvent.setup();
+    const { onClose } = renderSheet();
+    await user.click(screen.getByRole('radio', { name: 'Income' }));
+    await user.click(screen.getByRole('radio', { name: 'Yesterday' }));
+    await user.type(screen.getByLabelText(/amount/i), '10');
+    await user.click(screen.getByRole('radio', { name: 'Salary' }));
+    await user.click(screen.getByRole('button', { name: /add note/i }));
+    await user.type(screen.getByLabelText(/note/i), 'March');
+
+    await user.click(screen.getByRole('button', { name: /save & add another/i }));
+
+    expect(mockCreate).toHaveBeenCalledTimes(1);
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByLabelText(/amount/i)).toHaveValue('');
+    expect(screen.getByLabelText(/amount/i)).toHaveFocus();
+    expect(screen.getByRole('radio', { name: 'Salary' })).not.toBeChecked();
+    expect(screen.queryByLabelText(/note/i)).not.toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'Income' })).toBeChecked();
+    expect(screen.getByRole('radio', { name: 'Yesterday' })).toBeChecked();
+  });
+
+  it('runs Save & add another when Enter is pressed while adding', async () => {
+    const user = userEvent.setup();
+    const { onClose } = renderSheet();
+    await user.click(screen.getByRole('radio', { name: 'Dining' }));
+    await user.type(screen.getByLabelText(/amount/i), '4.80{Enter}');
+    expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({ amount: 480, categoryId: 'cat-dining' }));
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('offers Undo that deletes the created transaction', async () => {
+    const user = userEvent.setup();
+    renderSheet();
+    await user.type(screen.getByLabelText(/amount/i), '4.80');
+    await user.click(screen.getByRole('radio', { name: 'Dining' }));
+    await user.click(screen.getByRole('button', { name: /^save$/i }));
+
+    expect(await screen.findByText(/saved £4\.80 · dining/i)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Undo' }));
+
+    await waitFor(() => expect(mockRemove).toHaveBeenCalledWith({ transactionId: 't-real', yearMonth: '2026-07' }));
+  });
+
+  it('defers Undo until the create has finished', async () => {
+    const user = userEvent.setup();
+    const pending = deferred<{ transactionId: string; yearMonth: string }>();
+    mockCreate.mockReturnValue(pending.promise);
+    renderSheet();
+    await user.type(screen.getByLabelText(/amount/i), '4.80');
+    await user.click(screen.getByRole('radio', { name: 'Dining' }));
+    await user.click(screen.getByRole('button', { name: /^save$/i }));
+
+    await user.click(await screen.findByRole('button', { name: 'Undo' }));
+    expect(mockRemove).not.toHaveBeenCalled();
+
+    pending.resolve({ transactionId: 'late-id', yearMonth: '2026-07' });
+    await waitFor(() => expect(mockRemove).toHaveBeenCalledWith({ transactionId: 'late-id', yearMonth: '2026-07' }));
+  });
+
+  it('shows a Retry toast when the create fails and re-sends the same input', async () => {
+    const user = userEvent.setup();
+    mockCreate.mockRejectedValueOnce(new Error('boom'));
+    renderSheet();
+    await user.type(screen.getByLabelText(/amount/i), '4.80');
+    await user.click(screen.getByRole('radio', { name: 'Dining' }));
+    await user.click(screen.getByRole('button', { name: /^save$/i }));
+
+    await user.click(await screen.findByRole('button', { name: 'Retry' }));
+
+    expect(mockCreate).toHaveBeenCalledTimes(2);
+    expect(mockCreate).toHaveBeenLastCalledWith(mockCreate.mock.calls[0][0]);
+  });
+
+  it('stays silent when the create fails after the user pressed Undo', async () => {
+    const user = userEvent.setup();
+    const pending = deferred<never>();
+    mockCreate.mockReturnValue(pending.promise.then(() => { throw new Error('boom'); }));
+    renderSheet();
+    await user.type(screen.getByLabelText(/amount/i), '4.80');
+    await user.click(screen.getByRole('radio', { name: 'Dining' }));
+    await user.click(screen.getByRole('button', { name: /^save$/i }));
+    await user.click(await screen.findByRole('button', { name: 'Undo' }));
+
+    pending.resolve(undefined as never);
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 50)); });
+
+    expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/couldn't save/i)).not.toBeInTheDocument();
+    expect(mockRemove).not.toHaveBeenCalled();
+  });
+
+  it('awaits the update in edit mode and shows an inline error on failure', async () => {
+    const user = userEvent.setup();
+    mockUpdate.mockRejectedValue(new Error('boom'));
+    const { onClose } = renderSheet({ editing });
+    await user.click(screen.getByRole('button', { name: /^save$/i }));
+    expect(await screen.findByText(/could not save/i)).toBeInTheDocument();
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: /save & add another/i })).not.toBeInTheDocument();
+  });
+
+  it('closes after a successful edit', async () => {
+    const user = userEvent.setup();
+    mockUpdate.mockResolvedValue({});
+    const { onClose } = renderSheet({ editing });
+    await user.click(screen.getByRole('button', { name: /^save$/i }));
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+  });
+
+  it('renders as a centred modal on wide screens', () => {
+    const original = window.matchMedia;
+    window.matchMedia = ((query: string) => ({ ...original(query), matches: true })) as typeof window.matchMedia;
+    try {
+      renderSheet();
+      expect(document.querySelector('.mantine-Modal-root')).not.toBeNull();
+      expect(document.querySelector('.mantine-Drawer-root')).toBeNull();
+    } finally {
+      window.matchMedia = original;
+    }
+  });
+
+  it('renders as a bottom drawer on narrow screens', () => {
+    renderSheet();
+    expect(document.querySelector('.mantine-Drawer-root')).not.toBeNull();
+    expect(document.querySelector('.mantine-Modal-root')).toBeNull();
   });
 });
