@@ -51,4 +51,21 @@ describe('DefaultLayout add shortcut', () => {
     await userEvent.setup().click(screen.getByRole('button', { name: 'Add transaction' }));
     expect(screen.getByText('Add sheet open')).toBeInTheDocument();
   });
+
+  it('shows the quick entry tips button in the header', async () => {
+    renderLayout();
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Quick entry tips' }));
+    expect(await screen.findByRole('dialog', { name: 'Quick entry tips' })).toBeInTheDocument();
+  });
+
+  it('ignores N while the tips dialog is open', async () => {
+    const user = userEvent.setup();
+    renderLayout();
+    await user.click(screen.getByRole('button', { name: 'Quick entry tips' }));
+    await screen.findByRole('dialog', { name: 'Quick entry tips' });
+
+    await user.keyboard('n');
+
+    expect(screen.queryByText('Add sheet open')).not.toBeInTheDocument();
+  });
 });

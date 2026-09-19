@@ -613,4 +613,16 @@ describe('TransactionSheet', () => {
     renderSheet({ editing });
     expect(screen.queryByLabelText('Quick add')).not.toBeInTheDocument();
   });
+
+  it('shows an example under the quick add field, even beside an error', async () => {
+    const user = userEvent.setup();
+    renderSheet();
+    const example = 'e.g. coffee 3.50 · 3.50 coffee · +2400 salary (income)';
+
+    expect(screen.getByText(example)).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText('Quick add'), 'coffee{Enter}');
+    expect(await screen.findByText("Couldn't find an amount")).toBeInTheDocument();
+    expect(screen.getByText(example)).toBeInTheDocument();
+  });
 });

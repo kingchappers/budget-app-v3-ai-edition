@@ -309,6 +309,7 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, template
         {!editing && (
           <TextInput
             label="Quick add"
+            description="e.g. coffee 3.50 · 3.50 coffee · +2400 salary (income)"
             placeholder="coffee 3.50"
             value={quickAdd}
             error={quickAddError}
