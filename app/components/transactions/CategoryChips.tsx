@@ -41,14 +41,12 @@ export function CategoryChips({ chips, all, value, onChange, loading = false, er
           aria-label="All categories"
           placeholder="Search categories"
           searchable
+          allowDeselect={false}
           autoFocus
           data={all.map(c => ({ value: c.categoryId, label: c.name }))}
           value={value}
-          onChange={picked => {
-            if (!picked) return;
-            onChange(picked);
-            setShowAll(false);
-          }}
+          onOptionSubmit={() => setShowAll(false)}
+          onChange={picked => { if (picked) onChange(picked); }}
         />
       )}
     </Input.Wrapper>

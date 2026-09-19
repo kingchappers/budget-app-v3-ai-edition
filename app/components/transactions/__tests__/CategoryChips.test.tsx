@@ -84,6 +84,19 @@ describe('CategoryChips', () => {
     expect(onChange).toHaveBeenCalledWith('cat-travel');
   });
 
+  it('closes the list and keeps the choice when the already-selected option is picked again', async () => {
+    const user = userEvent.setup();
+    const onChange = renderChips({ value: 'cat-travel' });
+
+    await user.click(screen.getByRole('button', { name: /more/i }));
+    await user.click(screen.getByPlaceholderText('Search categories'));
+    await user.click(await screen.findByRole('option', { name: 'Travel', hidden: true }));
+
+    expect(onChange).not.toHaveBeenCalled();
+    expect(screen.queryByPlaceholderText('Search categories')).not.toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'Travel' })).toBeChecked();
+  });
+
   it('shows a loading message instead of chips while categories load', () => {
     renderChips({ loading: true });
     expect(screen.getByText(/loading categories/i)).toBeInTheDocument();
