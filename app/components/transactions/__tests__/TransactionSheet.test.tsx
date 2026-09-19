@@ -276,4 +276,22 @@ describe('TransactionSheet', () => {
     await user.click(screen.getByRole('button', { name: /^save$/i }));
     await waitFor(() => expect(onClose).toHaveBeenCalled());
   });
+
+  it('renders as a centred modal on wide screens', () => {
+    const original = window.matchMedia;
+    window.matchMedia = ((query: string) => ({ ...original(query), matches: true })) as typeof window.matchMedia;
+    try {
+      renderSheet();
+      expect(document.querySelector('.mantine-Modal-root')).not.toBeNull();
+      expect(document.querySelector('.mantine-Drawer-root')).toBeNull();
+    } finally {
+      window.matchMedia = original;
+    }
+  });
+
+  it('renders as a bottom drawer on narrow screens', () => {
+    renderSheet();
+    expect(document.querySelector('.mantine-Drawer-root')).not.toBeNull();
+    expect(document.querySelector('.mantine-Modal-root')).toBeNull();
+  });
 });
