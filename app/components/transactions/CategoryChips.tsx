@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { Button, Chip, Group, Input, Select, Text } from '@mantine/core';
 import type { Category } from '~/lib/types';
 
@@ -12,6 +12,7 @@ export interface CategoryChipsProps {
 }
 
 export function CategoryChips({ chips, all, value, onChange, loading = false, error = null }: CategoryChipsProps) {
+  const groupName = useId();
   const [showAll, setShowAll] = useState(false);
 
   if (loading) return <Text size="sm" c="dimmed">Loading categories…</Text>;
@@ -27,7 +28,7 @@ export function CategoryChips({ chips, all, value, onChange, loading = false, er
       <Chip.Group multiple={false} value={value ?? ''} onChange={onChange}>
         <Group gap="xs" mt={4} role="radiogroup" aria-label="Category">
           {visible.map(c => (
-            <Chip key={c.categoryId} value={c.categoryId} variant="outline">{c.name}</Chip>
+            <Chip key={c.categoryId} name={groupName} value={c.categoryId} variant="outline">{c.name}</Chip>
           ))}
           <Button variant="subtle" size="compact-sm" aria-expanded={showAll} onClick={() => setShowAll(open => !open)}>
             More…

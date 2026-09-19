@@ -37,6 +37,25 @@ describe('CategoryChips', () => {
     expect(within(group).getByRole('radio', { name: 'Groceries' })).toBeInTheDocument();
   });
 
+  it('gives every radio in the group the same non-empty name', () => {
+    renderChips();
+    const radios = within(screen.getByRole('radiogroup', { name: 'Category' })).getAllByRole('radio');
+    const names = new Set(radios.map(radio => radio.getAttribute('name')));
+    expect(names.size).toBe(1);
+    expect(radios[0].getAttribute('name')).toBeTruthy();
+  });
+
+  it('keeps radio names distinct between two instances', () => {
+    render(
+      <MantineProvider>
+        <CategoryChips chips={[groceries]} all={[groceries]} value={null} onChange={vi.fn()} />
+        <CategoryChips chips={[dining]} all={[dining]} value={null} onChange={vi.fn()} />
+      </MantineProvider>,
+    );
+    const [first, second] = screen.getAllByRole('radio');
+    expect(first.getAttribute('name')).not.toBe(second.getAttribute('name'));
+  });
+
   it('reports the chosen category', async () => {
     const onChange = renderChips();
     await userEvent.setup().click(screen.getByRole('radio', { name: 'Dining' }));
