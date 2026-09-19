@@ -70,7 +70,10 @@ function TransactionsContent() {
           </ActionIcon>
         )}
         value={filter.query}
-        onChange={e => setFilter(f => ({ ...f, query: e.currentTarget.value }))}
+        onChange={e => {
+          const query = e.currentTarget.value;
+          setFilter(f => ({ ...f, query }));
+        }}
       />
       <Group grow>
         <Select
