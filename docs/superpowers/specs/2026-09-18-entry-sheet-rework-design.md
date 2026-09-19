@@ -70,7 +70,7 @@ The API derives `yearMonth = date.slice(0, 7)` and generates `transactionId` and
 
 **`useDeleteTransaction`** changes to take `{ transactionId, yearMonth }` as mutation variables instead of binding `yearMonth` at hook creation, so Undo can delete from whichever month the entry landed in. The existing caller in `app/routes/transactions.tsx` is updated. `useUpdateTransaction(yearMonth)` is unchanged.
 
-**Toast plumbing:** add `@mantine/notifications`, import its styles, and mount `<Notifications />` in `app/root.tsx`. Position it bottom-centre with an offset above the bottom tab bar and floating button (`bottom: 84`, 56px tall) and a z-index above the button's 101. Auto-dismiss after about 5 seconds. The note is rendered as plain React text.
+**Toast plumbing:** add `@mantine/notifications`, import its styles, and mount `<Notifications />` in `app/root.tsx`. Position it bottom-centre with an offset above the bottom tab bar and floating button (`bottom: 84`, 56px tall) on narrow screens, and bottom-left on wide screens (>= `sm`) so it never covers the centred modal's buttons (the left side is the empty lower part of the sidebar), with a z-index above the button's 101. The offset applies to the bottom containers only, because an offset on the root style would stretch the empty `top-*` containers over the page and swallow clicks. Auto-dismiss after about 5 seconds. The note is rendered as plain React text.
 
 ### 3. Desktop experience
 

@@ -15,3 +15,10 @@ body {
   outline: 2px solid var(--mantine-color-primary-6);
   outline-offset: 2px;
 }
+
+/* Narrow screens: lift bottom-centre toasts above the tab bar and the floating add button. */
+@media (max-width: 47.99em) {
+  .mantine-Notifications-root[data-position='bottom-center'] {
+    bottom: 150px;
+  }
+}

@@ -14,8 +14,9 @@ import {
 import type { Route } from "./+types/root";
 import "./app.css";
 
-import { ColorSchemeScript, MantineProvider, mantineHtmlProps, createTheme } from '@mantine/core';
+import { ColorSchemeScript, MantineProvider, mantineHtmlProps, createTheme, useMantineTheme } from '@mantine/core';
 import { DatesProvider } from '@mantine/dates';
+import { useMediaQuery } from '@mantine/hooks';
 import { Notifications } from '@mantine/notifications';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
@@ -66,6 +67,12 @@ const theme = createTheme({
   },
 });
 
+function ResponsiveNotifications() {
+  const theme = useMantineTheme();
+  const isDesktop = useMediaQuery(`(min-width: ${theme.breakpoints.sm})`);
+  return <Notifications position={isDesktop ? 'bottom-left' : 'bottom-center'} />;
+}
+
 export const links: Route.LinksFunction = () => [
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
   {
@@ -92,7 +99,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <body>
         <QueryClientProvider client={queryClient}>
           <MantineProvider defaultColorScheme="auto" theme={theme}>
-            <Notifications position="bottom-center" styles={{ root: { bottom: 150 } }} />
+            <ResponsiveNotifications />
             <DatesProvider settings={{ locale: 'en-gb' }}>{children}</DatesProvider>
           </MantineProvider>
         </QueryClientProvider>
