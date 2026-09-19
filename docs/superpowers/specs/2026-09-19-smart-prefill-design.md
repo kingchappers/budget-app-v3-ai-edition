@@ -21,6 +21,7 @@ The same branch also carries an unrelated bug fix made at the user's request: ty
 | What does Enter do on the quick-add line? | **Only fills the form.** Never saves. |
 | What does the grammar cover? | Amount first or last; `+` prefix means income. No date keyword. |
 | What does Duplicate do? | Opens the **add sheet prefilled, dated today**. |
+| How do users learn about these options? | An **inline example** under the Quick add field plus a **'?' button in the app header** opening a compact "Quick entry tips" modal. No nav item, no help page. |
 | How does Duplicate reach the sheet? | **Route-local**: the Transactions route keeps a `duplicating` state and passes a `template` prop to its own sheet instance (next to `editing`). No shared context. |
 
 ## Goals
@@ -29,10 +30,11 @@ The same branch also carries an unrelated bug fix made at the user's request: ty
 2. One typed line (`coffee 3.50`) fills amount, note, type and category.
 3. A regular purchase can be repeated from its row.
 4. Nothing is ever saved from a guess: the user always confirms.
+5. The quick-entry options (including A's `N` shortcut and Save & add another) are discoverable in the UI.
 
 ## Non-goals
 
-A `yesterday`/`today` keyword; prefix or fuzzy matching; amount-based suggestions; any server change, endpoint or data model; auto-saving; investments through quick add; Duplicate anywhere but the Transactions page; a shared add-sheet context; moving validation errors off the Amount field (a good follow-up, since quick add gets its own inline error).
+A `yesterday`/`today` keyword; prefix or fuzzy matching; amount-based suggestions; any server change, endpoint or data model; auto-saving; investments through quick add; Duplicate anywhere but the Transactions page; a shared add-sheet context; moving validation errors off the Amount field (a good follow-up, since quick add gets its own inline error); a Help page or nav item; an onboarding tour; remembering whether tips were "seen".
 
 ## Design
 
@@ -79,6 +81,17 @@ A `yesterday`/`today` keyword; prefix or fuzzy matching; amount-based suggestion
 
 **`TransactionRow`** gains `onDuplicate?: (t: Transaction) => void` and a Duplicate item in its menu (with a copy icon), rendered only when the handler is provided. **`app/routes/transactions.tsx`** holds `duplicating: Transaction | null`; its sheet gets `template={duplicating}`, `opened={editing !== null || duplicating !== null}`, and an `onClose` that clears both.
 
+### 3. Discoverability
+
+- **Inline example:** the Quick add input carries a description line, always visible: `e.g. coffee 3.50 · 3.50 coffee · +2400 salary (income)`. Parser errors still appear below the field.
+- **Header '?' button:** `DefaultLayout`'s header gets a small help icon button (`aria-label="Quick entry tips"`) beside the colour-scheme toggle. It opens a compact `Modal` titled "Quick entry tips" with short static entries:
+  - **`N`** (keyboard) or the + button opens Add transaction.
+  - **Quick add:** type `coffee 3.50` (or `3.50 coffee`) and press Enter to fill the form; start the amount with `+` for income (`+2400 salary`). It never saves by itself.
+  - **Remembered categories:** type a note you've used before and its category is suggested (from the last three months).
+  - **Save & add another:** Enter in any other field saves and keeps the sheet open for the next entry; an Undo toast follows each save.
+  - **Duplicate:** on the Transactions page, open a row's menu and choose Duplicate.
+- The tips are a new `app/components/layout/QuickEntryTips.tsx`, rendered by `DefaultLayout`. The text is static, so it must be kept in step with the behaviour above when that changes.
+
 ## Files touched
 
 | File | Change |
@@ -90,6 +103,8 @@ A `yesterday`/`today` keyword; prefix or fuzzy matching; amount-based suggestion
 | `app/components/transactions/CategoryChips.tsx` | Only if needed: a small ref or prop so the sheet can focus the chip group |
 | `app/components/transactions/TransactionRow.tsx` | `onDuplicate` prop and menu item |
 | `app/routes/transactions.tsx` (+ test) | `duplicating` state and sheet wiring; the search fix (`554adb3`) is already here |
+| `app/components/layout/QuickEntryTips.tsx` (+ test) | New: header '?' button and tips modal |
+| `app/components/layout/DefaultLayout.tsx` | Render `QuickEntryTips` in the header |
 | `docs/ROADMAP.md` | Status row for B |
 
 No API, infra, auth or `SECURITY.md` control changes: matching, parsing and history all run in the browser over data the API already returns. The note is rendered as plain React text in the hint (never HTML). Existing server-side validation still applies to whatever is finally saved.
@@ -100,6 +115,7 @@ No API, infra, auth or `SECURITY.md` control changes: matching, parsing and hist
 - **`noteMemory`:** normalisation (case, spaces); most recent wins (date, then `createdAt`); type mismatch skips to an older matching-type entry or returns null; deleted category skipped; empty note; empty history.
 - **`useNoteHistory`:** requests exactly the three months; disabled while closed; index reflects new data.
 - **Sheet:** Enter on the quick-add line fills the form and makes **no create call**; the form does not submit; the line clears; parse errors show and clear on typing; focus goes to Save & add another when recalled and to the chips otherwise; `+` sets Income and looks up an income category; the note field selects a category only on a full match; a user-picked category survives note edits; a `memory` category clears when the note stops matching; type change re-runs the lookup; edit mode never recalls; the hint appears and disappears; the template prefills with today's date and a `user` source.
+- **Discoverability:** the '?' button has an accessible name and opens a modal titled "Quick entry tips" that mentions `N`, quick add, `+` for income, remembered categories, Save & add another and Duplicate; the sheet shows the example line under Quick add and keeps showing it beside a parser error; the existing `DefaultLayout` tests still pass with the new header button.
 - **Route:** Duplicate opens the sheet prefilled (extends `app/routes/__tests__/transactions.test.tsx`). **Row:** the menu item calls `onDuplicate`.
 - **Browser:** a real-browser pass with the stubbed headless harness (Auth0 and `/api/*` stubbed): the quick-add line never POSTs, a recalled category selects, focus lands as designed, Duplicate opens prefilled, and the search box no longer crashes.
 - `yarn typecheck` and `yarn test` must pass.
@@ -114,7 +130,8 @@ Atomic, test-first commits on `feat/smart-prefill` (after the search fix `554adb
 4. Duplicate: row menu, route wiring, sheet `template`
 5. Memory pre-selection from the note field
 6. The quick-add field and post-fill focus
-7. Browser verification and docs
+7. Discoverability: the inline example and the header tips modal
+8. Browser verification and docs
 
 ## Branching
 
