@@ -400,6 +400,17 @@ describe('TransactionSheet', () => {
     expect(screen.getByText("Suggested from your earlier 'starbucks'")).toBeInTheDocument();
   });
 
+  it('announces the remembered category suggestion as a status message', async () => {
+    const user = userEvent.setup();
+    mockTransactions = [pastTxn({ description: 'Starbucks', categoryId: 'cat-dining' })];
+    renderSheet();
+
+    await user.click(screen.getByRole('button', { name: /add note/i }));
+    await user.type(screen.getByLabelText(/note/i), 'starbucks');
+
+    expect(screen.getByText("Suggested from your earlier 'starbucks'")).toHaveAttribute('role', 'status');
+  });
+
   it('does not select a category for a partial note', async () => {
     const user = userEvent.setup();
     mockTransactions = [pastTxn({ description: 'Starbucks', categoryId: 'cat-dining' })];

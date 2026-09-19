@@ -347,7 +347,7 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, template
           />
         </div>
         {categorySource === 'memory' && description.trim() !== '' && (
-          <Text size="xs" c="dimmed">Suggested from your earlier '{description.trim()}'</Text>
+          <Text size="xs" c="dimmed" role="status">Suggested from your earlier '{description.trim()}'</Text>
         )}
         {editing ? (
           <DateInput
