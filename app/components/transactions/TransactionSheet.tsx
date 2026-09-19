@@ -275,6 +275,8 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, template
     setCategorySource('none');
     setDescription('');
     setNoteOpen(false);
+    setQuickAdd('');
+    setQuickAddError(null);
     setError(null);
     amountRef.current?.focus();
   }

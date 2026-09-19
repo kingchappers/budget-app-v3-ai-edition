@@ -267,6 +267,21 @@ describe('TransactionSheet', () => {
     expect(screen.getByRole('radio', { name: 'Yesterday' })).toBeChecked();
   });
 
+  it('clears the quick add line and its error on Save & add another', async () => {
+    const user = userEvent.setup();
+    renderSheet();
+    await user.type(screen.getByLabelText('Quick add'), 'coffee{Enter}');
+    expect(screen.getByText("Couldn't find an amount")).toBeInTheDocument();
+    await user.type(screen.getByLabelText(/amount/i), '4.80');
+    await user.click(screen.getByRole('radio', { name: 'Dining' }));
+
+    await user.click(screen.getByRole('button', { name: /save & add another/i }));
+
+    expect(mockCreate).toHaveBeenCalledTimes(1);
+    expect(screen.getByLabelText('Quick add')).toHaveValue('');
+    expect(screen.queryByText("Couldn't find an amount")).not.toBeInTheDocument();
+  });
+
   it('runs Save & add another when Enter is pressed while adding', async () => {
     const user = userEvent.setup();
     const { onClose } = renderSheet();
