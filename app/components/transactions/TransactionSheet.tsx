@@ -3,10 +3,12 @@ import { Button, Drawer, Group, Modal, SegmentedControl, Stack, Text, TextInput,
 import { useMediaQuery } from '@mantine/hooks';
 import { DateInput } from '@mantine/dates';
 import { notifications } from '@mantine/notifications';
+import { useNoteHistory } from '~/hooks/useNoteHistory';
 import { useSnapshotWhileOpen } from '~/hooks/useSnapshotWhileOpen';
 import type { TransactionInput } from '~/lib/api';
 import { formatPence, formatPencePlain, parsePounds } from '~/lib/money';
 import { currentYearMonth, dateChoiceFor, todayIso, yesterdayIso, type DateChoice } from '~/lib/months';
+import { categoryForNote } from '~/lib/noteMemory';
 import {
   useCategories,
   useCreateTransaction,
@@ -29,6 +31,7 @@ const DATE_OPTIONS: { label: string; value: DateChoice }[] = [
 ];
 
 type SaveMode = 'close' | 'addAnother';
+type CategorySource = 'none' | 'memory' | 'user';
 
 export interface TransactionSheetProps {
   opened: boolean;
@@ -58,6 +61,7 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, template
   const isDesktop = useMediaQuery(`(min-width: ${theme.breakpoints.sm})`);
   const { data: categories = [], isLoading: categoriesLoading, error: categoriesError } = useCategories();
   const monthTransactions = useSnapshotWhileOpen(useTransactions(currentYearMonth(), opened).data, opened);
+  const noteIndex = useNoteHistory(opened);
   const create = useCreateTransaction();
   const update = useUpdateTransaction(yearMonth);
   const remove = useDeleteTransaction();
@@ -72,6 +76,7 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, template
   const [dateChoice, setDateChoice] = useState<DateChoice>('today');
   const [noteOpen, setNoteOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [categorySource, setCategorySource] = useState<CategorySource>('none');
 
   useEffect(() => {
     if (!opened) return;
@@ -83,6 +88,7 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, template
       setDescription(editing.description);
       setDate(editing.date);
       setDateChoice(dateChoiceFor(editing.date));
+      setCategorySource('none');
     } else if (template) {
       setAmount(formatPencePlain(template.amount));
       setType(template.type);
@@ -90,6 +96,7 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, template
       setDescription(template.description);
       setDate(todayIso());
       setDateChoice('today');
+      setCategorySource('user');
     } else {
       setAmount('');
       setType('EXPENSE');
@@ -97,6 +104,7 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, template
       setDescription('');
       setDate(todayIso());
       setDateChoice('today');
+      setCategorySource('none');
     }
     setNoteOpen(!editing && template != null && template.description !== '');
     setError(null);
@@ -109,6 +117,34 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, template
     setDateChoice(choice);
     if (choice === 'today') setDate(todayIso());
     if (choice === 'yesterday') setDate(yesterdayIso());
+  }
+
+  function handleCategoryChange(id: string): void {
+    setCategoryId(id);
+    setCategorySource('user');
+  }
+
+  function handleNoteChange(note: string): void {
+    setDescription(note);
+    if (editing || categorySource === 'user') return;
+
+    const recalled = categoryForNote(noteIndex, note, type, categories);
+    if (recalled) {
+      setCategoryId(recalled);
+      setCategorySource('memory');
+      return;
+    }
+    if (categorySource === 'memory') {
+      setCategoryId(null);
+      setCategorySource('none');
+    }
+  }
+
+  function handleTypeChange(next: TransactionType): void {
+    setType(next);
+    const recalled = editing ? null : categoryForNote(noteIndex, description, next, categories);
+    setCategoryId(recalled);
+    setCategorySource(recalled ? 'memory' : 'none');
   }
 
   function validate(): TransactionInput | null {
@@ -189,6 +225,7 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, template
     createSubmittedRef.current = false;
     setAmount('');
     setCategoryId(null);
+    setCategorySource('none');
     setDescription('');
     setNoteOpen(false);
     setError(null);
@@ -236,17 +273,20 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, template
         <SegmentedControl
           fullWidth
           value={type}
-          onChange={value => { setType(value as TransactionType); setCategoryId(null); }}
+          onChange={value => handleTypeChange(value as TransactionType)}
           data={TYPE_OPTIONS}
         />
         <CategoryChips
           chips={chips}
           all={eligible}
           value={categoryId}
-          onChange={setCategoryId}
+          onChange={handleCategoryChange}
           loading={categoriesLoading}
           error={categoriesError ? 'Could not load categories' : null}
         />
+        {categorySource === 'memory' && description.trim() !== '' && (
+          <Text size="xs" c="dimmed">Suggested from your earlier '{description.trim()}'</Text>
+        )}
         {editing ? (
           <DateInput
             label="Date"
@@ -277,7 +317,7 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, template
           <TextInput
             label="Note (optional)"
             value={description}
-            onChange={e => setDescription(e.currentTarget.value)}
+            onChange={e => handleNoteChange(e.currentTarget.value)}
             maxLength={200}
           />
         ) : (

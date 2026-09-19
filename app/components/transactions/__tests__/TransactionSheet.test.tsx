@@ -61,6 +61,13 @@ const editing: Transaction = {
   description: 'Lunch', date: '2026-07-03', createdAt: '',
 };
 
+function pastTxn(over: Partial<Transaction>): Transaction {
+  return {
+    transactionId: 'p1', yearMonth: '2026-07', amount: 100, type: 'EXPENSE', categoryId: 'cat-dining',
+    description: '', date: '2026-07-01', createdAt: '', ...over,
+  };
+}
+
 describe('TransactionSheet', () => {
   beforeEach(() => {
     mockCreate.mockReset();
@@ -364,5 +371,130 @@ describe('TransactionSheet', () => {
     renderSheet();
     expect(document.querySelector('.mantine-Drawer-root')).not.toBeNull();
     expect(document.querySelector('.mantine-Modal-root')).toBeNull();
+  });
+
+  it('selects the remembered category when a known note is fully typed', async () => {
+    const user = userEvent.setup();
+    mockTransactions = [pastTxn({ description: 'Starbucks', categoryId: 'cat-dining' })];
+    renderSheet();
+
+    await user.click(screen.getByRole('button', { name: /add note/i }));
+    await user.type(screen.getByLabelText(/note/i), 'starbucks');
+
+    expect(screen.getByRole('radio', { name: 'Dining' })).toBeChecked();
+    expect(screen.getByText("Suggested from your earlier 'starbucks'")).toBeInTheDocument();
+  });
+
+  it('does not select a category for a partial note', async () => {
+    const user = userEvent.setup();
+    mockTransactions = [pastTxn({ description: 'Starbucks', categoryId: 'cat-dining' })];
+    renderSheet();
+
+    await user.click(screen.getByRole('button', { name: /add note/i }));
+    await user.type(screen.getByLabelText(/note/i), 'starb');
+
+    expect(screen.getByRole('radio', { name: 'Dining' })).not.toBeChecked();
+    expect(screen.queryByText(/suggested from your earlier/i)).not.toBeInTheDocument();
+  });
+
+  it('never overwrites a category the user picked', async () => {
+    const user = userEvent.setup();
+    mockTransactions = [
+      pastTxn({ transactionId: 'a', description: 'Starbucks', categoryId: 'cat-dining' }),
+      pastTxn({ transactionId: 'b', description: 'Tesco', categoryId: 'cat-food' }),
+    ];
+    renderSheet();
+
+    await user.click(screen.getByRole('radio', { name: 'Groceries' }));
+    await user.click(screen.getByRole('button', { name: /add note/i }));
+    await user.type(screen.getByLabelText(/note/i), 'starbucks');
+
+    expect(screen.getByRole('radio', { name: 'Groceries' })).toBeChecked();
+    expect(screen.getByRole('radio', { name: 'Dining' })).not.toBeChecked();
+  });
+
+  it('clears a remembered category when the note stops matching', async () => {
+    const user = userEvent.setup();
+    mockTransactions = [pastTxn({ description: 'Starbucks', categoryId: 'cat-dining' })];
+    renderSheet();
+
+    await user.click(screen.getByRole('button', { name: /add note/i }));
+    await user.type(screen.getByLabelText(/note/i), 'starbucks');
+    expect(screen.getByRole('radio', { name: 'Dining' })).toBeChecked();
+
+    await user.type(screen.getByLabelText(/note/i), 'x');
+
+    expect(screen.getByRole('radio', { name: 'Dining' })).not.toBeChecked();
+    expect(screen.queryByText(/suggested from your earlier/i)).not.toBeInTheDocument();
+  });
+
+  it('drops the hint once the user picks a category', async () => {
+    const user = userEvent.setup();
+    mockTransactions = [pastTxn({ description: 'Starbucks', categoryId: 'cat-dining' })];
+    renderSheet();
+
+    await user.click(screen.getByRole('button', { name: /add note/i }));
+    await user.type(screen.getByLabelText(/note/i), 'starbucks');
+    await user.click(screen.getByRole('radio', { name: 'Groceries' }));
+
+    expect(screen.queryByText(/suggested from your earlier/i)).not.toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'Groceries' })).toBeChecked();
+  });
+
+  it('re-runs the lookup when the type changes', async () => {
+    const user = userEvent.setup();
+    mockTransactions = [
+      pastTxn({ transactionId: 'a', description: 'Refund', categoryId: 'cat-dining' }),
+      pastTxn({ transactionId: 'b', description: 'Refund', categoryId: 'cat-salary', type: 'INCOME', date: '2026-07-02' }),
+    ];
+    renderSheet();
+
+    await user.click(screen.getByRole('button', { name: /add note/i }));
+    await user.type(screen.getByLabelText(/note/i), 'refund');
+    expect(screen.getByRole('radio', { name: 'Dining' })).toBeChecked();
+
+    await user.click(screen.getByRole('radio', { name: 'Income' }));
+    expect(screen.getByRole('radio', { name: 'Salary' })).toBeChecked();
+
+    await user.click(screen.getByRole('radio', { name: 'Spend' }));
+    expect(screen.getByRole('radio', { name: 'Dining' })).toBeChecked();
+  });
+
+  it('clears the category on a type change when the note has no match there', async () => {
+    const user = userEvent.setup();
+    mockTransactions = [pastTxn({ description: 'Starbucks', categoryId: 'cat-dining' })];
+    renderSheet();
+
+    await user.click(screen.getByRole('button', { name: /add note/i }));
+    await user.type(screen.getByLabelText(/note/i), 'starbucks');
+    await user.click(screen.getByRole('radio', { name: 'Income' }));
+
+    expect(screen.getByRole('radio', { name: 'Salary' })).not.toBeChecked();
+    expect(screen.queryByText(/suggested from your earlier/i)).not.toBeInTheDocument();
+  });
+
+  it('never recalls a category while editing', async () => {
+    const user = userEvent.setup();
+    mockTransactions = [pastTxn({ description: 'Starbucks', categoryId: 'cat-dining' })];
+    renderSheet({ editing: { ...editing, categoryId: 'cat-food', description: 'Lunch' } });
+
+    const note = screen.getByLabelText(/note/i);
+    await user.clear(note);
+    await user.type(note, 'starbucks');
+
+    expect(screen.getByRole('radio', { name: 'Groceries' })).toBeChecked();
+    expect(screen.queryByText(/suggested from your earlier/i)).not.toBeInTheDocument();
+  });
+
+  it('keeps a duplicated category when the note is changed', async () => {
+    const user = userEvent.setup();
+    mockTransactions = [pastTxn({ description: 'Starbucks', categoryId: 'cat-dining' })];
+    renderSheet({ template: { ...editing, categoryId: 'cat-food', description: 'Tesco' } });
+
+    const note = screen.getByLabelText(/note/i);
+    await user.clear(note);
+    await user.type(note, 'starbucks');
+
+    expect(screen.getByRole('radio', { name: 'Groceries' })).toBeChecked();
   });
 });
