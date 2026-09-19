@@ -4,7 +4,7 @@ Bank sync was dropped (see `DECISIONS.md`), so manual entry is the core interact
 
 | # | Sub-project | Status |
 |---|---|---|
-| A | Entry sheet rework | Spec approved: `superpowers/specs/2026-09-18-entry-sheet-rework-design.md` |
+| A | Entry sheet rework | Implemented on `feat/entry-sheet-rework` (PR pending). Spec: `superpowers/specs/2026-09-18-entry-sheet-rework-design.md`, plan: `superpowers/plans/2026-09-18-entry-sheet-rework.md` |
 | B | Smart prefill | Not started |
 | C | Recurring templates | Not started |
 | D | PWA and add shortcut | Not started |
