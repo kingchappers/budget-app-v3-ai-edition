@@ -35,6 +35,7 @@ export interface TransactionSheetProps {
   onClose: () => void;
   yearMonth: string;
   editing?: Transaction | null;
+  template?: Transaction | null;
 }
 
 interface ToastActionProps {
@@ -52,7 +53,7 @@ function ToastAction({ text, actionLabel, onAction }: ToastActionProps) {
   );
 }
 
-export function TransactionSheet({ opened, onClose, yearMonth, editing }: TransactionSheetProps) {
+export function TransactionSheet({ opened, onClose, yearMonth, editing, template }: TransactionSheetProps) {
   const theme = useMantineTheme();
   const isDesktop = useMediaQuery(`(min-width: ${theme.breakpoints.sm})`);
   const { data: categories = [], isLoading: categoriesLoading, error: categoriesError } = useCategories();
@@ -82,6 +83,13 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing }: Transa
       setDescription(editing.description);
       setDate(editing.date);
       setDateChoice(dateChoiceFor(editing.date));
+    } else if (template) {
+      setAmount(formatPencePlain(template.amount));
+      setType(template.type);
+      setCategoryId(template.categoryId);
+      setDescription(template.description);
+      setDate(todayIso());
+      setDateChoice('today');
     } else {
       setAmount('');
       setType('EXPENSE');
@@ -90,9 +98,9 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing }: Transa
       setDate(todayIso());
       setDateChoice('today');
     }
-    setNoteOpen(false);
+    setNoteOpen(!editing && template != null && template.description !== '');
     setError(null);
-  }, [opened, editing]);
+  }, [opened, editing, template]);
 
   const eligible = categories.filter(c => c.type === categoryTypeFor(type));
   const chips = topCategories(monthTransactions ?? [], categories, type, CHIP_LIMIT);

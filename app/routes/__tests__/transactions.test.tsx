@@ -24,7 +24,10 @@ const transactions: Transaction[] = [
 vi.mock('~/components/layout/DefaultLayout', () => ({
   DefaultLayout: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
-vi.mock('~/components/transactions/TransactionSheet', () => ({ TransactionSheet: () => null }));
+vi.mock('~/components/transactions/TransactionSheet', () => ({
+  TransactionSheet: ({ opened, template }: { opened: boolean; template?: { description: string } | null }) =>
+    opened ? <div>{template ? `Sheet template: ${template.description}` : 'Sheet open'}</div> : null,
+}));
 vi.mock('~/lib/queries', () => ({
   useCategories: () => ({ data: categories }),
   useTransactions: () => ({ data: transactions, isLoading: false, error: null }),
@@ -67,5 +70,17 @@ describe('Transactions route search', () => {
 
     expect(screen.getByLabelText('Search transactions')).toHaveValue('');
     expect(screen.getByText('Petrol')).toBeInTheDocument();
+  });
+});
+
+describe('Transactions route duplicate', () => {
+  it('opens the add sheet prefilled from a row via Duplicate', async () => {
+    const user = userEvent.setup();
+    renderRoute();
+
+    await user.click(screen.getByRole('button', { name: 'Actions for Weekly Shop' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Duplicate' }));
+
+    expect(screen.getByText('Sheet template: Weekly Shop')).toBeInTheDocument();
   });
 });

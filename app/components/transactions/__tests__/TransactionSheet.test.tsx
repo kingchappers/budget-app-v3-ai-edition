@@ -174,6 +174,33 @@ describe('TransactionSheet', () => {
     expect(screen.queryByRole('radio', { name: 'Yesterday' })).not.toBeInTheDocument();
   });
 
+  it('prefills from a template, dated today', async () => {
+    const user = userEvent.setup();
+    renderSheet({ template: editing });
+
+    expect(screen.getByLabelText(/amount/i)).toHaveValue('4.80');
+    expect(screen.getByRole('radio', { name: 'Dining' })).toBeChecked();
+    expect(screen.getByLabelText(/note/i)).toHaveValue('Lunch');
+    expect(screen.getByRole('radio', { name: 'Today' })).toBeChecked();
+
+    await user.click(screen.getByRole('button', { name: /^save$/i }));
+
+    expect(mockCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ amount: 480, categoryId: 'cat-dining', description: 'Lunch', date: todayIso() }),
+    );
+  });
+
+  it('keeps the note collapsed for a template with no note', () => {
+    renderSheet({ template: { ...editing, description: '' } });
+    expect(screen.queryByLabelText(/note/i)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /add note/i })).toBeInTheDocument();
+  });
+
+  it('prefers the transaction being edited over a template', () => {
+    renderSheet({ editing, template: { ...editing, amount: 999 } });
+    expect(screen.getByLabelText(/amount/i)).toHaveValue('4.80');
+  });
+
   it('closes immediately without waiting for the create to finish', async () => {
     const user = userEvent.setup();
     mockCreate.mockReturnValue(new Promise(() => {}));
