@@ -10,17 +10,24 @@ Bank sync was dropped (see `DECISIONS.md`), so manual entry is the core interact
 | D | PWA and add shortcut | Not started |
 | E | CSV/OFX import | Not started |
 
-## B: Smart prefill (next after A)
+## B: Smart prefill
 
-Category memory, duplicate from a row, one-line quick add.
+Implemented on `feat/smart-prefill`. Spec: `superpowers/specs/2026-09-19-smart-prefill-design.md`, plan: `superpowers/plans/2026-09-19-smart-prefill.md`.
 
-- **Builds on A:** chips and the sheet form. Category memory extends `topCategories`/pre-selection; quick add opens or bypasses the sheet.
-- **Open questions:**
-  - Memory needs history beyond the current month. Does that mean a new API read (for example, last 90 days of description → category), or a client-side lookup over several cached months?
-  - Match key: exact description, case-insensitive, or prefix?
-  - Quick-add grammar: `coffee 3.50`, `3.50 coffee`, `+2400 salary` for income. What happens when no category matches: open the sheet with what was parsed, or ask?
-  - Duplicate: dated today, or keep the original date?
-- **Security:** any new API read follows IO-01 validation.
+- **Built:**
+  - A Quick add line atop the add sheet. Enter only fills the form (amount, type, note, category); it never saves.
+  - Category memory keyed on the note, looked up over the last three months of cached transactions. Match is exact, ignoring case and spaces.
+  - Duplicate in the row menu opens the add sheet prefilled and dated today.
+  - An example line under Quick add and a header "?" tips modal explaining the options.
+- **Decisions:** memory is a client-side lookup over cached months (no new API read); match key is the whole note, not a prefix; quick add fills the sheet rather than bypassing it; Duplicate is dated today, not the original date.
+- **Follow-ups:**
+  - History that loads after a full note is typed gets no recall until the next keystroke (re-run the lookup when the note index changes).
+  - IME composition guard on the Quick add Enter.
+  - The chip-focus effect should fall back to Amount when no chip exists.
+  - Enter on an empty Quick add shows "Couldn't find an amount".
+  - A latent guard for an empty category id from the chip group.
+  - Sheet tests should key mock history by month and render under StrictMode.
+  - Pre-existing and separate: focus stays on the row's Actions button after Edit/Duplicate, so Tab walks rows behind the modal.
 
 ## C: Recurring templates
 
