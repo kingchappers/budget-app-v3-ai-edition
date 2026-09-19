@@ -497,4 +497,120 @@ describe('TransactionSheet', () => {
 
     expect(screen.getByRole('radio', { name: 'Groceries' })).toBeChecked();
   });
+
+  it('fills the form from the quick add line without saving', async () => {
+    const user = userEvent.setup();
+    renderSheet();
+
+    await user.type(screen.getByLabelText('Quick add'), 'coffee 3.50{Enter}');
+
+    expect(screen.getByLabelText(/amount/i)).toHaveValue('3.50');
+    expect(screen.getByLabelText(/note/i)).toHaveValue('coffee');
+    expect(screen.getByLabelText('Quick add')).toHaveValue('');
+    expect(mockCreate).not.toHaveBeenCalled();
+    expect(screen.queryByText(/enter a valid amount/i)).not.toBeInTheDocument();
+  });
+
+  it('recalls the category and switches to income for a + line', async () => {
+    const user = userEvent.setup();
+    mockTransactions = [pastTxn({ description: 'salary', categoryId: 'cat-salary', type: 'INCOME' })];
+    renderSheet();
+
+    await user.type(screen.getByLabelText('Quick add'), '+2400 salary{Enter}');
+
+    expect(screen.getByRole('radio', { name: 'Income' })).toBeChecked();
+    expect(screen.getByRole('radio', { name: 'Salary' })).toBeChecked();
+    expect(screen.getByLabelText(/amount/i)).toHaveValue('2400.00');
+    expect(screen.getByText("Suggested from your earlier 'salary'")).toBeInTheDocument();
+    expect(mockCreate).not.toHaveBeenCalled();
+  });
+
+  it('focuses Save & add another when a category was recalled', async () => {
+    const user = userEvent.setup();
+    mockTransactions = [pastTxn({ description: 'coffee', categoryId: 'cat-dining' })];
+    renderSheet();
+
+    await user.type(screen.getByLabelText('Quick add'), 'coffee 3.50{Enter}');
+
+    expect(screen.getByRole('button', { name: /save & add another/i })).toHaveFocus();
+  });
+
+  it('focuses the category chips when no category was recalled', async () => {
+    const user = userEvent.setup();
+    renderSheet();
+
+    await user.type(screen.getByLabelText('Quick add'), 'flat white 3.50{Enter}');
+
+    const group = screen.getByRole('radiogroup', { name: 'Category' });
+    expect(within(group).getAllByRole('radio')[0]).toHaveFocus();
+  });
+
+  it('focuses the first chip of the new type when the line flips the type', async () => {
+    const user = userEvent.setup();
+    renderSheet();
+
+    await user.type(screen.getByLabelText('Quick add'), '+2400 bonus{Enter}');
+
+    const group = screen.getByRole('radiogroup', { name: 'Category' });
+    expect(screen.getByRole('radio', { name: 'Income' })).toBeChecked();
+    expect(within(group).getAllByRole('radio')[0]).toHaveFocus();
+  });
+
+  it('shows the parser message and keeps the text when the line is invalid', async () => {
+    const user = userEvent.setup();
+    renderSheet();
+
+    await user.type(screen.getByLabelText('Quick add'), 'coffee{Enter}');
+
+    expect(await screen.findByText("Couldn't find an amount")).toBeInTheDocument();
+    expect(screen.getByLabelText('Quick add')).toHaveValue('coffee');
+    expect(screen.getByLabelText(/amount/i)).toHaveValue('');
+  });
+
+  it('clears the parser message on the next keystroke', async () => {
+    const user = userEvent.setup();
+    renderSheet();
+
+    await user.type(screen.getByLabelText('Quick add'), 'coffee{Enter}');
+    await screen.findByText("Couldn't find an amount");
+    await user.type(screen.getByLabelText('Quick add'), ' 3');
+
+    expect(screen.queryByText("Couldn't find an amount")).not.toBeInTheDocument();
+  });
+
+  it('sets the type from the line even if another type was selected', async () => {
+    const user = userEvent.setup();
+    renderSheet();
+
+    await user.click(screen.getByRole('radio', { name: 'Income' }));
+    await user.type(screen.getByLabelText('Quick add'), 'coffee 3.50{Enter}');
+
+    expect(screen.getByRole('radio', { name: 'Spend' })).toBeChecked();
+  });
+
+  it('keeps the chosen date when filling from the line', async () => {
+    const user = userEvent.setup();
+    renderSheet();
+
+    await user.click(screen.getByRole('radio', { name: 'Yesterday' }));
+    await user.type(screen.getByLabelText('Quick add'), 'coffee 3.50{Enter}');
+
+    expect(screen.getByRole('radio', { name: 'Yesterday' })).toBeChecked();
+  });
+
+  it('replaces a category the user had already picked', async () => {
+    const user = userEvent.setup();
+    mockTransactions = [pastTxn({ description: 'coffee', categoryId: 'cat-dining' })];
+    renderSheet();
+
+    await user.click(screen.getByRole('radio', { name: 'Groceries' }));
+    await user.type(screen.getByLabelText('Quick add'), 'coffee 3.50{Enter}');
+
+    expect(screen.getByRole('radio', { name: 'Dining' })).toBeChecked();
+  });
+
+  it('does not show the quick add line when editing', () => {
+    renderSheet({ editing });
+    expect(screen.queryByLabelText('Quick add')).not.toBeInTheDocument();
+  });
 });

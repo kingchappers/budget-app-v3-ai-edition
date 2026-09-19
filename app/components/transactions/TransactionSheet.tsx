@@ -9,6 +9,7 @@ import type { TransactionInput } from '~/lib/api';
 import { formatPence, formatPencePlain, parsePounds } from '~/lib/money';
 import { currentYearMonth, dateChoiceFor, todayIso, yesterdayIso, type DateChoice } from '~/lib/months';
 import { categoryForNote } from '~/lib/noteMemory';
+import { parseQuickAdd } from '~/lib/quickAdd';
 import {
   useCategories,
   useCreateTransaction,
@@ -67,6 +68,9 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, template
   const remove = useDeleteTransaction();
   const amountRef = useRef<HTMLInputElement>(null);
   const createSubmittedRef = useRef(false);
+  const saveAnotherRef = useRef<HTMLButtonElement>(null);
+  const chipsRef = useRef<HTMLDivElement>(null);
+  const focusChipsAfterRenderRef = useRef(false);
 
   const [amount, setAmount] = useState('');
   const [type, setType] = useState<TransactionType>('EXPENSE');
@@ -77,6 +81,8 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, template
   const [noteOpen, setNoteOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [categorySource, setCategorySource] = useState<CategorySource>('none');
+  const [quickAdd, setQuickAdd] = useState('');
+  const [quickAddError, setQuickAddError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!opened) return;
@@ -108,7 +114,15 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, template
     }
     setNoteOpen(!editing && template != null && template.description !== '');
     setError(null);
+    setQuickAdd('');
+    setQuickAddError(null);
   }, [opened, editing, template]);
+
+  useEffect(() => {
+    if (!focusChipsAfterRenderRef.current) return;
+    focusChipsAfterRenderRef.current = false;
+    chipsRef.current?.querySelector<HTMLInputElement>('input[type="radio"]')?.focus();
+  });
 
   const eligible = categories.filter(c => c.type === categoryTypeFor(type));
   const chips = topCategories(monthTransactions ?? [], categories, type, CHIP_LIMIT);
@@ -145,6 +159,39 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, template
     const recalled = editing ? null : categoryForNote(noteIndex, description, next, categories);
     setCategoryId(recalled);
     setCategorySource(recalled ? 'memory' : 'none');
+  }
+
+  function handleQuickAddChange(value: string): void {
+    setQuickAdd(value);
+    setQuickAddError(null);
+  }
+
+  function handleQuickAddKeyDown(event: React.KeyboardEvent<HTMLInputElement>): void {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+
+    const parsed = parseQuickAdd(quickAdd);
+    if (!parsed.ok) {
+      setQuickAddError(parsed.message);
+      return;
+    }
+
+    const recalled = categoryForNote(noteIndex, parsed.note, parsed.type, categories);
+    setAmount(formatPencePlain(parsed.amount));
+    setType(parsed.type);
+    setDescription(parsed.note);
+    if (parsed.note !== '') setNoteOpen(true);
+    setCategoryId(recalled);
+    setCategorySource(recalled ? 'memory' : 'none');
+    setError(null);
+    setQuickAdd('');
+    setQuickAddError(null);
+
+    if (recalled) {
+      saveAnotherRef.current?.focus();
+      return;
+    }
+    focusChipsAfterRenderRef.current = true;
   }
 
   function validate(): TransactionInput | null {
@@ -259,6 +306,16 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, template
   const form = (
     <form onSubmit={e => { e.preventDefault(); void handleSubmit(editing ? 'close' : 'addAnother'); }}>
       <Stack>
+        {!editing && (
+          <TextInput
+            label="Quick add"
+            placeholder="coffee 3.50"
+            value={quickAdd}
+            error={quickAddError}
+            onChange={e => handleQuickAddChange(e.currentTarget.value)}
+            onKeyDown={handleQuickAddKeyDown}
+          />
+        )}
         <TextInput
           ref={amountRef}
           label="Amount"
@@ -276,14 +333,16 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, template
           onChange={value => handleTypeChange(value as TransactionType)}
           data={TYPE_OPTIONS}
         />
-        <CategoryChips
-          chips={chips}
-          all={eligible}
-          value={categoryId}
-          onChange={handleCategoryChange}
-          loading={categoriesLoading}
-          error={categoriesError ? 'Could not load categories' : null}
-        />
+        <div ref={chipsRef}>
+          <CategoryChips
+            chips={chips}
+            all={eligible}
+            value={categoryId}
+            onChange={handleCategoryChange}
+            loading={categoriesLoading}
+            error={categoriesError ? 'Could not load categories' : null}
+          />
+        </div>
         {categorySource === 'memory' && description.trim() !== '' && (
           <Text size="xs" c="dimmed">Suggested from your earlier '{description.trim()}'</Text>
         )}
@@ -331,7 +390,7 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, template
             <Button type="submit" loading={update.isPending}>Save</Button>
           ) : (
             <>
-              <Button type="submit" variant="light">Save & add another</Button>
+              <Button ref={saveAnotherRef} type="submit" variant="light">Save & add another</Button>
               <Button onClick={() => void handleSubmit('close')}>Save</Button>
             </>
           )}
