@@ -24,7 +24,7 @@ function TransactionsContent() {
   const [filter, setFilter] = useState<TransactionFilter>({ query: '', categoryId: null, type: null });
   const categories = useCategories();
   const transactions = useTransactions(yearMonth);
-  const remove = useDeleteTransaction(yearMonth);
+  const remove = useDeleteTransaction();
 
   const nameFor = (id: string) =>
     categories.data?.find(c => c.categoryId === id)?.name ?? 'Unknown category';
@@ -109,7 +109,7 @@ function TransactionsContent() {
               categoryName={nameFor(t.categoryId)}
               categoryIcon={iconFor(t.categoryId)}
               onEdit={setEditing}
-              onDelete={(item) => remove.mutate(item.transactionId)}
+              onDelete={(item) => remove.mutate({ transactionId: item.transactionId, yearMonth: item.yearMonth })}
             />
           ))}
         </div>

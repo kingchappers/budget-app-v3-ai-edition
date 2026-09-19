@@ -16,7 +16,7 @@ export interface TransactionSheetProps {
 
 export function TransactionSheet({ opened, onClose, yearMonth, editing }: TransactionSheetProps) {
   const { data: categories = [], isLoading: categoriesLoading, error: categoriesError } = useCategories();
-  const create = useCreateTransaction(yearMonth);
+  const create = useCreateTransaction();
   const update = useUpdateTransaction(yearMonth);
 
   const [amount, setAmount] = useState('');
