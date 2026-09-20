@@ -5,6 +5,9 @@ import type { Category, Recurring, Transaction } from '~/lib/types';
 interface QueryState<T> { data?: T; isLoading: boolean; error?: Error | null; refetch?: () => void }
 
 const mockRefetch = vi.fn();
+const mockCategoriesRefetch = vi.fn();
+const mockCurrentRefetch = vi.fn();
+const mockNextRefetch = vi.fn();
 let recurringState: QueryState<Recurring[]>;
 let categoriesState: QueryState<Category[]>;
 let monthStates: Record<string, QueryState<Transaction[]>>;
@@ -45,10 +48,16 @@ describe('useDueRecurring', () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date(2026, 8, 28));
     mockRefetch.mockReset();
+    mockCategoriesRefetch.mockReset();
+    mockCurrentRefetch.mockReset();
+    mockNextRefetch.mockReset();
     requestedMonths.length = 0;
     recurringState = { data: [rec({})], isLoading: false, error: null, refetch: mockRefetch };
-    categoriesState = { data: categories, isLoading: false };
-    monthStates = { '2026-09': { data: [], isLoading: false }, '2026-10': { data: [], isLoading: false } };
+    categoriesState = { data: categories, isLoading: false, error: null, refetch: mockCategoriesRefetch };
+    monthStates = {
+      '2026-09': { data: [], isLoading: false, error: null, refetch: mockCurrentRefetch },
+      '2026-10': { data: [], isLoading: false, error: null, refetch: mockNextRefetch },
+    };
   });
 
   afterEach(() => { vi.useRealTimers(); });
@@ -104,5 +113,52 @@ describe('useDueRecurring', () => {
     expect(result.current.error).toBe(boom);
     result.current.refetch();
     expect(mockRefetch).toHaveBeenCalled();
+  });
+
+  it('surfaces a transactions error and shows no items, so nothing can be added twice', () => {
+    const boom = new Error('boom');
+    monthStates['2026-09'] = { data: undefined, isLoading: false, error: boom, refetch: mockCurrentRefetch };
+    const { result } = renderHook(() => useDueRecurring());
+
+    expect(result.current.error).toBe(boom);
+    expect(result.current.items).toEqual([]);
+  });
+
+  it('surfaces a categories error and shows no items', () => {
+    const boom = new Error('boom');
+    categoriesState = { data: undefined, isLoading: false, error: boom, refetch: mockCategoriesRefetch };
+    const { result } = renderHook(() => useDueRecurring());
+
+    expect(result.current.error).toBe(boom);
+    expect(result.current.items).toEqual([]);
+  });
+
+  it('refetches only the queries that failed', () => {
+    monthStates['2026-10'] = { data: undefined, isLoading: false, error: new Error('boom'), refetch: mockNextRefetch };
+    const { result } = renderHook(() => useDueRecurring());
+
+    result.current.refetch();
+
+    expect(mockNextRefetch).toHaveBeenCalledTimes(1);
+    expect(mockRefetch).not.toHaveBeenCalled();
+    expect(mockCategoriesRefetch).not.toHaveBeenCalled();
+    expect(mockCurrentRefetch).not.toHaveBeenCalled();
+  });
+
+  it('keeps the same refetch function across renders', () => {
+    const { result, rerender } = renderHook(() => useDueRecurring());
+    const first = result.current.refetch;
+
+    rerender();
+
+    expect(result.current.refetch).toBe(first);
+  });
+
+  it('rolls the second transactions query into January in December', () => {
+    vi.setSystemTime(new Date(2026, 11, 15));
+    renderHook(() => useDueRecurring());
+
+    expect(requestedMonths).toContain('2026-12');
+    expect(requestedMonths).toContain('2027-01');
   });
 });

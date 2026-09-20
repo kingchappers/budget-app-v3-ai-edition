@@ -654,12 +654,12 @@ describe('TransactionSheet', () => {
 
   it('uses the template date instead of today when one is given', async () => {
     const user = userEvent.setup();
-    renderSheet({ template: editing, templateDate: '2026-10-01' });
+    renderSheet({ template: editing, templateDate: '2099-01-15' });
 
     expect(screen.getByRole('radio', { name: 'Other…' })).toBeChecked();
     await user.click(screen.getByRole('button', { name: /^save$/i }));
 
-    expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({ date: '2026-10-01' }));
+    expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({ date: '2099-01-15' }));
   });
 
   it('selects Today when the template date is today', () => {
