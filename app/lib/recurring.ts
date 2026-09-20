@@ -1,6 +1,8 @@
+import type { RecurringInput } from './api';
+import { parsePounds } from './money';
 import { addDaysIso, daysBetweenIso, lastDayOfMonth, shiftMonth } from './months';
 import { normaliseNote } from './noteMemory';
-import type { Category, Recurring, Transaction } from './types';
+import type { Category, Recurring, Transaction, TransactionType } from './types';
 
 export type DueStatus = 'upcoming' | 'today' | 'overdue';
 
@@ -92,4 +94,59 @@ export function formatDayOfMonth(day: number): string {
 
   const suffixes: Record<number, string> = { 1: 'st', 2: 'nd', 3: 'rd' };
   return `${day}${suffixes[day % 10] ?? 'th'}`;
+}
+
+export interface RecurringFormValues {
+  type: TransactionType;
+  categoryId: string | null;
+  amount: string;
+  description: string;
+  dayOfMonth: number | string;
+  leadDays: number | string;
+}
+
+export type RecurringFormErrors = Partial<Record<'amount' | 'category' | 'description' | 'dayOfMonth' | 'leadDays', string>>;
+
+export type RecurringFormResult =
+  | { ok: true; value: RecurringInput }
+  | { ok: false; errors: RecurringFormErrors };
+
+function toWholeNumber(value: number | string): number | null {
+  if (typeof value === 'number') return Number.isInteger(value) ? value : null;
+  const trimmed = value.trim();
+  if (!/^\d+$/.test(trimmed)) return null;
+  return Number(trimmed);
+}
+
+export function validateRecurringForm(values: RecurringFormValues): RecurringFormResult {
+  const errors: RecurringFormErrors = {};
+
+  const amount = parsePounds(values.amount);
+  if (!amount.ok) errors.amount = amount.message;
+  if (!values.categoryId) errors.category = 'Choose a category';
+
+  const day = toWholeNumber(values.dayOfMonth);
+  if (day === null || day < 1 || day > 31) errors.dayOfMonth = 'Enter a day from 1 to 31';
+
+  const leadDays = toWholeNumber(values.leadDays);
+  if (leadDays === null || leadDays < 0 || leadDays > 14) errors.leadDays = 'Enter 0 to 14 days';
+
+  const description = values.description.trim();
+  if (description.length > 200) errors.description = 'Note is too long';
+
+  if (!amount.ok || !values.categoryId || day === null || leadDays === null || Object.keys(errors).length > 0) {
+    return { ok: false, errors };
+  }
+
+  return {
+    ok: true,
+    value: {
+      type: values.type,
+      categoryId: values.categoryId,
+      amount: amount.pence,
+      description,
+      dayOfMonth: day,
+      leadDays,
+    },
+  };
 }

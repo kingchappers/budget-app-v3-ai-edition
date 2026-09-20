@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  computeDueItems, dueDateFor, dueLabel, formatDayOfMonth, isHandled,
+  computeDueItems, dueDateFor, dueLabel, formatDayOfMonth, isHandled, validateRecurringForm,
 } from '../recurring';
 import type { Category, Recurring, Transaction } from '../types';
 
@@ -171,5 +171,54 @@ describe('formatDayOfMonth', () => {
       [21, '21st'], [22, '22nd'], [23, '23rd'], [28, '28th'], [31, '31st'],
     ];
     for (const [day, expected] of cases) expect(formatDayOfMonth(day)).toBe(expected);
+  });
+});
+
+describe('validateRecurringForm', () => {
+  const values = {
+    type: 'INCOME' as const, categoryId: 'cat-salary', amount: '2400.00', description: ' Salary ',
+    dayOfMonth: 28 as number | string, leadDays: 3 as number | string,
+  };
+
+  it('returns the API input in pence, with the note trimmed', () => {
+    expect(validateRecurringForm(values)).toEqual({
+      ok: true,
+      value: { type: 'INCOME', categoryId: 'cat-salary', amount: 240000, description: 'Salary', dayOfMonth: 28, leadDays: 3 },
+    });
+  });
+
+  it('accepts whole numbers typed as text and both range ends', () => {
+    expect(validateRecurringForm({ ...values, dayOfMonth: '1', leadDays: '0' }).ok).toBe(true);
+    expect(validateRecurringForm({ ...values, dayOfMonth: 31, leadDays: 14 }).ok).toBe(true);
+  });
+
+  it('reports each problem on its own field, all at once', () => {
+    const result = validateRecurringForm({ ...values, amount: 'abc', categoryId: null, dayOfMonth: 40, leadDays: 20 });
+    expect(result).toEqual({
+      ok: false,
+      errors: {
+        amount: 'Enter a valid amount',
+        category: 'Choose a category',
+        dayOfMonth: 'Enter a day from 1 to 31',
+        leadDays: 'Enter 0 to 14 days',
+      },
+    });
+  });
+
+  it.each([0, 32, 1.5, '', 'abc', -3])('rejects day of month %s', (dayOfMonth) => {
+    const result = validateRecurringForm({ ...values, dayOfMonth });
+    expect(result.ok === false && result.errors.dayOfMonth).toBe('Enter a day from 1 to 31');
+  });
+
+  it.each([-1, 15, 2.5, '', 'x'])('rejects remind days %s', (leadDays) => {
+    const result = validateRecurringForm({ ...values, leadDays });
+    expect(result.ok === false && result.errors.leadDays).toBe('Enter 0 to 14 days');
+  });
+
+  it('reports an empty amount and an overlong note', () => {
+    const empty = validateRecurringForm({ ...values, amount: '' });
+    expect(empty.ok === false && empty.errors.amount).toBe('Enter an amount');
+    const long = validateRecurringForm({ ...values, description: 'a'.repeat(201) });
+    expect(long.ok === false && long.errors.description).toBe('Note is too long');
   });
 });
