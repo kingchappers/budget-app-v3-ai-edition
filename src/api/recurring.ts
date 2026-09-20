@@ -1,4 +1,4 @@
-import { QueryCommand, PutCommand } from '@aws-sdk/lib-dynamodb';
+import { QueryCommand, PutCommand, UpdateCommand, DeleteCommand } from '@aws-sdk/lib-dynamodb';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { docClient, TABLE, pk, recurringSk } from './db';
 import { SECURITY_HEADERS, VALID_TRANSACTION_TYPES } from './constants';
@@ -7,6 +7,11 @@ import { ok, err } from './http';
 
 const DEFAULT_LEAD_DAYS = 3;
 const MAX_NOTE_LENGTH = 200;
+const PERIOD_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
+
+function isConditionalFailure(error: unknown): boolean {
+  return error instanceof Error && error.name === 'ConditionalCheckFailedException';
+}
 
 export interface ValidRecurringInput {
   type: TransactionType;
@@ -125,4 +130,94 @@ export async function createRecurring(
   }));
 
   return { statusCode: 201, headers: SECURITY_HEADERS, body: JSON.stringify({ recurring }) };
+}
+
+export async function updateRecurring(
+  event: APIGatewayProxyEventV2,
+  userId: string,
+  params: Record<string, string>,
+): Promise<ApiResponse> {
+  const { recurringId } = params;
+  if (!recurringId) return err(400, 'recurringId is required');
+
+  const body = parseJsonObject(event);
+  if (!body) return err(400, 'Invalid JSON body');
+
+  const validation = validateRecurringInput(body);
+  if (validation.ok === false) return err(400, validation.message);
+  const { type, categoryId, amount, description, dayOfMonth, leadDays } = validation.value;
+
+  try {
+    const result = await docClient.send(new UpdateCommand({
+      TableName: TABLE,
+      Key: { PK: pk(userId), SK: recurringSk(recurringId) },
+      UpdateExpression:
+        'SET #type = :type, categoryId = :categoryId, amount = :amount, description = :description, '
+        + 'dayOfMonth = :dayOfMonth, leadDays = :leadDays, updatedAt = :updatedAt',
+      ConditionExpression: 'attribute_exists(PK)',
+      ExpressionAttributeNames: { '#type': 'type' },
+      ExpressionAttributeValues: {
+        ':type': type,
+        ':categoryId': categoryId,
+        ':amount': amount,
+        ':description': description,
+        ':dayOfMonth': dayOfMonth,
+        ':leadDays': leadDays,
+        ':updatedAt': new Date().toISOString(),
+      },
+      ReturnValues: 'ALL_NEW',
+    }));
+    return ok({ recurring: toRecurring(result.Attributes ?? {}) });
+  } catch (error) {
+    if (isConditionalFailure(error)) return err(404, 'Recurring item not found');
+    throw error;
+  }
+}
+
+export async function deleteRecurring(
+  _event: APIGatewayProxyEventV2,
+  userId: string,
+  params: Record<string, string>,
+): Promise<ApiResponse> {
+  const { recurringId } = params;
+  if (!recurringId) return err(400, 'recurringId is required');
+
+  await docClient.send(new DeleteCommand({
+    TableName: TABLE,
+    Key: { PK: pk(userId), SK: recurringSk(recurringId) },
+  }));
+
+  return { statusCode: 204, headers: SECURITY_HEADERS, body: '' };
+}
+
+export async function setRecurringHandled(
+  event: APIGatewayProxyEventV2,
+  userId: string,
+  params: Record<string, string>,
+): Promise<ApiResponse> {
+  const { recurringId } = params;
+  if (!recurringId) return err(400, 'recurringId is required');
+
+  const body = parseJsonObject(event);
+  if (!body) return err(400, 'Invalid JSON body');
+
+  const { period } = body;
+  if (period !== null && !(typeof period === 'string' && PERIOD_PATTERN.test(period))) {
+    return err(400, 'period must be YYYY-MM or null');
+  }
+
+  try {
+    const result = await docClient.send(new UpdateCommand({
+      TableName: TABLE,
+      Key: { PK: pk(userId), SK: recurringSk(recurringId) },
+      UpdateExpression: 'SET handledPeriod = :period, updatedAt = :updatedAt',
+      ConditionExpression: 'attribute_exists(PK)',
+      ExpressionAttributeValues: { ':period': period, ':updatedAt': new Date().toISOString() },
+      ReturnValues: 'ALL_NEW',
+    }));
+    return ok({ recurring: toRecurring(result.Attributes ?? {}) });
+  } catch (error) {
+    if (isConditionalFailure(error)) return err(404, 'Recurring item not found');
+    throw error;
+  }
 }
