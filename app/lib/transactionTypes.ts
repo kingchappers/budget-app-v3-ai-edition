@@ -1,3 +1,4 @@
+import { formatPence } from './money';
 import type { CategoryType, TransactionType } from './types';
 
 export const TYPE_OPTIONS: { label: string; value: TransactionType }[] = [
@@ -16,4 +17,10 @@ const CATEGORY_TYPE_BY_TRANSACTION_TYPE: Record<TransactionType, CategoryType> =
 
 export function categoryTypeFor(type: TransactionType): CategoryType {
   return CATEGORY_TYPE_BY_TRANSACTION_TYPE[type];
+}
+
+const OUTGOING_TYPES: ReadonlySet<TransactionType> = new Set<TransactionType>(['EXPENSE', 'INVESTMENT_IN']);
+
+export function formatSignedPence(type: TransactionType, pence: number): string {
+  return `${OUTGOING_TYPES.has(type) ? '−' : '+'}${formatPence(pence)}`;
 }
