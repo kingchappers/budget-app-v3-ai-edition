@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { Button, Drawer, Group, Modal, SegmentedControl, Stack, Text, TextInput, useMantineTheme } from '@mantine/core';
-import { useMediaQuery } from '@mantine/hooks';
+import { Button, Group, SegmentedControl, Stack, Text, TextInput } from '@mantine/core';
 import { DateInput } from '@mantine/dates';
 import { notifications } from '@mantine/notifications';
+import { ResponsiveSheet } from '~/components/layout/ResponsiveSheet';
 import { useNoteHistory } from '~/hooks/useNoteHistory';
 import { useSnapshotWhileOpen } from '~/hooks/useSnapshotWhileOpen';
 import type { TransactionInput } from '~/lib/api';
@@ -58,8 +58,6 @@ function ToastAction({ text, actionLabel, onAction }: ToastActionProps) {
 }
 
 export function TransactionSheet({ opened, onClose, yearMonth, editing, template }: TransactionSheetProps) {
-  const theme = useMantineTheme();
-  const isDesktop = useMediaQuery(`(min-width: ${theme.breakpoints.sm})`);
   const { data: categories = [], isLoading: categoriesLoading, error: categoriesError } = useCategories();
   const monthTransactions = useSnapshotWhileOpen(useTransactions(currentYearMonth(), opened).data, opened);
   const noteIndex = useNoteHistory(opened);
@@ -404,17 +402,9 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, template
 
   const title = editing ? 'Edit transaction' : 'Add transaction';
 
-  if (isDesktop) {
-    return (
-      <Modal opened={opened} onClose={onClose} title={title} centered size={440}>
-        {form}
-      </Modal>
-    );
-  }
-
   return (
-    <Drawer opened={opened} onClose={onClose} position="bottom" size="auto" title={title}>
+    <ResponsiveSheet opened={opened} onClose={onClose} title={title}>
       {form}
-    </Drawer>
+    </ResponsiveSheet>
   );
 }
