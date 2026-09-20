@@ -42,6 +42,13 @@ Implemented on `feat/recurring-templates`. Spec: `superpowers/specs/2026-09-19-r
   - Weekly and yearly cadence, and an end date or pause for a template.
   - Deleting a category does not check references; templates left pointing at one are flagged on the Recurring page and skipped on Home.
   - A hand-entered transaction only clears a due item when its type, category and (if set) note match the template.
+  - Pressing Undo on the saved toast after a Due-card Edit deletes the transaction but leaves the item marked handled, so the row does not return (Undo after Add does return it).
+  - On a 390px screen the Due card truncates its "Due today · 20 Sep" line when the note or amount is wide; the date could move to its own line.
+  - Recurring page Delete is immediate, with no confirmation or Undo, and shows the raw HTTP status text on failure.
+  - The categories page says "Nothing was changed" when the reassign succeeded and only the delete failed (pre-existing; templates now move with the reassign).
+  - Home's Due card and "Manage recurring" link sit behind Home's own loading and error gate.
+  - Tidy-ups: `pad()` is duplicated in `months.ts` and `recurring.ts`; `TransactionRow` has its own outgoing-type set instead of `formatSignedPence`; `validateRecurringInput` repeats blocks of `validateTransactionInput`; `amount` has no upper bound in either handler (whole-app).
+  - Pre-existing, seen during verification: on mobile every bottom sheet renders full height with its content at the top, and the floating + button overlaps the last Recent row's amount at 390px.
 
 ## D: PWA and add shortcut
 
