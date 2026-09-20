@@ -23,11 +23,12 @@ function byDay(a: Recurring, b: Recurring): number {
 interface RecurringRowProps {
   item: Recurring;
   category: Category | undefined;
+  categoriesLoaded: boolean;
   onEdit: (item: Recurring) => void;
   onDelete: (item: Recurring) => void;
 }
 
-function RecurringRow({ item, category, onEdit, onDelete }: RecurringRowProps) {
+function RecurringRow({ item, category, categoriesLoaded, onEdit, onDelete }: RecurringRowProps) {
   const label = item.description || category?.name || 'Recurring item';
   const Icon = getCategoryIcon(category?.icon ?? 'tag');
 
@@ -40,7 +41,7 @@ function RecurringRow({ item, category, onEdit, onDelete }: RecurringRowProps) {
         <div style={{ minWidth: 0 }}>
           <Text truncate>{label}</Text>
           <Text size="xs" c="dimmed">{scheduleText(item)}</Text>
-          {!category && <Text size="xs" c="danger">Category deleted</Text>}
+          {categoriesLoaded && !category && <Text size="xs" c="danger">Category deleted</Text>}
         </div>
       </Group>
       <Group gap="xs" wrap="nowrap">
@@ -98,6 +99,7 @@ function RecurringContent() {
           key={item.recurringId}
           item={item}
           category={categories.data?.find(c => c.categoryId === item.categoryId)}
+          categoriesLoaded={categories.data !== undefined}
           onEdit={setEditing}
           onDelete={target => remove.mutate(target.recurringId)}
         />

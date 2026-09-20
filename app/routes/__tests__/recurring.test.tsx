@@ -7,6 +7,8 @@ import type { Category, Recurring } from '~/lib/types';
 const mockDelete = vi.fn();
 const mockRefetch = vi.fn();
 let mockQuery: { data?: Recurring[]; isLoading: boolean; error: Error | null };
+let mockCategories: Category[] | undefined;
+let mockDeleteError: Error | null;
 
 const categories: Category[] = [
   { categoryId: 'cat-salary', name: 'Salary', type: 'INCOME', icon: 'briefcase', isDefault: true, createdAt: '' },
@@ -29,8 +31,8 @@ vi.mock('~/components/recurring/RecurringForm', () => ({
 }));
 vi.mock('~/lib/queries', () => ({
   useRecurring: () => ({ ...mockQuery, refetch: mockRefetch }),
-  useCategories: () => ({ data: categories }),
-  useDeleteRecurring: () => ({ mutate: mockDelete }),
+  useCategories: () => ({ data: mockCategories }),
+  useDeleteRecurring: () => ({ mutate: mockDelete, error: mockDeleteError }),
 }));
 
 import RecurringPage from '../recurring';
@@ -48,6 +50,8 @@ describe('Recurring page', () => {
     mockDelete.mockReset();
     mockRefetch.mockReset();
     mockQuery = { data: [], isLoading: false, error: null };
+    mockCategories = categories;
+    mockDeleteError = null;
   });
 
   it('lists templates by day of month with their schedule and signed amount', () => {
@@ -77,6 +81,14 @@ describe('Recurring page', () => {
     renderPage();
     expect(screen.getByText('Old gym')).toBeInTheDocument();
     expect(screen.getByText('Category deleted')).toBeInTheDocument();
+  });
+
+  it('does not flag a missing category while categories are still loading', () => {
+    mockCategories = undefined;
+    mockQuery.data = [rec({ categoryId: 'cat-gone', description: 'Old gym' })];
+    renderPage();
+    expect(screen.getByText('Old gym')).toBeInTheDocument();
+    expect(screen.queryByText('Category deleted')).not.toBeInTheDocument();
   });
 
   it('shows an empty state', () => {
@@ -110,6 +122,14 @@ describe('Recurring page', () => {
     await user.click(await screen.findByRole('menuitem', { name: 'Delete' }));
 
     expect(mockDelete).toHaveBeenCalledWith('r9');
+  });
+
+  it('shows why a delete failed', () => {
+    mockQuery.data = [rec({})];
+    mockDeleteError = new Error('nope');
+    renderPage();
+    expect(screen.getByText('Could not delete the recurring item')).toBeInTheDocument();
+    expect(screen.getByText('nope')).toBeInTheDocument();
   });
 
   it('offers a retry when loading fails', async () => {
