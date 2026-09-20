@@ -15,6 +15,56 @@ function chunk<T>(items: T[], size: number): T[][] {
   return chunks;
 }
 
+async function reassignItems(
+  userId: string,
+  prefix: string,
+  categoryId: string,
+  toCategoryId: string,
+): Promise<number> {
+  const matching: Record<string, unknown>[] = [];
+  let lastEvaluatedKey: Record<string, unknown> | undefined;
+  do {
+    const result = await docClient.send(new QueryCommand({
+      TableName: TABLE,
+      KeyConditionExpression: 'PK = :pk AND begins_with(SK, :prefix)',
+      ExpressionAttributeValues: { ':pk': pk(userId), ':prefix': prefix },
+      ExclusiveStartKey: lastEvaluatedKey,
+    }));
+
+    for (const item of result.Items || []) {
+      if (item.categoryId === categoryId) {
+        matching.push(item);
+      }
+    }
+
+    lastEvaluatedKey = result.LastEvaluatedKey as Record<string, unknown> | undefined;
+  } while (lastEvaluatedKey);
+
+  let reassigned = 0;
+  for (const batch of chunk(matching, UPDATE_BATCH_SIZE)) {
+    const results = await Promise.all(batch.map(async (item) => {
+      try {
+        await docClient.send(new UpdateCommand({
+          TableName: TABLE,
+          Key: { PK: pk(userId), SK: item.SK },
+          UpdateExpression: 'SET categoryId = :c',
+          ConditionExpression: 'attribute_exists(SK)',
+          ExpressionAttributeValues: { ':c': toCategoryId },
+        }));
+        return true;
+      } catch (error) {
+        if (error instanceof Error && error.name === 'ConditionalCheckFailedException') {
+          return false;
+        }
+        throw error;
+      }
+    }));
+    reassigned += results.filter(Boolean).length;
+  }
+
+  return reassigned;
+}
+
 export async function reassignCategory(
   event: APIGatewayProxyEventV2,
   userId: string,
@@ -52,46 +102,8 @@ export async function reassignCategory(
     }
   }
 
-  const matching: Record<string, unknown>[] = [];
-  let lastEvaluatedKey: Record<string, unknown> | undefined;
-  do {
-    const result = await docClient.send(new QueryCommand({
-      TableName: TABLE,
-      KeyConditionExpression: 'PK = :pk AND begins_with(SK, :prefix)',
-      ExpressionAttributeValues: { ':pk': pk(userId), ':prefix': 'TXN#' },
-      ExclusiveStartKey: lastEvaluatedKey,
-    }));
+  const reassigned = await reassignItems(userId, 'TXN#', categoryId, toCategoryId);
+  const recurringReassigned = await reassignItems(userId, 'RECUR#', categoryId, toCategoryId);
 
-    for (const item of result.Items || []) {
-      if (item.categoryId === categoryId) {
-        matching.push(item);
-      }
-    }
-
-    lastEvaluatedKey = result.LastEvaluatedKey as Record<string, unknown> | undefined;
-  } while (lastEvaluatedKey);
-
-  let reassigned = 0;
-  for (const batch of chunk(matching, UPDATE_BATCH_SIZE)) {
-    const results = await Promise.all(batch.map(async (item) => {
-      try {
-        await docClient.send(new UpdateCommand({
-          TableName: TABLE,
-          Key: { PK: pk(userId), SK: item.SK },
-          UpdateExpression: 'SET categoryId = :c',
-          ConditionExpression: 'attribute_exists(SK)',
-          ExpressionAttributeValues: { ':c': toCategoryId },
-        }));
-        return true;
-      } catch (error) {
-        if (error instanceof Error && error.name === 'ConditionalCheckFailedException') {
-          return false;
-        }
-        throw error;
-      }
-    }));
-    reassigned += results.filter(Boolean).length;
-  }
-
-  return ok({ reassigned });
+  return ok({ reassigned, recurringReassigned });
 }
