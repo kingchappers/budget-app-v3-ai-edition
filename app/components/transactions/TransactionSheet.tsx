@@ -33,9 +33,11 @@ export interface TransactionSheetProps {
   yearMonth: string;
   editing?: Transaction | null;
   template?: Transaction | null;
+  templateDate?: string;
+  onSaved?: (created: Transaction) => void;
 }
 
-export function TransactionSheet({ opened, onClose, yearMonth, editing, template }: TransactionSheetProps) {
+export function TransactionSheet({ opened, onClose, yearMonth, editing, template, templateDate, onSaved }: TransactionSheetProps) {
   const { data: categories = [], isLoading: categoriesLoading, error: categoriesError } = useCategories();
   const monthTransactions = useSnapshotWhileOpen(useTransactions(currentYearMonth(), opened).data, opened);
   const noteIndex = useNoteHistory(opened);
@@ -75,8 +77,8 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, template
       setType(template.type);
       setCategoryId(template.categoryId);
       setDescription(template.description);
-      setDate(todayIso());
-      setDateChoice('today');
+      setDate(templateDate ?? todayIso());
+      setDateChoice(templateDate ? dateChoiceFor(templateDate) : 'today');
       setCategorySource('user');
     } else {
       setAmount('');
@@ -91,7 +93,7 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, template
     setError(null);
     setQuickAdd('');
     setQuickAddError(null);
-  }, [opened, editing, template]);
+  }, [opened, editing, template, templateDate]);
 
   useEffect(() => {
     if (!focusChipsAfterRenderRef.current) return;
@@ -215,7 +217,9 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, template
 
     if (createSubmittedRef.current) return;
     createSubmittedRef.current = true;
-    void saveWithUndo(input);
+    void saveWithUndo(input).then(created => {
+      if (created) onSaved?.(created);
+    });
     if (mode === 'addAnother') {
       resetForNextEntry();
       return;
