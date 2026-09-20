@@ -30,6 +30,10 @@ export function QuickEntryTips() {
           <Text size="sm">
             <strong>Duplicate:</strong> on the Transactions page, open a row's menu and choose Duplicate.
           </Text>
+          <Text size="sm">
+            <strong>Recurring:</strong> choose Repeat monthly in a transaction's menu to set one up. When it is
+            due it appears at the top of Home with Add, Edit and Skip. Manage them under Recurring.
+          </Text>
         </Stack>
       </Modal>
     </>

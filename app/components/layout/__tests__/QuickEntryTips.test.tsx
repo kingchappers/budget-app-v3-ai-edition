@@ -48,4 +48,16 @@ describe('QuickEntryTips', () => {
 
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   });
+
+  it('explains recurring items', async () => {
+    const user = userEvent.setup();
+    renderTips();
+
+    await user.click(screen.getByRole('button', { name: 'Quick entry tips' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Quick entry tips' });
+
+    expect(within(dialog).getByText('Recurring:')).toBeInTheDocument();
+    expect(within(dialog).getByText(/Repeat monthly/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/top of Home/i)).toBeInTheDocument();
+  });
 });
