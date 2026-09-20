@@ -2,13 +2,14 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import { useAuth0 } from '@auth0/auth0-react';
 import { useProtectedApi } from '~/hooks/useProtectedApi';
-import { createApi, type TransactionInput } from './api';
-import type { Category, TargetPeriod, Transaction } from './types';
+import { createApi, type RecurringInput, type TransactionInput } from './api';
+import type { Category, Recurring, TargetPeriod, Transaction } from './types';
 
 export const queryKeys = {
   categories: ['categories'] as const,
   targets: ['targets'] as const,
   transactions: (yearMonth: string) => ['transactions', yearMonth] as const,
+  recurring: ['recurring'] as const,
 };
 
 function useApi() {
@@ -159,6 +160,75 @@ export function useDeleteCategory() {
       qc.invalidateQueries({ queryKey: queryKeys.categories });
       qc.invalidateQueries({ queryKey: queryKeys.targets });
       qc.invalidateQueries({ queryKey: ['transactions'] });
+    },
+  });
+}
+
+export function useRecurring() {
+  const api = useApi();
+  const enabled = useAuthReady();
+  return useQuery({
+    queryKey: queryKeys.recurring,
+    queryFn: () => api.getRecurring(),
+    enabled,
+  });
+}
+
+export function useCreateRecurring() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: RecurringInput) => api.createRecurring(input),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.recurring }),
+  });
+}
+
+export function useUpdateRecurring() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { recurringId: string; input: RecurringInput }) =>
+      api.updateRecurring(vars.recurringId, vars.input),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.recurring }),
+  });
+}
+
+export function useDeleteRecurring() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (recurringId: string) => api.deleteRecurring(recurringId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.recurring }),
+  });
+}
+
+interface SetHandledVars {
+  recurringId: string;
+  period: string | null;
+}
+
+function withHandledPeriod(rows: Recurring[] | undefined, recurringId: string, period: string | null): Recurring[] | undefined {
+  return rows?.map(row => (row.recurringId === recurringId ? { ...row, handledPeriod: period } : row));
+}
+
+export function useSetRecurringHandled() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation<Recurring, Error, SetHandledVars, { previousPeriod: string | null }>({
+    mutationFn: (vars) => api.setRecurringHandled(vars.recurringId, vars.period),
+    onMutate: async (vars) => {
+      await qc.cancelQueries({ queryKey: queryKeys.recurring });
+      const rows = qc.getQueryData<Recurring[]>(queryKeys.recurring);
+      const previousPeriod = rows?.find(row => row.recurringId === vars.recurringId)?.handledPeriod ?? null;
+      qc.setQueryData<Recurring[]>(queryKeys.recurring, current => withHandledPeriod(current, vars.recurringId, vars.period));
+      return { previousPeriod };
+    },
+    onError: (_error, vars, context) => {
+      if (!context) return;
+      qc.setQueryData<Recurring[]>(queryKeys.recurring, current => withHandledPeriod(current, vars.recurringId, context.previousPeriod));
+    },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.recurring });
     },
   });
 }

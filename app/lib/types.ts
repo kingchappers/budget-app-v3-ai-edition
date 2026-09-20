@@ -28,3 +28,16 @@ export interface CategoryTarget {
   period: TargetPeriod;
   updatedAt: string;
 }
+
+export interface Recurring {
+  recurringId: string;
+  type: TransactionType;
+  categoryId: string;
+  amount: number;
+  description: string;
+  dayOfMonth: number;
+  leadDays: number;
+  handledPeriod: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
