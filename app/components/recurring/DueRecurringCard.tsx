@@ -103,13 +103,13 @@ export function DueRecurringCard() {
                 </ThemeIcon>
                 <div style={{ minWidth: 0 }}>
                   <Text truncate>{label}</Text>
-                  <Text size="xs" c={item.status === 'overdue' ? 'danger' : 'dimmed'}>
+                  <Text size="xs" truncate c={item.status === 'overdue' ? 'danger' : 'dimmed'}>
                     {`${dueLabel(item)} · ${formatShortDate(item.dueDate)}`}
                   </Text>
                 </div>
               </Group>
-              <Group gap="xs" wrap="nowrap">
-                <Text fw={500}>{formatSignedPence(item.recurring.type, item.recurring.amount)}</Text>
+              <Group gap="xs" wrap="nowrap" style={{ flexShrink: 0 }}>
+                <Text fw={500} style={{ whiteSpace: 'nowrap' }}>{formatSignedPence(item.recurring.type, item.recurring.amount)}</Text>
                 <Button size="compact-sm" aria-label={`Add ${label}`} onClick={() => add(item)}>Add</Button>
                 <Menu position="bottom-end">
                   <Menu.Target>

@@ -40,12 +40,12 @@ function RecurringRow({ item, category, categoriesLoaded, onEdit, onDelete }: Re
         </ThemeIcon>
         <div style={{ minWidth: 0 }}>
           <Text truncate>{label}</Text>
-          <Text size="xs" c="dimmed">{scheduleText(item)}</Text>
+          <Text size="xs" c="dimmed" truncate>{scheduleText(item)}</Text>
           {categoriesLoaded && !category && <Text size="xs" c="danger">Category deleted</Text>}
         </div>
       </Group>
-      <Group gap="xs" wrap="nowrap">
-        <Text fw={500}>{formatSignedPence(item.type, item.amount)}</Text>
+      <Group gap="xs" wrap="nowrap" style={{ flexShrink: 0 }}>
+        <Text fw={500} style={{ whiteSpace: 'nowrap' }}>{formatSignedPence(item.type, item.amount)}</Text>
         <Menu position="bottom-end">
           <Menu.Target>
             <ActionIcon variant="subtle" aria-label={`Actions for ${label}`}><IconDots size={16} /></ActionIcon>
