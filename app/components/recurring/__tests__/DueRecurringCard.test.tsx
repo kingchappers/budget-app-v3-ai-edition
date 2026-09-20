@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MantineProvider } from '@mantine/core';
 import { Notifications, notifications } from '@mantine/notifications';
@@ -68,6 +68,7 @@ function renderCard() {
 describe('DueRecurringCard', () => {
   beforeEach(() => {
     mockSave.mockReset();
+    mockSave.mockResolvedValue(null);
     mockHandled.mockReset();
     mockRefetch.mockReset();
     dueState = { items: [item()], isLoading: false, error: null, refetch: mockRefetch };
@@ -165,5 +166,21 @@ describe('DueRecurringCard', () => {
     await user.click(screen.getByRole('button', { name: 'simulate saved' }));
 
     await waitFor(() => expect(mockHandled).toHaveBeenCalledWith({ recurringId: 'r1', period: '2026-09' }));
+  });
+
+  it('ignores a second Add while the first is still saving, then allows a retry once it settles', async () => {
+    let settle!: (value: null) => void;
+    mockSave.mockReturnValueOnce(new Promise<null>(resolve => { settle = resolve; }));
+    mockSave.mockResolvedValue(null);
+    const user = userEvent.setup();
+    renderCard();
+    const addButton = screen.getByRole('button', { name: 'Add Salary' });
+
+    await user.dblClick(addButton);
+    expect(mockSave).toHaveBeenCalledTimes(1);
+
+    await act(async () => { settle(null); });
+    await user.click(addButton);
+    expect(mockSave).toHaveBeenCalledTimes(2);
   });
 });

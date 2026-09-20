@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { ActionIcon, Alert, Anchor, Button, Card, Group, Menu, Text, ThemeIcon, Title } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { IconDots, IconPencil } from '@tabler/icons-react';
@@ -33,6 +33,7 @@ export function DueRecurringCard() {
   const { data: categories = [] } = useCategories();
   const saveWithUndo = useSaveWithUndo();
   const setHandled = useSetRecurringHandled();
+  const addingRef = useRef<Set<string>>(new Set());
   const [editing, setEditing] = useState<DueItem | null>(null);
   const template = useMemo(() => (editing ? syntheticTransaction(editing) : null), [editing]);
 
@@ -47,13 +48,16 @@ export function DueRecurringCard() {
 
   function add(item: DueItem): void {
     const { recurring, dueDate } = item;
+    const inFlight = addingRef.current;
+    if (inFlight.has(recurring.recurringId)) return;
+    inFlight.add(recurring.recurringId);
     void saveWithUndo({
       amount: recurring.amount,
       type: recurring.type,
       categoryId: recurring.categoryId,
       description: recurring.description,
       date: dueDate,
-    });
+    }).finally(() => { inFlight.delete(recurring.recurringId); });
   }
 
   function skip(item: DueItem): void {

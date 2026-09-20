@@ -145,9 +145,14 @@ export function useCreateCategory() {
 
 export function useReassignCategory() {
   const api = useApi();
+  const qc = useQueryClient();
   return useMutation({
     mutationFn: (vars: { categoryId: string; toCategoryId: string }) =>
       api.reassignCategory(vars.categoryId, vars.toCategoryId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.recurring });
+      qc.invalidateQueries({ queryKey: ['transactions'] });
+    },
   });
 }
 
@@ -160,6 +165,7 @@ export function useDeleteCategory() {
       qc.invalidateQueries({ queryKey: queryKeys.categories });
       qc.invalidateQueries({ queryKey: queryKeys.targets });
       qc.invalidateQueries({ queryKey: ['transactions'] });
+      qc.invalidateQueries({ queryKey: queryKeys.recurring });
     },
   });
 }

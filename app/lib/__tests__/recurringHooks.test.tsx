@@ -10,7 +10,7 @@ vi.mock('~/hooks/useProtectedApi', () => ({ useProtectedApi: () => ({ request })
 vi.mock('@auth0/auth0-react', () => ({ useAuth0: () => ({ isAuthenticated: authenticated }) }));
 
 import {
-  queryKeys, useCreateRecurring, useDeleteRecurring, useRecurring, useSetRecurringHandled, useUpdateRecurring,
+  queryKeys, useCreateRecurring, useDeleteCategory, useDeleteRecurring, useReassignCategory, useRecurring, useSetRecurringHandled, useUpdateRecurring,
 } from '../queries';
 
 function deferred<T>() {
@@ -133,6 +133,40 @@ describe('useSetRecurringHandled', () => {
     const { result } = renderHook(() => useSetRecurringHandled(), { wrapper });
 
     act(() => { result.current.mutate({ recurringId: 'r1', period: '2026-09' }); });
+
+    await waitFor(() => expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.recurring }));
+  });
+});
+
+describe('category mutations and the recurring cache', () => {
+  it('a successful reassign refreshes recurring templates and transactions', async () => {
+    request.mockResolvedValue({ moved: 2 });
+    const invalidate = vi.spyOn(client, 'invalidateQueries');
+    const { result } = renderHook(() => useReassignCategory(), { wrapper });
+
+    act(() => { result.current.mutate({ categoryId: 'old', toCategoryId: 'new' }); });
+
+    await waitFor(() => expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.recurring }));
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['transactions'] });
+  });
+
+  it('a failed reassign leaves the caches alone', async () => {
+    request.mockRejectedValue(new Error('boom'));
+    const invalidate = vi.spyOn(client, 'invalidateQueries');
+    const { result } = renderHook(() => useReassignCategory(), { wrapper });
+
+    act(() => { result.current.mutate({ categoryId: 'old', toCategoryId: 'new' }); });
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(invalidate).not.toHaveBeenCalled();
+  });
+
+  it('a successful delete refreshes recurring templates', async () => {
+    request.mockResolvedValue(undefined);
+    const invalidate = vi.spyOn(client, 'invalidateQueries');
+    const { result } = renderHook(() => useDeleteCategory(), { wrapper });
+
+    act(() => { result.current.mutate('old'); });
 
     await waitFor(() => expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.recurring }));
   });
