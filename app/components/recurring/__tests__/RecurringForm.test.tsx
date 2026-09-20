@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MantineProvider } from '@mantine/core';
@@ -45,6 +45,10 @@ describe('RecurringForm', () => {
     mockCreate.mockResolvedValue({});
     mockUpdate.mockReset();
     mockUpdate.mockResolvedValue({});
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it('shows each problem on its own field and saves nothing', async () => {
@@ -126,6 +130,26 @@ describe('RecurringForm', () => {
     expect(onClose).toHaveBeenCalled();
   });
 
+  it('asks for a category when the saved one no longer exists', async () => {
+    const user = userEvent.setup();
+    renderForm({ editing: { ...existing, categoryId: 'cat-deleted' } });
+
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(await screen.findByText('Choose a category')).toBeInTheDocument();
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it('asks for a category when the saved one is of a different type', async () => {
+    const user = userEvent.setup();
+    renderForm({ editing: { ...existing, categoryId: 'cat-housing' } });
+
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(await screen.findByText('Choose a category')).toBeInTheDocument();
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
   it('reports out-of-range day and reminder on their own fields', async () => {
     const user = userEvent.setup();
     renderForm({ draft });
@@ -154,7 +178,6 @@ describe('RecurringForm', () => {
     expect(await screen.findByText(/could not save/i)).toBeInTheDocument();
     expect(onClose).not.toHaveBeenCalled();
     expect(logged).toHaveBeenCalledWith('Failed to save recurring template', expect.objectContaining({ error: expect.any(Error) }));
-    logged.mockRestore();
   });
 
   it('closes on Cancel without saving', async () => {

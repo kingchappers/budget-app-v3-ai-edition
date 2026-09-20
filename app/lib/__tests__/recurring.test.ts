@@ -215,6 +215,15 @@ describe('validateRecurringForm', () => {
     expect(result.ok === false && result.errors.leadDays).toBe('Enter 0 to 14 days');
   });
 
+  it('treats a whitespace-only note as empty', () => {
+    const result = validateRecurringForm({ ...values, description: '   ' });
+    expect(result.ok && result.value.description).toBe('');
+  });
+
+  it('accepts a note of exactly 200 characters after trimming', () => {
+    expect(validateRecurringForm({ ...values, description: ` ${'a'.repeat(200)} ` }).ok).toBe(true);
+  });
+
   it('reports an empty amount and an overlong note', () => {
     const empty = validateRecurringForm({ ...values, amount: '' });
     expect(empty.ok === false && empty.errors.amount).toBe('Enter an amount');

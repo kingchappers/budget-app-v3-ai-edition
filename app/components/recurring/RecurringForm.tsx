@@ -58,7 +58,8 @@ export function RecurringForm({ opened, onClose, editing, draft }: RecurringForm
   const pending = create.isPending || update.isPending;
 
   async function handleSubmit(): Promise<void> {
-    const result = validateRecurringForm({ type, categoryId, amount, description, dayOfMonth, leadDays });
+    const validCategoryId = options.some(o => o.value === categoryId) ? categoryId : null;
+    const result = validateRecurringForm({ type, categoryId: validCategoryId, amount, description, dayOfMonth, leadDays });
     if (!result.ok) {
       setErrors(result.errors);
       setFormError(null);
