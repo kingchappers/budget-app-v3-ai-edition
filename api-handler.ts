@@ -7,6 +7,7 @@ import { getCategories, createCategory, deleteCategory } from './src/api/categor
 import { getTransactions, createTransaction, deleteTransaction, updateTransaction } from './src/api/transactions';
 import { getTargets, upsertTarget, deleteTarget } from './src/api/targets';
 import { reassignCategory } from './src/api/reassign';
+import { getRecurring, createRecurring } from './src/api/recurring';
 
 const AUTH0_DOMAIN = process.env.AUTH0_DOMAIN || '';
 const AUTH0_AUDIENCE = process.env.AUTH0_AUDIENCE || '';
@@ -36,6 +37,8 @@ router.put('/api/transactions/{yearMonth}/{transactionId}', updateTransaction);
 router.get('/api/targets', getTargets);
 router.put('/api/targets/{categoryId}', upsertTarget);
 router.delete('/api/targets/{categoryId}', deleteTarget);
+router.get('/api/recurring', getRecurring);
+router.post('/api/recurring', createRecurring);
 
 export const handler: APIGatewayProxyHandlerV2 = async (event) => {
   try {
