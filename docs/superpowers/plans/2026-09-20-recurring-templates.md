@@ -2452,7 +2452,7 @@ Expected: FAIL. `validateRecurringForm` and `../RecurringForm` do not exist.
 
 - [ ] **Step 3: Implement**
 
-In `app/lib/recurring.ts`, replace the two import lines at the top with:
+In `app/lib/recurring.ts`, replace the **three** import lines at the top (`./months`, `./noteMemory`, and `import type { Category, Recurring, Transaction } from './types'`) with:
 
 ```ts
 import type { RecurringInput } from './api';
