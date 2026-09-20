@@ -4,6 +4,7 @@ import { Alert, Button, Card, Group, Loader, Stack, Text, Title } from '@mantine
 import { DefaultLayout } from '~/components/layout/DefaultLayout';
 import { MonthHeader } from '~/components/budget/MonthHeader';
 import { CategoryProgressRow } from '~/components/budget/CategoryProgressRow';
+import { DueRecurringCard } from '~/components/recurring/DueRecurringCard';
 import { TransactionRow } from '~/components/transactions/TransactionRow';
 import { buildMonthSummary } from '~/lib/summary';
 import { formatPence } from '~/lib/money';
@@ -49,6 +50,7 @@ function HomeContent() {
 
   return (
     <Stack>
+      <DueRecurringCard />
       <MonthHeader yearMonth={yearMonth} onChange={setYearMonth} />
 
       {!hasTargets && (
@@ -86,6 +88,10 @@ function HomeContent() {
             ))}
         <Button component={Link} to="/transactions" variant="subtle" mt="xs">See all</Button>
       </div>
+
+      <Button component={Link} to="/recurring" variant="subtle" style={{ alignSelf: 'flex-start' }}>
+        Manage recurring
+      </Button>
     </Stack>
   );
 }
