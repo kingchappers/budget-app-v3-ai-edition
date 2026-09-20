@@ -1,29 +1,22 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button, Group, SegmentedControl, Stack, Text, TextInput } from '@mantine/core';
 import { DateInput } from '@mantine/dates';
-import { notifications } from '@mantine/notifications';
 import { ResponsiveSheet } from '~/components/layout/ResponsiveSheet';
 import { useNoteHistory } from '~/hooks/useNoteHistory';
+import { useSaveWithUndo } from '~/hooks/useSaveWithUndo';
 import { useSnapshotWhileOpen } from '~/hooks/useSnapshotWhileOpen';
 import type { TransactionInput } from '~/lib/api';
-import { formatPence, formatPencePlain, parsePounds } from '~/lib/money';
+import { formatPencePlain, parsePounds } from '~/lib/money';
 import { currentYearMonth, dateChoiceFor, todayIso, yesterdayIso, type DateChoice } from '~/lib/months';
 import { categoryForNote } from '~/lib/noteMemory';
 import { parseQuickAdd } from '~/lib/quickAdd';
-import {
-  useCategories,
-  useCreateTransaction,
-  useDeleteTransaction,
-  useTransactions,
-  useUpdateTransaction,
-} from '~/lib/queries';
+import { useCategories, useTransactions, useUpdateTransaction } from '~/lib/queries';
 import { topCategories } from '~/lib/transactions';
 import { TYPE_OPTIONS, categoryTypeFor } from '~/lib/transactionTypes';
 import type { Transaction, TransactionType } from '~/lib/types';
 import { CategoryChips } from './CategoryChips';
 
 const CHIP_LIMIT = 5;
-const TOAST_MS = 5000;
 
 const DATE_OPTIONS: { label: string; value: DateChoice }[] = [
   { label: 'Today', value: 'today' },
@@ -42,28 +35,12 @@ export interface TransactionSheetProps {
   template?: Transaction | null;
 }
 
-interface ToastActionProps {
-  text: string;
-  actionLabel: string;
-  onAction: () => void;
-}
-
-function ToastAction({ text, actionLabel, onAction }: ToastActionProps) {
-  return (
-    <Group justify="space-between" wrap="nowrap" gap="sm">
-      <Text size="sm">{text}</Text>
-      <Button variant="subtle" size="compact-sm" onClick={onAction}>{actionLabel}</Button>
-    </Group>
-  );
-}
-
 export function TransactionSheet({ opened, onClose, yearMonth, editing, template }: TransactionSheetProps) {
   const { data: categories = [], isLoading: categoriesLoading, error: categoriesError } = useCategories();
   const monthTransactions = useSnapshotWhileOpen(useTransactions(currentYearMonth(), opened).data, opened);
   const noteIndex = useNoteHistory(opened);
-  const create = useCreateTransaction();
   const update = useUpdateTransaction(yearMonth);
-  const remove = useDeleteTransaction();
+  const saveWithUndo = useSaveWithUndo();
   const amountRef = useRef<HTMLInputElement>(null);
   const createSubmittedRef = useRef(false);
   const saveAnotherRef = useRef<HTMLButtonElement>(null);
@@ -209,63 +186,6 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, template
     return { amount: parsed.pence, type, categoryId, description, date };
   }
 
-  function describeInput(input: TransactionInput): string {
-    const categoryName = categories.find(c => c.categoryId === input.categoryId)?.name ?? 'Transaction';
-    return `${formatPence(input.amount)} · ${categoryName}`;
-  }
-
-  function showFailureToast(input: TransactionInput): void {
-    const toastId = `failed-${crypto.randomUUID()}`;
-    notifications.show({
-      id: toastId,
-      color: 'danger',
-      autoClose: false,
-      message: (
-        <ToastAction
-          text={`Couldn't save ${describeInput(input)}`}
-          actionLabel="Retry"
-          onAction={() => {
-            notifications.hide(toastId);
-            submitNew(input);
-          }}
-        />
-      ),
-    });
-  }
-
-  function submitNew(input: TransactionInput): void {
-    const toastId = `saved-${crypto.randomUUID()}`;
-    let undone = false;
-    const outcome = create.mutateAsync(input).then(
-      created => created,
-      () => {
-        notifications.hide(toastId);
-        // A cancelled entry must not offer Retry, or one tap would re-create it.
-        if (!undone) showFailureToast(input);
-        return null;
-      },
-    );
-
-    notifications.show({
-      id: toastId,
-      autoClose: TOAST_MS,
-      message: (
-        <ToastAction
-          text={`Saved ${describeInput(input)}`}
-          actionLabel="Undo"
-          onAction={() => {
-            undone = true;
-            notifications.hide(toastId);
-            void outcome.then(created => {
-              if (!created) return;
-              remove.mutate({ transactionId: created.transactionId, yearMonth: created.yearMonth });
-            });
-          }}
-        />
-      ),
-    });
-  }
-
   function resetForNextEntry(): void {
     createSubmittedRef.current = false;
     setAmount('');
@@ -295,7 +215,7 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, template
 
     if (createSubmittedRef.current) return;
     createSubmittedRef.current = true;
-    submitNew(input);
+    void saveWithUndo(input);
     if (mode === 'addAnother') {
       resetForNextEntry();
       return;
