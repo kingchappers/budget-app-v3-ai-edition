@@ -651,4 +651,41 @@ describe('TransactionSheet', () => {
     expect(await screen.findByText("Couldn't find an amount")).toBeInTheDocument();
     expect(screen.getByText(example)).toBeInTheDocument();
   });
+
+  it('uses the template date instead of today when one is given', async () => {
+    const user = userEvent.setup();
+    renderSheet({ template: editing, templateDate: '2099-01-15' });
+
+    expect(screen.getByRole('radio', { name: 'Other…' })).toBeChecked();
+    await user.click(screen.getByRole('button', { name: /^save$/i }));
+
+    expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({ date: '2099-01-15' }));
+  });
+
+  it('selects Today when the template date is today', () => {
+    renderSheet({ template: editing, templateDate: todayIso() });
+    expect(screen.getByRole('radio', { name: 'Today' })).toBeChecked();
+  });
+
+  it('reports the created transaction through onSaved after a successful create', async () => {
+    const user = userEvent.setup();
+    const onSaved = vi.fn();
+    renderSheet({ template: editing, onSaved });
+
+    await user.click(screen.getByRole('button', { name: /^save$/i }));
+
+    await waitFor(() => expect(onSaved).toHaveBeenCalledWith({ transactionId: 't-real', yearMonth: '2026-07' }));
+  });
+
+  it('does not call onSaved when the create fails', async () => {
+    const user = userEvent.setup();
+    mockCreate.mockRejectedValue(new Error('boom'));
+    const onSaved = vi.fn();
+    renderSheet({ template: editing, onSaved });
+
+    await user.click(screen.getByRole('button', { name: /^save$/i }));
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 20)); });
+
+    expect(onSaved).not.toHaveBeenCalled();
+  });
 });

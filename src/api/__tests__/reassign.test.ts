@@ -39,13 +39,15 @@ describe('reassignCategory', () => {
 
     expect(res.statusCode).toBe(200);
     expect(JSON.parse(res.body).reassigned).toBe(2);
-    expect(mockSend).toHaveBeenCalledTimes(3);
+    expect(mockSend).toHaveBeenCalledTimes(4);
+    expect(JSON.parse(res.body).recurringReassigned).toBe(0);
     expect(mockSend.mock.calls[1][0].Key.SK).toBe('TXN#2026-06#a');
     expect(mockSend.mock.calls[1][0].ExpressionAttributeValues[':c']).toBe('cat-entertainment');
   });
 
   it('returns 200 with zero when nothing matches', async () => {
     mockSend.mockResolvedValueOnce({ Items: [{ SK: 'TXN#2026-07#c', categoryId: 'cat-food' }] });
+    mockSend.mockResolvedValue({});
     const res = await reassignCategory(makeEvent({ toCategoryId: 'cat-entertainment' }), 'user-1', { categoryId: 'cat-custom' });
     expect(res.statusCode).toBe(200);
     expect(JSON.parse(res.body).reassigned).toBe(0);
@@ -153,5 +155,50 @@ describe('reassignCategory', () => {
     const updateCall = mockSend.mock.calls.find(call => call[0].Key);
     expect(updateCall).toBeDefined();
     expect(updateCall![0].ConditionExpression).toBe('attribute_exists(SK)');
+  });
+
+  it('also moves recurring templates that use the category', async () => {
+    mockSend.mockImplementation(async (command: { ExpressionAttributeValues?: Record<string, unknown>; Key?: unknown }) => {
+      const prefix = command.ExpressionAttributeValues?.[':prefix'];
+      if (prefix === 'TXN#') return { Items: [{ SK: 'TXN#2026-07#a', categoryId: 'cat-custom' }] };
+      if (prefix === 'RECUR#') {
+        return { Items: [
+          { SK: 'RECUR#r1', categoryId: 'cat-custom' },
+          { SK: 'RECUR#r2', categoryId: 'cat-food' },
+        ] };
+      }
+      return {};
+    });
+
+    const res = await reassignCategory(makeEvent({ toCategoryId: 'cat-entertainment' }), 'user-1', { categoryId: 'cat-custom' });
+
+    const body = JSON.parse(res.body);
+    expect(body.reassigned).toBe(1);
+    expect(body.recurringReassigned).toBe(1);
+    const updatedKeys = mockSend.mock.calls.filter(call => call[0].Key).map(call => call[0].Key.SK);
+    expect(updatedKeys).toEqual(['TXN#2026-07#a', 'RECUR#r1']);
+  });
+
+  it('paginates the templates query and only touches the caller\'s items', async () => {
+    mockSend.mockImplementation(async (command: {
+      ExpressionAttributeValues?: Record<string, unknown>; ExclusiveStartKey?: unknown; Key?: unknown;
+    }) => {
+      if (command.ExpressionAttributeValues?.[':prefix'] === 'RECUR#') {
+        if (command.ExclusiveStartKey === undefined) {
+          return { Items: [{ SK: 'RECUR#r1', categoryId: 'cat-custom' }], LastEvaluatedKey: { PK: 'USER#user-1', SK: 'RECUR#r1' } };
+        }
+        return { Items: [{ SK: 'RECUR#r2', categoryId: 'cat-custom' }] };
+      }
+      return {};
+    });
+
+    const res = await reassignCategory(makeEvent({ toCategoryId: 'cat-entertainment' }), 'user-1', { categoryId: 'cat-custom' });
+
+    expect(JSON.parse(res.body).recurringReassigned).toBe(2);
+    const commands = mockSend.mock.calls.map(call => call[0]);
+    const queries = commands.filter(command => command.KeyConditionExpression);
+    expect(queries.every(command => command.ExpressionAttributeValues[':pk'] === 'USER#user-1')).toBe(true);
+    const updates = commands.filter(command => command.Key);
+    expect(updates.every(command => command.Key.PK === 'USER#user-1')).toBe(true);
   });
 });

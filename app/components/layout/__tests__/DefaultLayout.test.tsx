@@ -68,4 +68,11 @@ describe('DefaultLayout add shortcut', () => {
 
     expect(screen.queryByText('Add sheet open')).not.toBeInTheDocument();
   });
+
+  it('links to Recurring from the sidebar only, not the bottom tab bar', () => {
+    renderLayout();
+    const links = screen.getAllByRole('link', { name: 'Recurring' });
+    expect(links).toHaveLength(1);
+    expect(links[0]).toHaveAttribute('href', '/recurring');
+  });
 });

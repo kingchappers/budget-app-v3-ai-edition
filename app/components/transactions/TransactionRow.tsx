@@ -1,5 +1,5 @@
 import { ActionIcon, Group, Menu, Text, ThemeIcon } from '@mantine/core';
-import { IconCopy, IconDots, IconPencil, IconTrash } from '@tabler/icons-react';
+import { IconCopy, IconDots, IconPencil, IconRepeat, IconTrash } from '@tabler/icons-react';
 import { formatPence } from '~/lib/money';
 import { getCategoryIcon } from '~/lib/categoryIcons';
 import type { Transaction } from '~/lib/types';
@@ -7,7 +7,7 @@ import type { Transaction } from '~/lib/types';
 const OUTGOING = new Set(['EXPENSE', 'INVESTMENT_IN']);
 
 export function TransactionRow({
-  transaction, categoryName, categoryIcon, onEdit, onDelete, onDuplicate,
+  transaction, categoryName, categoryIcon, onEdit, onDelete, onDuplicate, onRepeat,
 }: {
   transaction: Transaction;
   categoryName: string;
@@ -15,6 +15,7 @@ export function TransactionRow({
   onEdit?: (t: Transaction) => void;
   onDelete?: (t: Transaction) => void;
   onDuplicate?: (t: Transaction) => void;
+  onRepeat?: (t: Transaction) => void;
 }) {
   const label = transaction.description || categoryName;
   const sign = OUTGOING.has(transaction.type) ? '−' : '+';
@@ -33,7 +34,7 @@ export function TransactionRow({
       </Group>
       <Group gap="xs" wrap="nowrap">
         <Text fw={500}>{sign}{formatPence(transaction.amount)}</Text>
-        {(onEdit || onDelete || onDuplicate) && (
+        {(onEdit || onDelete || onDuplicate || onRepeat) && (
           <Menu position="bottom-end">
             <Menu.Target>
               <ActionIcon variant="subtle" aria-label={`Actions for ${label}`}><IconDots size={16} /></ActionIcon>
@@ -41,6 +42,7 @@ export function TransactionRow({
             <Menu.Dropdown>
               {onEdit && <Menu.Item leftSection={<IconPencil size={14} />} onClick={() => onEdit(transaction)}>Edit</Menu.Item>}
               {onDuplicate && <Menu.Item leftSection={<IconCopy size={14} />} onClick={() => onDuplicate(transaction)}>Duplicate</Menu.Item>}
+              {onRepeat && <Menu.Item leftSection={<IconRepeat size={14} />} onClick={() => onRepeat(transaction)}>Repeat monthly</Menu.Item>}
               {onDelete && <Menu.Item color="danger" leftSection={<IconTrash size={14} />} onClick={() => onDelete(transaction)}>Delete</Menu.Item>}
             </Menu.Dropdown>
           </Menu>

@@ -1,4 +1,4 @@
-import type { Category, CategoryTarget, TargetPeriod, Transaction, TransactionType } from './types';
+import type { Category, CategoryTarget, Recurring, TargetPeriod, Transaction, TransactionType } from './types';
 
 type Request = (endpoint: string, options?: RequestInit) => Promise<unknown>;
 
@@ -8,6 +8,15 @@ export interface TransactionInput {
   categoryId: string;
   description: string;
   date: string;
+}
+
+export interface RecurringInput {
+  type: TransactionType;
+  categoryId: string;
+  amount: number;
+  description: string;
+  dayOfMonth: number;
+  leadDays: number;
 }
 
 export function createApi(request: Request) {
@@ -70,6 +79,35 @@ export function createApi(request: Request) {
     },
     deleteTarget: async (categoryId: string): Promise<void> => {
       await request(`/api/targets/${encodeURIComponent(categoryId)}`, { method: 'DELETE' });
+    },
+
+    getRecurring: async (): Promise<Recurring[]> => {
+      const res = await request('/api/recurring') as { recurring: Recurring[] };
+      return res.recurring;
+    },
+    createRecurring: async (input: RecurringInput): Promise<Recurring> => {
+      const res = await request('/api/recurring', {
+        method: 'POST',
+        body: JSON.stringify(input),
+      }) as { recurring: Recurring };
+      return res.recurring;
+    },
+    updateRecurring: async (recurringId: string, input: RecurringInput): Promise<Recurring> => {
+      const res = await request(`/api/recurring/${encodeURIComponent(recurringId)}`, {
+        method: 'PUT',
+        body: JSON.stringify(input),
+      }) as { recurring: Recurring };
+      return res.recurring;
+    },
+    deleteRecurring: async (recurringId: string): Promise<void> => {
+      await request(`/api/recurring/${encodeURIComponent(recurringId)}`, { method: 'DELETE' });
+    },
+    setRecurringHandled: async (recurringId: string, period: string | null): Promise<Recurring> => {
+      const res = await request(`/api/recurring/${encodeURIComponent(recurringId)}/handled`, {
+        method: 'POST',
+        body: JSON.stringify({ period }),
+      }) as { recurring: Recurring };
+      return res.recurring;
     },
   };
 }

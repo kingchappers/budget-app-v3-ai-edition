@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ActionIcon, Alert, Button, Divider, Group, Loader, Select, Stack, Text, TextInput } from '@mantine/core';
 import { IconSearch, IconX } from '@tabler/icons-react';
 import { DefaultLayout } from '~/components/layout/DefaultLayout';
 import { MonthHeader } from '~/components/budget/MonthHeader';
+import { RecurringForm, type RecurringDraft } from '~/components/recurring/RecurringForm';
 import { TransactionRow } from '~/components/transactions/TransactionRow';
 import { TransactionSheet } from '~/components/transactions/TransactionSheet';
 import { filterTransactions, type TransactionFilter } from '~/lib/transactions';
@@ -22,6 +23,18 @@ function TransactionsContent() {
   const [yearMonth, setYearMonth] = useState(currentYearMonth());
   const [editing, setEditing] = useState<Transaction | null>(null);
   const [duplicating, setDuplicating] = useState<Transaction | null>(null);
+  const [repeating, setRepeating] = useState<Transaction | null>(null);
+  const repeatDraft = useMemo<RecurringDraft | null>(() => (
+    repeating
+      ? {
+          type: repeating.type,
+          categoryId: repeating.categoryId,
+          amount: repeating.amount,
+          description: repeating.description,
+          dayOfMonth: Number(repeating.date.slice(8, 10)),
+        }
+      : null
+  ), [repeating]);
   const [filter, setFilter] = useState<TransactionFilter>({ query: '', categoryId: null, type: null });
   const categories = useCategories();
   const transactions = useTransactions(yearMonth);
@@ -114,6 +127,7 @@ function TransactionsContent() {
               categoryIcon={iconFor(t.categoryId)}
               onEdit={setEditing}
               onDuplicate={setDuplicating}
+              onRepeat={setRepeating}
               onDelete={(item) => remove.mutate({ transactionId: item.transactionId, yearMonth: item.yearMonth })}
             />
           ))}
@@ -130,6 +144,7 @@ function TransactionsContent() {
         editing={editing}
         template={duplicating}
       />
+      <RecurringForm opened={repeating !== null} onClose={() => setRepeating(null)} draft={repeatDraft} />
     </Stack>
   );
 }

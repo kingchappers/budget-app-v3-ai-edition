@@ -5,7 +5,7 @@ import { Auth0Provider } from '@auth0/auth0-react';
 import Authentication from "../authentication/Authentication";
 import { ColorSchemeToggle } from './ColorSchemeToggle';
 import { QuickEntryTips } from './QuickEntryTips';
-import { IconHome, IconList, IconTarget, IconPlus, IconTag } from '@tabler/icons-react';
+import { IconHome, IconList, IconRepeat, IconTarget, IconPlus, IconTag } from '@tabler/icons-react';
 import { NavLink as RouterNavLink, useLocation } from 'react-router';
 import { TransactionSheet } from '../transactions/TransactionSheet';
 import { currentYearMonth } from '~/lib/months';
@@ -15,6 +15,10 @@ const NAV_ITEMS = [
   { to: '/transactions', label: 'Transactions', Icon: IconList },
   { to: '/targets', label: 'Targets', Icon: IconTarget },
   { to: '/categories', label: 'Categories', Icon: IconTag },
+];
+
+const SIDEBAR_ONLY_ITEMS = [
+  { to: '/recurring', label: 'Recurring', Icon: IconRepeat },
 ];
 
 function isNavItemActive(pathname: string, to: string) {
@@ -52,7 +56,7 @@ function SidebarNav() {
   const { pathname } = useLocation();
   return (
     <>
-      {NAV_ITEMS.map(({ to, label, Icon }) => (
+      {[...NAV_ITEMS, ...SIDEBAR_ONLY_ITEMS].map(({ to, label, Icon }) => (
         <NavLink
           key={to}
           component={RouterNavLink}

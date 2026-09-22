@@ -31,6 +31,19 @@ export interface CategoryTarget {
   updatedAt: string;
 }
 
+export interface Recurring {
+  recurringId: string;
+  type: TransactionType;
+  categoryId: string;
+  amount: number;
+  description: string;
+  dayOfMonth: number;
+  leadDays: number;
+  handledPeriod: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface ApiResponse {
   statusCode: number;
   headers: Record<string, string>;
