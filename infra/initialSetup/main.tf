@@ -390,6 +390,27 @@ data "aws_iam_policy_document" "github_iam_policy_document" {
     actions   = ["sts:GetCallerIdentity"]
     resources = ["*"]
   }
+
+  # ACM Certificate access 
+  statement {
+    sid    = "AcmCertificateAccess"
+    effect = "Allow"
+    actions = [
+      "acm:RequestCertificate",
+      "acm:DescribeCertificate",
+      "acm:ListCertificates",
+      "acm:GetCertificate",
+      "acm:ListTagsForCertificate",
+      "acm:AddTagsToCertificate",
+      "acm:RemoveTagsFromCertificate",
+      "acm:RequestCertificate",
+      "acm:DeleteCertificate",
+      "acm:UpdateCertificateOptions"
+    ]
+    resources = [
+      "arn:aws:acm:${var.aws_region}:${data.aws_caller_identity.current.account_id}:certificate*",
+    ]
+  }
 }
 
 resource "aws_iam_policy" "github_actions_iam_policy" {
