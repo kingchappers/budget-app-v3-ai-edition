@@ -127,6 +127,70 @@ resource "aws_apigatewayv2_stage" "default" {
   }
 }
 
+####################################################################################################
+# DNS Config
+# ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
+####################################################################################################
+
+# ACM Certificate 
+resource "aws_acm_certificate" "budget" {
+  domain_name       = "budget.scgrid.xyz"
+  validation_method = "DNS"
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+# Output the validation record so you can copy it into Porkbun
+output "acm_validation_cname" {
+  value = {
+    for dvo in aws_acm_certificate.budget.domain_validation_options :
+    dvo.domain_name => {
+      name  = dvo.resource_record_name
+      value = dvo.resource_record_value
+    }
+  }
+}
+
+# Wait for cert validation to complete (one-time, after you add the CNAME)
+resource "aws_acm_certificate_validation" "budget" {
+  certificate_arn         = aws_acm_certificate.budget.arn
+  # Hardcode the FQDN you added in Porkbun after first apply,
+  # or use a data source to look it up. See note below.
+  validation_record_fqdns = ["_REPLACE_WITH_YOUR_VALIDATION_FQDN.example.com."]
+}
+
+# ─── API Gateway v2 (HTTP API) ─────────────────────────────────────
+
+# ─── Custom Domain (v2) ────────────────────────────────────────────
+resource "aws_apigatewayv2_domain_name" "default" {
+  domain_name = "budget.scgrid.xyz"
+
+  domain_name_configuration {
+    certificate_arn = aws_acm_certificate_validation.budget.certificate_arn
+    endpoint_type   = "REGIONAL"
+    security_policy = "TLS_1_2"
+  }
+}
+
+# ─── API Mapping (replaces base_path_mapping) ──────────────────────
+resource "aws_apigatewayv2_api_mapping" "app" {
+  api_id      = aws_apigatewayv2_api.app.id
+  domain_name = aws_apigatewayv2_domain_name.default.id
+  stage       = aws_apigatewayv2_stage.default.id
+}
+
+# ─── Output the CNAME target for Porkbun ───────────────────────────
+output "api_gateway_cname_target" {
+  value = aws_apigatewayv2_domain_name.default.domain_name_configuration[0].target_domain_name
+}
+
+####################################################################################################
+# ↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑
+# DNS Config
+####################################################################################################
+
 # CloudWatch logs for API Gateway
 resource "aws_cloudwatch_log_group" "api_logs" {
   name              = "/aws/apigateway/${var.app_name}"
