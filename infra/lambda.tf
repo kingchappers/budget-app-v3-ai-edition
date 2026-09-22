@@ -158,7 +158,7 @@ resource "aws_acm_certificate_validation" "budget" {
   certificate_arn         = aws_acm_certificate.budget.arn
   # Hardcode the FQDN you added in Porkbun after first apply,
   # or use a data source to look it up. See note below.
-  validation_record_fqdns = ["_REPLACE_WITH_YOUR_VALIDATION_FQDN.example.com."]
+  validation_record_fqdns = ["_b1b248fd28f0182e40eb25fac9dc4eea.budget.scgrid.xyz."]
 }
 
 # ─── API Gateway v2 (HTTP API) ─────────────────────────────────────
