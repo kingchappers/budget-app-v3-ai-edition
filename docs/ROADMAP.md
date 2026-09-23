@@ -6,8 +6,8 @@ Bank sync was dropped (see `DECISIONS.md`), so manual entry is the core interact
 |---|---|---|
 | A | Entry sheet rework | Implemented on `feat/entry-sheet-rework` ([PR #29](https://github.com/kingchappers/budget-app-v3-ai-edition/pull/29)). Spec: `superpowers/specs/2026-09-18-entry-sheet-rework-design.md`, plan: `superpowers/plans/2026-09-18-entry-sheet-rework.md` |
 | B | Smart prefill | Implemented on `feat/smart-prefill` ([PR #30](https://github.com/kingchappers/budget-app-v3-ai-edition/pull/30)). Spec: `superpowers/specs/2026-09-19-smart-prefill-design.md`, plan: `superpowers/plans/2026-09-19-smart-prefill.md` |
-| C | Recurring templates | Implemented on `feat/recurring-templates` (PR pending). Spec: `superpowers/specs/2026-09-19-recurring-templates-design.md`, plan: `superpowers/plans/2026-09-20-recurring-templates.md` |
-| D | PWA and add shortcut | Not started |
+| C | Recurring templates | Implemented on `feat/recurring-templates` ([PR #32](https://github.com/kingchappers/budget-app-v3-ai-edition/pull/32)). Spec: `superpowers/specs/2026-09-19-recurring-templates-design.md`, plan: `superpowers/plans/2026-09-20-recurring-templates.md` |
+| D | PWA and add shortcut | Implemented on `feat/pwa-add-shortcut` (PR pending). Spec: `superpowers/specs/2026-09-23-pwa-add-shortcut-design.md`, plan: `superpowers/plans/2026-09-23-pwa-add-shortcut.md` |
 | E | CSV/OFX import | Not started |
 
 ## B: Smart prefill
@@ -52,13 +52,17 @@ Implemented on `feat/recurring-templates`. Spec: `superpowers/specs/2026-09-19-r
 
 ## D: PWA and add shortcut
 
-Installable app with a shortcut that opens straight into the entry sheet.
+Implemented on `feat/pwa-add-shortcut`. Spec: `superpowers/specs/2026-09-23-pwa-add-shortcut-design.md`, plan: `superpowers/plans/2026-09-23-pwa-add-shortcut.md`.
 
-- **Builds on A:** the sheet is opened by a query param or route, for example `/?add=1`.
-- **Open questions:**
-  - Service worker scope and caching, given the static Lambda behind API Gateway.
-  - Auth0 refresh-token behaviour in an installed PWA (the app uses localStorage plus rotating refresh tokens).
-  - Platform support: iOS may not support manifest app shortcuts, so verify before promising it. A home-screen icon that opens `/?add=1` is the fallback.
+- **Built:**
+  - A web manifest, icons and iOS/Android install metadata, so the app installs from `budget.scgrid.xyz` as a standalone window.
+  - An Android long-press "Add transaction" shortcut (`/?add=1`), and an "Open Add sheet on launch" toggle in the avatar menu for the installed app (works on iPhone too).
+  - The static Lambda handler rewritten as a typed, tested file: binary files served as base64, per-type `Cache-Control` (hashed assets immutable), 404 for missing files, hardened path checks.
+- **Decisions:** installable only, no service worker; launch behaviour is a per-device toggle rather than a second icon; no infra change (the static handler stays on the Lambda).
+- **Follow-ups:**
+  - Confirm on a real iPhone whether an Auth0 login stays inside the installed app.
+  - Offline launch and an offline entry queue (see Later ideas).
+  - Replace the first-draft icon with a designed one (swap `public/icons/icon.svg` and regenerate the PNGs).
 
 ## E: CSV/OFX import
 
@@ -72,6 +76,10 @@ Bulk import from bank statement exports. `DECISIONS.md` already names this as th
   - Payload limits: parse client-side and post in batches rather than uploading a file to the API.
   - A preview-and-confirm step before anything is written.
 - **Security:** batch endpoint needs strict validation and size limits (IO-01).
+
+## Later ideas
+
+- **Offline entry queue:** enter transactions with no signal and sync later. Needs a service worker, a persistent queue, idempotent creates and token refresh while offline. Its own sub-project.
 
 ## Deliberately excluded
 
