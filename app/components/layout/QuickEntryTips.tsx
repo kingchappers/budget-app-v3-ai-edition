@@ -34,6 +34,11 @@ export function QuickEntryTips() {
             <strong>Recurring:</strong> choose Repeat monthly in a transaction's menu to set one up. When it is
             due it appears at the top of Home with Add, Edit and Skip. Manage them under Recurring.
           </Text>
+          <Text size="sm">
+            <strong>Install:</strong> add the app to your home screen for a full-screen version. On Android,
+            long-press the icon for an Add transaction shortcut. Turn on Open Add sheet on launch in your
+            avatar menu to start every launch on the Add sheet.
+          </Text>
         </Stack>
       </Modal>
     </>
