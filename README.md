@@ -25,7 +25,7 @@ This serves as a template for future projects requiring web apps with authentica
 - **Routes:**
   - `GET /` → serves `index.html` (SPA entry point)
   - `GET /assets/*` → serves JS/CSS files with correct MIME types
-  - Falls back to `index.html` for any unknown route (enables client-side routing)
+  - Falls back to `index.html` for any unknown route without a file extension (enables client-side routing); a missing file with an extension returns 404
 - **Authentication:** None required - publicly accessible
 - **Purpose:** Serves your React app and static assets
 

@@ -63,6 +63,8 @@ Implemented on `feat/pwa-add-shortcut`. Spec: `superpowers/specs/2026-09-23-pwa-
   - Confirm on a real iPhone whether an Auth0 login stays inside the installed app.
   - Offline launch and an offline entry queue (see Later ideas).
   - Replace the first-draft icon with a designed one (swap `public/icons/icon.svg` and regenerate the PNGs).
+  - The static Lambda handler is served publicly at `/index.js`, because it lives inside the served `build/client` directory (pre-existing, low impact since the repo is public). Move the entry file out of the served root or answer that path with a 404.
+  - Static responses carry no Content-Security-Policy (SECURITY.md WEB-A05). A CSP needs the Google Fonts and Auth0 origins allowed, so it was left out of D on purpose.
 
 ## E: CSV/OFX import
 
