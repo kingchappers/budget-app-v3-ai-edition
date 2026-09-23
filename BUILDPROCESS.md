@@ -60,19 +60,16 @@ This handler:
 - `build/client/index.js` - becomes the Lambda handler for the static file server
 
 ### Why This Approach?
-- Avoids needing a separate build process for the handler
-- The handler is embedded directly into the client build directory
+- The handler is typed source (`src/static/handler.ts`) with unit tests, compiled with `tsc`
+- The compiled file is copied into the client build directory as `build/client/index.js`
 - When the static file server Lambda is deployed, it uses this file as its entry point
 - Lambda looks for a handler named "index.handler", which matches this output
 
 ### MIME Type Mapping
-The injected handler includes MIME type mappings for:
-- `.html` → text/html
-- `.js` → application/javascript
-- `.css` → text/css
-- `.json` → application/json
-- `.png/.jpg/.gif/.svg` → appropriate image types
-- `.woff/.woff2` → font types
+The compiled handler includes MIME type mappings for:
+- Text (served as UTF-8): `.html`, `.js`, `.css`, `.json`, `.svg`, `.webmanifest` (application/manifest+json), `.txt`
+- Binary (served base64 encoded): `.png`, `.jpg/.jpeg`, `.gif`, `.ico`, `.woff`, `.woff2`
+- Anything else is served as base64 `application/octet-stream`
 
 ---
 
@@ -163,7 +160,7 @@ After `yarn build` completes:
 ```
 build/
 ├── client/
-│   ├── index.js                    ← Static file server handler (INJECTED)
+│   ├── index.js                    ← Static file server handler (COMPILED)
 │   ├── index.html                  ← React app entry point
 │   └── assets/
 │       ├── _index-CjGoVtFd.js      ← Compiled React code
@@ -283,7 +280,7 @@ Terraform:
 
 The build process is a **three-stage pipeline** that transforms:
 1. **React source** → optimized static assets
-2. **Static assets** → Lambda handler wrapped with HTTP functionality
+2. **Static file server handler** → typed source compiled into a Lambda handler beside the assets
 3. **API source** → compiled Lambda handler with bundled dependencies
 
 All three stages are coordinated by a single `yarn build` command, producing two separate Lambda deployments from a unified source tree.

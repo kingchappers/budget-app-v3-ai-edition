@@ -21,7 +21,7 @@ This serves as a template for future projects requiring web apps with authentica
 - The `Auth0Provider` component wraps the entire application, maintaining auth state globally
 
 ### 3. Static File Server Lambda
-- **Handler:** `build/client/index.js` (compiled from `handler.ts`)
+- **Handler:** `build/client/index.js` (compiled from `src/static/handler.ts`)
 - **Routes:**
   - `GET /` → serves `index.html` (SPA entry point)
   - `GET /assets/*` → serves JS/CSS files with correct MIME types
@@ -91,7 +91,6 @@ This serves as a template for future projects requiring web apps with authentica
 | File | Purpose |
 |------|---------|
 | `api-handler.ts` | Source code for Protected API Lambda (JWT validation) |
-| `handler.ts` | Source code for Static File Server Lambda |
 | `build/client/index.js` | Compiled static file server (auto-generated) |
 | `build/api/index.js` | Compiled API handler (auto-generated) |
 | `app/hooks/useProtectedApi.ts` | React hook to make authenticated API requests |
