@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { ActionIcon, AppShell, Flex, Text, NavLink, Group, Paper, Tooltip } from '@mantine/core';
 import { useHotkeys } from '@mantine/hooks';
 import { Auth0Provider } from '@auth0/auth0-react';
@@ -8,6 +8,7 @@ import { QuickEntryTips } from './QuickEntryTips';
 import { IconHome, IconList, IconRepeat, IconTarget, IconPlus, IconTag } from '@tabler/icons-react';
 import { NavLink as RouterNavLink, useLocation } from 'react-router';
 import { TransactionSheet } from '../transactions/TransactionSheet';
+import { LaunchIntent } from './LaunchIntent';
 import { currentYearMonth } from '~/lib/months';
 
 const NAV_ITEMS = [
@@ -72,6 +73,7 @@ function SidebarNav() {
 
 export function DefaultLayout({ children }: { children: React.ReactNode }) {
   const [addOpen, setAddOpen] = useState(false);
+  const openAdd = useCallback(() => setAddOpen(true), []);
 
   useHotkeys([['n', () => {
     if (document.querySelector('[role="dialog"]')) return;
@@ -129,6 +131,7 @@ export function DefaultLayout({ children }: { children: React.ReactNode }) {
           </ActionIcon>
         </Tooltip>
         <TransactionSheet opened={addOpen} onClose={() => setAddOpen(false)} yearMonth={currentYearMonth()} />
+        <LaunchIntent onOpenAdd={openAdd} />
         <BottomTabs />
       </AppShell>
     </Auth0Provider>

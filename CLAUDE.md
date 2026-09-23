@@ -31,7 +31,7 @@ Tests use **Vitest** (`src/api/__tests__/`), covering the API router and handler
 
 ### Two Lambda Functions
 
-1. **Static File Server** (`build/client/index.js`) — serves React SPA assets, falls back to `index.html` for client-side routing. No auth. Handler is *injected* by `scripts/inject-handler.cjs` (not compiled from source).
+1. **Static File Server** (`build/client/index.js`) — serves React SPA assets, falls back to `index.html` for client-side routing. No auth. Compiled from `src/static/handler.ts` by `scripts/build-static-handler.cjs`; serves binary files as base64, sets `Cache-Control` per file type, and returns 404 for a missing file that has an extension.
 
 2. **Protected API** (`build/api/index.js`) — compiled from `api-handler.ts`. Validates JWT via Auth0 JWKS. Routes: `/api/test`, `/api/user-info`. Dependencies bundled into `build/api/node_modules/` by `scripts/build-api-handler.cjs`.
 
@@ -39,7 +39,7 @@ Tests use **Vitest** (`src/api/__tests__/`), covering the API router and handler
 
 `yarn build` chains three steps with `&&`:
 1. `react-router build` → `build/client/` (assets) + `build/server/` (unused)
-2. `inject-handler.cjs` → overwrites `build/client/index.js` with static file server handler
+2. `build-static-handler.cjs` → compiles `src/static/handler.ts` to `build/client/index.js` (the static file server handler)
 3. `build-api-handler.cjs` → compiles `api-handler.ts` to `build/api/index.js`, installs production deps
 
 ### Frontend
@@ -77,7 +77,8 @@ Reference control IDs in commits (e.g., "addresses AUTH-02", "fixes IO-03").
 | `api-handler.ts` | Protected API Lambda source (JWT validation, routing) |
 | `app/hooks/useProtectedApi.ts` | React hook for authenticated fetch |
 | `app/components/layout/DefaultLayout.tsx` | App shell with Auth0Provider |
-| `scripts/inject-handler.cjs` | Generates static file server Lambda handler |
+| `src/static/handler.ts` | Static file server Lambda source (tested) |
+| `scripts/build-static-handler.cjs` | Compiles the static handler to `build/client/index.js` |
 | `scripts/build-api-handler.cjs` | Compiles API handler + bundles deps |
 | `infra/lambda.tf` | Static Lambda + API Gateway + IAM |
 | `infra/api-lambda.tf` | API Lambda + routes |

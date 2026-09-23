@@ -21,11 +21,11 @@ This serves as a template for future projects requiring web apps with authentica
 - The `Auth0Provider` component wraps the entire application, maintaining auth state globally
 
 ### 3. Static File Server Lambda
-- **Handler:** `build/client/index.js` (compiled from `handler.ts`)
+- **Handler:** `build/client/index.js` (compiled from `src/static/handler.ts`)
 - **Routes:**
   - `GET /` → serves `index.html` (SPA entry point)
   - `GET /assets/*` → serves JS/CSS files with correct MIME types
-  - Falls back to `index.html` for any unknown route (enables client-side routing)
+  - Falls back to `index.html` for any unknown route without a file extension (enables client-side routing); a missing file with an extension returns 404
 - **Authentication:** None required - publicly accessible
 - **Purpose:** Serves your React app and static assets
 
@@ -91,7 +91,6 @@ This serves as a template for future projects requiring web apps with authentica
 | File | Purpose |
 |------|---------|
 | `api-handler.ts` | Source code for Protected API Lambda (JWT validation) |
-| `handler.ts` | Source code for Static File Server Lambda |
 | `build/client/index.js` | Compiled static file server (auto-generated) |
 | `build/api/index.js` | Compiled API handler (auto-generated) |
 | `app/hooks/useProtectedApi.ts` | React hook to make authenticated API requests |
@@ -99,7 +98,8 @@ This serves as a template for future projects requiring web apps with authentica
 | `app/components/layout/DefaultLayout.tsx` | Auth0Provider wrapper - maintains auth state globally |
 | `infra/lambda.tf` | Terraform: Static File Server Lambda + API Gateway |
 | `infra/api-lambda.tf` | Terraform: Protected API Lambda + routes |
-| `scripts/inject-handler.cjs` | Build script: injects handler into static files |
+| `src/static/handler.ts` | Static file server Lambda handler source |
+| `scripts/build-static-handler.cjs` | Build script: compiles the static handler to `build/client/index.js` |
 | `scripts/build-api-handler.cjs` | Build script: compiles API handler + installs deps |
 | `.github/workflows/yarnBuild.yml` | CI/CD: builds app + deploys infrastructure |
 

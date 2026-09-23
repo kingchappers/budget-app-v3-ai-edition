@@ -84,6 +84,8 @@ export const links: Route.LinksFunction = () => [
     rel: "stylesheet",
     href: "https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap",
   },
+  { rel: "manifest", href: "/manifest.webmanifest" },
+  { rel: "apple-touch-icon", href: "/icons/apple-touch-icon.png" },
 ];
 
 export function Layout({ children }: { children: React.ReactNode }) {
@@ -92,6 +94,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="theme-color" media="(prefers-color-scheme: light)" content="#0f766e" />
+        <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#134e4a" />
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-title" content="Budget" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <ColorSchemeScript defaultColorScheme="auto" />
         <Meta />
         <Links />

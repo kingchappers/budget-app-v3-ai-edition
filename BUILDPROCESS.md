@@ -5,7 +5,7 @@
 Everything builds from a single `yarn build` command. The build script has **three sequential steps** defined in `package.json`:
 
 ```json
-"build": "react-router build && node scripts/inject-handler.cjs && node scripts/build-api-handler.cjs"
+"build": "react-router build && node scripts/build-static-handler.cjs && node scripts/build-api-handler.cjs"
 ```
 
 If any step fails, the entire build stops.
@@ -36,42 +36,40 @@ This is the standard React Router build output that compiles your TypeScript/JSX
 
 ---
 
-## Step 2: Inject Handler (Static File Server)
+## Step 2: Compile Static Handler (Static File Server)
 
 ```bash
-node scripts/inject-handler.cjs
+node scripts/build-static-handler.cjs
 ```
 
 ### What It Does
-Injects the static file server handler code directly into `build/client/index.js`
+Compiles the static file server handler from `src/static/handler.ts` into `build/client/index.js`
 
 ### How It Works
-The script [`scripts/inject-handler.cjs`](scripts/inject-handler.cjs):
-1. Defines the static file server handler as a Node.js function
-2. Writes it as a string to `build/client/index.js`
+The script [`scripts/build-static-handler.cjs`](scripts/build-static-handler.cjs):
+1. Compiles the typed, unit-tested source [`src/static/handler.ts`](src/static/handler.ts) with `tsc` (same flags as the API handler)
+2. Copies the single compiled file to `build/client/index.js`
 
 This handler:
-- Serves HTML, JS, CSS, JSON, images, and font files with correct MIME types
-- Falls back to `index.html` for unknown routes (enables client-side routing for SPA)
-- Includes security checks to prevent path traversal attacks
+- Serves HTML, JS, CSS, JSON, the web manifest and SVG as text, and images and fonts as base64, with correct MIME types
+- Sets `Cache-Control` per file type: `/assets/*` immutable for a year, `/icons/*` for a day, everything else must be revalidated
+- Falls back to `index.html` for unknown routes without a file extension (enables client-side routing for SPA) and returns 404 for a missing file that has one
+- Decodes the request path first and rejects path traversal, encoded traversal and NUL bytes
 
 ### Output Location
 - `build/client/index.js` - becomes the Lambda handler for the static file server
 
 ### Why This Approach?
-- Avoids needing a separate build process for the handler
-- The handler is embedded directly into the client build directory
+- The handler is typed source (`src/static/handler.ts`) with unit tests, compiled with `tsc`
+- The compiled file is copied into the client build directory as `build/client/index.js`
 - When the static file server Lambda is deployed, it uses this file as its entry point
 - Lambda looks for a handler named "index.handler", which matches this output
 
 ### MIME Type Mapping
-The injected handler includes MIME type mappings for:
-- `.html` → text/html
-- `.js` → application/javascript
-- `.css` → text/css
-- `.json` → application/json
-- `.png/.jpg/.gif/.svg` → appropriate image types
-- `.woff/.woff2` → font types
+The compiled handler includes MIME type mappings for:
+- Text (served as UTF-8): `.html`, `.js`, `.css`, `.json`, `.svg`, `.webmanifest` (application/manifest+json), `.txt`
+- Binary (served base64 encoded): `.png`, `.jpg/.jpeg`, `.gif`, `.ico`, `.woff`, `.woff2`
+- Anything else is served as base64 `application/octet-stream`
 
 ---
 
@@ -162,7 +160,7 @@ After `yarn build` completes:
 ```
 build/
 ├── client/
-│   ├── index.js                    ← Static file server handler (INJECTED)
+│   ├── index.js                    ← Static file server handler (COMPILED)
 │   ├── index.html                  ← React app entry point
 │   └── assets/
 │       ├── _index-CjGoVtFd.js      ← Compiled React code
@@ -214,9 +212,9 @@ If any step fails, subsequent steps don't run, preventing incomplete builds.
 
 Each script knows where to output because paths are hardcoded:
 
-**inject-handler.cjs:**
+**build-static-handler.cjs:**
 ```javascript
-const outputPath = path.join(__dirname, '../build/client/index.js');
+const target = path.join(root, 'build/client/index.js');
 ```
 
 **build-api-handler.cjs:**
@@ -270,11 +268,11 @@ Terraform:
 
 ### MIME type errors in browser
 **Cause:** Static handler serving files with wrong content-type
-**Solution:** The MIME type mapping in inject-handler.cjs handles all common file types
+**Solution:** The MIME type mapping in src/static/handler.ts handles all common file types
 
 ### React app 404 on refresh
 **Cause:** Static handler not falling back to `index.html` for unknown routes
-**Solution:** The inject-handler.cjs includes SPA fallback logic
+**Solution:** src/static/handler.ts includes SPA fallback logic
 
 ---
 
@@ -282,7 +280,7 @@ Terraform:
 
 The build process is a **three-stage pipeline** that transforms:
 1. **React source** → optimized static assets
-2. **Static assets** → Lambda handler wrapped with HTTP functionality
+2. **Static file server handler** → typed source compiled into a Lambda handler beside the assets
 3. **API source** → compiled Lambda handler with bundled dependencies
 
 All three stages are coordinated by a single `yarn build` command, producing two separate Lambda deployments from a unified source tree.
