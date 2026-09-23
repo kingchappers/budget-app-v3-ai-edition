@@ -89,13 +89,12 @@ export function writeOpenOnLaunch(local: Storage | null, enabled: boolean): void
 
 export function consumeLaunchIntent({ session, local, standalone }: LaunchContext): boolean {
   let pending = false;
-  let firstEvaluation = true;
+  let firstEvaluation = false;
 
   if (session !== null) {
     pending = readItem(session, PENDING_ADD_KEY) === '1';
     if (pending) removeItem(session, PENDING_ADD_KEY);
-    firstEvaluation = readItem(session, LAUNCH_HANDLED_KEY) !== '1';
-    if (firstEvaluation) writeItem(session, LAUNCH_HANDLED_KEY, '1');
+    firstEvaluation = readItem(session, LAUNCH_HANDLED_KEY) !== '1' && writeItem(session, LAUNCH_HANDLED_KEY, '1');
   }
 
   const launchOpen = firstEvaluation && standalone && readOpenOnLaunch(local);

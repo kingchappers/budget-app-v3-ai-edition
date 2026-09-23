@@ -159,8 +159,20 @@ describe('consumeLaunchIntent', () => {
     expect(consumeLaunchIntent(context)).toBe(false);
   });
 
-  it('never opens without session storage when the toggle is off', () => {
+  it('never opens with null session storage even when toggle is on', () => {
+    writeOpenOnLaunch(window.localStorage, true);
     expect(consumeLaunchIntent({ session: null, local: window.localStorage, standalone: true })).toBe(false);
+  });
+
+  it('never opens with broken session storage even when toggle is on', () => {
+    writeOpenOnLaunch(window.localStorage, true);
+    const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      expect(consumeLaunchIntent({ session: brokenStorage(), local: window.localStorage, standalone: true })).toBe(false);
+      expect(errorLog).toHaveBeenCalled();
+    } finally {
+      errorLog.mockRestore();
+    }
   });
 });
 
