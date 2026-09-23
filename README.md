@@ -99,7 +99,8 @@ This serves as a template for future projects requiring web apps with authentica
 | `app/components/layout/DefaultLayout.tsx` | Auth0Provider wrapper - maintains auth state globally |
 | `infra/lambda.tf` | Terraform: Static File Server Lambda + API Gateway |
 | `infra/api-lambda.tf` | Terraform: Protected API Lambda + routes |
-| `scripts/inject-handler.cjs` | Build script: injects handler into static files |
+| `src/static/handler.ts` | Static file server Lambda handler source |
+| `scripts/build-static-handler.cjs` | Build script: compiles the static handler to `build/client/index.js` |
 | `scripts/build-api-handler.cjs` | Build script: compiles API handler + installs deps |
 | `.github/workflows/yarnBuild.yml` | CI/CD: builds app + deploys infrastructure |
 

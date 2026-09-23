@@ -5,7 +5,7 @@
 Everything builds from a single `yarn build` command. The build script has **three sequential steps** defined in `package.json`:
 
 ```json
-"build": "react-router build && node scripts/inject-handler.cjs && node scripts/build-api-handler.cjs"
+"build": "react-router build && node scripts/build-static-handler.cjs && node scripts/build-api-handler.cjs"
 ```
 
 If any step fails, the entire build stops.
@@ -36,24 +36,25 @@ This is the standard React Router build output that compiles your TypeScript/JSX
 
 ---
 
-## Step 2: Inject Handler (Static File Server)
+## Step 2: Compile Static Handler (Static File Server)
 
 ```bash
-node scripts/inject-handler.cjs
+node scripts/build-static-handler.cjs
 ```
 
 ### What It Does
-Injects the static file server handler code directly into `build/client/index.js`
+Compiles the static file server handler from `src/static/handler.ts` into `build/client/index.js`
 
 ### How It Works
-The script [`scripts/inject-handler.cjs`](scripts/inject-handler.cjs):
-1. Defines the static file server handler as a Node.js function
-2. Writes it as a string to `build/client/index.js`
+The script [`scripts/build-static-handler.cjs`](scripts/build-static-handler.cjs):
+1. Compiles the typed, unit-tested source [`src/static/handler.ts`](src/static/handler.ts) with `tsc` (same flags as the API handler)
+2. Copies the single compiled file to `build/client/index.js`
 
 This handler:
-- Serves HTML, JS, CSS, JSON, images, and font files with correct MIME types
-- Falls back to `index.html` for unknown routes (enables client-side routing for SPA)
-- Includes security checks to prevent path traversal attacks
+- Serves HTML, JS, CSS, JSON, the web manifest and SVG as text, and images and fonts as base64, with correct MIME types
+- Sets `Cache-Control` per file type: `/assets/*` immutable for a year, `/icons/*` for a day, everything else must be revalidated
+- Falls back to `index.html` for unknown routes without a file extension (enables client-side routing for SPA) and returns 404 for a missing file that has one
+- Decodes the request path first and rejects path traversal, encoded traversal and NUL bytes
 
 ### Output Location
 - `build/client/index.js` - becomes the Lambda handler for the static file server
@@ -214,9 +215,9 @@ If any step fails, subsequent steps don't run, preventing incomplete builds.
 
 Each script knows where to output because paths are hardcoded:
 
-**inject-handler.cjs:**
+**build-static-handler.cjs:**
 ```javascript
-const outputPath = path.join(__dirname, '../build/client/index.js');
+const target = path.join(root, 'build/client/index.js');
 ```
 
 **build-api-handler.cjs:**
@@ -270,11 +271,11 @@ Terraform:
 
 ### MIME type errors in browser
 **Cause:** Static handler serving files with wrong content-type
-**Solution:** The MIME type mapping in inject-handler.cjs handles all common file types
+**Solution:** The MIME type mapping in src/static/handler.ts handles all common file types
 
 ### React app 404 on refresh
 **Cause:** Static handler not falling back to `index.html` for unknown routes
-**Solution:** The inject-handler.cjs includes SPA fallback logic
+**Solution:** src/static/handler.ts includes SPA fallback logic
 
 ---
 
