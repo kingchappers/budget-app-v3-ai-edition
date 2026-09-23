@@ -1,12 +1,13 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MantineProvider } from '@mantine/core';
 import { MemoryRouter } from 'react-router';
 
+const auth = vi.hoisted(() => ({ isAuthenticated: false, isLoading: false }));
 vi.mock('@auth0/auth0-react', () => ({
   Auth0Provider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-  useAuth0: () => ({ isAuthenticated: false, isLoading: false }),
+  useAuth0: () => auth,
 }));
 vi.mock('../../authentication/Authentication', () => ({ default: () => null }));
 vi.mock('../../transactions/TransactionSheet', () => ({
@@ -24,6 +25,14 @@ function renderLayout(children: React.ReactNode = <p>page</p>) {
     </MantineProvider>,
   );
 }
+
+beforeEach(() => {
+  auth.isAuthenticated = false;
+  auth.isLoading = false;
+  window.sessionStorage.clear();
+  window.localStorage.clear();
+  window.history.replaceState(null, '', '/');
+});
 
 describe('DefaultLayout add shortcut', () => {
   it('opens the add sheet when N is pressed', async () => {
@@ -74,5 +83,25 @@ describe('DefaultLayout add shortcut', () => {
     const links = screen.getAllByRole('link', { name: 'Recurring' });
     expect(links).toHaveLength(1);
     expect(links[0]).toHaveAttribute('href', '/recurring');
+  });
+});
+
+describe('DefaultLayout launch intent', () => {
+  it('opens the add sheet from ?add=1 once signed in and cleans the URL', () => {
+    auth.isAuthenticated = true;
+    window.history.replaceState(null, '', '/?add=1');
+
+    renderLayout();
+
+    expect(screen.getByText('Add sheet open')).toBeInTheDocument();
+    expect(window.location.search).toBe('');
+  });
+
+  it('does not open the add sheet from ?add=1 while signed out', () => {
+    window.history.replaceState(null, '', '/?add=1');
+
+    renderLayout();
+
+    expect(screen.queryByText('Add sheet open')).not.toBeInTheDocument();
   });
 });
