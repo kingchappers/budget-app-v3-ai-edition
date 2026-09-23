@@ -66,6 +66,16 @@ function decodeRequestPath(rawPath: string | undefined): string | null {
   return decoded.startsWith('/') ? decoded : `/${decoded}`;
 }
 
+function statOrUndefined(target: string): fs.Stats | undefined {
+  try {
+    return fs.statSync(target, { throwIfNoEntry: false });
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code === 'ENAMETOOLONG' || code === 'ENOTDIR' || code === 'ELOOP') return undefined;
+    throw error;
+  }
+}
+
 function fileResponse(filePath: string, urlPath: string): APIGatewayProxyStructuredResultV2 {
   const ext = path.extname(filePath).toLowerCase();
   const cacheHeaders = { 'Cache-Control': cacheControlFor(urlPath), ...SECURITY_HEADERS };
@@ -91,6 +101,10 @@ export function createStaticHandler(rootDir: string): StaticHandler {
   const root = path.resolve(rootDir);
   const indexPath = path.join(root, 'index.html');
 
+  function canonicalUrlPath(filePath: string): string {
+    return '/' + path.relative(root, filePath).split(path.sep).join('/');
+  }
+
   return async (event: StaticEvent): Promise<APIGatewayProxyStructuredResultV2> => {
     try {
       const urlPath = decodeRequestPath(event.rawPath);
@@ -101,13 +115,13 @@ export function createStaticHandler(rootDir: string): StaticHandler {
         return textResponse(403, 'text/plain', 'Forbidden');
       }
 
-      const stat = fs.statSync(requested, { throwIfNoEntry: false });
-      if (stat?.isFile()) return fileResponse(requested, urlPath);
+      const stat = statOrUndefined(requested);
+      if (stat?.isFile()) return fileResponse(requested, canonicalUrlPath(requested));
 
       if (stat?.isDirectory()) {
         const dirIndex = path.join(requested, 'index.html');
-        if (fs.statSync(dirIndex, { throwIfNoEntry: false })?.isFile()) {
-          return fileResponse(dirIndex, urlPath);
+        if (statOrUndefined(dirIndex)?.isFile()) {
+          return fileResponse(dirIndex, canonicalUrlPath(dirIndex));
         }
       }
 

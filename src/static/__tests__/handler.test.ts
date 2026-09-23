@@ -199,3 +199,45 @@ describe('failure handling', () => {
     }
   });
 });
+
+describe('ENAMETOOLONG and similar stat errors', () => {
+  it('treats an overlong path segment with an extension as 404', async () => {
+    const res = await handle({ rawPath: '/x.' + 'a'.repeat(300) });
+
+    expect(res.statusCode).toBe(404);
+    expect(res.headers?.['Content-Type']).toBe('text/plain');
+    expect(res.body).toBe('Not Found');
+  });
+
+  it('falls back to index.html for an overlong path segment without extension', async () => {
+    const res = await handle({ rawPath: '/' + 'a'.repeat(300) });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toBe(INDEX_HTML);
+  });
+
+  it('treats ENOTDIR (file used as directory) as index.html fallback', async () => {
+    const res = await handle({ rawPath: '/index.html/foo' });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toBe(INDEX_HTML);
+  });
+});
+
+describe('cache header normalization', () => {
+  it('serves /assets/../index.html with no-cache, not immutable', async () => {
+    const res = await handle({ rawPath: '/assets/../index.html' });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.headers?.['Cache-Control']).toBe('no-cache');
+    expect(res.body).toBe(INDEX_HTML);
+  });
+
+  it('serves /assets/../icons/icon-192.png with icon cache (canonical path)', async () => {
+    const res = await handle({ rawPath: '/assets/../icons/icon-192.png' });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.headers?.['Cache-Control']).toBe('public, max-age=86400');
+    expect(res.isBase64Encoded).toBe(true);
+  });
+});
