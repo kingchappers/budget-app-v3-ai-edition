@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MantineProvider } from '@mantine/core';
 import { MemoryRouter } from 'react-router';
+import { PENDING_ADD_KEY } from '~/lib/launchIntent';
 
 const auth = vi.hoisted(() => ({ isAuthenticated: false, isLoading: false }));
 vi.mock('@auth0/auth0-react', () => ({
@@ -103,5 +104,6 @@ describe('DefaultLayout launch intent', () => {
     renderLayout();
 
     expect(screen.queryByText('Add sheet open')).not.toBeInTheDocument();
+    expect(window.sessionStorage.getItem(PENDING_ADD_KEY)).toBe('1');
   });
 });
