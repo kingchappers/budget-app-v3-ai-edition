@@ -655,7 +655,7 @@ Expected: clean and green.
 ```bash
 git add scripts/build-static-handler.cjs package.json CLAUDE.md README.md BUILDPROCESS.md
 git commit -q -F - <<'EOF'
-build: compile the static handler from TypeScript
+refactor: compile the static handler from TypeScript
 
 Replaces the handler pasted into a string by inject-handler.cjs with the
 tested src/static/handler.ts, built by the same tsc flags as the API.
