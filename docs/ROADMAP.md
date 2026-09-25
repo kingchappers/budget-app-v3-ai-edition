@@ -1,6 +1,6 @@
 # Roadmap: Fast Transaction Entry
 
-Bank sync was dropped (see `DECISIONS.md`), so manual entry is the core interaction. The work is split into five sub-projects. Each gets its own brainstorm → spec → plan → PR, in this order. Later ones build on earlier ones.
+Bank sync was dropped (see `DECISIONS.md`), so manual entry is the core interaction. The work is split into sub-projects A to J (E was dropped). Each gets its own brainstorm → spec → plan → PR. Later ones build on earlier ones.
 
 | # | Sub-project | Status |
 |---|---|---|
