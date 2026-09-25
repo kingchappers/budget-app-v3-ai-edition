@@ -155,3 +155,15 @@ describe('buildMonthSummary', () => {
     expect(res.spending[0].isOver).toBe(false);
   });
 });
+
+describe('buildMonthSummary groups', () => {
+  it('carries the category group onto its progress row', () => {
+    const summary = buildMonthSummary({
+      transactions: [],
+      categories: [{ categoryId: 'c1', name: 'Mortgage', type: 'EXPENSE', icon: 'tag', isDefault: true, createdAt: '', group: 'BILLS' }],
+      targets: [{ categoryId: 'c1', targetAmount: 100000, period: 'MONTHLY', updatedAt: '' }],
+      yearMonth: '2026-09',
+    });
+    expect(summary.spending[0].group).toBe('BILLS');
+  });
+});

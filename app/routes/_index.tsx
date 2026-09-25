@@ -6,10 +6,25 @@ import { MonthHeader } from '~/components/budget/MonthHeader';
 import { CategoryProgressRow } from '~/components/budget/CategoryProgressRow';
 import { DueRecurringCard } from '~/components/recurring/DueRecurringCard';
 import { TransactionRow } from '~/components/transactions/TransactionRow';
+import { groupItems, bucketKeyFor } from '~/lib/categoryGroups';
 import { buildMonthSummary } from '~/lib/summary';
+import type { CategoryProgress } from '~/lib/summary';
 import { formatPence } from '~/lib/money';
 import { currentYearMonth } from '~/lib/months';
 import { useCategories, useTargets, useTransactions } from '~/lib/queries';
+
+function GroupedProgress({ items }: { items: CategoryProgress[] }) {
+  return (
+    <>
+      {groupItems(items, p => bucketKeyFor({ group: p.group, type: 'EXPENSE' })).map(bucket => (
+        <div key={bucket.key}>
+          <Text size="xs" fw={600} c="dimmed" tt="uppercase" mb={4}>{bucket.label}</Text>
+          {bucket.items.map(p => <CategoryProgressRow key={p.categoryId} progress={p} />)}
+        </div>
+      ))}
+    </>
+  );
+}
 
 function HomeContent() {
   const [yearMonth, setYearMonth] = useState(currentYearMonth());
@@ -63,14 +78,14 @@ function HomeContent() {
       {summary.spending.length > 0 && (
         <div>
           <Title order={5} mb="xs">Spending vs target</Title>
-          {summary.spending.map(p => <CategoryProgressRow key={p.categoryId} progress={p} />)}
+          <GroupedProgress items={summary.spending} />
         </div>
       )}
 
       {summary.saving.length > 0 && (
         <div>
           <Title order={5} mb="xs">Saving vs target</Title>
-          {summary.saving.map(p => <CategoryProgressRow key={p.categoryId} progress={p} />)}
+          <GroupedProgress items={summary.saving} />
         </div>
       )}
 
