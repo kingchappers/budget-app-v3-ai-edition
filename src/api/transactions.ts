@@ -51,7 +51,7 @@ export function validateTransactionInput(
     return { ok: false, message: 'amount must be a positive integer representing pence/cents' };
   }
   if (!type || !VALID_TRANSACTION_TYPES.has(type as string)) {
-    return { ok: false, message: 'type must be EXPENSE, INCOME, INVESTMENT_IN, or INVESTMENT_OUT' };
+    return { ok: false, message: 'type must be EXPENSE, INCOME, SET_ASIDE, or TAKE_OUT' };
   }
   if (!categoryId || typeof categoryId !== 'string' || categoryId.length > 100) {
     return { ok: false, message: 'categoryId is required' };

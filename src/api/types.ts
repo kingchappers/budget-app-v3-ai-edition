@@ -1,6 +1,6 @@
-export type TransactionType = 'EXPENSE' | 'INCOME' | 'INVESTMENT_IN' | 'INVESTMENT_OUT';
+export type TransactionType = 'EXPENSE' | 'INCOME' | 'SET_ASIDE' | 'TAKE_OUT';
 
-export type CategoryType = 'EXPENSE' | 'INCOME' | 'INVESTMENT';
+export type CategoryType = 'EXPENSE' | 'INCOME' | 'POT';
 export type CategoryGroup = 'BILLS' | 'SINKING_FUNDS' | 'EVERYDAY' | 'SAVING_INVESTMENT';
 
 export type TargetPeriod = 'MONTHLY' | 'WEEKLY';

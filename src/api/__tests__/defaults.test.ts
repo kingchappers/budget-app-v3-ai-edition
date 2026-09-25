@@ -28,9 +28,10 @@ describe('DEFAULT_CATEGORIES', () => {
     expect(namesIn('SAVING_INVESTMENT')).toEqual(['Emergency fund', 'Investment']);
   });
 
-  it('makes Saving & Investment categories INVESTMENT type and every other grouped one EXPENSE', () => {
+  it('makes Sinking Funds and Saving & Investment categories POT type and Bills and Everyday EXPENSE', () => {
     for (const c of DEFAULT_CATEGORIES.filter(c => c.group)) {
-      expect(c.type).toBe(c.group === 'SAVING_INVESTMENT' ? 'INVESTMENT' : 'EXPENSE');
+      const isPotGroup = c.group === 'SAVING_INVESTMENT' || c.group === 'SINKING_FUNDS';
+      expect(c.type).toBe(isPotGroup ? 'POT' : 'EXPENSE');
     }
   });
 

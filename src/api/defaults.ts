@@ -16,10 +16,10 @@ export const DEFAULT_CATEGORIES: Category[] = [
   def('cat-subscriptions', 'Subscriptions', 'EXPENSE', '🗓️', 'BILLS'),
   def('cat-utilities', 'Utilities', 'EXPENSE', '⚡', 'BILLS'),
   // SINKING FUNDS
-  def('cat-holidays', 'Holidays', 'EXPENSE', '✈️', 'SINKING_FUNDS'),
-  def('cat-home-maintenance', 'Home maintenance', 'EXPENSE', '🛠️', 'SINKING_FUNDS'),
-  def('cat-gifts', 'Gifts', 'EXPENSE', '🎁', 'SINKING_FUNDS'),
-  def('cat-insurance', 'Insurance', 'EXPENSE', '📄', 'SINKING_FUNDS'),
+  def('cat-holidays', 'Holidays', 'POT', '✈️', 'SINKING_FUNDS'),
+  def('cat-home-maintenance', 'Home maintenance', 'POT', '🛠️', 'SINKING_FUNDS'),
+  def('cat-gifts', 'Gifts', 'POT', '🎁', 'SINKING_FUNDS'),
+  def('cat-insurance', 'Insurance', 'POT', '📄', 'SINKING_FUNDS'),
   // EVERYDAY SPENDING
   def('cat-charity', 'Charity', 'EXPENSE', '💖', 'EVERYDAY'),
   def('cat-going-out', 'Going Out & Entertainment', 'EXPENSE', '🎡', 'EVERYDAY'),
@@ -27,9 +27,9 @@ export const DEFAULT_CATEGORIES: Category[] = [
   def('cat-health', 'Health', 'EXPENSE', '🏥', 'EVERYDAY'),
   def('cat-personal-spending', 'Personal Spending', 'EXPENSE', '🛍️', 'EVERYDAY'),
   def('cat-transport', 'Transport', 'EXPENSE', '🛞', 'EVERYDAY'),
-  // SAVING & INVESTMENT (INVESTMENT type until pots replace it)
-  def('cat-emergency-fund', 'Emergency fund', 'INVESTMENT', '😌', 'SAVING_INVESTMENT'),
-  def('cat-investment', 'Investment', 'INVESTMENT', 'tag', 'SAVING_INVESTMENT'),
+  // SAVING & INVESTMENT
+  def('cat-emergency-fund', 'Emergency fund', 'POT', '😌', 'SAVING_INVESTMENT'),
+  def('cat-investment', 'Investment', 'POT', 'tag', 'SAVING_INVESTMENT'),
   // INCOME (ungrouped)
   def('cat-salary', 'Salary', 'INCOME', 'briefcase'),
   def('cat-freelance', 'Freelance/Contract', 'INCOME', 'code'),

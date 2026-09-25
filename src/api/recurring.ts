@@ -35,7 +35,7 @@ export function validateRecurringInput(body: Record<string, unknown>): Validatio
     return { ok: false, message: 'amount must be a positive integer representing pence/cents' };
   }
   if (typeof type !== 'string' || !VALID_TRANSACTION_TYPES.has(type)) {
-    return { ok: false, message: 'type must be EXPENSE, INCOME, INVESTMENT_IN, or INVESTMENT_OUT' };
+    return { ok: false, message: 'type must be EXPENSE, INCOME, SET_ASIDE, or TAKE_OUT' };
   }
   if (typeof categoryId !== 'string' || categoryId === '' || categoryId.length > 100) {
     return { ok: false, message: 'categoryId is required' };
