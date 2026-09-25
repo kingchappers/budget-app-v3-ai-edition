@@ -7,7 +7,7 @@ import { TOAST_MS, ToastAction } from '~/components/layout/ToastAction';
 import { TransactionSheet } from '~/components/transactions/TransactionSheet';
 import { useDueRecurring } from '~/hooks/useDueRecurring';
 import { useSaveWithUndo } from '~/hooks/useSaveWithUndo';
-import { getCategoryIcon } from '~/lib/categoryIcons';
+import { CategoryIcon } from '~/components/categories/CategoryIcon';
 import { currentYearMonth, formatShortDate } from '~/lib/months';
 import { useCategories, useSetRecurringHandled } from '~/lib/queries';
 import { dueLabel, type DueItem } from '~/lib/recurring';
@@ -97,13 +97,13 @@ export function DueRecurringCard() {
           <Anchor component={Link} to="/recurring" size="sm">Manage</Anchor>
         </Group>
         {items.map(item => {
-          const Icon = getCategoryIcon(categories.find(c => c.categoryId === item.recurring.categoryId)?.icon ?? 'tag');
+          const iconName = categories.find(c => c.categoryId === item.recurring.categoryId)?.icon ?? 'tag';
           const label = labelFor(item);
           return (
             <Group key={item.recurring.recurringId} justify="space-between" wrap="nowrap" py={4}>
               <Group gap="sm" wrap="nowrap" style={{ minWidth: 0 }}>
                 <ThemeIcon variant="light" color="primary" radius="xl" size={32}>
-                  <Icon size={18} stroke={1.6} />
+                  <CategoryIcon icon={iconName} />
                 </ThemeIcon>
                 <div style={{ minWidth: 0 }}>
                   <Text truncate>{label}</Text>

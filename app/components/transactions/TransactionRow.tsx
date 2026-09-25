@@ -1,7 +1,7 @@
 import { ActionIcon, Group, Menu, Text, ThemeIcon } from '@mantine/core';
 import { IconCopy, IconDots, IconPencil, IconRepeat, IconTrash } from '@tabler/icons-react';
 import { formatPence } from '~/lib/money';
-import { getCategoryIcon } from '~/lib/categoryIcons';
+import { CategoryIcon } from '~/components/categories/CategoryIcon';
 import type { Transaction } from '~/lib/types';
 
 const OUTGOING = new Set(['EXPENSE', 'INVESTMENT_IN']);
@@ -19,13 +19,12 @@ export function TransactionRow({
 }) {
   const label = transaction.description || categoryName;
   const sign = OUTGOING.has(transaction.type) ? '−' : '+';
-  const Icon = getCategoryIcon(categoryIcon);
 
   return (
     <Group justify="space-between" wrap="nowrap" py={4}>
       <Group gap="sm" wrap="nowrap" style={{ minWidth: 0 }}>
         <ThemeIcon variant="light" color="primary" radius="xl" size={32}>
-          <Icon size={18} stroke={1.6} />
+          <CategoryIcon icon={categoryIcon} />
         </ThemeIcon>
         <div style={{ minWidth: 0 }}>
           <Text truncate>{label}</Text>
