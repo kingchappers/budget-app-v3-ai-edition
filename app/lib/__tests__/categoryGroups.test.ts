@@ -1,0 +1,82 @@
+import { describe, it, expect } from 'vitest';
+import { bucketKeyFor, defaultGroupFor, groupCategories, groupsForType, groupItems } from '../categoryGroups';
+import type { Category } from '../types';
+
+function cat(categoryId: string, type: Category['type'], group?: string): Category {
+  return { categoryId, name: categoryId, type, icon: 'tag', isDefault: false, createdAt: '', group } as Category;
+}
+
+describe('groupCategories', () => {
+  it('orders buckets Bills, Sinking Funds, Everyday, Saving, Income, Other', () => {
+    const buckets = groupCategories([
+      cat('inc', 'INCOME'),
+      cat('other', 'EXPENSE'),
+      cat('save', 'INVESTMENT', 'SAVING_INVESTMENT'),
+      cat('day', 'EXPENSE', 'EVERYDAY'),
+      cat('sink', 'EXPENSE', 'SINKING_FUNDS'),
+      cat('bill', 'EXPENSE', 'BILLS'),
+    ]);
+    expect(buckets.map(b => b.label)).toEqual([
+      'Bills', 'Sinking Funds', 'Everyday Spending', 'Saving & Investment', 'Income', 'Other',
+    ]);
+  });
+
+  it('omits empty buckets', () => {
+    const buckets = groupCategories([cat('bill', 'EXPENSE', 'BILLS')]);
+    expect(buckets.map(b => b.key)).toEqual(['BILLS']);
+  });
+
+  it('keeps the input order inside a bucket', () => {
+    const buckets = groupCategories([cat('b', 'EXPENSE', 'BILLS'), cat('a', 'EXPENSE', 'BILLS')]);
+    expect(buckets[0].items.map(c => c.categoryId)).toEqual(['b', 'a']);
+  });
+
+  it('puts a category with no group under Other', () => {
+    expect(groupCategories([cat('x', 'EXPENSE')])[0].key).toBe('OTHER');
+  });
+
+  it('puts a category with an unknown group under Other instead of dropping it', () => {
+    const buckets = groupCategories([cat('x', 'EXPENSE', 'MYSTERY')]);
+    expect(buckets).toHaveLength(1);
+    expect(buckets[0].key).toBe('OTHER');
+  });
+});
+
+describe('bucketKeyFor', () => {
+  it('ignores any group on an INCOME category', () => {
+    expect(bucketKeyFor({ type: 'INCOME', group: 'BILLS' })).toBe('INCOME');
+  });
+});
+
+describe('groupItems', () => {
+  it('buckets arbitrary items by a key function', () => {
+    const buckets = groupItems([{ n: 1, g: 'EVERYDAY' as const }, { n: 2, g: 'BILLS' as const }], i => i.g);
+    expect(buckets.map(b => b.key)).toEqual(['BILLS', 'EVERYDAY']);
+  });
+});
+
+describe('defaultGroupFor', () => {
+  it('returns null for income, Saving & Investment for investment and Everyday otherwise', () => {
+    expect(defaultGroupFor('INCOME')).toBeNull();
+    expect(defaultGroupFor('INVESTMENT')).toBe('SAVING_INVESTMENT');
+    expect(defaultGroupFor('EXPENSE')).toBe('EVERYDAY');
+  });
+});
+
+describe('groupsForType', () => {
+  it('offers the three spending groups for EXPENSE', () => {
+    expect(groupsForType('EXPENSE')).toEqual([
+      { value: 'BILLS', label: 'Bills' },
+      { value: 'SINKING_FUNDS', label: 'Sinking Funds' },
+      { value: 'EVERYDAY', label: 'Everyday Spending' },
+    ]);
+  });
+
+  it('offers only Saving & Investment for INVESTMENT', () => {
+    expect(groupsForType('INVESTMENT')).toEqual([{ value: 'SAVING_INVESTMENT', label: 'Saving & Investment' }]);
+  });
+
+  it('offers no groups for INCOME', () => {
+    expect(groupsForType('INCOME')).toEqual([]);
+  });
+});

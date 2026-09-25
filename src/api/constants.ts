@@ -12,5 +12,6 @@ export const VALID_TRANSACTION_TYPES = new Set([
 ]);
 
 export const VALID_CATEGORY_TYPES = new Set(['EXPENSE', 'INCOME', 'INVESTMENT']);
+export const VALID_CATEGORY_GROUPS = new Set(['BILLS', 'SINKING_FUNDS', 'EVERYDAY', 'SAVING_INVESTMENT']);
 
 export const VALID_PERIODS = new Set(['MONTHLY', 'WEEKLY']);

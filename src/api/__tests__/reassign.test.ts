@@ -35,20 +35,20 @@ describe('reassignCategory', () => {
     ] });
     mockSend.mockResolvedValue({});
 
-    const res = await reassignCategory(makeEvent({ toCategoryId: 'cat-entertainment' }), 'user-1', { categoryId: 'cat-custom' });
+    const res = await reassignCategory(makeEvent({ toCategoryId: 'cat-going-out' }), 'user-1', { categoryId: 'cat-custom' });
 
     expect(res.statusCode).toBe(200);
     expect(JSON.parse(res.body).reassigned).toBe(2);
     expect(mockSend).toHaveBeenCalledTimes(4);
     expect(JSON.parse(res.body).recurringReassigned).toBe(0);
     expect(mockSend.mock.calls[1][0].Key.SK).toBe('TXN#2026-06#a');
-    expect(mockSend.mock.calls[1][0].ExpressionAttributeValues[':c']).toBe('cat-entertainment');
+    expect(mockSend.mock.calls[1][0].ExpressionAttributeValues[':c']).toBe('cat-going-out');
   });
 
   it('returns 200 with zero when nothing matches', async () => {
     mockSend.mockResolvedValueOnce({ Items: [{ SK: 'TXN#2026-07#c', categoryId: 'cat-food' }] });
     mockSend.mockResolvedValue({});
-    const res = await reassignCategory(makeEvent({ toCategoryId: 'cat-entertainment' }), 'user-1', { categoryId: 'cat-custom' });
+    const res = await reassignCategory(makeEvent({ toCategoryId: 'cat-going-out' }), 'user-1', { categoryId: 'cat-custom' });
     expect(res.statusCode).toBe(200);
     expect(JSON.parse(res.body).reassigned).toBe(0);
   });
@@ -95,7 +95,7 @@ describe('reassignCategory', () => {
     });
     mockSend.mockResolvedValue({});
 
-    const res = await reassignCategory(makeEvent({ toCategoryId: 'cat-entertainment' }), 'user-1', { categoryId: 'cat-custom' });
+    const res = await reassignCategory(makeEvent({ toCategoryId: 'cat-going-out' }), 'user-1', { categoryId: 'cat-custom' });
 
     expect(res.statusCode).toBe(200);
     expect(JSON.parse(res.body).reassigned).toBe(2);
@@ -115,7 +115,7 @@ describe('reassignCategory', () => {
     });
     mockSend.mockResolvedValue({});
 
-    await reassignCategory(makeEvent({ toCategoryId: 'cat-entertainment' }), 'user-1', { categoryId: 'cat-custom' });
+    await reassignCategory(makeEvent({ toCategoryId: 'cat-going-out' }), 'user-1', { categoryId: 'cat-custom' });
 
     const queryCalls = mockSend.mock.calls.filter(call => call[0].KeyConditionExpression?.includes('begins_with'));
     expect(queryCalls[0][0].ExclusiveStartKey).toBeUndefined();
@@ -138,7 +138,7 @@ describe('reassignCategory', () => {
       return Promise.resolve({});
     });
 
-    const res = await reassignCategory(makeEvent({ toCategoryId: 'cat-entertainment' }), 'user-1', { categoryId: 'cat-custom' });
+    const res = await reassignCategory(makeEvent({ toCategoryId: 'cat-going-out' }), 'user-1', { categoryId: 'cat-custom' });
 
     expect(res.statusCode).toBe(200);
     expect(JSON.parse(res.body).reassigned).toBe(2);
@@ -150,7 +150,7 @@ describe('reassignCategory', () => {
     ] });
     mockSend.mockResolvedValue({});
 
-    await reassignCategory(makeEvent({ toCategoryId: 'cat-entertainment' }), 'user-1', { categoryId: 'cat-custom' });
+    await reassignCategory(makeEvent({ toCategoryId: 'cat-going-out' }), 'user-1', { categoryId: 'cat-custom' });
 
     const updateCall = mockSend.mock.calls.find(call => call[0].Key);
     expect(updateCall).toBeDefined();
@@ -170,7 +170,7 @@ describe('reassignCategory', () => {
       return {};
     });
 
-    const res = await reassignCategory(makeEvent({ toCategoryId: 'cat-entertainment' }), 'user-1', { categoryId: 'cat-custom' });
+    const res = await reassignCategory(makeEvent({ toCategoryId: 'cat-going-out' }), 'user-1', { categoryId: 'cat-custom' });
 
     const body = JSON.parse(res.body);
     expect(body.reassigned).toBe(1);
@@ -192,7 +192,7 @@ describe('reassignCategory', () => {
       return {};
     });
 
-    const res = await reassignCategory(makeEvent({ toCategoryId: 'cat-entertainment' }), 'user-1', { categoryId: 'cat-custom' });
+    const res = await reassignCategory(makeEvent({ toCategoryId: 'cat-going-out' }), 'user-1', { categoryId: 'cat-custom' });
 
     expect(JSON.parse(res.body).recurringReassigned).toBe(2);
     const commands = mockSend.mock.calls.map(call => call[0]);

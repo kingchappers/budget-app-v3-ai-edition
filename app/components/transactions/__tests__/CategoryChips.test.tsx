@@ -107,4 +107,36 @@ describe('CategoryChips', () => {
     renderChips({ error: 'Could not load categories' });
     expect(screen.getByText('Could not load categories')).toBeInTheDocument();
   });
+
+  it('groups the All categories list under group headings', async () => {
+    const user = userEvent.setup();
+    const bill = { ...cat('cat-mortgage', 'Mortgage'), group: 'BILLS' as const };
+    const day = { ...cat('cat-groceries', 'Groceries'), group: 'EVERYDAY' as const };
+    renderChips({ chips: [bill], all: [bill, day] });
+
+    await user.click(screen.getByRole('button', { name: /more/i }));
+    await user.click(screen.getByPlaceholderText('Search categories'));
+
+    expect(await screen.findByText('Bills')).toBeInTheDocument();
+    expect(screen.getByText('Everyday Spending')).toBeInTheDocument();
+  });
+
+  it('shows a flat list without headings when every category is in one bucket', async () => {
+    const user = userEvent.setup();
+    const salary = { ...cat('cat-salary', 'Salary'), type: 'INCOME' as const };
+    const bonus = { ...cat('cat-bonus', 'Bonus'), type: 'INCOME' as const };
+    renderChips({ chips: [salary], all: [salary, bonus] });
+
+    await user.click(screen.getByRole('button', { name: /more/i }));
+    await user.click(screen.getByPlaceholderText('Search categories'));
+
+    expect(await screen.findByRole('option', { name: 'Bonus', hidden: true })).toBeInTheDocument();
+    expect(screen.queryByText('Income')).not.toBeInTheDocument();
+  });
+
+  it('prefixes a chip with the category emoji', () => {
+    const groceries = { ...cat('cat-groceries', 'Groceries'), icon: '🛒' };
+    renderChips({ chips: [groceries], all: [groceries] });
+    expect(screen.getByRole('radio', { name: '🛒 Groceries' })).toBeInTheDocument();
+  });
 });

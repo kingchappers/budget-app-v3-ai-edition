@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Alert, Button, Card, Group, Loader, SegmentedControl, Stack, Text, TextInput, Title } from '@mantine/core';
 import { DefaultLayout } from '~/components/layout/DefaultLayout';
+import { categoryLabel } from '~/lib/categoryIcons';
+import { groupCategories } from '~/lib/categoryGroups';
 import { formatPencePlain, parsePounds } from '~/lib/money';
 import { useCategories, useDeleteTarget, useSetTarget, useTargets } from '~/lib/queries';
 import type { Category, TargetPeriod } from '~/lib/types';
@@ -26,7 +28,7 @@ function TargetRow({ category, amountPence, period }: {
   return (
     <Card withBorder mb="xs">
       <Group justify="space-between" mb="xs">
-        <Text fw={500}>{category.name}</Text>
+        <Text fw={500}>{categoryLabel(category)}</Text>
         {amountPence !== null && (
           <Button size="compact-xs" variant="subtle" color="danger"
             onClick={() => { setValue(''); clearTarget.mutate(category.categoryId); }}>
@@ -68,27 +70,22 @@ function TargetsContent() {
 
   const targetFor = (id: string) => targets.data?.find(t => t.categoryId === id);
   const eligible = (categories.data ?? []).filter(c => c.type !== 'INCOME');
-  const expense = eligible.filter(c => c.type === 'EXPENSE');
-  const investment = eligible.filter(c => c.type === 'INVESTMENT');
 
   return (
     <Stack>
       <Title order={3}>Targets</Title>
       <Text c="dimmed" size="sm">Income has no target — it is shown as a monthly total instead.</Text>
 
-      <Title order={5} mt="md">Spending</Title>
-      {expense.map(c => {
-        const t = targetFor(c.categoryId);
-        return <TargetRow key={c.categoryId} category={c}
-          amountPence={t?.targetAmount ?? null} period={t?.period ?? 'MONTHLY'} />;
-      })}
-
-      <Title order={5} mt="md">Saving</Title>
-      {investment.map(c => {
-        const t = targetFor(c.categoryId);
-        return <TargetRow key={c.categoryId} category={c}
-          amountPence={t?.targetAmount ?? null} period={t?.period ?? 'MONTHLY'} />;
-      })}
+      {groupCategories(eligible).map(bucket => (
+        <div key={bucket.key}>
+          <Title order={5} mt="md" mb="xs">{bucket.label}</Title>
+          {bucket.items.map(c => {
+            const t = targetFor(c.categoryId);
+            return <TargetRow key={c.categoryId} category={c}
+              amountPence={t?.targetAmount ?? null} period={t?.period ?? 'MONTHLY'} />;
+          })}
+        </div>
+      ))}
     </Stack>
   );
 }

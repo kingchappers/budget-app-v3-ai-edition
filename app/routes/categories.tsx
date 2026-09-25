@@ -3,7 +3,9 @@ import { Alert, Badge, Button, Card, Group, Loader, Select, Stack, Text, TextInp
 import { DefaultLayout } from '~/components/layout/DefaultLayout';
 import { ReassignDialog } from '~/components/categories/ReassignDialog';
 import { useCategories, useCreateCategory, useDeleteCategory, useReassignCategory } from '~/lib/queries';
-import type { Category, CategoryType } from '~/lib/types';
+import { defaultGroupFor, groupCategories, groupsForType } from '~/lib/categoryGroups';
+import { categoryLabel } from '~/lib/categoryIcons';
+import type { Category, CategoryGroup, CategoryType } from '~/lib/types';
 
 const TYPES: { value: CategoryType; label: string }[] = [
   { value: 'EXPENSE', label: 'Spending' },
@@ -19,6 +21,7 @@ function CategoriesContent() {
 
   const [name, setName] = useState('');
   const [type, setType] = useState<CategoryType>('EXPENSE');
+  const [group, setGroup] = useState<CategoryGroup>('EVERYDAY');
   const [pendingDelete, setPendingDelete] = useState<Category | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -55,12 +58,24 @@ function CategoriesContent() {
           <TextInput label="New category" placeholder="e.g. Padel" style={{ flex: 1, minWidth: 160 }}
             value={name} onChange={e => setName(e.currentTarget.value)} />
           <Select label="Type" data={TYPES} value={type}
-            onChange={v => setType(v as CategoryType)} allowDeselect={false} />
+            onChange={v => {
+              const next = v as CategoryType;
+              setType(next);
+              const nextGroup = defaultGroupFor(next);
+              if (!nextGroup) return;
+              const stillValid = groupsForType(next).some(option => option.value === group);
+              if (!stillValid) setGroup(nextGroup);
+            }} allowDeselect={false} />
+          <Select label="Group" data={groupsForType(type)} value={type === 'INCOME' ? null : group}
+            onChange={v => { if (v) setGroup(v as CategoryGroup); }}
+            disabled={type !== 'EXPENSE'} allowDeselect={false} />
           <Button
             disabled={name.trim() === ''}
             loading={createCategory.isPending}
             onClick={() => {
-              createCategory.mutate({ name: name.trim(), type, icon: 'tag' });
+              createCategory.mutate(type === 'INCOME'
+                ? { name: name.trim(), type, icon: 'tag' }
+                : { name: name.trim(), type, icon: 'tag', group });
               setName('');
             }}
           >
@@ -69,18 +84,17 @@ function CategoriesContent() {
         </Group>
       </Card>
 
-      {TYPES.map(({ value, label }) => (
-        <div key={value}>
-          <Title order={5} mt="md" mb="xs">{label}</Title>
-          {all.filter(c => c.type === value).map(c => (
+      {groupCategories(all).map(bucket => (
+        <div key={bucket.key}>
+          <Title order={5} mt="md" mb="xs">{bucket.label}</Title>
+          {bucket.items.map(c => (
             <Group key={c.categoryId} justify="space-between" py={6}>
               <Group gap="xs">
-                <Text>{c.name}</Text>
+                <Text>{categoryLabel(c)}</Text>
                 {c.isDefault && <Badge size="xs" variant="light">default</Badge>}
               </Group>
               {!c.isDefault && (
-                <Button size="compact-xs" variant="subtle" color="danger"
-                  onClick={() => setPendingDelete(c)}>
+                <Button size="compact-xs" variant="subtle" color="danger" onClick={() => setPendingDelete(c)}>
                   Delete
                 </Button>
               )}

@@ -3,7 +3,7 @@ import { ActionIcon, Alert, Button, Group, Loader, Menu, Stack, Text, ThemeIcon,
 import { IconDots, IconPencil, IconPlus, IconTrash } from '@tabler/icons-react';
 import { DefaultLayout } from '~/components/layout/DefaultLayout';
 import { RecurringForm } from '~/components/recurring/RecurringForm';
-import { getCategoryIcon } from '~/lib/categoryIcons';
+import { CategoryIcon } from '~/components/categories/CategoryIcon';
 import { useCategories, useDeleteRecurring, useRecurring } from '~/lib/queries';
 import { formatDayOfMonth } from '~/lib/recurring';
 import { formatSignedPence } from '~/lib/transactionTypes';
@@ -30,13 +30,12 @@ interface RecurringRowProps {
 
 function RecurringRow({ item, category, categoriesLoaded, onEdit, onDelete }: RecurringRowProps) {
   const label = item.description || category?.name || 'Recurring item';
-  const Icon = getCategoryIcon(category?.icon ?? 'tag');
 
   return (
     <Group justify="space-between" wrap="nowrap" py={4}>
       <Group gap="sm" wrap="nowrap" style={{ minWidth: 0 }}>
         <ThemeIcon variant="light" color="primary" radius="xl" size={32}>
-          <Icon size={18} stroke={1.6} />
+          <CategoryIcon icon={category?.icon ?? 'tag'} />
         </ThemeIcon>
         <div style={{ minWidth: 0 }}>
           <Text truncate>{label}</Text>

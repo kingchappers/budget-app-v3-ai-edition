@@ -1,4 +1,4 @@
-import type { Category, CategoryTarget, TargetPeriod, Transaction } from './types';
+import type { Category, CategoryGroup, CategoryTarget, TargetPeriod, Transaction } from './types';
 
 export interface CategoryProgress {
   categoryId: string;
@@ -10,6 +10,7 @@ export interface CategoryProgress {
   period: TargetPeriod;
   percent: number;
   isOver: boolean;
+  group?: CategoryGroup;
 }
 
 export interface MonthSummary {
@@ -45,6 +46,7 @@ function toProgress(
     categoryId: category.categoryId,
     name: category.name,
     icon: category.icon,
+    group: category.group,
     spent,
     target: normalised,
     rawTarget: target.targetAmount,
