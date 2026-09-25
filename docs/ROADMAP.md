@@ -81,7 +81,7 @@ Dropped on 2026-09-24: manual CSV/OFX import was judged a clunky experience the 
 Implemented on `feat/category-groups`. Spec: `superpowers/specs/2026-09-24-category-groups-design.md`, plan: `superpowers/plans/2026-09-24-category-groups.md`.
 
 - **Built:**
-  - Fixed category groups and the owner's YNAB default categories (24 defaults, including the 4 income ones).
+  - Fixed category groups and the owner's YNAB default categories (21 defaults, including the 4 income ones).
   - A `CategoryIcon` component rendering emoji icons.
   - Grouped display in the category picker, the Categories page, Targets and Home.
 - **Decisions:** no remap script, because the test data was deleted; Saving & Investment stay `INVESTMENT` type until F2 pots; custom categories default their group by type.

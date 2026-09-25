@@ -95,4 +95,4 @@ Removed default ids: `cat-housing`, `cat-food`, `cat-entertainment`, `cat-clothi
 
 ## Amendment, 2026-09-25
 
-The owner removed three personal categories from the defaults: Garden Project, Certifications and Windows. The defaults are now 24 in all: 20 grouped (5 Bills, 5 Sinking Funds, 8 Everyday, 2 Saving & Investment: Emergency fund and Investment) plus the 4 income defaults. The table in section 1 lists the original 27; read it without those three rows. The owner adds personal categories as custom ones.
+The owner removed six personal categories from the defaults: Garden Project, Certifications, Windows, Conference, Pets and Car maintenance. The defaults are now 21 in all: 17 grouped (5 Bills, 4 Sinking Funds, 6 Everyday, 2 Saving & Investment: Emergency fund and Investment) plus the 4 income defaults. The table in section 1 lists the original 27; read it without those six rows. The owner adds personal categories as custom ones.

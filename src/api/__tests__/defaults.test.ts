@@ -5,9 +5,9 @@ const namesIn = (group: string): string[] =>
   DEFAULT_CATEGORIES.filter(c => c.group === group).map(c => c.name);
 
 describe('DEFAULT_CATEGORIES', () => {
-  it('has 24 categories with unique ids', () => {
-    expect(DEFAULT_CATEGORIES).toHaveLength(24);
-    expect(DEFAULT_CATEGORY_IDS.size).toBe(24);
+  it('has 21 categories with unique ids', () => {
+    expect(DEFAULT_CATEGORIES).toHaveLength(21);
+    expect(DEFAULT_CATEGORY_IDS.size).toBe(21);
   });
 
   it('lists Bills in order', () => {
@@ -15,12 +15,12 @@ describe('DEFAULT_CATEGORIES', () => {
   });
 
   it('lists Sinking Funds in order', () => {
-    expect(namesIn('SINKING_FUNDS')).toEqual(['Car maintenance', 'Holidays', 'Home maintenance', 'Gifts', 'Insurance']);
+    expect(namesIn('SINKING_FUNDS')).toEqual(['Holidays', 'Home maintenance', 'Gifts', 'Insurance']);
   });
 
   it('lists Everyday Spending in order', () => {
     expect(namesIn('EVERYDAY')).toEqual([
-      'Charity', 'Conference', 'Going Out & Entertainment', 'Groceries', 'Health', 'Pets', 'Personal Spending', 'Transport',
+      'Charity', 'Going Out & Entertainment', 'Groceries', 'Health', 'Personal Spending', 'Transport',
     ]);
   });
 
@@ -46,7 +46,7 @@ describe('DEFAULT_CATEGORIES', () => {
 
   it('does not include Joint Account or the removed investment defaults', () => {
     const names = DEFAULT_CATEGORIES.map(c => c.name);
-    for (const removed of ['Joint Account', 'Garden Project', 'Certifications', 'Windows', 'Stocks', 'Crypto', 'Real Estate', 'Other Investments']) {
+    for (const removed of ['Joint Account', 'Garden Project', 'Certifications', 'Windows', 'Conference', 'Pets', 'Car maintenance', 'Stocks', 'Crypto', 'Real Estate', 'Other Investments']) {
       expect(names).not.toContain(removed);
     }
   });
