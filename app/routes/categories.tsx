@@ -3,7 +3,7 @@ import { Alert, Badge, Button, Card, Group, Loader, Select, Stack, Text, TextInp
 import { DefaultLayout } from '~/components/layout/DefaultLayout';
 import { ReassignDialog } from '~/components/categories/ReassignDialog';
 import { useCategories, useCreateCategory, useDeleteCategory, useReassignCategory } from '~/lib/queries';
-import { defaultGroupFor, GROUP_OPTIONS, groupCategories } from '~/lib/categoryGroups';
+import { defaultGroupFor, groupCategories, groupsForType } from '~/lib/categoryGroups';
 import { categoryLabel } from '~/lib/categoryIcons';
 import type { Category, CategoryGroup, CategoryType } from '~/lib/types';
 
@@ -62,11 +62,13 @@ function CategoriesContent() {
               const next = v as CategoryType;
               setType(next);
               const nextGroup = defaultGroupFor(next);
-              if (nextGroup) setGroup(nextGroup);
+              if (!nextGroup) return;
+              const stillValid = groupsForType(next).some(option => option.value === group);
+              if (!stillValid) setGroup(nextGroup);
             }} allowDeselect={false} />
-          <Select label="Group" data={GROUP_OPTIONS} value={type === 'INCOME' ? null : group}
+          <Select label="Group" data={groupsForType(type)} value={type === 'INCOME' ? null : group}
             onChange={v => { if (v) setGroup(v as CategoryGroup); }}
-            disabled={type === 'INCOME'} allowDeselect={false} />
+            disabled={type !== 'EXPENSE'} allowDeselect={false} />
           <Button
             disabled={name.trim() === ''}
             loading={createCategory.isPending}

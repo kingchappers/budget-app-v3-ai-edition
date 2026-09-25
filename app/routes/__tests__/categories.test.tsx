@@ -75,4 +75,47 @@ describe('Categories page', () => {
     await user.click(await screen.findByRole('option', { name: 'Investment', hidden: true }));
     expect(screen.getByLabelText('Group', { selector: 'input' })).toHaveValue('Saving & Investment');
   });
+
+  it('does not offer Saving & Investment when the type is Spending', async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await user.click(screen.getByLabelText('Group', { selector: 'input' }));
+    expect(await screen.findByRole('option', { name: 'Bills', hidden: true })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'Saving & Investment', hidden: true })).not.toBeInTheDocument();
+  });
+
+  it('fixes Group to Saving & Investment for Investment and sends it', async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await user.click(screen.getByLabelText('Type', { selector: 'input' }));
+    await user.click(await screen.findByRole('option', { name: 'Investment', hidden: true }));
+    expect(screen.getByLabelText('Group', { selector: 'input' })).toBeDisabled();
+    expect(screen.getByLabelText('Group', { selector: 'input' })).toHaveValue('Saving & Investment');
+
+    await user.type(screen.getByLabelText('New category'), 'ISA');
+    await user.click(screen.getByRole('button', { name: 'Add' }));
+    expect(state.create).toHaveBeenCalledWith({ name: 'ISA', type: 'INVESTMENT', icon: 'tag', group: 'SAVING_INVESTMENT' });
+  });
+
+  it('resets Group to Everyday Spending when switching Investment back to Spending', async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await user.click(screen.getByLabelText('Type', { selector: 'input' }));
+    await user.click(await screen.findByRole('option', { name: 'Investment', hidden: true }));
+    await user.click(screen.getByLabelText('Type', { selector: 'input' }));
+    await user.click(await screen.findByRole('option', { name: 'Spending', hidden: true }));
+    expect(screen.getByLabelText('Group', { selector: 'input' })).toHaveValue('Everyday Spending');
+  });
+
+  it('keeps a chosen Group across an Income round trip', async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await user.click(screen.getByLabelText('Group', { selector: 'input' }));
+    await user.click(await screen.findByRole('option', { name: 'Bills', hidden: true }));
+    await user.click(screen.getByLabelText('Type', { selector: 'input' }));
+    await user.click(await screen.findByRole('option', { name: 'Income', hidden: true }));
+    await user.click(screen.getByLabelText('Type', { selector: 'input' }));
+    await user.click(await screen.findByRole('option', { name: 'Spending', hidden: true }));
+    expect(screen.getByLabelText('Group', { selector: 'input' })).toHaveValue('Bills');
+  });
 });

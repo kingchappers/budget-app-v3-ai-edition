@@ -116,6 +116,24 @@ describe('createCategory', () => {
     const res = await createCategory(makeEvent({ name: 'Bonus', type: 'INCOME' }), 'user-1', {});
     expect(JSON.parse(res.body).category.group).toBeUndefined();
   });
+
+  it.each([
+    ['EXPENSE', 'SAVING_INVESTMENT'],
+    ['INVESTMENT', 'BILLS'],
+  ])('returns 400 for %s with group %s', async (type, group) => {
+    const res = await createCategory(makeEvent({ name: 'X', type, group }), 'user-1', {});
+    expect(res.statusCode).toBe(400);
+    expect(mockSend).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['EXPENSE', 'BILLS'],
+    ['INVESTMENT', 'SAVING_INVESTMENT'],
+  ])('returns 201 for %s with group %s', async (type, group) => {
+    mockSend.mockResolvedValueOnce({});
+    const res = await createCategory(makeEvent({ name: 'X', type, group }), 'user-1', {});
+    expect(res.statusCode).toBe(201);
+  });
 });
 
 describe('deleteCategory', () => {

@@ -49,3 +49,9 @@ export function defaultGroupFor(type: CategoryType): CategoryGroup | null {
   if (type === 'INVESTMENT') return 'SAVING_INVESTMENT';
   return 'EVERYDAY';
 }
+
+export function groupsForType(type: CategoryType): { value: CategoryGroup; label: string }[] {
+  if (type === 'INCOME') return [];
+  if (type === 'INVESTMENT') return GROUP_OPTIONS.filter(option => option.value === 'SAVING_INVESTMENT');
+  return GROUP_OPTIONS.filter(option => option.value !== 'SAVING_INVESTMENT');
+}

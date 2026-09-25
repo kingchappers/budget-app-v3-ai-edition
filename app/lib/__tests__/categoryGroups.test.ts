@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { bucketKeyFor, defaultGroupFor, groupCategories, groupItems } from '../categoryGroups';
+import { bucketKeyFor, defaultGroupFor, groupCategories, groupsForType, groupItems } from '../categoryGroups';
 import type { Category } from '../types';
 
 function cat(categoryId: string, type: Category['type'], group?: string): Category {
@@ -60,5 +60,23 @@ describe('defaultGroupFor', () => {
     expect(defaultGroupFor('INCOME')).toBeNull();
     expect(defaultGroupFor('INVESTMENT')).toBe('SAVING_INVESTMENT');
     expect(defaultGroupFor('EXPENSE')).toBe('EVERYDAY');
+  });
+});
+
+describe('groupsForType', () => {
+  it('offers the three spending groups for EXPENSE', () => {
+    expect(groupsForType('EXPENSE')).toEqual([
+      { value: 'BILLS', label: 'Bills' },
+      { value: 'SINKING_FUNDS', label: 'Sinking Funds' },
+      { value: 'EVERYDAY', label: 'Everyday Spending' },
+    ]);
+  });
+
+  it('offers only Saving & Investment for INVESTMENT', () => {
+    expect(groupsForType('INVESTMENT')).toEqual([{ value: 'SAVING_INVESTMENT', label: 'Saving & Investment' }]);
+  });
+
+  it('offers no groups for INCOME', () => {
+    expect(groupsForType('INCOME')).toEqual([]);
   });
 });

@@ -54,6 +54,12 @@ export async function createCategory(
     if (typeof group !== 'string' || !VALID_CATEGORY_GROUPS.has(group)) {
       return err(400, 'group must be BILLS, SINKING_FUNDS, EVERYDAY, or SAVING_INVESTMENT');
     }
+    if (type === 'INVESTMENT' && group !== 'SAVING_INVESTMENT') {
+      return err(400, 'INVESTMENT categories must use the SAVING_INVESTMENT group');
+    }
+    if (type === 'EXPENSE' && group === 'SAVING_INVESTMENT') {
+      return err(400, 'EXPENSE categories cannot use the SAVING_INVESTMENT group');
+    }
   }
 
   const resolvedGroup = (group as CategoryGroup | undefined) ?? defaultGroupFor(type as CategoryType);
