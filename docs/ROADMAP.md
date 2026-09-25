@@ -7,8 +7,14 @@ Bank sync was dropped (see `DECISIONS.md`), so manual entry is the core interact
 | A | Entry sheet rework | Implemented on `feat/entry-sheet-rework` ([PR #29](https://github.com/kingchappers/budget-app-v3-ai-edition/pull/29)). Spec: `superpowers/specs/2026-09-18-entry-sheet-rework-design.md`, plan: `superpowers/plans/2026-09-18-entry-sheet-rework.md` |
 | B | Smart prefill | Implemented on `feat/smart-prefill` ([PR #30](https://github.com/kingchappers/budget-app-v3-ai-edition/pull/30)). Spec: `superpowers/specs/2026-09-19-smart-prefill-design.md`, plan: `superpowers/plans/2026-09-19-smart-prefill.md` |
 | C | Recurring templates | Implemented on `feat/recurring-templates` ([PR #32](https://github.com/kingchappers/budget-app-v3-ai-edition/pull/32)). Spec: `superpowers/specs/2026-09-19-recurring-templates-design.md`, plan: `superpowers/plans/2026-09-20-recurring-templates.md` |
-| D | PWA and add shortcut | Implemented on `feat/pwa-add-shortcut` (PR pending). Spec: `superpowers/specs/2026-09-23-pwa-add-shortcut-design.md`, plan: `superpowers/plans/2026-09-23-pwa-add-shortcut.md` |
-| E | CSV/OFX import | Not started |
+| D | PWA and add shortcut | Merged ([PR #36](https://github.com/kingchappers/budget-app-v3-ai-edition/pull/36)). Spec: `superpowers/specs/2026-09-23-pwa-add-shortcut-design.md`, plan: `superpowers/plans/2026-09-23-pwa-add-shortcut.md` |
+| E | CSV/OFX import | Dropped: manual CSV/OFX import was judged clunky and would not be used. |
+| F1 | Category groups and YNAB defaults | Implemented on `feat/category-groups`. Spec: `superpowers/specs/2026-09-24-category-groups-design.md`, plan: `superpowers/plans/2026-09-24-category-groups.md` |
+| F2 | Savings and sinking-fund pots | Not started: carried-over balance, Set aside / Take out, goal and monthly targets, optional auto-contribute |
+| G | Polish and hardening pass | Not started |
+| H | Spending insights | Not started (after F) |
+| I | Net worth and accounts | Not started |
+| J | Offline entry queue | Not started |
 
 ## B: Smart prefill
 
@@ -66,22 +72,27 @@ Implemented on `feat/pwa-add-shortcut`. Spec: `superpowers/specs/2026-09-23-pwa-
   - The static Lambda handler is served publicly at `/index.js`, because it lives inside the served `build/client` directory (pre-existing, low impact since the repo is public). Move the entry file out of the served root or answer that path with a 404.
   - Static responses carry no Content-Security-Policy (SECURITY.md WEB-A05). A CSP needs the Google Fonts and Auth0 origins allowed, so it was left out of D on purpose.
 
-## E: CSV/OFX import
+## E: CSV/OFX import (dropped)
 
-Bulk import from bank statement exports. `DECISIONS.md` already names this as the reasonable middle ground for the lack of bank sync.
+Dropped on 2026-09-24: manual CSV/OFX import was judged a clunky experience the owner would not use. Automatic bank sync is covered in `DECISIONS.md`.
 
-- **Builds on B:** category memory can pre-categorise imported rows.
-- **Open questions:**
-  - CSV first, OFX later? Column mapping UI versus fixed presets for common UK banks.
-  - Duplicate detection (for example date + amount + description) so re-importing an overlapping statement is safe.
-  - Sign conventions and how they map to the four transaction types.
-  - Payload limits: parse client-side and post in batches rather than uploading a file to the API.
-  - A preview-and-confirm step before anything is written.
-- **Security:** batch endpoint needs strict validation and size limits (IO-01).
+## F1: Category groups and YNAB defaults
+
+Implemented on `feat/category-groups`. Spec: `superpowers/specs/2026-09-24-category-groups-design.md`, plan: `superpowers/plans/2026-09-24-category-groups.md`.
+
+- **Built:**
+  - Fixed category groups and the owner's 27 YNAB default categories.
+  - A `CategoryIcon` component rendering emoji icons.
+  - Grouped display in the category picker, the Categories page, Targets and Home.
+- **Decisions:** no remap script, because the test data was deleted; Saving & Investment stay `INVESTMENT` type until F2 pots; custom categories default their group by type.
+- **Follow-ups:**
+  - Deleting a custom category leaves its target orphaned.
+  - User-created groups.
+  - Old default ids such as `cat-food` are removed, so anything still referencing them shows as an unknown category.
 
 ## Later ideas
 
-- **Offline entry queue:** enter transactions with no signal and sync later. Needs a service worker, a persistent queue, idempotent creates and token refresh while offline. Its own sub-project.
+- **Offline entry queue:** enter transactions with no signal and sync later. Needs a service worker, a persistent queue, idempotent creates and token refresh while offline. Tracked as sub-project J.
 
 ## Deliberately excluded
 
