@@ -51,3 +51,25 @@ export interface ApiResponse {
   headers: Record<string, string>;
   body: string;
 }
+
+export interface PotAutoEntry { from: string; amount: number }
+export interface PotSettings {
+  categoryId: string;
+  monthlyAmount: number | null;
+  goalAmount: number | null;
+  autoContribute: PotAutoEntry[];
+  updatedAt: string;
+}
+export interface PotMonth {
+  yearMonth: string; opening: number; setAside: number; autoAdded: number;
+  takeOut: number; spent: number; closing: number;
+}
+export interface PotSummary {
+  categoryId: string;
+  monthlyAmount: number | null;
+  goalAmount: number | null;
+  autoAmountNow: number;
+  balance: number;
+  thisMonth: { setAside: number; autoAdded: number; takeOut: number; spent: number };
+  months: PotMonth[];
+}
