@@ -1,4 +1,5 @@
 import type { Icon } from '@tabler/icons-react';
+import type { Category } from './types';
 import {
   IconHome, IconShoppingCart, IconCar, IconBolt, IconHeart, IconDeviceTv, IconShirt,
   IconSparkles, IconBook, IconToolsKitchen2, IconRefresh, IconPlane, IconGift, IconShield,
@@ -36,4 +37,14 @@ const ICONS: Record<string, Icon> = {
 
 export function getCategoryIcon(iconName: string): Icon {
   return ICONS[iconName] ?? IconCategory;
+}
+
+const EMOJI = /\p{Extended_Pictographic}/u;
+
+export function isEmojiIcon(icon: string): boolean {
+  return EMOJI.test(icon);
+}
+
+export function categoryLabel(category: Pick<Category, 'icon' | 'name'>): string {
+  return isEmojiIcon(category.icon) ? `${category.icon} ${category.name}` : category.name;
 }

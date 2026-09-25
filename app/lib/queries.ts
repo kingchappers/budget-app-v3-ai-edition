@@ -3,7 +3,7 @@ import { useMemo } from 'react';
 import { useAuth0 } from '@auth0/auth0-react';
 import { useProtectedApi } from '~/hooks/useProtectedApi';
 import { createApi, type RecurringInput, type TransactionInput } from './api';
-import type { Category, Recurring, TargetPeriod, Transaction } from './types';
+import type { Category, CategoryGroup, Recurring, TargetPeriod, Transaction } from './types';
 
 export const queryKeys = {
   categories: ['categories'] as const,
@@ -138,7 +138,7 @@ export function useCreateCategory() {
   const api = useApi();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: { name: string; type: Category['type']; icon: string }) => api.createCategory(input),
+    mutationFn: (input: { name: string; type: Category['type']; icon: string; group?: CategoryGroup }) => api.createCategory(input),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.categories }),
   });
 }

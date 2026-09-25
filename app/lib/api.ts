@@ -1,4 +1,4 @@
-import type { Category, CategoryTarget, Recurring, TargetPeriod, Transaction, TransactionType } from './types';
+import type { Category, CategoryGroup, CategoryTarget, Recurring, TargetPeriod, Transaction, TransactionType } from './types';
 
 type Request = (endpoint: string, options?: RequestInit) => Promise<unknown>;
 
@@ -25,7 +25,7 @@ export function createApi(request: Request) {
       const res = await request('/api/categories') as { categories: Category[] };
       return res.categories;
     },
-    createCategory: async (input: { name: string; type: Category['type']; icon: string }): Promise<Category> => {
+    createCategory: async (input: { name: string; type: Category['type']; icon: string; group?: CategoryGroup }): Promise<Category> => {
       const res = await request('/api/categories', {
         method: 'POST',
         body: JSON.stringify(input),

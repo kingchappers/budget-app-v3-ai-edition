@@ -1,5 +1,6 @@
 export type TransactionType = 'EXPENSE' | 'INCOME' | 'INVESTMENT_IN' | 'INVESTMENT_OUT';
 export type CategoryType = 'EXPENSE' | 'INCOME' | 'INVESTMENT';
+export type CategoryGroup = 'BILLS' | 'SINKING_FUNDS' | 'EVERYDAY' | 'SAVING_INVESTMENT';
 export type TargetPeriod = 'MONTHLY' | 'WEEKLY';
 
 export interface Category {
@@ -7,6 +8,7 @@ export interface Category {
   name: string;
   type: CategoryType;
   icon: string;
+  group?: CategoryGroup;
   isDefault: boolean;
   createdAt: string;
 }
