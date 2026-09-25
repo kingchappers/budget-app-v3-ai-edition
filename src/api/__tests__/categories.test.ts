@@ -37,7 +37,7 @@ describe('getCategories', () => {
     const res = await getCategories(makeEvent(), 'user-1', {});
     expect(res.statusCode).toBe(200);
     const body = JSON.parse(res.body);
-    expect(body.categories.some((c: any) => c.categoryId === 'cat-housing')).toBe(true);
+    expect(body.categories.some((c: any) => c.categoryId === 'cat-mortgage')).toBe(true);
     expect(body.categories.some((c: any) => c.categoryId === 'custom-1')).toBe(true);
   });
 });
@@ -78,6 +78,44 @@ describe('createCategory', () => {
     );
     expect(res.statusCode).toBe(400);
   });
+
+  it('stores a valid group', async () => {
+    mockSend.mockResolvedValueOnce({});
+    const res = await createCategory(makeEvent({ name: 'Joint Account', type: 'EXPENSE', group: 'BILLS' }), 'user-1', {});
+    expect(res.statusCode).toBe(201);
+    expect(JSON.parse(res.body).category.group).toBe('BILLS');
+    expect(mockSend.mock.calls[0][0].Item.group).toBe('BILLS');
+  });
+
+  it('defaults an EXPENSE category to EVERYDAY', async () => {
+    mockSend.mockResolvedValueOnce({});
+    const res = await createCategory(makeEvent({ name: 'Padel', type: 'EXPENSE' }), 'user-1', {});
+    expect(JSON.parse(res.body).category.group).toBe('EVERYDAY');
+  });
+
+  it('defaults an INVESTMENT category to SAVING_INVESTMENT', async () => {
+    mockSend.mockResolvedValueOnce({});
+    const res = await createCategory(makeEvent({ name: 'ISA', type: 'INVESTMENT' }), 'user-1', {});
+    expect(JSON.parse(res.body).category.group).toBe('SAVING_INVESTMENT');
+  });
+
+  it.each([null, '', 5, 'NOPE', 'bills'])('returns 400 for invalid group %j', async (group) => {
+    const res = await createCategory(makeEvent({ name: 'X', type: 'EXPENSE', group }), 'user-1', {});
+    expect(res.statusCode).toBe(400);
+    expect(mockSend).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when a group is sent for an INCOME category', async () => {
+    const res = await createCategory(makeEvent({ name: 'Bonus', type: 'INCOME', group: 'BILLS' }), 'user-1', {});
+    expect(res.statusCode).toBe(400);
+    expect(mockSend).not.toHaveBeenCalled();
+  });
+
+  it('stores no group for an INCOME category', async () => {
+    mockSend.mockResolvedValueOnce({});
+    const res = await createCategory(makeEvent({ name: 'Bonus', type: 'INCOME' }), 'user-1', {});
+    expect(JSON.parse(res.body).category.group).toBeUndefined();
+  });
 });
 
 describe('deleteCategory', () => {
@@ -91,7 +129,7 @@ describe('deleteCategory', () => {
   });
 
   it('returns 403 when trying to delete a default category', async () => {
-    const res = await deleteCategory(makeEvent(), 'user-1', { categoryId: 'cat-housing' });
+    const res = await deleteCategory(makeEvent(), 'user-1', { categoryId: 'cat-mortgage' });
     expect(res.statusCode).toBe(403);
     expect(mockSend).not.toHaveBeenCalled();
   });
