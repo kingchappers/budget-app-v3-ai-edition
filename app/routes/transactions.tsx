@@ -15,8 +15,8 @@ import type { Transaction, TransactionType } from '~/lib/types';
 const TYPE_OPTIONS: { value: TransactionType; label: string }[] = [
   { value: 'EXPENSE', label: 'Expense' },
   { value: 'INCOME', label: 'Income' },
-  { value: 'INVESTMENT_IN', label: 'Investment in' },
-  { value: 'INVESTMENT_OUT', label: 'Investment out' },
+  { value: 'SET_ASIDE', label: 'Set aside' },
+  { value: 'TAKE_OUT', label: 'Take out' },
 ];
 
 function TransactionsContent() {

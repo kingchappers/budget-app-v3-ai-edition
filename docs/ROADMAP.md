@@ -10,7 +10,7 @@ Bank sync was dropped (see `DECISIONS.md`), so manual entry is the core interact
 | D | PWA and add shortcut | Merged ([PR #36](https://github.com/kingchappers/budget-app-v3-ai-edition/pull/36)). Spec: `superpowers/specs/2026-09-23-pwa-add-shortcut-design.md`, plan: `superpowers/plans/2026-09-23-pwa-add-shortcut.md` |
 | E | CSV/OFX import | Dropped: manual CSV/OFX import was judged clunky and would not be used. |
 | F1 | Category groups and YNAB defaults | Implemented on `feat/category-groups` ([PR #37](https://github.com/kingchappers/budget-app-v3-ai-edition/pull/37)). Spec: `superpowers/specs/2026-09-24-category-groups-design.md`, plan: `superpowers/plans/2026-09-24-category-groups.md` |
-| F2 | Savings and sinking-fund pots | Not started: carried-over balance, Set aside / Take out, goal and monthly targets, optional auto-contribute |
+| F2 | Savings and sinking-fund pots | Implemented on `feat/savings-pots` (PR pending). Spec: `superpowers/specs/2026-09-25-savings-pots-design.md`, plan: `superpowers/plans/2026-09-25-savings-pots.md` |
 | G | Polish and hardening pass | Not started |
 | H | Spending insights | Not started (after F) |
 | I | Net worth and accounts | Not started |
@@ -81,7 +81,7 @@ Dropped on 2026-09-24: manual CSV/OFX import was judged a clunky experience the 
 Implemented on `feat/category-groups`. Spec: `superpowers/specs/2026-09-24-category-groups-design.md`, plan: `superpowers/plans/2026-09-24-category-groups.md`.
 
 - **Built:**
-  - Fixed category groups and the owner's 27 YNAB default categories.
+  - Fixed category groups and the owner's YNAB default categories (21 defaults, including the 4 income ones).
   - A `CategoryIcon` component rendering emoji icons.
   - Grouped display in the category picker, the Categories page, Targets and Home.
 - **Decisions:** no remap script, because the test data was deleted; Saving & Investment stay `INVESTMENT` type until F2 pots; custom categories default their group by type.
@@ -97,6 +97,35 @@ Implemented on `feat/category-groups`. Spec: `superpowers/specs/2026-09-24-categ
   - Emoji are read aloud in chip and option names, because `categoryLabel` puts them into the accessible name.
   - 🛜 (Phone and Internet) is a Unicode 15 emoji and may render as a blank box on older phones; swap it for 📶 if so.
   - `isEmojiIcon` misses flag and keycap emoji, which matters only if users can set icons later.
+
+## F2: Savings and sinking-fund pots
+
+Implemented on `feat/savings-pots`. Spec: `superpowers/specs/2026-09-25-savings-pots-design.md`, plan: `superpowers/plans/2026-09-25-savings-pots.md`.
+
+- **Built:**
+  - Pot categories (Sinking Funds and Saving & Investment) with a carried-over balance.
+  - Spend, Set aside and Take out entry types, replacing Invest in/out.
+  - Optional monthly and goal amounts per pot, and derived auto-contribute.
+  - `GET /api/pots` and `PUT /api/pots/{categoryId}`. No infra, IAM or dependency changes.
+  - A Pots page with a history sheet and trend line, and a Pots section on Home.
+- **Decisions:** pots are a category type (`POT`) and the old investment types are removed with no migration; the balance is derived on demand from the full history, so nothing stored can drift; auto-contribute is a list of `{ from, amount }` entries, not scheduled writes; entries dated after the month being viewed are excluded; negative balances are allowed and flagged; a custom pot with no group defaults to Sinking Funds; Home's Pots section follows its month selector.
+- **Follow-ups:**
+  - A quick-add syntax for Set aside.
+  - A stored monthly summary if `GET /api/pots` gets slow.
+  - The transaction API should check category type against entry type.
+  - Pots spanning several categories.
+  - Deleting a custom category leaves its pot settings orphaned.
+  - Net worth and account balances (I).
+  - The Home pots section and the Pots page duplicate a small `formatBalance` helper.
+  - Missing tests for a few edges: pots invalidation from the update, reassign and category hooks, the Home error branch, the month passed to `usePots`, and the balance-above-goal text.
+  - The trend line stroke is clipped at the svg edges.
+  - A literal `null` request body to the pots PUT gives a non-400 error (the same pattern exists in other handlers).
+  - Any F1 targets already set on categories that are now pots (Holidays, Gifts and so on) are no longer shown or editable, because Targets covers spending categories only; clear them before deploying.
+  - The pots settings PUT is a read-modify-write with no conditional put, so two tabs saving at once could lose an auto-contribute entry (acceptable for one user).
+  - The Home Pots section appears after the rest of Home has loaded, causing a small layout shift; a skeleton would fix it.
+  - On the Pots page the floating + button covers the Set aside button of a row that scrolls under it (the same fixed-button overlap as elsewhere in the app); scrolling to the end clears it.
+  - On a 390px screen the history sheet's month table scrolls sideways (the Closing column is off screen) with no hint, and the sheet is taller than the screen so the settings need scrolling. The trend line's end points are half-clipped at the edge of its box.
+  - The client's local month and the server's UTC month can differ for about an hour around midnight on the 1st, so Home's "next month" could hit the API's month bound for that hour.
 
 ## Later ideas
 

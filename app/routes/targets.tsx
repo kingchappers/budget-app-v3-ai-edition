@@ -69,12 +69,12 @@ function TargetsContent() {
   }
 
   const targetFor = (id: string) => targets.data?.find(t => t.categoryId === id);
-  const eligible = (categories.data ?? []).filter(c => c.type !== 'INCOME');
+  const eligible = (categories.data ?? []).filter(c => c.type === 'EXPENSE');
 
   return (
     <Stack>
       <Title order={3}>Targets</Title>
-      <Text c="dimmed" size="sm">Income has no target — it is shown as a monthly total instead.</Text>
+      <Text c="dimmed" size="sm">Income and pots have no monthly target here. Set a pot's goal and plan on the Pots page.</Text>
 
       {groupCategories(eligible).map(bucket => (
         <div key={bucket.key}>

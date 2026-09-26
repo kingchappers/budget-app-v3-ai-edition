@@ -111,7 +111,8 @@ describe('createRecurring', () => {
     ['leadDays 0', { leadDays: 0 }],
     ['leadDays 14', { leadDays: 14 }],
     ['a 200 character note', { description: 'a'.repeat(200) }],
-    ['INVESTMENT_IN', { type: 'INVESTMENT_IN' }],
+    ['SET_ASIDE', { type: 'SET_ASIDE' }],
+    ['TAKE_OUT', { type: 'TAKE_OUT' }],
   ])('accepts %s', async (_label, override) => {
     mockSend.mockResolvedValueOnce({});
     const res = await createRecurring(makeEvent({ ...validBody, ...override }), 'user-1', {});
@@ -124,6 +125,8 @@ describe('createRecurring', () => {
     ['fractional amount', { amount: 10.5 }],
     ['string amount', { amount: '100' }],
     ['unknown type', { type: 'TRANSFER' }],
+    ['the removed INVESTMENT_IN type', { type: 'INVESTMENT_IN' }],
+    ['the removed INVESTMENT_OUT type', { type: 'INVESTMENT_OUT' }],
     ['missing type', { type: undefined }],
     ['empty categoryId', { categoryId: '' }],
     ['overlong categoryId', { categoryId: 'c'.repeat(101) }],

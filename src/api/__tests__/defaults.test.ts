@@ -5,9 +5,9 @@ const namesIn = (group: string): string[] =>
   DEFAULT_CATEGORIES.filter(c => c.group === group).map(c => c.name);
 
 describe('DEFAULT_CATEGORIES', () => {
-  it('has 27 categories with unique ids', () => {
-    expect(DEFAULT_CATEGORIES).toHaveLength(27);
-    expect(DEFAULT_CATEGORY_IDS.size).toBe(27);
+  it('has 21 categories with unique ids', () => {
+    expect(DEFAULT_CATEGORIES).toHaveLength(21);
+    expect(DEFAULT_CATEGORY_IDS.size).toBe(21);
   });
 
   it('lists Bills in order', () => {
@@ -15,22 +15,23 @@ describe('DEFAULT_CATEGORIES', () => {
   });
 
   it('lists Sinking Funds in order', () => {
-    expect(namesIn('SINKING_FUNDS')).toEqual(['Car maintenance', 'Certifications', 'Holidays', 'Home maintenance', 'Gifts', 'Insurance']);
+    expect(namesIn('SINKING_FUNDS')).toEqual(['Holidays', 'Home maintenance', 'Gifts', 'Insurance']);
   });
 
   it('lists Everyday Spending in order', () => {
     expect(namesIn('EVERYDAY')).toEqual([
-      'Charity', 'Conference', 'Going Out & Entertainment', 'Groceries', 'Health', 'Pets', 'Personal Spending', 'Transport',
+      'Charity', 'Going Out & Entertainment', 'Groceries', 'Health', 'Personal Spending', 'Transport',
     ]);
   });
 
   it('lists Saving & Investment in order', () => {
-    expect(namesIn('SAVING_INVESTMENT')).toEqual(['Emergency fund', 'Garden Project', 'Investment', 'Windows']);
+    expect(namesIn('SAVING_INVESTMENT')).toEqual(['Emergency fund', 'Investment']);
   });
 
-  it('makes Saving & Investment categories INVESTMENT type and every other grouped one EXPENSE', () => {
+  it('makes Sinking Funds and Saving & Investment categories POT type and Bills and Everyday EXPENSE', () => {
     for (const c of DEFAULT_CATEGORIES.filter(c => c.group)) {
-      expect(c.type).toBe(c.group === 'SAVING_INVESTMENT' ? 'INVESTMENT' : 'EXPENSE');
+      const isPotGroup = c.group === 'SAVING_INVESTMENT' || c.group === 'SINKING_FUNDS';
+      expect(c.type).toBe(isPotGroup ? 'POT' : 'EXPENSE');
     }
   });
 
@@ -46,7 +47,7 @@ describe('DEFAULT_CATEGORIES', () => {
 
   it('does not include Joint Account or the removed investment defaults', () => {
     const names = DEFAULT_CATEGORIES.map(c => c.name);
-    for (const removed of ['Joint Account', 'Stocks', 'Crypto', 'Real Estate', 'Other Investments']) {
+    for (const removed of ['Joint Account', 'Garden Project', 'Certifications', 'Windows', 'Conference', 'Pets', 'Car maintenance', 'Stocks', 'Crypto', 'Real Estate', 'Other Investments']) {
       expect(names).not.toContain(removed);
     }
   });

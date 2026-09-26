@@ -6,6 +6,7 @@ import { SECURITY_HEADERS } from './src/api/constants';
 import { getCategories, createCategory, deleteCategory } from './src/api/categories';
 import { getTransactions, createTransaction, deleteTransaction, updateTransaction } from './src/api/transactions';
 import { getTargets, upsertTarget, deleteTarget } from './src/api/targets';
+import { getPots, putPot } from './src/api/pots';
 import { reassignCategory } from './src/api/reassign';
 import {
   getRecurring, createRecurring, updateRecurring, deleteRecurring, setRecurringHandled,
@@ -39,6 +40,8 @@ router.put('/api/transactions/{yearMonth}/{transactionId}', updateTransaction);
 router.get('/api/targets', getTargets);
 router.put('/api/targets/{categoryId}', upsertTarget);
 router.delete('/api/targets/{categoryId}', deleteTarget);
+router.get('/api/pots', getPots);
+router.put('/api/pots/{categoryId}', putPot);
 router.get('/api/recurring', getRecurring);
 router.post('/api/recurring', createRecurring);
 router.put('/api/recurring/{recurringId}', updateRecurring);

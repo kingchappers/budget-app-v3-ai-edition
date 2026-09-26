@@ -93,10 +93,10 @@ describe('createCategory', () => {
     expect(JSON.parse(res.body).category.group).toBe('EVERYDAY');
   });
 
-  it('defaults an INVESTMENT category to SAVING_INVESTMENT', async () => {
+  it('defaults a POT category to SINKING_FUNDS', async () => {
     mockSend.mockResolvedValueOnce({});
-    const res = await createCategory(makeEvent({ name: 'ISA', type: 'INVESTMENT' }), 'user-1', {});
-    expect(JSON.parse(res.body).category.group).toBe('SAVING_INVESTMENT');
+    const res = await createCategory(makeEvent({ name: 'Boiler', type: 'POT' }), 'user-1', {});
+    expect(JSON.parse(res.body).category.group).toBe('SINKING_FUNDS');
   });
 
   it.each([null, '', 5, 'NOPE', 'bills'])('returns 400 for invalid group %j', async (group) => {
@@ -119,7 +119,9 @@ describe('createCategory', () => {
 
   it.each([
     ['EXPENSE', 'SAVING_INVESTMENT'],
-    ['INVESTMENT', 'BILLS'],
+    ['EXPENSE', 'SINKING_FUNDS'],
+    ['POT', 'BILLS'],
+    ['POT', 'EVERYDAY'],
   ])('returns 400 for %s with group %s', async (type, group) => {
     const res = await createCategory(makeEvent({ name: 'X', type, group }), 'user-1', {});
     expect(res.statusCode).toBe(400);
@@ -128,11 +130,19 @@ describe('createCategory', () => {
 
   it.each([
     ['EXPENSE', 'BILLS'],
-    ['INVESTMENT', 'SAVING_INVESTMENT'],
+    ['EXPENSE', 'EVERYDAY'],
+    ['POT', 'SINKING_FUNDS'],
+    ['POT', 'SAVING_INVESTMENT'],
   ])('returns 201 for %s with group %s', async (type, group) => {
     mockSend.mockResolvedValueOnce({});
     const res = await createCategory(makeEvent({ name: 'X', type, group }), 'user-1', {});
     expect(res.statusCode).toBe(201);
+  });
+
+  it('returns 400 for the removed INVESTMENT type', async () => {
+    const res = await createCategory(makeEvent({ name: 'X', type: 'INVESTMENT' }), 'user-1', {});
+    expect(res.statusCode).toBe(400);
+    expect(mockSend).not.toHaveBeenCalled();
   });
 });
 

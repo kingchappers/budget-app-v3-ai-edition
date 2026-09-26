@@ -92,3 +92,7 @@ Removed default ids: `cat-housing`, `cat-food`, `cat-entertainment`, `cat-clothi
 - Deleting a custom category leaves its target orphaned (existing gap).
 - User-created groups.
 - F2 converts Saving & Investment and Sinking Funds into pots.
+
+## Amendment, 2026-09-25
+
+The owner removed six personal categories from the defaults: Garden Project, Certifications, Windows, Conference, Pets and Car maintenance. The defaults are now 21 in all: 17 grouped (5 Bills, 4 Sinking Funds, 6 Everyday, 2 Saving & Investment: Emergency fund and Investment) plus the 4 income defaults. The table in section 1 lists the original 27; read it without those six rows. The owner adds personal categories as custom ones.

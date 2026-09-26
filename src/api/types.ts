@@ -1,6 +1,6 @@
-export type TransactionType = 'EXPENSE' | 'INCOME' | 'INVESTMENT_IN' | 'INVESTMENT_OUT';
+export type TransactionType = 'EXPENSE' | 'INCOME' | 'SET_ASIDE' | 'TAKE_OUT';
 
-export type CategoryType = 'EXPENSE' | 'INCOME' | 'INVESTMENT';
+export type CategoryType = 'EXPENSE' | 'INCOME' | 'POT';
 export type CategoryGroup = 'BILLS' | 'SINKING_FUNDS' | 'EVERYDAY' | 'SAVING_INVESTMENT';
 
 export type TargetPeriod = 'MONTHLY' | 'WEEKLY';
@@ -50,4 +50,26 @@ export interface ApiResponse {
   statusCode: number;
   headers: Record<string, string>;
   body: string;
+}
+
+export interface PotAutoEntry { from: string; amount: number }
+export interface PotSettings {
+  categoryId: string;
+  monthlyAmount: number | null;
+  goalAmount: number | null;
+  autoContribute: PotAutoEntry[];
+  updatedAt: string;
+}
+export interface PotMonth {
+  yearMonth: string; opening: number; setAside: number; autoAdded: number;
+  takeOut: number; spent: number; closing: number;
+}
+export interface PotSummary {
+  categoryId: string;
+  monthlyAmount: number | null;
+  goalAmount: number | null;
+  autoAmountNow: number;
+  balance: number;
+  thisMonth: { setAside: number; autoAdded: number; takeOut: number; spent: number };
+  months: PotMonth[];
 }

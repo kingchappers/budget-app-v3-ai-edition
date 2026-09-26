@@ -2,7 +2,7 @@ import { QueryCommand, PutCommand, DeleteCommand } from '@aws-sdk/lib-dynamodb';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { docClient, TABLE, pk, catSk } from './db';
 import { DEFAULT_CATEGORIES, DEFAULT_CATEGORY_IDS } from './defaults';
-import { SECURITY_HEADERS, VALID_CATEGORY_TYPES, VALID_CATEGORY_GROUPS } from './constants';
+import { SECURITY_HEADERS, VALID_CATEGORY_TYPES, VALID_CATEGORY_GROUPS, POT_GROUPS } from './constants';
 import type { Category, CategoryGroup, CategoryType, ApiResponse } from './types';
 import { ok, err } from './http';
 
@@ -23,7 +23,7 @@ export async function getCategories(
 
 function defaultGroupFor(type: CategoryType): CategoryGroup | undefined {
   if (type === 'INCOME') return undefined;
-  if (type === 'INVESTMENT') return 'SAVING_INVESTMENT';
+  if (type === 'POT') return 'SINKING_FUNDS';
   return 'EVERYDAY';
 }
 
@@ -45,7 +45,7 @@ export async function createCategory(
     return err(400, 'name must be a non-empty string of at most 50 characters');
   }
   if (!type || !VALID_CATEGORY_TYPES.has(type as string)) {
-    return err(400, 'type must be EXPENSE, INCOME, or INVESTMENT');
+    return err(400, 'type must be EXPENSE, INCOME, or POT');
   }
   if (group !== undefined) {
     if (type === 'INCOME') {
@@ -54,11 +54,11 @@ export async function createCategory(
     if (typeof group !== 'string' || !VALID_CATEGORY_GROUPS.has(group)) {
       return err(400, 'group must be BILLS, SINKING_FUNDS, EVERYDAY, or SAVING_INVESTMENT');
     }
-    if (type === 'INVESTMENT' && group !== 'SAVING_INVESTMENT') {
-      return err(400, 'INVESTMENT categories must use the SAVING_INVESTMENT group');
+    if (type === 'POT' && !POT_GROUPS.has(group)) {
+      return err(400, 'POT categories must use the SINKING_FUNDS or SAVING_INVESTMENT group');
     }
-    if (type === 'EXPENSE' && group === 'SAVING_INVESTMENT') {
-      return err(400, 'EXPENSE categories cannot use the SAVING_INVESTMENT group');
+    if (type === 'EXPENSE' && POT_GROUPS.has(group)) {
+      return err(400, 'EXPENSE categories cannot use the SINKING_FUNDS or SAVING_INVESTMENT group');
     }
   }
 

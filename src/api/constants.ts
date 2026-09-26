@@ -8,10 +8,11 @@ export const SECURITY_HEADERS: Record<string, string> = {
 };
 
 export const VALID_TRANSACTION_TYPES = new Set([
-  'EXPENSE', 'INCOME', 'INVESTMENT_IN', 'INVESTMENT_OUT',
+  'EXPENSE', 'INCOME', 'SET_ASIDE', 'TAKE_OUT',
 ]);
 
-export const VALID_CATEGORY_TYPES = new Set(['EXPENSE', 'INCOME', 'INVESTMENT']);
+export const VALID_CATEGORY_TYPES = new Set(['EXPENSE', 'INCOME', 'POT']);
 export const VALID_CATEGORY_GROUPS = new Set(['BILLS', 'SINKING_FUNDS', 'EVERYDAY', 'SAVING_INVESTMENT']);
+export const POT_GROUPS = new Set(['SINKING_FUNDS', 'SAVING_INVESTMENT']);
 
 export const VALID_PERIODS = new Set(['MONTHLY', 'WEEKLY']);

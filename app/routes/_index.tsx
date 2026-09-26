@@ -4,14 +4,15 @@ import { Alert, Button, Card, Group, Loader, Stack, Text, Title } from '@mantine
 import { DefaultLayout } from '~/components/layout/DefaultLayout';
 import { MonthHeader } from '~/components/budget/MonthHeader';
 import { CategoryProgressRow } from '~/components/budget/CategoryProgressRow';
+import { HomePots } from '~/components/pots/HomePots';
 import { DueRecurringCard } from '~/components/recurring/DueRecurringCard';
 import { TransactionRow } from '~/components/transactions/TransactionRow';
 import { groupItems, bucketKeyFor } from '~/lib/categoryGroups';
 import { buildMonthSummary } from '~/lib/summary';
 import type { CategoryProgress } from '~/lib/summary';
 import { formatPence } from '~/lib/money';
-import { currentYearMonth } from '~/lib/months';
-import { useCategories, useTargets, useTransactions } from '~/lib/queries';
+import { currentYearMonth, shiftMonth } from '~/lib/months';
+import { useCategories, usePots, useTargets, useTransactions } from '~/lib/queries';
 
 function GroupedProgress({ items }: { items: CategoryProgress[] }) {
   return (
@@ -31,6 +32,8 @@ function HomeContent() {
   const categories = useCategories();
   const targets = useTargets();
   const transactions = useTransactions(yearMonth);
+  const potsEnabled = yearMonth <= shiftMonth(currentYearMonth(), 1);
+  const pots = usePots(yearMonth, potsEnabled);
 
   const isLoading = categories.isLoading || targets.isLoading || transactions.isLoading;
   const error = categories.error || targets.error || transactions.error;
@@ -61,7 +64,7 @@ function HomeContent() {
 
   if (isLoading) return <Group justify="center" py="xl"><Loader /></Group>;
 
-  const hasTargets = summary.spending.length > 0 || summary.saving.length > 0;
+  const hasTargets = summary.spending.length > 0;
 
   return (
     <Stack>
@@ -82,12 +85,11 @@ function HomeContent() {
         </div>
       )}
 
-      {summary.saving.length > 0 && (
-        <div>
-          <Title order={5} mb="xs">Saving vs target</Title>
-          <GroupedProgress items={summary.saving} />
-        </div>
-      )}
+      {potsEnabled && (pots.error ? (
+        <Text size="sm" c="dimmed">Could not load pots.</Text>
+      ) : (
+        <HomePots pots={pots.data ?? []} categories={categories.data ?? []} />
+      ))}
 
       <Group justify="space-between">
         <Text c="dimmed">Income this month</Text>

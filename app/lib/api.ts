@@ -1,4 +1,4 @@
-import type { Category, CategoryGroup, CategoryTarget, Recurring, TargetPeriod, Transaction, TransactionType } from './types';
+import type { Category, CategoryGroup, CategoryTarget, PotSettingsInput, PotSummary, Recurring, TargetPeriod, Transaction, TransactionType } from './types';
 
 type Request = (endpoint: string, options?: RequestInit) => Promise<unknown>;
 
@@ -79,6 +79,17 @@ export function createApi(request: Request) {
     },
     deleteTarget: async (categoryId: string): Promise<void> => {
       await request(`/api/targets/${encodeURIComponent(categoryId)}`, { method: 'DELETE' });
+    },
+
+    getPots: async (asOf: string): Promise<PotSummary[]> => {
+      const res = await request(`/api/pots?asOf=${encodeURIComponent(asOf)}`) as { pots: PotSummary[] };
+      return res.pots;
+    },
+    savePot: async (categoryId: string, input: PotSettingsInput): Promise<void> => {
+      await request(`/api/pots/${encodeURIComponent(categoryId)}`, {
+        method: 'PUT',
+        body: JSON.stringify(input),
+      });
     },
 
     getRecurring: async (): Promise<Recurring[]> => {

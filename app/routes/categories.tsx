@@ -10,7 +10,7 @@ import type { Category, CategoryGroup, CategoryType } from '~/lib/types';
 const TYPES: { value: CategoryType; label: string }[] = [
   { value: 'EXPENSE', label: 'Spending' },
   { value: 'INCOME', label: 'Income' },
-  { value: 'INVESTMENT', label: 'Investment' },
+  { value: 'POT', label: 'Pot' },
 ];
 
 function CategoriesContent() {
@@ -68,7 +68,7 @@ function CategoriesContent() {
             }} allowDeselect={false} />
           <Select label="Group" data={groupsForType(type)} value={type === 'INCOME' ? null : group}
             onChange={v => { if (v) setGroup(v as CategoryGroup); }}
-            disabled={type !== 'EXPENSE'} allowDeselect={false} />
+            disabled={type === 'INCOME'} allowDeselect={false} />
           <Button
             disabled={name.trim() === ''}
             loading={createCategory.isPending}

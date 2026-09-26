@@ -46,12 +46,16 @@ export function groupCategories(categories: Category[]): Bucket<Category>[] {
 
 export function defaultGroupFor(type: CategoryType): CategoryGroup | null {
   if (type === 'INCOME') return null;
-  if (type === 'INVESTMENT') return 'SAVING_INVESTMENT';
+  if (type === 'POT') return 'SINKING_FUNDS';
   return 'EVERYDAY';
 }
 
+const GROUPS_BY_TYPE: Record<CategoryType, CategoryGroup[]> = {
+  EXPENSE: ['BILLS', 'EVERYDAY'],
+  POT: ['SINKING_FUNDS', 'SAVING_INVESTMENT'],
+  INCOME: [],
+};
+
 export function groupsForType(type: CategoryType): { value: CategoryGroup; label: string }[] {
-  if (type === 'INCOME') return [];
-  if (type === 'INVESTMENT') return GROUP_OPTIONS.filter(option => option.value === 'SAVING_INVESTMENT');
-  return GROUP_OPTIONS.filter(option => option.value !== 'SAVING_INVESTMENT');
+  return GROUP_OPTIONS.filter(option => GROUPS_BY_TYPE[type].includes(option.value));
 }

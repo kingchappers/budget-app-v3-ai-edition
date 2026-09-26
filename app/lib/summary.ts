@@ -15,7 +15,6 @@ export interface CategoryProgress {
 
 export interface MonthSummary {
   spending: CategoryProgress[];
-  saving: CategoryProgress[];
   incomeTotal: number;
   recent: Transaction[];
 }
@@ -73,7 +72,6 @@ export function buildMonthSummary(input: {
   const categoryById = new Map(categories.map(c => [c.categoryId, c]));
 
   const spending: CategoryProgress[] = [];
-  const saving: CategoryProgress[] = [];
   let incomeTotal = 0;
 
   for (const t of transactions) {
@@ -89,15 +87,6 @@ export function buildMonthSummary(input: {
         .filter(t => t.categoryId === category.categoryId && t.type === 'EXPENSE')
         .reduce((sum, t) => sum + t.amount, 0);
       spending.push(toProgress(category, target, spent, yearMonth));
-    } else if (category.type === 'INVESTMENT') {
-      const net = transactions
-        .filter(t => t.categoryId === category.categoryId)
-        .reduce((sum, t) => {
-          if (t.type === 'INVESTMENT_IN') return sum + t.amount;
-          if (t.type === 'INVESTMENT_OUT') return sum - t.amount;
-          return sum;
-        }, 0);
-      saving.push(toProgress(category, target, Math.max(0, net), yearMonth));
     }
   }
 
@@ -107,7 +96,6 @@ export function buildMonthSummary(input: {
 
   return {
     spending: spending.sort(byOverThenPercent),
-    saving: saving.sort(byOverThenPercent),
     incomeTotal,
     recent,
   };
