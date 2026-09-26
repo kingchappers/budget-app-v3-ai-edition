@@ -3,13 +3,14 @@ import { useMemo } from 'react';
 import { useAuth0 } from '@auth0/auth0-react';
 import { useProtectedApi } from '~/hooks/useProtectedApi';
 import { createApi, type RecurringInput, type TransactionInput } from './api';
-import type { Category, CategoryGroup, Recurring, TargetPeriod, Transaction } from './types';
+import type { Category, CategoryGroup, PotSettingsInput, Recurring, TargetPeriod, Transaction } from './types';
 
 export const queryKeys = {
   categories: ['categories'] as const,
   targets: ['targets'] as const,
   transactions: (yearMonth: string) => ['transactions', yearMonth] as const,
   recurring: ['recurring'] as const,
+  pots: (asOf: string) => ['pots', asOf] as const,
 };
 
 function useApi() {
@@ -85,6 +86,7 @@ export function useCreateTransaction() {
     },
     onSettled: (_created, _error, input) => {
       qc.invalidateQueries({ queryKey: queryKeys.transactions(input.date.slice(0, 7)) });
+      qc.invalidateQueries({ queryKey: ['pots'] });
     },
   });
 }
@@ -100,6 +102,7 @@ export function useUpdateTransaction(yearMonth: string) {
       if (updated.yearMonth !== yearMonth) {
         qc.invalidateQueries({ queryKey: queryKeys.transactions(updated.yearMonth) });
       }
+      qc.invalidateQueries({ queryKey: ['pots'] });
     },
   });
 }
@@ -110,8 +113,10 @@ export function useDeleteTransaction() {
   return useMutation({
     mutationFn: (vars: { transactionId: string; yearMonth: string }) =>
       api.deleteTransaction(vars.yearMonth, vars.transactionId),
-    onSuccess: (_data, vars) =>
-      qc.invalidateQueries({ queryKey: queryKeys.transactions(vars.yearMonth) }),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: queryKeys.transactions(vars.yearMonth) });
+      qc.invalidateQueries({ queryKey: ['pots'] });
+    },
   });
 }
 
@@ -139,7 +144,10 @@ export function useCreateCategory() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: { name: string; type: Category['type']; icon: string; group?: CategoryGroup }) => api.createCategory(input),
-    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.categories }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.categories });
+      qc.invalidateQueries({ queryKey: ['pots'] });
+    },
   });
 }
 
@@ -152,6 +160,7 @@ export function useReassignCategory() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.recurring });
       qc.invalidateQueries({ queryKey: ['transactions'] });
+      qc.invalidateQueries({ queryKey: ['pots'] });
     },
   });
 }
@@ -166,7 +175,28 @@ export function useDeleteCategory() {
       qc.invalidateQueries({ queryKey: queryKeys.targets });
       qc.invalidateQueries({ queryKey: ['transactions'] });
       qc.invalidateQueries({ queryKey: queryKeys.recurring });
+      qc.invalidateQueries({ queryKey: ['pots'] });
     },
+  });
+}
+
+export function usePots(asOf: string, enabled: boolean = true) {
+  const api = useApi();
+  const authReady = useAuthReady();
+  return useQuery({
+    queryKey: queryKeys.pots(asOf),
+    queryFn: () => api.getPots(asOf),
+    enabled: authReady && enabled,
+  });
+}
+
+export function useSavePot() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { categoryId: string; input: PotSettingsInput }) =>
+      api.savePot(vars.categoryId, vars.input),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['pots'] }),
   });
 }
 

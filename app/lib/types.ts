@@ -43,3 +43,25 @@ export interface Recurring {
   createdAt: string;
   updatedAt: string;
 }
+
+export interface PotMonth {
+  yearMonth: string; opening: number; setAside: number; autoAdded: number;
+  takeOut: number; spent: number; closing: number;
+}
+
+export interface PotSummary {
+  categoryId: string;
+  monthlyAmount: number | null;
+  goalAmount: number | null;
+  autoAmountNow: number;
+  balance: number;
+  thisMonth: { setAside: number; autoAdded: number; takeOut: number; spent: number };
+  months: PotMonth[];
+}
+
+export interface PotSettingsInput {
+  monthlyAmount: number | null;
+  goalAmount: number | null;
+  autoContribute: boolean;
+  month: string;
+}
