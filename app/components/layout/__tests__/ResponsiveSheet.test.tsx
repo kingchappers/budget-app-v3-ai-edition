@@ -47,4 +47,11 @@ describe('ResponsiveSheet', () => {
     await userEvent.setup().keyboard('{Escape}');
     await waitFor(() => expect(onClose).toHaveBeenCalled());
   });
+
+  it('sizes the bottom drawer to its content instead of filling the screen', () => {
+    renderSheet();
+    const content = document.querySelector('.mantine-Drawer-content') as HTMLElement;
+    expect(content).not.toBeNull();
+    expect(content).toHaveStyle({ height: 'auto' });
+  });
 });
