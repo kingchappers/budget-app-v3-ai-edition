@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MantineProvider } from '@mantine/core';
 import type { Category, Recurring } from '~/lib/types';
@@ -113,15 +113,67 @@ describe('Recurring page', () => {
     expect(screen.getByText('Form editing Salary')).toBeInTheDocument();
   });
 
-  it('deletes an item from its menu', async () => {
+  async function chooseDelete(user: ReturnType<typeof userEvent.setup>): Promise<HTMLElement> {
+    await user.click(screen.getByRole('button', { name: 'Actions for Salary' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Delete' }));
+    return screen.findByRole('dialog', { name: 'Delete recurring item' });
+  }
+
+  it('asks for confirmation before deleting and names the item', async () => {
     const user = userEvent.setup();
     mockQuery.data = [rec({ recurringId: 'r9' })];
     renderPage();
 
-    await user.click(screen.getByRole('button', { name: 'Actions for Salary' }));
-    await user.click(await screen.findByRole('menuitem', { name: 'Delete' }));
+    const dialog = await chooseDelete(user);
+
+    expect(within(dialog).getByText("Delete Salary? This can't be undone.")).toBeInTheDocument();
+    expect(mockDelete).not.toHaveBeenCalled();
+  });
+
+  it('deletes the item when Delete is confirmed', async () => {
+    const user = userEvent.setup();
+    mockQuery.data = [rec({ recurringId: 'r9' })];
+    renderPage();
+
+    const dialog = await chooseDelete(user);
+    await user.click(within(dialog).getByRole('button', { name: 'Delete' }));
 
     expect(mockDelete).toHaveBeenCalledWith('r9');
+  });
+
+  it('deletes only once even if Delete is clicked twice', async () => {
+    const user = userEvent.setup();
+    mockQuery.data = [rec({ recurringId: 'r9' })];
+    renderPage();
+
+    const dialog = await chooseDelete(user);
+    await user.dblClick(within(dialog).getByRole('button', { name: 'Delete' }));
+
+    expect(mockDelete).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not delete when Cancel is pressed', async () => {
+    const user = userEvent.setup();
+    mockQuery.data = [rec({ recurringId: 'r9' })];
+    renderPage();
+
+    const dialog = await chooseDelete(user);
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+
+    expect(mockDelete).not.toHaveBeenCalled();
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Delete recurring item' })).not.toBeInTheDocument());
+  });
+
+  it('does not delete when the dialog is dismissed with Escape', async () => {
+    const user = userEvent.setup();
+    mockQuery.data = [rec({ recurringId: 'r9' })];
+    renderPage();
+
+    await chooseDelete(user);
+    await user.keyboard('{Escape}');
+
+    expect(mockDelete).not.toHaveBeenCalled();
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Delete recurring item' })).not.toBeInTheDocument());
   });
 
   it('shows why a delete failed', () => {

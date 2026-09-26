@@ -21,7 +21,22 @@ export function ResponsiveSheet({ opened, onClose, title, children }: Responsive
   }
 
   return (
-    <Drawer opened={opened} onClose={onClose} position="bottom" size="auto" title={title}>
+    <Drawer
+      opened={opened}
+      onClose={onClose}
+      position="bottom"
+      size="auto"
+      title={title}
+      styles={{
+        content: {
+          flex: '0 0 auto',
+          height: 'auto',
+          maxHeight: '90dvh',
+          borderTopLeftRadius: 'var(--mantine-radius-lg)',
+          borderTopRightRadius: 'var(--mantine-radius-lg)',
+        },
+      }}
+    >
       {children}
     </Drawer>
   );

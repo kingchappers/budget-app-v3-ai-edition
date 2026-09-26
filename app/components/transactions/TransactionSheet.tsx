@@ -36,9 +36,10 @@ export interface TransactionSheetProps {
   template?: Transaction | null;
   templateDate?: string;
   onSaved?: (created: Transaction) => void;
+  onUndone?: () => void;
 }
 
-export function TransactionSheet({ opened, onClose, yearMonth, editing, preset, template, templateDate, onSaved }: TransactionSheetProps) {
+export function TransactionSheet({ opened, onClose, yearMonth, editing, preset, template, templateDate, onSaved, onUndone }: TransactionSheetProps) {
   const { data: categories = [], isLoading: categoriesLoading, error: categoriesError } = useCategories();
   const monthTransactions = useSnapshotWhileOpen(useTransactions(currentYearMonth(), opened).data, opened);
   const noteIndex = useNoteHistory(opened);
@@ -109,6 +110,18 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, preset, 
     focusChipsAfterRenderRef.current = false;
     chipsRef.current?.querySelector<HTMLInputElement>('input[type="radio"]')?.focus();
   });
+
+  const recalledForIndexRef = useRef(noteIndex);
+  useEffect(() => {
+    if (recalledForIndexRef.current === noteIndex) return;
+    recalledForIndexRef.current = noteIndex;
+    if (!opened || editing || categorySource === 'user' || description.trim() === '') return;
+
+    const recalled = categoryForNote(noteIndex, description, type, categories);
+    if (!recalled) return;
+    setCategoryId(recalled);
+    setCategorySource('memory');
+  }, [noteIndex, opened, editing, categorySource, description, type, categories]);
 
   const eligible = categories.filter(c => categoryTypesFor(type).includes(c.type));
   const chips = topCategories(monthTransactions ?? [], categories, type, CHIP_LIMIT);
@@ -226,7 +239,7 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, preset, 
 
     if (createSubmittedRef.current) return;
     createSubmittedRef.current = true;
-    void saveWithUndo(input).then(created => {
+    void saveWithUndo(input, { onUndo: onUndone }).then(created => {
       if (created) onSaved?.(created);
     });
     if (mode === 'addAnother') {

@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
+import { createHash } from 'crypto';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { createStaticHandler, type StaticHandler } from '../handler';
+import { buildCsp, createStaticHandler, type StaticHandler } from '../handler';
 
 // Bytes that are not valid UTF-8, so a handler that reads binary as text corrupts them.
 const BINARY_BYTES = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0xff, 0xfe, 0x00, 0x80]);
@@ -31,6 +32,7 @@ beforeAll(() => {
   fs.writeFileSync(path.join(site, 'icons', 'icon-192.png'), BINARY_BYTES);
   fs.writeFileSync(path.join(site, 'manifest.webmanifest'), '{"name":"Budget"}');
   fs.writeFileSync(path.join(site, 'favicon.ico'), BINARY_BYTES);
+  fs.writeFileSync(path.join(site, 'index.js'), 'handler source');
   fs.writeFileSync(path.join(base, 'site-evil', 'secret.txt'), 'secret');
   fs.writeFileSync(path.join(base, 'secret.txt'), 'secret');
   handle = createStaticHandler(site);
@@ -239,5 +241,124 @@ describe('cache header normalization', () => {
     expect(res.statusCode).toBe(200);
     expect(res.headers?.['Cache-Control']).toBe('public, max-age=86400');
     expect(res.isBase64Encoded).toBe(true);
+  });
+});
+
+describe('the handler source', () => {
+  it.each(['/index.js', '/index.js?x=1', '/%69ndex.js', '/assets/../index.js'])('returns 404 for %s', async (rawPath) => {
+    const res = await handle({ rawPath });
+
+    expect(res.statusCode).toBe(404);
+    expect(res.body).toBe('Not Found');
+    expectSecurityHeaders(res.headers);
+  });
+
+  it('still serves hashed assets that have index in their name', async () => {
+    const res = await handle({ rawPath: '/assets/index-abc12345.js' });
+    expect(res.statusCode).toBe(200);
+  });
+});
+
+describe('content security policy header', () => {
+  const CSP = 'Content-Security-Policy-Report-Only';
+
+  it.each(['/', '/index.html', '/transactions'])('is added to the page at %s', async (rawPath) => {
+    const res = await handle({ rawPath });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.headers?.[CSP]).toContain("script-src 'self'");
+    expect(res.headers).not.toHaveProperty('Content-Security-Policy');
+  });
+
+  it.each(['/assets/index-abc12345.js', '/icons/icon-192.png', '/manifest.webmanifest', '/missing.png', '/%2e%2e/secret.txt'])(
+    'is not added to %s',
+    async (rawPath) => {
+      const res = await handle({ rawPath });
+      expect(res.headers).not.toHaveProperty(CSP);
+    },
+  );
+
+  it('is built from the page\'s inline scripts and the tenant in csp.json', async () => {
+    const site = path.join(base, 'site-csp');
+    fs.mkdirSync(site);
+    const script = 'window.__ctx = 1;';
+    fs.writeFileSync(path.join(site, 'index.html'), `<html><script>${script}</script></html>`);
+    fs.writeFileSync(path.join(site, 'csp.json'), JSON.stringify({ auth0Domain: 'tenant.uk.auth0.com' }));
+
+    const res = await createStaticHandler(site)({ rawPath: '/' });
+
+    const policy = String(res.headers?.[CSP]);
+    expect(policy).toContain(`'sha256-${createHash('sha256').update(script).digest('base64')}'`);
+    expect(policy).toContain('https://tenant.uk.auth0.com');
+  });
+
+  it('still produces a policy when csp.json is missing', async () => {
+    const site = path.join(base, 'site-no-csp');
+    fs.mkdirSync(site);
+    fs.writeFileSync(path.join(site, 'index.html'), '<html></html>');
+
+    const res = await createStaticHandler(site)({ rawPath: '/' });
+
+    expect(String(res.headers?.[CSP])).toContain("connect-src 'self'; frame-src 'self';");
+  });
+});
+
+describe('buildCsp', () => {
+  const hash = (code: string): string => `'sha256-${createHash('sha256').update(code).digest('base64')}'`;
+  const directive = (policy: string, name: string): string =>
+    policy.split('; ').find(part => part.startsWith(`${name} `)) ?? '';
+
+  const html = [
+    '<html>',
+    '<script data-mantine-script="true">window.a = 1;</script>',
+    '<script src="/assets/app.js"></script>',
+    '<script type="module" async="">import "/assets/x.js";</script>',
+    '<script></script>',
+    '</html>',
+  ].join('');
+
+  it('hashes every inline script and skips scripts with a src and empty scripts', () => {
+    const scripts = directive(buildCsp(html, undefined), 'script-src');
+
+    expect(scripts).toContain(hash('window.a = 1;'));
+    expect(scripts).toContain(hash('import "/assets/x.js";'));
+    expect(scripts).not.toContain(hash(''));
+  });
+
+  it('never allows unsafe inline scripts or eval', () => {
+    const policy = buildCsp(html, 'tenant.uk.auth0.com');
+
+    expect(directive(policy, 'script-src')).not.toContain('unsafe');
+    expect(policy).not.toContain('unsafe-eval');
+  });
+
+  it('allows inline styles because Mantine adds style elements at runtime', () => {
+    expect(directive(buildCsp(html, undefined), 'style-src')).toContain("'unsafe-inline'");
+  });
+
+  it('allows the Auth0 tenant for connections and frames', () => {
+    const policy = buildCsp(html, 'tenant.uk.auth0.com');
+
+    expect(directive(policy, 'connect-src')).toContain('https://tenant.uk.auth0.com');
+    expect(directive(policy, 'frame-src')).toContain('https://tenant.uk.auth0.com');
+  });
+
+  it('allows only self when no domain is given', () => {
+    expect(directive(buildCsp(html, undefined), 'connect-src')).toBe("connect-src 'self'");
+  });
+
+  it.each(['evil.com; script-src *', 'a b', '', 'https://x.com'])('ignores an invalid domain %j', (domain) => {
+    const policy = buildCsp(html, domain);
+
+    expect(policy).not.toContain('evil');
+    expect(directive(policy, 'connect-src')).toBe("connect-src 'self'");
+  });
+
+  it('locks down objects, base URIs and framing', () => {
+    const policy = buildCsp(html, undefined);
+
+    expect(policy).toContain("object-src 'none'");
+    expect(policy).toContain("base-uri 'self'");
+    expect(policy).toContain("frame-ancestors 'none'");
   });
 });

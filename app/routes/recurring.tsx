@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ActionIcon, Alert, Button, Group, Loader, Menu, Stack, Text, ThemeIcon, Title } from '@mantine/core';
+import { ActionIcon, Alert, Button, Group, Loader, Menu, Modal, Stack, Text, ThemeIcon, Title } from '@mantine/core';
 import { IconDots, IconPencil, IconPlus, IconTrash } from '@tabler/icons-react';
 import { DefaultLayout } from '~/components/layout/DefaultLayout';
 import { RecurringForm } from '~/components/recurring/RecurringForm';
@@ -65,6 +65,13 @@ function RecurringContent() {
   const remove = useDeleteRecurring();
   const [editing, setEditing] = useState<Recurring | null>(null);
   const [creating, setCreating] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<Recurring | null>(null);
+
+  function confirmDelete(): void {
+    if (!pendingDelete) return;
+    remove.mutate(pendingDelete.recurringId);
+    setPendingDelete(null);
+  }
 
   if (recurring.error) {
     return (
@@ -100,7 +107,7 @@ function RecurringContent() {
           category={categories.data?.find(c => c.categoryId === item.categoryId)}
           categoriesLoaded={categories.data !== undefined}
           onEdit={setEditing}
-          onDelete={target => remove.mutate(target.recurringId)}
+          onDelete={setPendingDelete}
         />
       ))}
 
@@ -112,6 +119,21 @@ function RecurringContent() {
         }}
         editing={editing}
       />
+
+      <Modal
+        opened={pendingDelete !== null}
+        onClose={() => setPendingDelete(null)}
+        title="Delete recurring item"
+        centered
+      >
+        <Stack>
+          <Text>Delete {pendingDelete?.description || 'this item'}? This can't be undone.</Text>
+          <Group justify="flex-end">
+            <Button variant="default" onClick={() => setPendingDelete(null)}>Cancel</Button>
+            <Button color="danger" onClick={confirmDelete}>Delete</Button>
+          </Group>
+        </Stack>
+      </Modal>
     </Stack>
   );
 }
