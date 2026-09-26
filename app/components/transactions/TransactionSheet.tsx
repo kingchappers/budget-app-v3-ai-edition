@@ -36,9 +36,10 @@ export interface TransactionSheetProps {
   template?: Transaction | null;
   templateDate?: string;
   onSaved?: (created: Transaction) => void;
+  onUndone?: () => void;
 }
 
-export function TransactionSheet({ opened, onClose, yearMonth, editing, preset, template, templateDate, onSaved }: TransactionSheetProps) {
+export function TransactionSheet({ opened, onClose, yearMonth, editing, preset, template, templateDate, onSaved, onUndone }: TransactionSheetProps) {
   const { data: categories = [], isLoading: categoriesLoading, error: categoriesError } = useCategories();
   const monthTransactions = useSnapshotWhileOpen(useTransactions(currentYearMonth(), opened).data, opened);
   const noteIndex = useNoteHistory(opened);
@@ -238,7 +239,7 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, preset, 
 
     if (createSubmittedRef.current) return;
     createSubmittedRef.current = true;
-    void saveWithUndo(input).then(created => {
+    void saveWithUndo(input, { onUndo: onUndone }).then(created => {
       if (created) onSaved?.(created);
     });
     if (mode === 'addAnother') {

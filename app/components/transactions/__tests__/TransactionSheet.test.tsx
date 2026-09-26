@@ -307,6 +307,22 @@ describe('TransactionSheet', () => {
     await waitFor(() => expect(mockRemove).toHaveBeenCalledWith({ transactionId: 't-real', yearMonth: '2026-07' }));
   });
 
+  it('passes onUndone through so a caller can react to Undo', async () => {
+    const user = userEvent.setup();
+    const onUndone = vi.fn();
+    renderSheet({ onUndone });
+    await user.type(screen.getByLabelText(/amount/i), '4.80');
+    await user.click(screen.getByRole('radio', { name: 'Dining' }));
+    await user.click(screen.getByRole('button', { name: /^save$/i }));
+
+    expect(await screen.findByText(/saved £4\.80 · dining/i)).toBeInTheDocument();
+    expect(onUndone).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Undo' }));
+
+    await waitFor(() => expect(onUndone).toHaveBeenCalledTimes(1));
+    expect(mockRemove).toHaveBeenCalledWith({ transactionId: 't-real', yearMonth: '2026-07' });
+  });
+
   it('defers Undo until the create has finished', async () => {
     const user = userEvent.setup();
     const pending = deferred<{ transactionId: string; yearMonth: string }>();
