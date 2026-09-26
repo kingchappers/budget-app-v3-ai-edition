@@ -10,7 +10,7 @@ Bank sync was dropped (see `DECISIONS.md`), so manual entry is the core interact
 | D | PWA and add shortcut | Merged ([PR #36](https://github.com/kingchappers/budget-app-v3-ai-edition/pull/36)). Spec: `superpowers/specs/2026-09-23-pwa-add-shortcut-design.md`, plan: `superpowers/plans/2026-09-23-pwa-add-shortcut.md` |
 | E | CSV/OFX import | Dropped: manual CSV/OFX import was judged clunky and would not be used. |
 | F1 | Category groups and YNAB defaults | Implemented on `feat/category-groups` ([PR #37](https://github.com/kingchappers/budget-app-v3-ai-edition/pull/37)). Spec: `superpowers/specs/2026-09-24-category-groups-design.md`, plan: `superpowers/plans/2026-09-24-category-groups.md` |
-| F2 | Savings and sinking-fund pots | Not started: carried-over balance, Set aside / Take out, goal and monthly targets, optional auto-contribute |
+| F2 | Savings and sinking-fund pots | Implemented on `feat/savings-pots` (PR pending). Spec: `superpowers/specs/2026-09-25-savings-pots-design.md`, plan: `superpowers/plans/2026-09-25-savings-pots.md` |
 | G | Polish and hardening pass | Not started |
 | H | Spending insights | Not started (after F) |
 | I | Net worth and accounts | Not started |
@@ -97,6 +97,29 @@ Implemented on `feat/category-groups`. Spec: `superpowers/specs/2026-09-24-categ
   - Emoji are read aloud in chip and option names, because `categoryLabel` puts them into the accessible name.
   - 🛜 (Phone and Internet) is a Unicode 15 emoji and may render as a blank box on older phones; swap it for 📶 if so.
   - `isEmojiIcon` misses flag and keycap emoji, which matters only if users can set icons later.
+
+## F2: Savings and sinking-fund pots
+
+Implemented on `feat/savings-pots`. Spec: `superpowers/specs/2026-09-25-savings-pots-design.md`, plan: `superpowers/plans/2026-09-25-savings-pots.md`.
+
+- **Built:**
+  - Pot categories (Sinking Funds and Saving & Investment) with a carried-over balance.
+  - Spend, Set aside and Take out entry types, replacing Invest in/out.
+  - Optional monthly and goal amounts per pot, and derived auto-contribute.
+  - `GET /api/pots` and `PUT /api/pots/{categoryId}`. No infra, IAM or dependency changes.
+  - A Pots page with a history sheet and trend line, and a Pots section on Home.
+- **Decisions:** pots are a category type (`POT`) and the old investment types are removed with no migration; the balance is derived on demand from the full history, so nothing stored can drift; auto-contribute is a list of `{ from, amount }` entries, not scheduled writes; entries dated after the month being viewed are excluded; negative balances are allowed and flagged; a custom pot with no group defaults to Sinking Funds; Home's Pots section follows its month selector.
+- **Follow-ups:**
+  - A quick-add syntax for Set aside.
+  - A stored monthly summary if `GET /api/pots` gets slow.
+  - The transaction API should check category type against entry type.
+  - Pots spanning several categories.
+  - Deleting a custom category leaves its pot settings orphaned.
+  - Net worth and account balances (I).
+  - The Home pots section and the Pots page duplicate a small `formatBalance` helper.
+  - The pot history sheet has no tests for a few edges: pots invalidation from the update, reassign and category hooks, the error branch on Home, and the month passed to `usePots`.
+  - The trend line stroke is clipped at the svg edges.
+  - A literal `null` request body to the pots PUT gives a non-400 error (the same pattern exists in other handlers).
 
 ## Later ideas
 
