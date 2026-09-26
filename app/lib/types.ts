@@ -65,3 +65,17 @@ export interface PotSettingsInput {
   autoContribute: boolean;
   month: string;
 }
+
+export interface CategoryMonthSpend { yearMonth: string; spent: number }
+export interface CategorySpendTrend {
+  categoryId: string;
+  months: CategoryMonthSpend[];
+  total: number;
+  average: number;
+}
+export interface TopNote { note: string; count: number; total: number }
+export interface Insights {
+  months: string[];
+  categories: CategorySpendTrend[];
+  topNotes: TopNote[];
+}

@@ -10,7 +10,7 @@ const auth0 = {
 
 vi.mock('@auth0/auth0-react', () => ({ useAuth0: () => auth0 }));
 
-import { useCategories, useTransactions } from '../queries';
+import { useCategories, useInsights, useTransactions } from '../queries';
 
 function wrapper({ children }: { children: React.ReactNode }) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -63,5 +63,28 @@ describe('useTransactions', () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(fetch).toHaveBeenCalledWith('/api/transactions?year=2026&month=9', expect.anything());
+  });
+});
+
+describe('useInsights', () => {
+  beforeEach(() => {
+    auth0.isAuthenticated = true;
+    auth0.isLoading = false;
+    auth0.getAccessTokenSilently.mockClear();
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ months: [], categories: [], topNotes: [] }))));
+  });
+
+  it('fetches with the default months window', async () => {
+    const { result } = renderHook(() => useInsights('2026-09'), { wrapper });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(fetch).toHaveBeenCalledWith('/api/insights?asOf=2026-09&months=6', expect.anything());
+  });
+
+  it('fetches with a requested months window', async () => {
+    const { result } = renderHook(() => useInsights('2026-09', 3), { wrapper });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(fetch).toHaveBeenCalledWith('/api/insights?asOf=2026-09&months=3', expect.anything());
   });
 });

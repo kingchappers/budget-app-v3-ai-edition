@@ -5,7 +5,7 @@ import { Auth0Provider } from '@auth0/auth0-react';
 import Authentication from "../authentication/Authentication";
 import { ColorSchemeToggle } from './ColorSchemeToggle';
 import { QuickEntryTips } from './QuickEntryTips';
-import { IconHome, IconList, IconRepeat, IconTarget, IconPlus, IconTag, IconPigMoney } from '@tabler/icons-react';
+import { IconHome, IconList, IconRepeat, IconTarget, IconPlus, IconTag, IconPigMoney, IconChartBar } from '@tabler/icons-react';
 import { NavLink as RouterNavLink, useLocation } from 'react-router';
 import { TransactionSheet } from '../transactions/TransactionSheet';
 import { LaunchIntent } from './LaunchIntent';
@@ -21,6 +21,7 @@ const NAV_ITEMS = [
 
 const SIDEBAR_ONLY_ITEMS = [
   { to: '/recurring', label: 'Recurring', Icon: IconRepeat },
+  { to: '/insights', label: 'Insights', Icon: IconChartBar },
 ];
 
 function isNavItemActive(pathname: string, to: string) {

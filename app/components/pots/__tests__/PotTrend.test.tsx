@@ -32,4 +32,9 @@ describe('PotTrend', () => {
     const { container } = render(<PotTrend values={[1]} />);
     expect(container.querySelector('svg')).toBeNull();
   });
+
+  it('accepts a custom accessible label', () => {
+    const { getByRole } = render(<PotTrend values={[1, 2, 3]} label="Groceries spending trend" />);
+    expect(getByRole('img', { name: 'Groceries spending trend' })).toBeInTheDocument();
+  });
 });

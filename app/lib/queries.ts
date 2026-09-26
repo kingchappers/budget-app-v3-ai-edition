@@ -11,6 +11,7 @@ export const queryKeys = {
   transactions: (yearMonth: string) => ['transactions', yearMonth] as const,
   recurring: ['recurring'] as const,
   pots: (asOf: string) => ['pots', asOf] as const,
+  insights: (asOf: string, months: number) => ['insights', asOf, months] as const,
 };
 
 function useApi() {
@@ -235,6 +236,16 @@ export function useDeleteRecurring() {
   return useMutation({
     mutationFn: (recurringId: string) => api.deleteRecurring(recurringId),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.recurring }),
+  });
+}
+
+export function useInsights(asOf: string, months: number = 6) {
+  const api = useApi();
+  const authReady = useAuthReady();
+  return useQuery({
+    queryKey: queryKeys.insights(asOf, months),
+    queryFn: () => api.getInsights(asOf, months),
+    enabled: authReady,
   });
 }
 

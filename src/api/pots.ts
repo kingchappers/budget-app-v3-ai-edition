@@ -2,47 +2,18 @@ import { QueryCommand, PutCommand } from '@aws-sdk/lib-dynamodb';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { docClient, TABLE, pk, catSk, potSk } from './db';
 import { DEFAULT_CATEGORIES } from './defaults';
+import { queryAll } from './dynamo';
+import { isValidMonth, monthIndex, serverMonthIndex } from './months';
 import { autoAmountFor, computePots } from './potsCalc';
 import type { ApiResponse, Category, PotAutoEntry, PotSettings, Transaction } from './types';
 import { ok, err } from './http';
 
 export const MAX_POT_AMOUNT_PENCE = 1_000_000_000;
 export const MAX_AUTO_ENTRIES = 120;
-const MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
-
-function isValidMonth(value: unknown): value is string {
-  return typeof value === 'string' && MONTH_PATTERN.test(value);
-}
-
-function monthIndex(yearMonth: string): number {
-  const [year, month] = yearMonth.split('-').map(Number);
-  return year * 12 + (month - 1);
-}
-
-function serverMonthIndex(): number {
-  const now = new Date();
-  return now.getUTCFullYear() * 12 + now.getUTCMonth();
-}
 
 function isOptionalAmount(value: unknown): value is number | null {
   if (value === null) return true;
   return typeof value === 'number' && Number.isInteger(value) && value > 0 && value <= MAX_POT_AMOUNT_PENCE;
-}
-
-async function queryAll(userId: string, prefix: string): Promise<Record<string, unknown>[]> {
-  const items: Record<string, unknown>[] = [];
-  let lastEvaluatedKey: Record<string, unknown> | undefined;
-  do {
-    const result = await docClient.send(new QueryCommand({
-      TableName: TABLE,
-      KeyConditionExpression: 'PK = :pk AND begins_with(SK, :prefix)',
-      ExpressionAttributeValues: { ':pk': pk(userId), ':prefix': prefix },
-      ExclusiveStartKey: lastEvaluatedKey,
-    }));
-    items.push(...(result.Items || []));
-    lastEvaluatedKey = result.LastEvaluatedKey as Record<string, unknown> | undefined;
-  } while (lastEvaluatedKey);
-  return items;
 }
 
 async function queryOne(userId: string, sk: string): Promise<Record<string, unknown> | undefined> {

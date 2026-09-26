@@ -11,8 +11,8 @@ Bank sync was dropped (see `DECISIONS.md`), so manual entry is the core interact
 | E | CSV/OFX import | Dropped: manual CSV/OFX import was judged clunky and would not be used. |
 | F1 | Category groups and YNAB defaults | Implemented on `feat/category-groups` ([PR #37](https://github.com/kingchappers/budget-app-v3-ai-edition/pull/37)). Spec: `superpowers/specs/2026-09-24-category-groups-design.md`, plan: `superpowers/plans/2026-09-24-category-groups.md` |
 | F2 | Savings and sinking-fund pots | Implemented on `feat/savings-pots` (PR pending). Spec: `superpowers/specs/2026-09-25-savings-pots-design.md`, plan: `superpowers/plans/2026-09-25-savings-pots.md` |
-| G | Polish and hardening pass | Not started |
-| H | Spending insights | Not started (after F) |
+| G | Polish and hardening pass | Not started. Skipped for now at the owner's request; H was done first. |
+| H | Spending insights | Implemented on `claude/subprojects-g-h-tasks-slpjtk` (PR pending). Spec: `superpowers/specs/2026-09-26-spending-insights-design.md`, plan: `superpowers/plans/2026-09-26-spending-insights.md` |
 | I | Net worth and accounts | Not started |
 | J | Offline entry queue | Not started |
 
@@ -126,6 +126,23 @@ Implemented on `feat/savings-pots`. Spec: `superpowers/specs/2026-09-25-savings-
   - On the Pots page the floating + button covers the Set aside button of a row that scrolls under it (the same fixed-button overlap as elsewhere in the app); scrolling to the end clears it.
   - On a 390px screen the history sheet's month table scrolls sideways (the Closing column is off screen) with no hint, and the sheet is taller than the screen so the settings need scrolling. The trend line's end points are half-clipped at the edge of its box.
   - The client's local month and the server's UTC month can differ for about an hour around midnight on the 1st, so Home's "next month" could hit the API's month bound for that hour.
+
+## H: Spending insights
+
+Implemented on `claude/subprojects-g-h-tasks-slpjtk`. Spec: `superpowers/specs/2026-09-26-spending-insights-design.md`, plan: `superpowers/plans/2026-09-26-spending-insights.md`.
+
+- **Built:**
+  - `GET /api/insights?asOf=YYYY-MM&months=N` (default 6, 3–12 allowed), computed on demand from the full transaction history like F2's pots endpoint. Returns every `EXPENSE` category's zero-filled monthly spend over the window plus its total/average, and the top 8 notes by total spend (same note normalisation rule as B's memory).
+  - A new Insights page (sidebar-only, like Recurring): category trends (top 6 by total, with a sparkline reusing `PotTrend`), budget vs actual (reusing the existing Targets/Home progress math client-side, joined with the endpoint's actual/average figures), and a top merchants/notes list.
+  - `queryAll` and the month-validation helpers (`isValidMonth`/`monthIndex`/`serverMonthIndex`) were lifted out of `pots.ts` into `src/api/dynamo.ts` and `src/api/months.ts` so Insights could reuse them instead of a third copy; `pots.ts`'s behaviour is unchanged.
+  - `PotTrend` gained an optional `label` prop (default unchanged) so Insights' sparklines get their own accessible name instead of "Balance trend".
+- **Decisions:** `POT` categories are excluded (they have their own trend on the Pots page); the window is fixed at 6 months and not user-editable in this round; budget-vs-actual math stays client-side (reusing `summary.ts`) rather than duplicating target normalisation on the server; the API returns every `EXPENSE` category rather than separate shapes per section, since both the trends and budget-vs-actual views can filter the same array.
+- **Follow-ups:**
+  - No live browser pass was possible this session (no Auth0/AWS sandbox available) — verification is unit/component tests plus typecheck only. A real browser pass (mobile width included) is still owed before shipping.
+  - The window (6 months) isn't user-configurable.
+  - `CategoryTrendList` caps at 6 rows with no "see more" affordance.
+  - `TopNotesList` doesn't link a note back to its transactions.
+  - G (polish and hardening) is still not started.
 
 ## Later ideas
 

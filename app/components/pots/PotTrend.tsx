@@ -14,13 +14,13 @@ export function trendPoints(values: number[], width: number = WIDTH, height: num
     .join(' ');
 }
 
-export function PotTrend({ values }: { values: number[] }) {
+export function PotTrend({ values, label = 'Balance trend' }: { values: number[]; label?: string }) {
   const points = trendPoints(values);
   if (points === '') return null;
   return (
     <svg
       role="img"
-      aria-label="Balance trend"
+      aria-label={label}
       viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
       preserveAspectRatio="none"
       style={{ width: '100%', height: 48, display: 'block' }}

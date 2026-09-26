@@ -7,6 +7,7 @@ import { getCategories, createCategory, deleteCategory } from './src/api/categor
 import { getTransactions, createTransaction, deleteTransaction, updateTransaction } from './src/api/transactions';
 import { getTargets, upsertTarget, deleteTarget } from './src/api/targets';
 import { getPots, putPot } from './src/api/pots';
+import { getInsights } from './src/api/insights';
 import { reassignCategory } from './src/api/reassign';
 import {
   getRecurring, createRecurring, updateRecurring, deleteRecurring, setRecurringHandled,
@@ -42,6 +43,7 @@ router.put('/api/targets/{categoryId}', upsertTarget);
 router.delete('/api/targets/{categoryId}', deleteTarget);
 router.get('/api/pots', getPots);
 router.put('/api/pots/{categoryId}', putPot);
+router.get('/api/insights', getInsights);
 router.get('/api/recurring', getRecurring);
 router.post('/api/recurring', createRecurring);
 router.put('/api/recurring/{recurringId}', updateRecurring);

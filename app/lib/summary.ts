@@ -33,7 +33,7 @@ export function normaliseTargetToMonth(
   return Math.round((target * daysInMonth(yearMonth)) / 7);
 }
 
-function toProgress(
+export function toProgress(
   category: Category,
   target: CategoryTarget,
   spent: number,

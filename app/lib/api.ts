@@ -1,4 +1,4 @@
-import type { Category, CategoryGroup, CategoryTarget, PotSettingsInput, PotSummary, Recurring, TargetPeriod, Transaction, TransactionType } from './types';
+import type { Category, CategoryGroup, CategoryTarget, Insights, PotSettingsInput, PotSummary, Recurring, TargetPeriod, Transaction, TransactionType } from './types';
 
 type Request = (endpoint: string, options?: RequestInit) => Promise<unknown>;
 
@@ -119,6 +119,11 @@ export function createApi(request: Request) {
         body: JSON.stringify({ period }),
       }) as { recurring: Recurring };
       return res.recurring;
+    },
+
+    getInsights: async (asOf: string, months?: number): Promise<Insights> => {
+      const query = months ? `?asOf=${encodeURIComponent(asOf)}&months=${months}` : `?asOf=${encodeURIComponent(asOf)}`;
+      return await request(`/api/insights${query}`) as Insights;
     },
   };
 }
