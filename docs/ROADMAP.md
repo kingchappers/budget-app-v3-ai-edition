@@ -117,9 +117,12 @@ Implemented on `feat/savings-pots`. Spec: `superpowers/specs/2026-09-25-savings-
   - Deleting a custom category leaves its pot settings orphaned.
   - Net worth and account balances (I).
   - The Home pots section and the Pots page duplicate a small `formatBalance` helper.
-  - The pot history sheet has no tests for a few edges: pots invalidation from the update, reassign and category hooks, the error branch on Home, and the month passed to `usePots`.
+  - Missing tests for a few edges: pots invalidation from the update, reassign and category hooks, the Home error branch, the month passed to `usePots`, and the balance-above-goal text.
   - The trend line stroke is clipped at the svg edges.
   - A literal `null` request body to the pots PUT gives a non-400 error (the same pattern exists in other handlers).
+  - Any F1 targets already set on categories that are now pots (Holidays, Gifts and so on) are no longer shown or editable, because Targets covers spending categories only; clear them before deploying.
+  - The pots settings PUT is a read-modify-write with no conditional put, so two tabs saving at once could lose an auto-contribute entry (acceptable for one user).
+  - The Home Pots section appears after the rest of Home has loaded, causing a small layout shift; a skeleton would fix it.
 
 ## Later ideas
 
