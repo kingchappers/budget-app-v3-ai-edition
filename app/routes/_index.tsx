@@ -4,6 +4,7 @@ import { Alert, Button, Card, Group, Loader, Stack, Text, Title } from '@mantine
 import { DefaultLayout } from '~/components/layout/DefaultLayout';
 import { MonthHeader } from '~/components/budget/MonthHeader';
 import { CategoryProgressRow } from '~/components/budget/CategoryProgressRow';
+import { HomePots } from '~/components/pots/HomePots';
 import { DueRecurringCard } from '~/components/recurring/DueRecurringCard';
 import { TransactionRow } from '~/components/transactions/TransactionRow';
 import { groupItems, bucketKeyFor } from '~/lib/categoryGroups';
@@ -11,7 +12,7 @@ import { buildMonthSummary } from '~/lib/summary';
 import type { CategoryProgress } from '~/lib/summary';
 import { formatPence } from '~/lib/money';
 import { currentYearMonth } from '~/lib/months';
-import { useCategories, useTargets, useTransactions } from '~/lib/queries';
+import { useCategories, usePots, useTargets, useTransactions } from '~/lib/queries';
 
 function GroupedProgress({ items }: { items: CategoryProgress[] }) {
   return (
@@ -31,6 +32,7 @@ function HomeContent() {
   const categories = useCategories();
   const targets = useTargets();
   const transactions = useTransactions(yearMonth);
+  const pots = usePots(yearMonth);
 
   const isLoading = categories.isLoading || targets.isLoading || transactions.isLoading;
   const error = categories.error || targets.error || transactions.error;
@@ -80,6 +82,12 @@ function HomeContent() {
           <Title order={5} mb="xs">Spending vs target</Title>
           <GroupedProgress items={summary.spending} />
         </div>
+      )}
+
+      {pots.error ? (
+        <Text size="sm" c="dimmed">Could not load pots.</Text>
+      ) : (
+        <HomePots pots={pots.data ?? []} categories={categories.data ?? []} />
       )}
 
       <Group justify="space-between">
