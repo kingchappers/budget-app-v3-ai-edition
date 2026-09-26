@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MantineProvider } from '@mantine/core';
+import { MantineProvider, type MantineColorsTuple } from '@mantine/core';
 import type { Category, PotSummary } from '~/lib/types';
 import { currentYearMonth } from '~/lib/months';
 
@@ -128,6 +128,29 @@ describe('PotHistorySheet', () => {
     await user.clear(screen.getByLabelText('Monthly amount'));
     await user.click(screen.getByRole('button', { name: 'Save' }));
     expect(save.mutate.mock.calls[0][0].input).toMatchObject({ monthlyAmount: null, autoContribute: false });
+  });
+
+  it('shows an error and keeps the sheet open when saving fails', async () => {
+    const user = userEvent.setup();
+    save.mutate.mockImplementation((_vars: unknown, options: { onError: (e: Error) => void }) => options.onError(new Error('boom')));
+    const onClose = renderSheet(makePot());
+    await user.type(screen.getByLabelText('Monthly amount'), '50');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('Could not save. Try again.');
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('shows a negative balance with a minus sign and the danger colour', () => {
+    const danger = Array(10).fill('#c00') as unknown as MantineColorsTuple;
+    render(
+      <MantineProvider theme={{ colors: { danger } }}>
+        <PotHistorySheet pot={makePot({ balance: -3000 })} category={category} onClose={vi.fn()} />
+      </MantineProvider>,
+    );
+    const balance = screen.getByText('Balance').nextElementSibling as HTMLElement;
+    expect(balance).toHaveTextContent('−£30.00');
+    expect(balance).toHaveStyle({ color: 'var(--mantine-color-danger-text)' });
   });
 
   it('shows an error and does not save for an invalid amount', async () => {

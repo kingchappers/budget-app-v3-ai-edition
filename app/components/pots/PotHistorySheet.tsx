@@ -54,7 +54,7 @@ function PotSettingsForm({ pot, onClose }: { pot: PotSummary; onClose: () => voi
           month: currentYearMonth(),
         },
       },
-      { onSuccess: onClose },
+      { onSuccess: onClose, onError: () => setError('Could not save. Try again.') },
     );
   }
 
