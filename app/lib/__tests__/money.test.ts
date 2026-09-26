@@ -2,6 +2,22 @@ import { describe, it, expect } from 'vitest';
 import { parsePounds, formatPence, formatPencePlain } from '../money';
 
 describe('parsePounds', () => {
+  it('accepts exactly the £10,000,000 cap', () => {
+    expect(parsePounds('10000000')).toEqual({ ok: true, pence: 1_000_000_000 });
+  });
+
+  it('rejects one penny over the cap', () => {
+    expect(parsePounds('10000000.01')).toEqual({ ok: false, message: 'Amount is too large' });
+  });
+
+  it('rejects a 20-digit amount whose pence value is not a safe integer', () => {
+    expect(parsePounds('99999999999999999999')).toEqual({ ok: false, message: 'Amount is too large' });
+  });
+
+  it('rejects a digit string so long it overflows to Infinity', () => {
+    expect(parsePounds('9'.repeat(400))).toEqual({ ok: false, message: 'Amount is too large' });
+  });
+
   it('parses whole pounds', () => {
     expect(parsePounds('4')).toEqual({ ok: true, pence: 400 });
   });

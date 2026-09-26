@@ -18,6 +18,7 @@ vi.mock('@aws-sdk/lib-dynamodb', () => ({
 }));
 
 import { getTransactions, createTransaction, deleteTransaction, updateTransaction, validateTransactionInput } from '../transactions';
+import { MAX_AMOUNT_PENCE } from '../constants';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 
 function makeEvent(opts: {
@@ -267,5 +268,18 @@ describe('updateTransaction', () => {
       body: { amount: 480, type: 'EXPENSE', categoryId: 'cat-dining', description: 'x', date: '2026-07-16' },
     }), 'user-1', { yearMonth: '07-2026', transactionId: 'txn-1' });
     expect(res.statusCode).toBe(400);
+  });
+});
+
+describe('validateTransactionInput amount cap', () => {
+  const body = { type: 'EXPENSE', categoryId: 'cat-holidays', description: '', date: '2026-07-15' };
+
+  it('accepts an amount of exactly the cap', () => {
+    expect(validateTransactionInput({ ...body, amount: MAX_AMOUNT_PENCE }).ok).toBe(true);
+  });
+
+  it('rejects an amount one pence over the cap', () => {
+    const result = validateTransactionInput({ ...body, amount: MAX_AMOUNT_PENCE + 1 });
+    expect(result.ok).toBe(false);
   });
 });

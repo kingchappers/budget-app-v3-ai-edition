@@ -1,7 +1,7 @@
 import { QueryCommand, PutCommand, DeleteCommand, GetCommand, TransactWriteCommand } from '@aws-sdk/lib-dynamodb';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { docClient, TABLE, pk, txnSk } from './db';
-import { SECURITY_HEADERS, VALID_TRANSACTION_TYPES } from './constants';
+import { MAX_AMOUNT_PENCE, SECURITY_HEADERS, VALID_TRANSACTION_TYPES } from './constants';
 import type { Transaction, ApiResponse } from './types';
 import { ok, err } from './http';
 
@@ -47,8 +47,8 @@ export function validateTransactionInput(
 ): { ok: true; value: ValidTransactionInput } | { ok: false; message: string } {
   const { amount, type, categoryId, description, date } = body;
 
-  if (typeof amount !== 'number' || !Number.isInteger(amount) || amount <= 0) {
-    return { ok: false, message: 'amount must be a positive integer representing pence/cents' };
+  if (typeof amount !== 'number' || !Number.isInteger(amount) || amount <= 0 || amount > MAX_AMOUNT_PENCE) {
+    return { ok: false, message: `amount must be a positive integer representing pence/cents, at most ${MAX_AMOUNT_PENCE}` };
   }
   if (!type || !VALID_TRANSACTION_TYPES.has(type as string)) {
     return { ok: false, message: 'type must be EXPENSE, INCOME, SET_ASIDE, or TAKE_OUT' };

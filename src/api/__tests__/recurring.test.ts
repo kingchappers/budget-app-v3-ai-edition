@@ -16,7 +16,8 @@ vi.mock('@aws-sdk/lib-dynamodb', () => ({
   DeleteCommand: vi.fn(function(i: unknown) { return i; }),
 }));
 
-import { createRecurring, deleteRecurring, getRecurring, setRecurringHandled, updateRecurring } from '../recurring';
+import { createRecurring, deleteRecurring, getRecurring, setRecurringHandled, updateRecurring, validateRecurringInput } from '../recurring';
+import { MAX_AMOUNT_PENCE } from '../constants';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 
 function makeEvent(body?: unknown, rawBody?: string): APIGatewayProxyEventV2 {
@@ -292,5 +293,17 @@ describe('setRecurringHandled', () => {
   it('rejects a missing id and malformed JSON with 400', async () => {
     expect((await setRecurringHandled(makeEvent({ period: '2026-09' }), 'user-1', {})).statusCode).toBe(400);
     expect((await setRecurringHandled(makeEvent(undefined, '{'), 'user-1', { recurringId: 'r1' })).statusCode).toBe(400);
+  });
+});
+
+describe('validateRecurringInput amount cap', () => {
+  const body = { type: 'EXPENSE', categoryId: 'cat-holidays', description: 'Rent', dayOfMonth: 1, leadDays: 3 };
+
+  it('accepts an amount of exactly the cap', () => {
+    expect(validateRecurringInput({ ...body, amount: MAX_AMOUNT_PENCE }).ok).toBe(true);
+  });
+
+  it('rejects an amount one pence over the cap', () => {
+    expect(validateRecurringInput({ ...body, amount: MAX_AMOUNT_PENCE + 1 }).ok).toBe(false);
   });
 });
