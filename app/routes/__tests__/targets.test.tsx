@@ -10,7 +10,7 @@ vi.mock('~/components/layout/DefaultLayout', () => ({
 const categories: Category[] = [
   { categoryId: 'g', name: 'Groceries', type: 'EXPENSE', group: 'EVERYDAY', icon: '🛒', isDefault: true, createdAt: '' },
   { categoryId: 'm', name: 'Mortgage', type: 'EXPENSE', group: 'BILLS', icon: '🏠', isDefault: true, createdAt: '' },
-  { categoryId: 'w', name: 'Windows', type: 'INVESTMENT', group: 'SAVING_INVESTMENT', icon: '🪟', isDefault: true, createdAt: '' },
+  { categoryId: 'w', name: 'Emergency fund', type: 'POT', group: 'SAVING_INVESTMENT', icon: '😌', isDefault: true, createdAt: '' },
   { categoryId: 's', name: 'Salary', type: 'INCOME', icon: 'briefcase', isDefault: true, createdAt: '' },
 ];
 
@@ -27,7 +27,8 @@ describe('Targets page', () => {
   it('has one section per group in order and no Income section', () => {
     render(<MantineProvider><Targets /></MantineProvider>);
     const headings = screen.getAllByRole('heading', { level: 5 }).map(h => h.textContent);
-    expect(headings).toEqual(['Bills', 'Everyday Spending', 'Saving & Investment']);
+    expect(screen.queryByText('😌 Emergency fund')).not.toBeInTheDocument();
+    expect(headings).toEqual(['Bills', 'Everyday Spending']);
   });
 
   it('shows the emoji before the category name', () => {

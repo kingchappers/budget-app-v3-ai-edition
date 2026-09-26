@@ -4,7 +4,7 @@ import { formatPence } from '~/lib/money';
 import { CategoryIcon } from '~/components/categories/CategoryIcon';
 import type { Transaction } from '~/lib/types';
 
-const OUTGOING = new Set(['EXPENSE', 'INVESTMENT_IN']);
+const OUTGOING = new Set(['EXPENSE', 'SET_ASIDE']);
 
 export function TransactionRow({
   transaction, categoryName, categoryIcon, onEdit, onDelete, onDuplicate, onRepeat,

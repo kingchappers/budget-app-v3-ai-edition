@@ -1,5 +1,5 @@
 import type { Category, Transaction, TransactionType } from './types';
-import { categoryTypeFor } from './transactionTypes';
+import { categoryTypesFor } from './transactionTypes';
 
 export interface TransactionFilter {
   query: string;
@@ -31,14 +31,14 @@ export function topCategories(
   type: TransactionType,
   limit: number,
 ): Category[] {
-  const categoryType = categoryTypeFor(type);
+  const categoryTypes = categoryTypesFor(type);
   const counts = new Map<string, number>();
   for (const t of transactions) {
     counts.set(t.categoryId, (counts.get(t.categoryId) ?? 0) + 1);
   }
 
   return categories
-    .filter(c => c.type === categoryType)
+    .filter(c => categoryTypes.includes(c.type))
     .sort((a, b) => (counts.get(b.categoryId) ?? 0) - (counts.get(a.categoryId) ?? 0))
     .slice(0, limit);
 }

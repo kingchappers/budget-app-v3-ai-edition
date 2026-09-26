@@ -6,7 +6,6 @@ const categories: Category[] = [
   { categoryId: 'cat-food', name: 'Food', type: 'EXPENSE', icon: 'shopping-cart', isDefault: true, createdAt: '' },
   { categoryId: 'cat-dining', name: 'Dining', type: 'EXPENSE', icon: 'tools-kitchen-2', isDefault: true, createdAt: '' },
   { categoryId: 'cat-salary', name: 'Salary', type: 'INCOME', icon: 'briefcase', isDefault: true, createdAt: '' },
-  { categoryId: 'cat-stocks', name: 'Stocks', type: 'INVESTMENT', icon: 'chart-line', isDefault: true, createdAt: '' },
 ];
 
 function txn(over: Partial<Transaction>): Transaction {
@@ -80,29 +79,6 @@ describe('buildMonthSummary', () => {
     expect(res.spending[0].categoryId).toBe('cat-dining');
   });
 
-  it('nets investment IN against OUT for saving progress', () => {
-    const res = buildMonthSummary({
-      ...base,
-      transactions: [
-        txn({ amount: 30000, type: 'INVESTMENT_IN', categoryId: 'cat-stocks' }),
-        txn({ amount: 10000, type: 'INVESTMENT_IN', categoryId: 'cat-stocks' }),
-        txn({ amount: 5000, type: 'INVESTMENT_OUT', categoryId: 'cat-stocks' }),
-      ],
-      targets: [{ categoryId: 'cat-stocks', targetAmount: 40000, period: 'MONTHLY', updatedAt: '' }],
-    });
-    expect(res.saving).toHaveLength(1);
-    expect(res.saving[0].spent).toBe(35000);
-  });
-
-  it('never reports negative saving progress', () => {
-    const res = buildMonthSummary({
-      ...base,
-      transactions: [txn({ amount: 5000, type: 'INVESTMENT_OUT', categoryId: 'cat-stocks' })],
-      targets: [{ categoryId: 'cat-stocks', targetAmount: 40000, period: 'MONTHLY', updatedAt: '' }],
-    });
-    expect(res.saving[0].spent).toBe(0);
-  });
-
   it('totals income without requiring a target', () => {
     const res = buildMonthSummary({
       ...base,
@@ -128,7 +104,17 @@ describe('buildMonthSummary', () => {
       targets: [{ categoryId: 'cat-deleted', targetAmount: 1000, period: 'MONTHLY', updatedAt: '' }],
     });
     expect(res.spending).toHaveLength(0);
-    expect(res.saving).toHaveLength(0);
+  });
+
+  it('ignores targets on pot categories', () => {
+    const res = buildMonthSummary({
+      transactions: [],
+      categories: [{ categoryId: 'pot-1', name: 'Holidays', type: 'POT', icon: 'tag', isDefault: true, createdAt: '', group: 'SINKING_FUNDS' }],
+      targets: [{ categoryId: 'pot-1', targetAmount: 5000, period: 'MONTHLY', updatedAt: '' }],
+      yearMonth: '2026-09',
+    });
+    expect(res.spending).toEqual([]);
+    expect('saving' in res).toBe(false);
   });
 
   it('returns recent transactions newest first, limited', () => {

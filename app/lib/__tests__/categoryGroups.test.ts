@@ -11,7 +11,7 @@ describe('groupCategories', () => {
     const buckets = groupCategories([
       cat('inc', 'INCOME'),
       cat('other', 'EXPENSE'),
-      cat('save', 'INVESTMENT', 'SAVING_INVESTMENT'),
+      cat('save', 'POT', 'SAVING_INVESTMENT'),
       cat('day', 'EXPENSE', 'EVERYDAY'),
       cat('sink', 'EXPENSE', 'SINKING_FUNDS'),
       cat('bill', 'EXPENSE', 'BILLS'),
@@ -56,27 +56,23 @@ describe('groupItems', () => {
 });
 
 describe('defaultGroupFor', () => {
-  it('returns null for income, Saving & Investment for investment and Everyday otherwise', () => {
+  it('returns null for income, Sinking Funds for pot and Everyday for spending', () => {
     expect(defaultGroupFor('INCOME')).toBeNull();
-    expect(defaultGroupFor('INVESTMENT')).toBe('SAVING_INVESTMENT');
+    expect(defaultGroupFor('POT')).toBe('SINKING_FUNDS');
     expect(defaultGroupFor('EXPENSE')).toBe('EVERYDAY');
   });
 });
 
 describe('groupsForType', () => {
-  it('offers the three spending groups for EXPENSE', () => {
-    expect(groupsForType('EXPENSE')).toEqual([
-      { value: 'BILLS', label: 'Bills' },
-      { value: 'SINKING_FUNDS', label: 'Sinking Funds' },
-      { value: 'EVERYDAY', label: 'Everyday Spending' },
-    ]);
+  it('offers Bills and Everyday Spending for EXPENSE', () => {
+    expect(groupsForType('EXPENSE').map(o => o.value)).toEqual(['BILLS', 'EVERYDAY']);
   });
 
-  it('offers only Saving & Investment for INVESTMENT', () => {
-    expect(groupsForType('INVESTMENT')).toEqual([{ value: 'SAVING_INVESTMENT', label: 'Saving & Investment' }]);
+  it('offers Sinking Funds and Saving & Investment for POT', () => {
+    expect(groupsForType('POT').map(o => o.value)).toEqual(['SINKING_FUNDS', 'SAVING_INVESTMENT']);
   });
 
-  it('offers no groups for INCOME', () => {
+  it('offers nothing for INCOME', () => {
     expect(groupsForType('INCOME')).toEqual([]);
   });
 });

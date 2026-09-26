@@ -61,7 +61,7 @@ function HomeContent() {
 
   if (isLoading) return <Group justify="center" py="xl"><Loader /></Group>;
 
-  const hasTargets = summary.spending.length > 0 || summary.saving.length > 0;
+  const hasTargets = summary.spending.length > 0;
 
   return (
     <Stack>
@@ -79,13 +79,6 @@ function HomeContent() {
         <div>
           <Title order={5} mb="xs">Spending vs target</Title>
           <GroupedProgress items={summary.spending} />
-        </div>
-      )}
-
-      {summary.saving.length > 0 && (
-        <div>
-          <Title order={5} mb="xs">Saving vs target</Title>
-          <GroupedProgress items={summary.saving} />
         </div>
       )}
 

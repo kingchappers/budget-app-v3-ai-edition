@@ -5,7 +5,7 @@ import { formatPencePlain } from '~/lib/money';
 import { todayIso } from '~/lib/months';
 import { useCategories, useCreateRecurring, useUpdateRecurring } from '~/lib/queries';
 import { validateRecurringForm, type RecurringFormErrors } from '~/lib/recurring';
-import { TYPE_OPTIONS, categoryTypeFor } from '~/lib/transactionTypes';
+import { TYPE_OPTIONS, categoryTypesFor } from '~/lib/transactionTypes';
 import type { Recurring, TransactionType } from '~/lib/types';
 
 const DEFAULT_LEAD_DAYS = 3;
@@ -53,7 +53,7 @@ export function RecurringForm({ opened, onClose, editing, draft }: RecurringForm
   }, [opened, editing, draft]);
 
   const options = categories
-    .filter(c => c.type === categoryTypeFor(type))
+    .filter(c => categoryTypesFor(type).includes(c.type))
     .map(c => ({ value: c.categoryId, label: c.name }));
   const pending = create.isPending || update.isPending;
 

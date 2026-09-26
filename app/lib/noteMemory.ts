@@ -1,4 +1,4 @@
-import { categoryTypeFor } from './transactionTypes';
+import { categoryTypesFor } from './transactionTypes';
 import type { Category, Transaction, TransactionType } from './types';
 
 export type NoteIndex = Map<string, Transaction[]>;
@@ -38,8 +38,8 @@ export function categoryForNote(
   const key = normaliseNote(note);
   if (key === '') return null;
 
-  const categoryType = categoryTypeFor(type);
-  const usable = new Set(categories.filter(c => c.type === categoryType).map(c => c.categoryId));
+  const categoryTypes = categoryTypesFor(type);
+  const usable = new Set(categories.filter(c => categoryTypes.includes(c.type)).map(c => c.categoryId));
   const match = index.get(key)?.find(t => usable.has(t.categoryId));
   return match?.categoryId ?? null;
 }

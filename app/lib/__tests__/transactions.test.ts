@@ -76,26 +76,27 @@ function cat(categoryId: string, type: Category['type'] = 'EXPENSE'): Category {
 }
 
 describe('topCategories', () => {
-  const list = [cat('a'), cat('b'), cat('c'), cat('salary', 'INCOME'), cat('stocks', 'INVESTMENT')];
+  const list = [cat('a'), cat('b'), cat('c'), cat('salary', 'INCOME'), cat('holidays', 'POT')];
 
   it('ranks categories by transaction count, most used first', () => {
     const items = [txn({ categoryId: 'c' }), txn({ categoryId: 'c' }), txn({ categoryId: 'b' })];
     const result = topCategories(items, list, 'EXPENSE', 5);
-    expect(result.map(c => c.categoryId)).toEqual(['c', 'b', 'a']);
+    expect(result.map(c => c.categoryId)).toEqual(['c', 'b', 'a', 'holidays']);
   });
 
   it('keeps default category order when counts are equal, including with no history', () => {
     const result = topCategories([], list, 'EXPENSE', 5);
-    expect(result.map(c => c.categoryId)).toEqual(['a', 'b', 'c']);
+    expect(result.map(c => c.categoryId)).toEqual(['a', 'b', 'c', 'holidays']);
   });
 
   it('only returns categories of the matching category type', () => {
     expect(topCategories([], list, 'INCOME', 5).map(c => c.categoryId)).toEqual(['salary']);
   });
 
-  it('maps both investment transaction types to investment categories', () => {
-    expect(topCategories([], list, 'INVESTMENT_IN', 5).map(c => c.categoryId)).toEqual(['stocks']);
-    expect(topCategories([], list, 'INVESTMENT_OUT', 5).map(c => c.categoryId)).toEqual(['stocks']);
+  it('maps set aside and take out to pot categories and spending to spending plus pots', () => {
+    expect(topCategories([], list, 'SET_ASIDE', 5).map(c => c.categoryId)).toEqual(['holidays']);
+    expect(topCategories([], list, 'TAKE_OUT', 5).map(c => c.categoryId)).toEqual(['holidays']);
+    expect(topCategories([], list, 'EXPENSE', 5).map(c => c.categoryId)).toEqual(['a', 'b', 'c', 'holidays']);
   });
 
   it('respects the limit', () => {

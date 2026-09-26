@@ -12,7 +12,7 @@ import { categoryForNote } from '~/lib/noteMemory';
 import { parseQuickAdd } from '~/lib/quickAdd';
 import { useCategories, useTransactions, useUpdateTransaction } from '~/lib/queries';
 import { topCategories } from '~/lib/transactions';
-import { TYPE_OPTIONS, categoryTypeFor } from '~/lib/transactionTypes';
+import { TYPE_OPTIONS, categoryTypesFor } from '~/lib/transactionTypes';
 import type { Transaction, TransactionType } from '~/lib/types';
 import { CategoryChips } from './CategoryChips';
 
@@ -101,7 +101,7 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, template
     chipsRef.current?.querySelector<HTMLInputElement>('input[type="radio"]')?.focus();
   });
 
-  const eligible = categories.filter(c => c.type === categoryTypeFor(type));
+  const eligible = categories.filter(c => categoryTypesFor(type).includes(c.type));
   const chips = topCategories(monthTransactions ?? [], categories, type, CHIP_LIMIT);
 
   function chooseDate(choice: DateChoice): void {

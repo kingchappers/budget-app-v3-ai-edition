@@ -68,12 +68,12 @@ describe('Categories page', () => {
     expect(state.create).toHaveBeenCalledWith({ name: 'Bonus', type: 'INCOME', icon: 'tag' });
   });
 
-  it('switches Group to Saving & Investment when the type is Investment', async () => {
+  it('switches Group to Sinking Funds when the type is Pot', async () => {
     const user = userEvent.setup();
     renderPage();
     await user.click(screen.getByLabelText('Type', { selector: 'input' }));
-    await user.click(await screen.findByRole('option', { name: 'Investment', hidden: true }));
-    expect(screen.getByLabelText('Group', { selector: 'input' })).toHaveValue('Saving & Investment');
+    await user.click(await screen.findByRole('option', { name: 'Pot', hidden: true }));
+    expect(screen.getByLabelText('Group', { selector: 'input' })).toHaveValue('Sinking Funds');
   });
 
   it('does not offer Saving & Investment when the type is Spending', async () => {
@@ -82,26 +82,26 @@ describe('Categories page', () => {
     await user.click(screen.getByLabelText('Group', { selector: 'input' }));
     expect(await screen.findByRole('option', { name: 'Bills', hidden: true })).toBeInTheDocument();
     expect(screen.queryByRole('option', { name: 'Saving & Investment', hidden: true })).not.toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'Sinking Funds', hidden: true })).not.toBeInTheDocument();
   });
 
-  it('fixes Group to Saving & Investment for Investment and sends it', async () => {
+  it('offers Sinking Funds and Saving & Investment for a Pot and sends the chosen group', async () => {
     const user = userEvent.setup();
     renderPage();
     await user.click(screen.getByLabelText('Type', { selector: 'input' }));
-    await user.click(await screen.findByRole('option', { name: 'Investment', hidden: true }));
-    expect(screen.getByLabelText('Group', { selector: 'input' })).toBeDisabled();
-    expect(screen.getByLabelText('Group', { selector: 'input' })).toHaveValue('Saving & Investment');
+    await user.click(await screen.findByRole('option', { name: 'Pot', hidden: true }));
+    expect(screen.getByLabelText('Group', { selector: 'input' })).toHaveValue('Sinking Funds');
 
-    await user.type(screen.getByLabelText('New category'), 'ISA');
+    await user.type(screen.getByLabelText('New category'), 'Boiler');
     await user.click(screen.getByRole('button', { name: 'Add' }));
-    expect(state.create).toHaveBeenCalledWith({ name: 'ISA', type: 'INVESTMENT', icon: 'tag', group: 'SAVING_INVESTMENT' });
+    expect(state.create).toHaveBeenCalledWith({ name: 'Boiler', type: 'POT', icon: 'tag', group: 'SINKING_FUNDS' });
   });
 
-  it('resets Group to Everyday Spending when switching Investment back to Spending', async () => {
+  it('resets Group to Everyday Spending when switching Pot back to Spending', async () => {
     const user = userEvent.setup();
     renderPage();
     await user.click(screen.getByLabelText('Type', { selector: 'input' }));
-    await user.click(await screen.findByRole('option', { name: 'Investment', hidden: true }));
+    await user.click(await screen.findByRole('option', { name: 'Pot', hidden: true }));
     await user.click(screen.getByLabelText('Type', { selector: 'input' }));
     await user.click(await screen.findByRole('option', { name: 'Spending', hidden: true }));
     expect(screen.getByLabelText('Group', { selector: 'input' })).toHaveValue('Everyday Spending');
