@@ -12,6 +12,7 @@ const mockUpdate = vi.fn();
 const mockRemove = vi.fn();
 const mockUseTransactions = vi.hoisted(() => vi.fn());
 let mockTransactions: Transaction[] = [];
+let mockPotCategories: unknown[] = [];
 
 vi.mock('~/lib/queries', () => ({
   useCategories: () => ({
@@ -19,6 +20,7 @@ vi.mock('~/lib/queries', () => ({
       { categoryId: 'cat-dining', name: 'Dining', type: 'EXPENSE', icon: 'x', isDefault: true, createdAt: '' },
       { categoryId: 'cat-food', name: 'Groceries', type: 'EXPENSE', icon: 'x', isDefault: true, createdAt: '' },
       { categoryId: 'cat-salary', name: 'Salary', type: 'INCOME', icon: 'x', isDefault: true, createdAt: '' },
+      ...mockPotCategories,
     ],
     isLoading: false,
   }),
@@ -75,6 +77,7 @@ describe('TransactionSheet', () => {
     mockUpdate.mockReset();
     mockRemove.mockReset();
     mockTransactions = [];
+    mockPotCategories = [];
     mockUseTransactions.mockReset();
     mockUseTransactions.mockImplementation(() => ({ data: mockTransactions }));
   });
@@ -687,5 +690,48 @@ describe('TransactionSheet', () => {
     await act(async () => { await new Promise(resolve => setTimeout(resolve, 20)); });
 
     expect(onSaved).not.toHaveBeenCalled();
+  });
+
+  describe('pots', () => {
+    const holidays = { categoryId: 'cat-holidays', name: 'Holidays', type: 'POT', icon: 'x', isDefault: true, createdAt: '' };
+
+    it('opens on the preset type and category', () => {
+      mockPotCategories = [holidays];
+      renderSheet({ preset: { type: 'SET_ASIDE', categoryId: 'cat-holidays' } });
+      expect(screen.getByRole('radio', { name: 'Set aside' })).toBeChecked();
+      expect(screen.getByRole('radio', { name: 'Holidays' })).toBeChecked();
+    });
+
+    it('ignores the preset when editing', () => {
+      mockPotCategories = [holidays];
+      renderSheet({ editing, preset: { type: 'SET_ASIDE', categoryId: 'cat-holidays' } });
+      expect(screen.getByRole('radio', { name: 'Spend' })).toBeChecked();
+      expect(screen.getByRole('radio', { name: 'Dining' })).toBeChecked();
+    });
+
+    it('offers only pots for Set aside and Take out, and both kinds for Spend', async () => {
+      mockPotCategories = [holidays];
+      const user = userEvent.setup();
+      renderSheet();
+      expect(chipNames()).toEqual(expect.arrayContaining(['Dining', 'Holidays']));
+      await user.click(screen.getByRole('radio', { name: 'Set aside' }));
+      expect(chipNames()).toEqual(['Holidays']);
+      await user.click(screen.getByRole('radio', { name: 'Take out' }));
+      expect(chipNames()).toEqual(['Holidays']);
+    });
+
+    it('clears an expense category when switching to Set aside and refuses to save', async () => {
+      mockPotCategories = [holidays];
+      const user = userEvent.setup();
+      renderSheet();
+      await user.click(screen.getByRole('radio', { name: 'Dining' }));
+      await user.click(screen.getByRole('radio', { name: 'Set aside' }));
+      const group = screen.getByRole('radiogroup', { name: 'Category' });
+      within(group).getAllByRole('radio').forEach(r => expect(r).not.toBeChecked());
+      await user.type(screen.getByLabelText(/amount/i), '4.80');
+      await user.click(screen.getByRole('button', { name: /^save$/i }));
+      expect(await screen.findByText(/choose a category/i)).toBeInTheDocument();
+      expect(mockCreate).not.toHaveBeenCalled();
+    });
   });
 });

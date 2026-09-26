@@ -32,12 +32,13 @@ export interface TransactionSheetProps {
   onClose: () => void;
   yearMonth: string;
   editing?: Transaction | null;
+  preset?: { type: TransactionType; categoryId: string } | null;
   template?: Transaction | null;
   templateDate?: string;
   onSaved?: (created: Transaction) => void;
 }
 
-export function TransactionSheet({ opened, onClose, yearMonth, editing, template, templateDate, onSaved }: TransactionSheetProps) {
+export function TransactionSheet({ opened, onClose, yearMonth, editing, preset, template, templateDate, onSaved }: TransactionSheetProps) {
   const { data: categories = [], isLoading: categoriesLoading, error: categoriesError } = useCategories();
   const monthTransactions = useSnapshotWhileOpen(useTransactions(currentYearMonth(), opened).data, opened);
   const noteIndex = useNoteHistory(opened);
@@ -80,6 +81,14 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, template
       setDate(templateDate ?? todayIso());
       setDateChoice(templateDate ? dateChoiceFor(templateDate) : 'today');
       setCategorySource('user');
+    } else if (preset) {
+      setAmount('');
+      setType(preset.type);
+      setCategoryId(preset.categoryId);
+      setDescription('');
+      setDate(todayIso());
+      setDateChoice('today');
+      setCategorySource('user');
     } else {
       setAmount('');
       setType('EXPENSE');
@@ -93,7 +102,7 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, template
     setError(null);
     setQuickAdd('');
     setQuickAddError(null);
-  }, [opened, editing, template, templateDate]);
+  }, [opened, editing, preset, template, templateDate]);
 
   useEffect(() => {
     if (!focusChipsAfterRenderRef.current) return;

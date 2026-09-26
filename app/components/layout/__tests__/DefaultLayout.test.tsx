@@ -85,6 +85,13 @@ describe('DefaultLayout add shortcut', () => {
     expect(links).toHaveLength(1);
     expect(links[0]).toHaveAttribute('href', '/recurring');
   });
+
+  it('links to Pots from both the bottom tab bar and the sidebar', () => {
+    renderLayout();
+    const links = screen.getAllByRole('link', { name: 'Pots' });
+    expect(links).toHaveLength(2);
+    links.forEach(link => expect(link).toHaveAttribute('href', '/pots'));
+  });
 });
 
 describe('DefaultLayout launch intent', () => {

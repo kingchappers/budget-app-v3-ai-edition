@@ -5,7 +5,7 @@ import { Auth0Provider } from '@auth0/auth0-react';
 import Authentication from "../authentication/Authentication";
 import { ColorSchemeToggle } from './ColorSchemeToggle';
 import { QuickEntryTips } from './QuickEntryTips';
-import { IconHome, IconList, IconRepeat, IconTarget, IconPlus, IconTag } from '@tabler/icons-react';
+import { IconHome, IconList, IconRepeat, IconTarget, IconPlus, IconTag, IconPigMoney } from '@tabler/icons-react';
 import { NavLink as RouterNavLink, useLocation } from 'react-router';
 import { TransactionSheet } from '../transactions/TransactionSheet';
 import { LaunchIntent } from './LaunchIntent';
@@ -15,6 +15,7 @@ const NAV_ITEMS = [
   { to: '/', label: 'Home', Icon: IconHome },
   { to: '/transactions', label: 'Transactions', Icon: IconList },
   { to: '/targets', label: 'Targets', Icon: IconTarget },
+  { to: '/pots', label: 'Pots', Icon: IconPigMoney },
   { to: '/categories', label: 'Categories', Icon: IconTag },
 ];
 
