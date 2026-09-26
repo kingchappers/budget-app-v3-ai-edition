@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Alert, Button, Group, Loader, Stack, Text, Title } from '@mantine/core';
 import { DefaultLayout } from '~/components/layout/DefaultLayout';
+import { PotHistorySheet } from '~/components/pots/PotHistorySheet';
 import { PotRow } from '~/components/pots/PotRow';
 import { TransactionSheet } from '~/components/transactions/TransactionSheet';
 import { bucketKeyFor, groupItems } from '~/lib/categoryGroups';
@@ -13,6 +14,7 @@ function PotsContent() {
   const categories = useCategories();
   const pots = usePots(asOf);
   const [addingTo, setAddingTo] = useState<string | null>(null);
+  const [openId, setOpenId] = useState<string | null>(null);
   const preset = useMemo(
     () => (addingTo ? { type: 'SET_ASIDE' as const, categoryId: addingTo } : null),
     [addingTo],
@@ -47,6 +49,7 @@ function PotsContent() {
               pot={pot}
               category={category}
               onSetAside={() => setAddingTo(pot.categoryId)}
+              onOpen={() => setOpenId(pot.categoryId)}
             />
           ))}
         </div>
@@ -56,6 +59,11 @@ function PotsContent() {
         onClose={() => setAddingTo(null)}
         yearMonth={asOf}
         preset={preset}
+      />
+      <PotHistorySheet
+        pot={rows.find(row => row.pot.categoryId === openId)?.pot ?? null}
+        category={rows.find(row => row.pot.categoryId === openId)?.category}
+        onClose={() => setOpenId(null)}
       />
     </Stack>
   );

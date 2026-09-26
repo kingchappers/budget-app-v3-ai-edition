@@ -17,7 +17,12 @@ vi.mock('~/components/transactions/TransactionSheet', () => ({
   TransactionSheet: ({ opened, preset }: { opened: boolean; preset?: { type: string; categoryId: string } | null }) =>
     (opened ? <div>Add sheet: {preset?.type} {preset?.categoryId}</div> : null),
 }));
+vi.mock('~/components/pots/PotHistorySheet', () => ({
+  PotHistorySheet: ({ pot }: { pot: { categoryId: string } | null }) =>
+    (pot ? <div>History: {pot.categoryId}</div> : null),
+}));
 vi.mock('~/lib/queries', () => ({
+  useSavePot: () => ({ mutate: vi.fn(), isPending: false }),
   useCategories: () => ({ data: state.categories, isLoading: false, error: null, refetch: vi.fn() }),
   usePots: () => ({
     data: state.potsError ? undefined : state.pots,
@@ -87,6 +92,12 @@ describe('Pots page', () => {
     renderPage();
     await userEvent.setup().click(screen.getByRole('button', { name: 'Set aside to Holidays' }));
     expect(screen.getByText('Add sheet: SET_ASIDE cat-holidays')).toBeInTheDocument();
+  });
+
+  it('opens the history sheet for the tapped pot', async () => {
+    renderPage();
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Open Holidays history' }));
+    expect(screen.getByText('History: cat-holidays')).toBeInTheDocument();
   });
 
   it('shows an empty state when there are no pots', () => {
