@@ -123,6 +123,9 @@ Implemented on `feat/savings-pots`. Spec: `superpowers/specs/2026-09-25-savings-
   - Any F1 targets already set on categories that are now pots (Holidays, Gifts and so on) are no longer shown or editable, because Targets covers spending categories only; clear them before deploying.
   - The pots settings PUT is a read-modify-write with no conditional put, so two tabs saving at once could lose an auto-contribute entry (acceptable for one user).
   - The Home Pots section appears after the rest of Home has loaded, causing a small layout shift; a skeleton would fix it.
+  - On the Pots page the floating + button covers the Set aside button of a row that scrolls under it (the same fixed-button overlap as elsewhere in the app); scrolling to the end clears it.
+  - On a 390px screen the history sheet's month table scrolls sideways (the Closing column is off screen) with no hint, and the sheet is taller than the screen so the settings need scrolling. The trend line's end points are half-clipped at the edge of its box.
+  - The client's local month and the server's UTC month can differ for about an hour around midnight on the 1st, so Home's "next month" could hit the API's month bound for that hour.
 
 ## Later ideas
 
