@@ -442,6 +442,57 @@ describe('TransactionSheet', () => {
     expect(screen.getByRole('radio', { name: 'Dining' })).not.toBeChecked();
   });
 
+  it('recalls the category once the note history loads after the note was typed', async () => {
+    const user = userEvent.setup();
+    const { setProps } = renderSheet();
+
+    await user.click(screen.getByRole('button', { name: /add note/i }));
+    await user.type(screen.getByLabelText(/note/i), 'starbucks');
+    expect(screen.getByRole('radio', { name: 'Dining' })).not.toBeChecked();
+
+    mockTransactions = [pastTxn({ description: 'Starbucks', categoryId: 'cat-dining' })];
+    setProps({});
+
+    await waitFor(() => expect(screen.getByRole('radio', { name: 'Dining' })).toBeChecked());
+    expect(screen.getByText("Suggested from your earlier 'starbucks'")).toBeInTheDocument();
+  });
+
+  it('does not overwrite a category the user picked when the history arrives late', async () => {
+    const user = userEvent.setup();
+    const { setProps } = renderSheet();
+
+    await user.click(screen.getByRole('radio', { name: 'Groceries' }));
+    await user.click(screen.getByRole('button', { name: /add note/i }));
+    await user.type(screen.getByLabelText(/note/i), 'starbucks');
+
+    mockTransactions = [pastTxn({ description: 'Starbucks', categoryId: 'cat-dining' })];
+    setProps({});
+
+    expect(screen.getByRole('radio', { name: 'Groceries' })).toBeChecked();
+    expect(screen.getByRole('radio', { name: 'Dining' })).not.toBeChecked();
+  });
+
+  it('does not change an edited transaction when the history arrives late', async () => {
+    const { setProps } = renderSheet({ editing });
+    expect(screen.getByRole('radio', { name: 'Dining' })).toBeChecked();
+
+    mockTransactions = [pastTxn({ description: 'Lunch', categoryId: 'cat-food' })];
+    setProps({});
+
+    expect(screen.getByRole('radio', { name: 'Dining' })).toBeChecked();
+    expect(screen.getByRole('radio', { name: 'Groceries' })).not.toBeChecked();
+  });
+
+  it('recalls nothing when the history arrives but there is no note', async () => {
+    const { setProps } = renderSheet();
+
+    mockTransactions = [pastTxn({ description: 'Starbucks', categoryId: 'cat-dining' })];
+    setProps({});
+
+    expect(screen.getByRole('radio', { name: 'Dining' })).not.toBeChecked();
+    expect(screen.getByRole('radio', { name: 'Groceries' })).not.toBeChecked();
+  });
+
   it('clears a remembered category when the note stops matching', async () => {
     const user = userEvent.setup();
     mockTransactions = [pastTxn({ description: 'Starbucks', categoryId: 'cat-dining' })];

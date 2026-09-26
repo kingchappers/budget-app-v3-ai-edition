@@ -110,6 +110,18 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, preset, 
     chipsRef.current?.querySelector<HTMLInputElement>('input[type="radio"]')?.focus();
   });
 
+  const recalledForIndexRef = useRef(noteIndex);
+  useEffect(() => {
+    if (recalledForIndexRef.current === noteIndex) return;
+    recalledForIndexRef.current = noteIndex;
+    if (!opened || editing || categorySource === 'user' || description.trim() === '') return;
+
+    const recalled = categoryForNote(noteIndex, description, type, categories);
+    if (!recalled) return;
+    setCategoryId(recalled);
+    setCategorySource('memory');
+  }, [noteIndex, opened, editing, categorySource, description, type, categories]);
+
   const eligible = categories.filter(c => categoryTypesFor(type).includes(c.type));
   const chips = topCategories(monthTransactions ?? [], categories, type, CHIP_LIMIT);
 
