@@ -31,7 +31,7 @@ Tests use **Vitest** (`src/api/__tests__/`), covering the API router and handler
 
 ### Two Lambda Functions
 
-1. **Static File Server** (`build/client/index.js`) — serves React SPA assets, falls back to `index.html` for client-side routing. No auth. Compiled from `src/static/handler.ts` by `scripts/build-static-handler.cjs`; serves binary files as base64, sets `Cache-Control` per file type, and returns 404 for a missing file that has an extension.
+1. **Static File Server** (`build/client/index.js`) — serves React SPA assets, falls back to `index.html` for client-side routing. No auth. Compiled from `src/static/handler.ts` by `scripts/build-static-handler.cjs`; serves binary files as base64, sets `Cache-Control` per file type, and returns 404 for a missing file that has an extension. It also sends a Content-Security-Policy-Report-Only header built from the page's inline scripts and `build/client/csp.json` (written by the build script from `VITE_AUTH0_DOMAIN`), and returns 404 for its own `index.js`.
 
 2. **Protected API** (`build/api/index.js`) — compiled from `api-handler.ts`. Validates JWT via Auth0 JWKS. Routes: `/api/test`, `/api/user-info`. Dependencies bundled into `build/api/node_modules/` by `scripts/build-api-handler.cjs`.
 
