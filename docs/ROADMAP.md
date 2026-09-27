@@ -14,7 +14,7 @@ Bank sync was dropped (see `DECISIONS.md`), so manual entry is the core interact
 | G | Polish and hardening | Merged ([PR #39](https://github.com/kingchappers/budget-app-v3-ai-edition/pull/39)). Spec: `superpowers/specs/2026-09-26-polish-hardening-design.md`, plan: `superpowers/plans/2026-09-26-polish-hardening.md` |
 | H | Spending insights | Not started (after F) |
 | I | Net worth and accounts | Not started |
-| J | Offline entry queue | Not started |
+| J | Offline entry queue | Implemented on `feat/offline-queue` ([PR #43](https://github.com/kingchappers/budget-app-v3-ai-edition/pull/43)). Spec: `superpowers/specs/2026-09-27-offline-entry-queue-design.md`, plan: `superpowers/plans/2026-09-27-offline-entry-queue.md` |
 
 ## B: Smart prefill
 
@@ -139,9 +139,20 @@ Implemented on `feat/polish-hardening`. Spec: `superpowers/specs/2026-09-26-poli
   - The bottom-sheet test (`sizes the bottom drawer to its content instead of filling the screen`) passed in jsdom even before the fix, because jsdom returns CSS's initial value (`height: auto`) for an element with no inline height rather than reproducing the full-height bug; a real-browser pass (Task 7) is what actually verified this one.
   - Task 7's real-browser pass found no CSP violations, in either report-only or enforcing mode, and confirmed both the Add sheet and a pot's history sheet size to content at 390px (each hit the 90dvh cap because their content is genuinely that tall, which is the designed behaviour, not the pre-fix bug).
 
-## Later ideas
+## J: Offline entry queue
 
-- **Offline entry queue:** enter transactions with no signal and sync later. Needs a service worker, a persistent queue, idempotent creates and token refresh while offline. Tracked as sub-project J.
+Implemented on `feat/offline-queue`. Spec: `superpowers/specs/2026-09-27-offline-entry-queue-design.md`, plan: `superpowers/plans/2026-09-27-offline-entry-queue.md`.
+
+- **Built:**
+  - Client-generated transaction ids from the start, replacing the old temp-id swap.
+  - An IndexedDB-backed offline queue for new-transaction creates, with a reentrancy-guarded flush.
+  - Automatic sync on `online`, tab focus and app launch, plus a manual "Sync now" button.
+  - A pending badge on queued rows and an offline-queue banner in the UI.
+- **Follow-ups:**
+  - Queuing edits and deletes made offline, with a conflict-resolution story for data that changed server-side in the meantime.
+  - A full offline app shell (service worker, cold-launch support) if that ever becomes worth the cost.
+  - Surfacing a queued entry's error detail somewhere more visible than "tap to see why" (the pending badge's tooltip already does tap-to-see; a persistent detail view is the deferred part).
+  - Task 8's browser-verification pass (Playwright, offline simulation) could not be completed in this environment — no headless Auth0 login stub exists in this repo yet — so the queue/banner/sync flow is unverified in a real browser. Remains outstanding.
 
 ## Deliberately excluded
 
