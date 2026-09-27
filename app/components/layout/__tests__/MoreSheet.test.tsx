@@ -35,4 +35,9 @@ describe('MoreSheet', () => {
     renderSheet(false);
     expect(screen.queryByRole('link', { name: 'Categories' })).not.toBeInTheDocument();
   });
+
+  it('lists Accounts after Insights', () => {
+    renderSheet();
+    expect(screen.getByRole('link', { name: 'Accounts' })).toHaveAttribute('href', '/accounts');
+  });
 });
