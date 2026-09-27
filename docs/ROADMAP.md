@@ -163,6 +163,8 @@ Implemented on `feat/net-worth-accounts`. Spec: `superpowers/specs/2026-09-27-ne
   - A finer breakdown than the asset/liability split.
   - Reminders to update a stale account.
   - `openAccount`/`updatingAccount` on the Accounts page hold stale data once `accounts` refetches after a mutation (the object reference from the list at open time); acceptable since the sheet closes on a successful update, but worth fixing properly later.
+  - **A £0 or negative balance can't be recorded** (both the client parser and the server's `isValidPence` require `> 0`), so paying off a credit card or closing an account leaves its last non-zero balance stuck in net worth forever, with no way out except deleting the account (which also erases its history). Flagged by the whole-branch review as a real spec gap, not fixed here — needs a decision on whether to allow `pence >= 0` before it's worth changing both ends of the validation.
+  - **Fixed post-review:** the net worth change figure measured from the end of the span's first month instead of before it, so "This month" always read +£0.00 regardless of what happened; the update-balance form didn't reset between accounts, so updating one account's balance could leave that amount sitting in the form when a different account's sheet was opened next; the API returned raw DynamoDB items (leaking `PK`/`SK`) instead of a clean shape; and an out-of-range date such as `2026-02-31` was accepted because `new Date` silently rolls it over instead of rejecting it. All fixed, with tests pinning each one.
 
 ## Later ideas
 

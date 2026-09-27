@@ -9,11 +9,12 @@ const save = vi.hoisted(() => ({ mutate: vi.fn() }));
 vi.mock('~/lib/queries', () => ({ useAddBalance: () => ({ mutate: save.mutate, isPending: false }) }));
 
 const account: Account = { accountId: 'acc-1', name: 'Lloyds', kind: 'ASSET', type: 'CASH', balances: [], createdAt: '' };
+const otherAccount: Account = { accountId: 'acc-2', name: 'Amex', kind: 'LIABILITY', type: 'CREDIT_CARD', balances: [], createdAt: '' };
 
 function renderSheet(data: Account | null = account) {
   const onClose = vi.fn();
-  render(<MantineProvider><UpdateBalanceSheet account={data} onClose={onClose} /></MantineProvider>);
-  return onClose;
+  const view = render(<MantineProvider><UpdateBalanceSheet account={data} onClose={onClose} /></MantineProvider>);
+  return { onClose, rerender: view.rerender };
 }
 
 beforeEach(() => { save.mutate.mockReset(); });
@@ -31,7 +32,7 @@ describe('UpdateBalanceSheet', () => {
 
   it('saves the entered amount and date', async () => {
     const user = userEvent.setup();
-    const onClose = renderSheet();
+    const { onClose } = renderSheet();
     await user.type(screen.getByLabelText('Balance'), '2500');
     await user.click(screen.getByRole('button', { name: 'Save' }));
 
@@ -59,5 +60,19 @@ describe('UpdateBalanceSheet', () => {
     save.mutate.mockImplementation((_vars, options) => options.onError(new Error('boom')));
     await user.click(screen.getByRole('button', { name: 'Save' }));
     expect(screen.getByRole('alert')).toBeInTheDocument();
+  });
+
+  it('resets the amount, date and error when the target account changes', async () => {
+    const user = userEvent.setup();
+    const { rerender } = renderSheet(account);
+    await user.type(screen.getByLabelText('Balance'), 'not a number');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+
+    rerender(<MantineProvider><UpdateBalanceSheet account={otherAccount} onClose={vi.fn()} /></MantineProvider>);
+
+    expect((screen.getByLabelText('Balance') as HTMLInputElement).value).toBe('');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getByText('Update Amex')).toBeInTheDocument();
   });
 });

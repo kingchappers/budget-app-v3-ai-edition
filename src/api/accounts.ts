@@ -11,7 +11,23 @@ const NAME_MAX_LENGTH = 50;
 
 function isValidDate(value: unknown): value is string {
   if (typeof value !== 'string' || !DATE_PATTERN.test(value)) return false;
-  return !Number.isNaN(new Date(`${value}T00:00:00Z`).getTime());
+  const date = new Date(`${value}T00:00:00Z`);
+  if (Number.isNaN(date.getTime())) return false;
+  // `new Date` rolls an out-of-range day/month over into the next one
+  // (2026-02-31 silently becomes 2026-03-03) rather than rejecting it, so
+  // round-trip through ISO formatting and require it to match verbatim.
+  return date.toISOString().slice(0, 10) === value;
+}
+
+function toAccount(item: Record<string, unknown>): Account {
+  return {
+    accountId: String(item.accountId),
+    name: String(item.name),
+    kind: item.kind as AccountKind,
+    type: item.type as AccountType,
+    balances: Array.isArray(item.balances) ? (item.balances as BalanceEntry[]) : [],
+    createdAt: typeof item.createdAt === 'string' ? item.createdAt : '',
+  };
 }
 
 function tomorrowIso(): string {
@@ -49,7 +65,7 @@ export async function getAccounts(
   _params: Record<string, string>,
 ): Promise<ApiResponse> {
   const items = await queryAll(userId, 'ACCOUNT#');
-  return ok({ accounts: items as unknown as Account[] });
+  return ok({ accounts: items.map(toAccount) });
 }
 
 export async function createAccount(
@@ -107,7 +123,7 @@ export async function updateAccount(
   if (!existingItem) {
     return err(404, 'Account not found');
   }
-  const existing = existingItem as unknown as Account;
+  const existing = toAccount(existingItem);
 
   let body: Record<string, unknown>;
   try {
@@ -181,7 +197,7 @@ export async function addBalance(
   if (!existingItem) {
     return err(404, 'Account not found');
   }
-  const existing = existingItem as unknown as Account;
+  const existing = toAccount(existingItem);
 
   const balances = applyBalanceEntry(existing.balances ?? [], date, pence);
   if (balances.length > MAX_BALANCE_ENTRIES) {

@@ -7,7 +7,7 @@ import { todayIso } from '~/lib/months';
 import { useAddBalance } from '~/lib/queries';
 import type { Account } from '~/lib/types';
 
-export function UpdateBalanceSheet({ account, onClose }: { account: Account | null; onClose: () => void }) {
+function UpdateBalanceForm({ account, onClose }: { account: Account; onClose: () => void }) {
   const save = useAddBalance();
   const [date, setDate] = useState(todayIso());
   const [amount, setAmount] = useState('');
@@ -15,7 +15,6 @@ export function UpdateBalanceSheet({ account, onClose }: { account: Account | nu
 
   function submit(event: React.FormEvent): void {
     event.preventDefault();
-    if (!account) return;
     const parsed = parsePounds(amount);
     if (!parsed.ok) { setError(parsed.message); return; }
     setError(null);
@@ -26,20 +25,27 @@ export function UpdateBalanceSheet({ account, onClose }: { account: Account | nu
   }
 
   return (
+    <form onSubmit={submit}>
+      <Stack gap="sm">
+        <DateInput label="Date" valueFormat="DD/MM/YYYY" value={date} onChange={value => setDate(value ?? todayIso())} />
+        <TextInput label="Balance" placeholder="0.00" leftSection="£" inputMode="decimal"
+          value={amount} onChange={e => setAmount(e.currentTarget.value)} />
+        {error && <Alert color="danger" role="alert">{error}</Alert>}
+        <Group justify="flex-end">
+          <Button type="submit" loading={save.isPending}>Save</Button>
+        </Group>
+      </Stack>
+    </form>
+  );
+}
+
+export function UpdateBalanceSheet({ account, onClose }: { account: Account | null; onClose: () => void }) {
+  return (
     <ResponsiveSheet opened={account !== null} onClose={onClose} title={account ? `Update ${account.name}` : 'Update balance'}>
-      {account && (
-        <form onSubmit={submit}>
-          <Stack gap="sm">
-            <DateInput label="Date" valueFormat="DD/MM/YYYY" value={date} onChange={value => setDate(value ?? todayIso())} />
-            <TextInput label="Balance" placeholder="0.00" leftSection="£" inputMode="decimal"
-              value={amount} onChange={e => setAmount(e.currentTarget.value)} />
-            {error && <Alert color="danger" role="alert">{error}</Alert>}
-            <Group justify="flex-end">
-              <Button type="submit" loading={save.isPending}>Save</Button>
-            </Group>
-          </Stack>
-        </form>
-      )}
+      {/* Keyed by accountId, like PotHistorySheet's settings form, so opening
+          a different account starts with fresh date/amount/error state
+          instead of carrying over whatever was last typed. */}
+      {account && <UpdateBalanceForm key={account.accountId} account={account} onClose={onClose} />}
     </ResponsiveSheet>
   );
 }

@@ -106,6 +106,14 @@ describe('getAccounts', () => {
     await getAccounts(event(), 'user-42', {});
     expect(mockSend.mock.calls[0][0].ExpressionAttributeValues[':pk']).toBe('USER#user-42');
   });
+
+  it('strips the raw DynamoDB key fields from the response', async () => {
+    useStore({ accounts: [{ ...account(), PK: 'USER#user-1', SK: 'ACCOUNT#acc-1' }] });
+    const res = await getAccounts(event(), 'user-1', {});
+    const [returned] = JSON.parse(res.body).accounts;
+    expect(returned).not.toHaveProperty('PK');
+    expect(returned).not.toHaveProperty('SK');
+  });
 });
 
 describe('createAccount', () => {
@@ -179,6 +187,8 @@ describe('addBalance', () => {
     ['missing date', { pence: 100 }],
     ['malformed date', { date: '2026-9-15', pence: 100 }],
     ['date too far ahead', { date: '2026-09-17', pence: 100 }],
+    ['a day that does not exist (rolls over instead of erroring)', { date: '2026-02-31', pence: 100 }],
+    ['a month that does not exist', { date: '2026-13-01', pence: 100 }],
     ['zero pence', { date: '2026-09-15', pence: 0 }],
     ['fractional pence', { date: '2026-09-15', pence: 100.5 }],
     ['pence over the cap', { date: '2026-09-15', pence: 1_000_000_001 }],
