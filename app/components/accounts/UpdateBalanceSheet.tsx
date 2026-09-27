@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Alert, Button, Group, Stack, TextInput } from '@mantine/core';
 import { DateInput } from '@mantine/dates';
 import { ResponsiveSheet } from '~/components/layout/ResponsiveSheet';
-import { parsePounds } from '~/lib/money';
+import { parseBalance } from '~/lib/money';
 import { todayIso } from '~/lib/months';
 import { useAddBalance } from '~/lib/queries';
 import type { Account } from '~/lib/types';
@@ -15,7 +15,7 @@ function UpdateBalanceForm({ account, onClose }: { account: Account; onClose: ()
 
   function submit(event: React.FormEvent): void {
     event.preventDefault();
-    const parsed = parsePounds(amount);
+    const parsed = parseBalance(amount);
     if (!parsed.ok) { setError(parsed.message); return; }
     setError(null);
     save.mutate(

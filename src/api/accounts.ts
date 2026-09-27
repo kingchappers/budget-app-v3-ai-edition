@@ -37,7 +37,10 @@ function tomorrowIso(): string {
 }
 
 function isValidPence(value: unknown): value is number {
-  return typeof value === 'number' && Number.isInteger(value) && value > 0 && value <= MAX_AMOUNT_PENCE;
+  // Unlike a transaction amount, a balance may be zero (an account paid off
+  // or closed) or negative (an overdrawn current account), so only its
+  // magnitude is capped.
+  return typeof value === 'number' && Number.isInteger(value) && Math.abs(value) <= MAX_AMOUNT_PENCE;
 }
 
 function typesFor(kind: AccountKind): Set<string> {

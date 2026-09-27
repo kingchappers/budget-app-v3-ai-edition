@@ -189,9 +189,9 @@ describe('addBalance', () => {
     ['date too far ahead', { date: '2026-09-17', pence: 100 }],
     ['a day that does not exist (rolls over instead of erroring)', { date: '2026-02-31', pence: 100 }],
     ['a month that does not exist', { date: '2026-13-01', pence: 100 }],
-    ['zero pence', { date: '2026-09-15', pence: 0 }],
     ['fractional pence', { date: '2026-09-15', pence: 100.5 }],
     ['pence over the cap', { date: '2026-09-15', pence: 1_000_000_001 }],
+    ['pence under the negative cap', { date: '2026-09-15', pence: -1_000_000_001 }],
   ])('returns 400 for %s', async (_label, body) => {
     useStore({ accountById: [account()] });
     const res = await addBalance(event(body), 'user-1', { accountId: 'acc-1' });
@@ -202,6 +202,19 @@ describe('addBalance', () => {
     useStore({ accountById: [account()] });
     const res = await addBalance(event({ date: '2026-09-16', pence: 100 }), 'user-1', { accountId: 'acc-1' });
     expect(res.statusCode).toBe(200);
+  });
+
+  it('accepts a zero balance, for an account paid off or closed', async () => {
+    useStore({ accountById: [account()] });
+    const res = await addBalance(event({ date: '2026-09-15', pence: 0 }), 'user-1', { accountId: 'acc-1' });
+    expect(res.statusCode).toBe(200);
+  });
+
+  it('accepts a negative balance, for an overdrawn account', async () => {
+    useStore({ accountById: [account()] });
+    const res = await addBalance(event({ date: '2026-09-15', pence: -5000 }), 'user-1', { accountId: 'acc-1' });
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body).account.balances).toEqual([{ date: '2026-09-15', pence: -5000 }]);
   });
 
   it('returns 404 for a missing account', async () => {
