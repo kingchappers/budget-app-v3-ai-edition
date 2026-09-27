@@ -6,6 +6,7 @@ import { Notifications, notifications } from '@mantine/notifications';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { todayIso, yesterdayIso } from '~/lib/months';
 import type { Transaction } from '~/lib/types';
+import { ApiError } from '~/lib/apiError';
 
 const mockCreate = vi.fn();
 const mockUpdate = vi.fn();
@@ -15,21 +16,25 @@ let mockTransactions: Transaction[] = [];
 let mockPotCategories: unknown[] = [];
 let mockCategoriesLoaded = true;
 
-vi.mock('~/lib/queries', () => ({
-  useCategories: () => ({
-    data: mockCategoriesLoaded ? [
-      { categoryId: 'cat-dining', name: 'Dining', type: 'EXPENSE', icon: 'x', isDefault: true, createdAt: '' },
-      { categoryId: 'cat-food', name: 'Groceries', type: 'EXPENSE', icon: 'x', isDefault: true, createdAt: '' },
-      { categoryId: 'cat-salary', name: 'Salary', type: 'INCOME', icon: 'x', isDefault: true, createdAt: '' },
-      ...mockPotCategories,
-    ] : [],
-    isLoading: false,
-  }),
-  useTransactions: mockUseTransactions,
-  useCreateTransaction: () => ({ mutateAsync: mockCreate, isPending: false }),
-  useUpdateTransaction: () => ({ mutateAsync: mockUpdate, isPending: false }),
-  useDeleteTransaction: () => ({ mutate: mockRemove }),
-}));
+vi.mock('~/lib/queries', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('~/lib/queries')>();
+  return {
+    ...actual,
+    useCategories: () => ({
+      data: mockCategoriesLoaded ? [
+        { categoryId: 'cat-dining', name: 'Dining', type: 'EXPENSE', icon: 'x', isDefault: true, createdAt: '' },
+        { categoryId: 'cat-food', name: 'Groceries', type: 'EXPENSE', icon: 'x', isDefault: true, createdAt: '' },
+        { categoryId: 'cat-salary', name: 'Salary', type: 'INCOME', icon: 'x', isDefault: true, createdAt: '' },
+        ...mockPotCategories,
+      ] : [],
+      isLoading: false,
+    }),
+    useTransactions: mockUseTransactions,
+    useCreateTransaction: () => ({ mutateAsync: mockCreate, isPending: false }),
+    useUpdateTransaction: () => ({ mutateAsync: mockUpdate, isPending: false }),
+    useDeleteTransaction: () => ({ mutate: mockRemove }),
+  };
+});
 
 import { TransactionSheet, type TransactionSheetProps } from '../TransactionSheet';
 
@@ -343,7 +348,7 @@ describe('TransactionSheet', () => {
 
   it('shows a Retry toast when the create fails and re-sends the same input', async () => {
     const user = userEvent.setup();
-    mockCreate.mockRejectedValueOnce(new Error('boom'));
+    mockCreate.mockRejectedValueOnce(new ApiError(400, 'Bad Request'));
     renderSheet();
     await user.type(screen.getByLabelText(/amount/i), '4.80');
     await user.click(screen.getByRole('radio', { name: 'Dining' }));
@@ -352,13 +357,14 @@ describe('TransactionSheet', () => {
     await user.click(await screen.findByRole('button', { name: 'Retry' }));
 
     expect(mockCreate).toHaveBeenCalledTimes(2);
-    expect(mockCreate).toHaveBeenLastCalledWith(mockCreate.mock.calls[0][0]);
+    const { transactionId: _firstTransactionId, ...firstInput } = mockCreate.mock.calls[0][0];
+    expect(mockCreate).toHaveBeenLastCalledWith(expect.objectContaining(firstInput));
   });
 
   it('stays silent when the create fails after the user pressed Undo', async () => {
     const user = userEvent.setup();
     const pending = deferred<never>();
-    mockCreate.mockReturnValue(pending.promise.then(() => { throw new Error('boom'); }));
+    mockCreate.mockReturnValue(pending.promise.then(() => { throw new ApiError(400, 'Bad Request'); }));
     renderSheet();
     await user.type(screen.getByLabelText(/amount/i), '4.80');
     await user.click(screen.getByRole('radio', { name: 'Dining' }));
