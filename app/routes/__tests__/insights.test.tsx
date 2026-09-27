@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MantineProvider } from '@mantine/core';
 
@@ -85,6 +85,16 @@ describe('Insights page', () => {
     data.transactions = [{ transactionId: 't1', yearMonth: '2026-09', amount: 100000, type: 'EXPENSE', categoryId: 'cat-mortgage', description: '', date: '2026-09-01', createdAt: '' }];
     const user = renderInsightsUser();
     await user.click(await screen.findByText('Bills'));
-    expect(await screen.findByText('Mortgage')).toBeInTheDocument();
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('Mortgage')).toBeInTheDocument();
+  });
+
+  it('shows the targets and pots sections', () => {
+    data.targets = [{ categoryId: 'cat-groceries', targetAmount: 20000, period: 'MONTHLY', updatedAt: '' }];
+    data.categories = [{ categoryId: 'cat-groceries', name: 'Groceries', type: 'EXPENSE', group: 'EVERYDAY', icon: 'tag', isDefault: true, createdAt: '' }];
+    data.pots = [{ categoryId: 'cat-holidays', monthlyAmount: null, goalAmount: null, autoAmountNow: 0, balance: 1000, thisMonth: { setAside: 0, autoAdded: 0, takeOut: 0, spent: 0 }, months: [] }];
+    renderPage();
+    expect(screen.getByRole('heading', { name: 'Targets' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Pots' })).toBeInTheDocument();
   });
 });

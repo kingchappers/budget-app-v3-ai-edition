@@ -6,8 +6,11 @@ import { ResponsiveSheet } from '~/components/layout/ResponsiveSheet';
 import { SummaryRow } from '~/components/insights/SummaryRow';
 import { GroupBreakdownChart } from '~/components/insights/GroupBreakdownChart';
 import { MonthlyTrendChart } from '~/components/insights/MonthlyTrendChart';
+import { BiggestMoversList } from '~/components/insights/BiggestMovers';
+import { TargetAdherence } from '~/components/insights/TargetAdherence';
+import { PotsTrend } from '~/components/insights/PotsTrend';
 import {
-  canGoNewer, categoriesInGroup, fetchRangeForAnchor, groupBreakdown, monthlyTrend, monthsInPeriod, splitPeriods, summaryTotals,
+  biggestMovers, canGoNewer, categoriesInGroup, fetchRangeForAnchor, groupBreakdown, monthlyTrend, monthsInPeriod, splitPeriods, summaryTotals, targetAdherence,
 } from '~/lib/insights';
 import { currentYearMonth, formatMonthLabel, shiftMonth } from '~/lib/months';
 import { formatPence } from '~/lib/money';
@@ -54,6 +57,8 @@ function InsightsContent() {
   const trend = monthlyTrend(transactions, monthsInPeriod(current));
   const drillDown = openGroup ? categoriesInGroup(transactions, categories.data ?? [], openGroup, current) : [];
   const openGroupLabel = breakdown.find(row => row.group === openGroup)?.label ?? '';
+  const movers = biggestMovers(transactions, categories.data ?? [], current, previous);
+  const adherence = targetAdherence(transactions, categories.data ?? [], targets.data ?? [], monthsInPeriod(current));
 
   return (
     <Stack>
@@ -79,6 +84,15 @@ function InsightsContent() {
 
       <Title order={5} mt="md">Monthly trend</Title>
       <MonthlyTrendChart rows={trend} />
+
+      <Title order={5} mt="md">Biggest movers</Title>
+      <BiggestMoversList up={movers.up} down={movers.down} />
+
+      <Title order={5} mt="md">Targets</Title>
+      <TargetAdherence rows={adherence} />
+
+      <Title order={5} mt="md">Pots</Title>
+      <PotsTrend pots={pots.data ?? []} />
 
       <ResponsiveSheet opened={openGroup !== null} onClose={() => setOpenGroup(null)} title={openGroupLabel}>
         <Stack>
