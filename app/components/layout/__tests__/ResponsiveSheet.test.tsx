@@ -52,6 +52,6 @@ describe('ResponsiveSheet', () => {
     renderSheet();
     const content = document.querySelector('.mantine-Drawer-content') as HTMLElement;
     expect(content).not.toBeNull();
-    expect(content).toHaveStyle({ height: 'auto' });
+    expect(content).toHaveStyle({ height: 'auto', maxHeight: '90dvh' });
   });
 });
