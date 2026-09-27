@@ -13,15 +13,16 @@ const mockRemove = vi.fn();
 const mockUseTransactions = vi.hoisted(() => vi.fn());
 let mockTransactions: Transaction[] = [];
 let mockPotCategories: unknown[] = [];
+let mockCategoriesLoaded = true;
 
 vi.mock('~/lib/queries', () => ({
   useCategories: () => ({
-    data: [
+    data: mockCategoriesLoaded ? [
       { categoryId: 'cat-dining', name: 'Dining', type: 'EXPENSE', icon: 'x', isDefault: true, createdAt: '' },
       { categoryId: 'cat-food', name: 'Groceries', type: 'EXPENSE', icon: 'x', isDefault: true, createdAt: '' },
       { categoryId: 'cat-salary', name: 'Salary', type: 'INCOME', icon: 'x', isDefault: true, createdAt: '' },
       ...mockPotCategories,
-    ],
+    ] : [],
     isLoading: false,
   }),
   useTransactions: mockUseTransactions,
@@ -78,6 +79,7 @@ describe('TransactionSheet', () => {
     mockRemove.mockReset();
     mockTransactions = [];
     mockPotCategories = [];
+    mockCategoriesLoaded = true;
     mockUseTransactions.mockReset();
     mockUseTransactions.mockImplementation(() => ({ data: mockTransactions }));
   });
@@ -467,6 +469,24 @@ describe('TransactionSheet', () => {
     expect(screen.getByRole('radio', { name: 'Dining' })).not.toBeChecked();
 
     mockTransactions = [pastTxn({ description: 'Starbucks', categoryId: 'cat-dining' })];
+    setProps({});
+
+    await waitFor(() => expect(screen.getByRole('radio', { name: 'Dining' })).toBeChecked());
+    expect(screen.getByText("Suggested from your earlier 'starbucks'")).toBeInTheDocument();
+  });
+
+  it('recalls the category once categories load after the note history', async () => {
+    const user = userEvent.setup();
+    mockCategoriesLoaded = false;
+    const { setProps } = renderSheet();
+
+    await user.click(screen.getByRole('button', { name: /add note/i }));
+    await user.type(screen.getByLabelText(/note/i), 'starbucks');
+
+    mockTransactions = [pastTxn({ description: 'Starbucks', categoryId: 'cat-dining' })];
+    setProps({});
+
+    mockCategoriesLoaded = true;
     setProps({});
 
     await waitFor(() => expect(screen.getByRole('radio', { name: 'Dining' })).toBeChecked());
