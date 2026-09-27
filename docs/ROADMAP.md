@@ -10,9 +10,9 @@ Bank sync was dropped (see `DECISIONS.md`), so manual entry is the core interact
 | D | PWA and add shortcut | Merged ([PR #36](https://github.com/kingchappers/budget-app-v3-ai-edition/pull/36)). Spec: `superpowers/specs/2026-09-23-pwa-add-shortcut-design.md`, plan: `superpowers/plans/2026-09-23-pwa-add-shortcut.md` |
 | E | CSV/OFX import | Dropped: manual CSV/OFX import was judged clunky and would not be used. |
 | F1 | Category groups and YNAB defaults | Implemented on `feat/category-groups` ([PR #37](https://github.com/kingchappers/budget-app-v3-ai-edition/pull/37)). Spec: `superpowers/specs/2026-09-24-category-groups-design.md`, plan: `superpowers/plans/2026-09-24-category-groups.md` |
-| F2 | Savings and sinking-fund pots | Merged ([PR #38](https://github.com/kingchappers/budget-app-v3-ai-edition/pull/38)). Spec: `superpowers/specs/2026-09-25-savings-pots-design.md`, plan: `superpowers/plans/2026-09-25-savings-pots.md` |
+| F2 | Savings and sinking-fund pots | Implemented on `feat/savings-pots` (PR pending). Spec: `superpowers/specs/2026-09-25-savings-pots-design.md`, plan: `superpowers/plans/2026-09-25-savings-pots.md` |
 | G | Polish and hardening | Merged ([PR #39](https://github.com/kingchappers/budget-app-v3-ai-edition/pull/39)). Spec: `superpowers/specs/2026-09-26-polish-hardening-design.md`, plan: `superpowers/plans/2026-09-26-polish-hardening.md` |
-| H | Spending insights | Not started (after F) |
+| H | Spending insights | Implemented on `feat/spending-insights` (PR pending). Spec: `superpowers/specs/2026-09-27-spending-insights-design.md`, plan: `superpowers/plans/2026-09-27-spending-insights.md` |
 | I | Net worth and accounts | Not started |
 | J | Offline entry queue | Not started |
 
@@ -138,6 +138,19 @@ Implemented on `feat/polish-hardening`. Spec: `superpowers/specs/2026-09-26-poli
   - Grouped selects in the recurring form, the Transactions filter and the reassign dialog; group editing; Home emoji (logged under F1).
   - The bottom-sheet test (`sizes the bottom drawer to its content instead of filling the screen`) passed in jsdom even before the fix, because jsdom returns CSS's initial value (`height: auto`) for an element with no inline height rather than reproducing the full-height bug; a real-browser pass (Task 7) is what actually verified this one.
   - Task 7's real-browser pass found no CSP violations, in either report-only or enforcing mode, and confirmed both the Add sheet and a pot's history sheet size to content at 390px (each hit the 90dvh cap because their content is genuinely that tall, which is the designed behaviour, not the pre-fix bug).
+
+## H: Spending insights
+
+Implemented on `feat/spending-insights`. Spec: `superpowers/specs/2026-09-27-spending-insights-design.md`, plan: `superpowers/plans/2026-09-27-spending-insights.md`.
+
+- **Built:** a `/insights` page with a paged, comparable span (This month / 3 / 6 / 12 months) showing a summary row, spending by group with a drill-down, a monthly trend, biggest movers, target adherence, and pot balances over time; a new `GET /api/transactions/range` endpoint; a "More" bottom tab replacing the direct Categories tab, opening a sheet for Categories, Recurring and Insights; `@mantine/charts`/`recharts` added as pinned dependencies.
+- **Decisions:** the range endpoint returns raw transactions and every total is computed client-side in `app/lib/insights.ts`; paging moves by the whole span length so the current and previous periods are always adjacent; the page is never shown for a month later than the current one.
+- **Follow-ups:**
+  - A free date range instead of fixed-length paging.
+  - A stored monthly summary if the range read (shared with pots) gets slow.
+  - Drill-down past a group into a single transaction.
+  - Exporting the page.
+  - Task 7's real-browser pass found that the Later arrow's guard (`canGoNewer`) only checks whether the anchor is before the current month, not whether the anchor plus the *current* span length would land in the future. Reachable in the real UI: pick "This month", page Earlier once (anchor = current month − 1), then switch to 6M (per spec the anchor is kept) — Later is not disabled and paging forward requests and renders a period several months into the future (repro'd: anchor 2026-08 with a 6-month span → `GET /api/transactions/range?from=2026-03&to=2027-02`). This was found, not fixed, since Task 7 is verification-only; a fix likely clamps the Later click's target anchor to `currentYearMonth()` rather than only gating on `canGoNewer`.
 
 ## Later ideas
 
