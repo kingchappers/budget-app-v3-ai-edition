@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parsePounds, formatPence, formatPencePlain } from '../money';
+import { parsePounds, parseBalance, formatPence, formatPencePlain } from '../money';
 
 describe('parsePounds', () => {
   it('accepts exactly the £10,000,000 cap', () => {
@@ -60,6 +60,35 @@ describe('parsePounds', () => {
   it('rejects non-numeric input', () => {
     expect(parsePounds('abc').ok).toBe(false);
     expect(parsePounds('').ok).toBe(false);
+  });
+});
+
+describe('parseBalance', () => {
+  it('accepts zero, unlike parsePounds', () => {
+    expect(parseBalance('0')).toEqual({ ok: true, pence: 0 });
+  });
+
+  it('accepts a negative amount for an overdrawn account', () => {
+    expect(parseBalance('-500')).toEqual({ ok: true, pence: -50000 });
+  });
+
+  it('accepts a negative amount with pence and a pound sign', () => {
+    expect(parseBalance('-£12.34')).toEqual({ ok: true, pence: -1234 });
+  });
+
+  it('still parses an ordinary positive balance', () => {
+    expect(parseBalance('1,250.00')).toEqual({ ok: true, pence: 125000 });
+  });
+
+  it('rejects an amount whose magnitude is over the cap, positive or negative', () => {
+    expect(parseBalance('10000000.01').ok).toBe(false);
+    expect(parseBalance('-10000000.01').ok).toBe(false);
+  });
+
+  it('rejects non-numeric input', () => {
+    expect(parseBalance('abc').ok).toBe(false);
+    expect(parseBalance('').ok).toBe(false);
+    expect(parseBalance('-').ok).toBe(false);
   });
 });
 

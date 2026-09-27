@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MantineProvider } from '@mantine/core';
 import { MemoryRouter } from 'react-router';
@@ -79,11 +79,26 @@ describe('DefaultLayout add shortcut', () => {
     expect(screen.queryByText('Add sheet open')).not.toBeInTheDocument();
   });
 
-  it('links to Recurring from the sidebar only, not the bottom tab bar', () => {
+  it('has four bottom-tab links plus a More button, and the sidebar lists everything including More items directly', () => {
     renderLayout();
-    const links = screen.getAllByRole('link', { name: 'Recurring' });
-    expect(links).toHaveLength(1);
-    expect(links[0]).toHaveAttribute('href', '/recurring');
+    const tabBar = screen.getByRole('navigation', { name: 'Primary' });
+    const tabLinks = ['Home', 'Transactions', 'Targets', 'Pots'].map(name =>
+      within(tabBar).getByRole('link', { name }),
+    );
+    expect(tabLinks).toHaveLength(4);
+    expect(within(tabBar).getByRole('button', { name: 'More' })).toBeInTheDocument();
+    expect(within(tabBar).queryByRole('link', { name: 'Categories' })).not.toBeInTheDocument();
+
+    expect(screen.getAllByRole('link', { name: 'Categories' })).toHaveLength(1);
+    expect(screen.getAllByRole('link', { name: 'Recurring' })).toHaveLength(1);
+    expect(screen.getAllByRole('link', { name: 'Insights' })).toHaveLength(1);
+  });
+
+  it('opens the More sheet from the bottom tab and it lists Categories, Recurring and Insights', async () => {
+    const user = userEvent.setup();
+    renderLayout();
+    await user.click(screen.getByRole('button', { name: 'More' }));
+    expect(await screen.findByRole('link', { name: 'Categories' })).toBeInTheDocument();
   });
 
   it('links to Pots from both the bottom tab bar and the sidebar', () => {

@@ -18,3 +18,7 @@ export const POT_GROUPS = new Set(['SINKING_FUNDS', 'SAVING_INVESTMENT']);
 export const VALID_PERIODS = new Set(['MONTHLY', 'WEEKLY']);
 
 export const MAX_AMOUNT_PENCE = 1_000_000_000;
+
+export const ASSET_TYPES = new Set(['CASH', 'SAVINGS', 'INVESTMENT']);
+export const LIABILITY_TYPES = new Set(['CREDIT_CARD', 'LOAN']);
+export const MAX_BALANCE_ENTRIES = 500;

@@ -13,3 +13,4 @@ export const txnSk = (yearMonth: string, transactionId: string): string =>
 export const targetSk = (categoryId: string): string => `TARGET#${categoryId}`;
 export const recurringSk = (recurringId: string): string => `RECUR#${recurringId}`;
 export const potSk = (categoryId: string): string => `POT#${categoryId}`;
+export const accountSk = (accountId: string): string => `ACCOUNT#${accountId}`;
