@@ -1,5 +1,5 @@
-import { ActionIcon, Group, Menu, Text, ThemeIcon } from '@mantine/core';
-import { IconCopy, IconDots, IconPencil, IconRepeat, IconTrash } from '@tabler/icons-react';
+import { ActionIcon, Group, Menu, Text, ThemeIcon, Tooltip } from '@mantine/core';
+import { IconClock, IconCopy, IconDots, IconPencil, IconRepeat, IconTrash } from '@tabler/icons-react';
 import { formatPence } from '~/lib/money';
 import { CategoryIcon } from '~/components/categories/CategoryIcon';
 import type { Transaction } from '~/lib/types';
@@ -7,7 +7,7 @@ import type { Transaction } from '~/lib/types';
 const OUTGOING = new Set(['EXPENSE', 'SET_ASIDE']);
 
 export function TransactionRow({
-  transaction, categoryName, categoryIcon, onEdit, onDelete, onDuplicate, onRepeat,
+  transaction, categoryName, categoryIcon, onEdit, onDelete, onDuplicate, onRepeat, pending, pendingError,
 }: {
   transaction: Transaction;
   categoryName: string;
@@ -16,6 +16,8 @@ export function TransactionRow({
   onDelete?: (t: Transaction) => void;
   onDuplicate?: (t: Transaction) => void;
   onRepeat?: (t: Transaction) => void;
+  pending?: boolean;
+  pendingError?: string;
 }) {
   const label = transaction.description || categoryName;
   const sign = OUTGOING.has(transaction.type) ? '−' : '+';
@@ -32,6 +34,15 @@ export function TransactionRow({
         </div>
       </Group>
       <Group gap="xs" wrap="nowrap">
+        {pending && (
+          <Tooltip label={pendingError ?? 'Waiting to sync'} events={{ hover: true, focus: true, touch: true }}>
+            <IconClock
+              size={16}
+              color={pendingError ? 'var(--mantine-color-warning-6)' : 'var(--mantine-color-dimmed)'}
+              aria-label={pendingError ?? 'Waiting to sync'}
+            />
+          </Tooltip>
+        )}
         <Text fw={500}>{sign}{formatPence(transaction.amount)}</Text>
         {(onEdit || onDelete || onDuplicate || onRepeat) && (
           <Menu position="bottom-end">

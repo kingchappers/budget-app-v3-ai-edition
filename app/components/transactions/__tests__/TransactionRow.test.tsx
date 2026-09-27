@@ -66,3 +66,20 @@ describe('TransactionRow menu', () => {
     expect(screen.getByRole('button', { name: 'Actions for Weekly Shop' })).toBeInTheDocument();
   });
 });
+
+describe('TransactionRow pending badge', () => {
+  it('shows a pending clock icon when pending is true', () => {
+    renderRow({ pending: true });
+    expect(screen.getByLabelText('Waiting to sync')).toBeInTheDocument();
+  });
+
+  it('shows the queued error as a tooltip label when pendingError is set', () => {
+    renderRow({ pending: true, pendingError: 'categoryId must be an existing category' });
+    expect(screen.getByLabelText('categoryId must be an existing category')).toBeInTheDocument();
+  });
+
+  it('shows no pending icon when pending is false or omitted', () => {
+    renderRow();
+    expect(screen.queryByLabelText('Waiting to sync')).not.toBeInTheDocument();
+  });
+});
