@@ -4,19 +4,20 @@ Sub-project **H**. It builds on F1 (category groups), F2 (pots) and G (polish an
 
 ## Intent
 
-A single Insights page that answers "where does my money go" and "am I on track", for a chosen span of recent months, always anchored on the current month (no picking an arbitrary past window in this sub-project). It reuses the categories, groups and pots already built, and adds one new API endpoint to read a range of months at once.
+A single Insights page that answers "where does my money go" and "am I on track", for a chosen span of recent months, with the ability to page back through earlier windows of that same length. It reuses the categories, groups and pots already built, and adds one new API endpoint to read a range of months at once.
 
 ## Decisions
 
 | Question | Decision |
 |----------|----------|
-| Span | A segmented control: This month, 3 months, 6 months (default), 12 months. The page shows the chosen span and compares it against the equal-length period immediately before it. Always anchored on the current month; looking at an older window is a follow-up, not built here. |
+| Span | A segmented control: This month, 3 months, 6 months (default), 12 months. The page shows the chosen span and compares it against the equal-length period immediately before it. |
+| Paging | The current period has an end month (the "anchor"), defaulting to the current month. Left/right arrows page the anchor by the whole span length, not one month at a time, so the current and previous periods are always adjacent and never overlap. The right arrow is disabled once the anchor is back at the current month, so the page never shows the future. Changing the span keeps the anchor month and just widens or narrows the window. |
 | Data | A new `GET /api/transactions/range` endpoint returns the raw transactions for the requested months; all grouping, totals and comparisons are pure client functions. The page also reuses the existing categories, targets and pots endpoints. |
 | Charts | `@mantine/charts` (built on Recharts), pinned to `8.3.12` to match the installed `@mantine/core`/`@mantine/hooks`, the same way `@mantine/notifications` is pinned. `recharts` is added as an explicit dependency at `2.15.4`, the peer version `@mantine/charts@8.3.12` requires (`>=2.13.3`). |
 | "Spending" | `EXPENSE`-type transactions, including a Spend made against a pot category. `SET_ASIDE` counts as saved, not spent. Income is shown as a total only, not broken down. |
 | Navigation | A fifth bottom tab, **More**, replaces the direct Categories tab. It opens a sheet listing Categories, Recurring and Insights. The desktop sidebar is unaffected and gains a direct Insights link. |
 
-**Not doing (on purpose):** picking an arbitrary past window (only the current-month-anchored presets); a server-side pre-totalled insights endpoint (grouping logic would then live in two places, since custom categories and groups are in the database while defaults are in code); exporting or printing a report; per-transaction drill-down from a chart (tapping through to a group's categories is included; further than that is not).
+**Not doing (on purpose):** a free date range (only whole-span paging by the presets' fixed lengths); a server-side pre-totalled insights endpoint (grouping logic would then live in two places, since custom categories and groups are in the database while defaults are in code); exporting or printing a report; per-transaction drill-down from a chart (tapping through to a group's categories is included; further than that is not).
 
 ## 1. Navigation: the More tab
 
@@ -38,7 +39,9 @@ A single Insights page that answers "where does my money go" and "am I on track"
 - `app/lib/api.ts` gets `getTransactionsRange(from: string, to: string): Promise<Transaction[]>`, calling the new route.
 - `app/lib/queries.ts` gets `useTransactionsRange(from: string, to: string)`, keyed `queryKeys.transactionsRange(from, to)`, invalidated by every mutation that already invalidates `['transactions']` or `['pots']`.
 - `app/lib/insights.ts` (new, pure, the heart of H) computes, from `{ transactions, categories, targets, from, to }`:
-  - `splitPeriods(from, to): { current: [string, string]; previous: [string, string] }` — the requested range and the equal-length range immediately before it.
+  - `fetchRangeForAnchor(anchor: string, months: number): { from: string; to: string }` — `to` is `anchor`, `from` is `shiftMonth(anchor, -(2 * months - 1))` (`shiftMonth` from `app/lib/months.ts`), covering the current period and its comparison period in one range. This is the `from`/`to` sent to `useTransactionsRange` and to `splitPeriods` below.
+  - `splitPeriods(from, to): { current: [string, string]; previous: [string, string] }` — splits a fetched `from`/`to` range exactly in half by month count: the second (later) half is `current`, the first half is `previous`.
+  - `canGoNewer(anchor: string): boolean` — `anchor < currentYearMonth()`, so the page knows when to enable the right arrow.
   - `summaryTotals(transactions, period): { income, spent, saved, net }` for one period (`saved` = `SET_ASIDE` minus `TAKE_OUT`; `spent` = `EXPENSE`; `net` = income − spent).
   - `groupBreakdown(transactions, categories, current, previous): { group, label, current, previous }[]` — spend per F1 group, both periods, via `groupCategories`.
   - `monthlyTrend(transactions, months): { yearMonth, income, spent, saved }[]` — one row per month in the full span (current period only; the trend chart shows the chosen span, not the comparison).
@@ -48,7 +51,7 @@ A single Insights page that answers "where does my money go" and "am I on track"
 
 ## 4. The Insights page
 
-Route `/insights`, in `DefaultLayout`. Top of the page: a segmented control for the span (This month / 3M / 6M / 12M, 6M selected by default), driving `from`/`to` for `useTransactionsRange`, `useTargets`, `useCategories`, and `usePots(to)`.
+Route `/insights`, in `DefaultLayout`. Top of the page: a segmented control for the span (This month / 3M / 6M / 12M, 6M selected by default) next to a small header with left/right arrows and a label ("Apr – Sep 2026", or the single month's name for This month), mirroring `MonthHeader`'s existing look. The header holds the anchor month (state, defaulting to `currentYearMonth()`); `fetchRangeForAnchor(anchor, months)` turns the anchor and the selected span into the `from`/`to` sent to `useTransactionsRange`, and `splitPeriods` turns that same `from`/`to` into the `current`/`previous` tuples every other `insights.ts` function takes. `useTargets`, `useCategories` and `usePots(anchor)` are unaffected by the doubled fetch range. The left arrow sets the anchor to `shiftMonth(anchor, -months)`; the right arrow (disabled when `!canGoNewer(anchor)`) sets it to `shiftMonth(anchor, months)`, clamped to `currentYearMonth()`.
 
 Sections, top to bottom, each with its own empty/loading handling:
 
@@ -65,14 +68,14 @@ A section with nothing to show for the chosen span (for example Biggest Movers w
 
 **Automated tests**
 
-- `app/lib/insights.ts`: each function gets direct unit tests, including the boundary cases: a one-month span (This month), a category with a target for only part of the span, a category with no activity in either period (excluded from movers, included in the group breakdown as zero), and the previous-period window crossing a year boundary.
+- `app/lib/insights.ts`: each function gets direct unit tests, including the boundary cases: a one-month span (This month), a category with a target for only part of the span, a category with no activity in either period (excluded from movers, included in the group breakdown as zero), the previous-period window crossing a year boundary, `fetchRangeForAnchor` across a year boundary, and `canGoNewer` at exactly the current month (false) and one month behind it (true).
 - API: `getTransactionsRange` — the 400 cases (bad format, `from > to`, span over 24 months), pagination across multiple pages, filtering to the requested months only, and that it is scoped to the caller's partition (no cross-user read).
 - Client hooks: `useTransactionsRange` fetches and caches by `(from, to)`; a transaction or pot mutation invalidates it.
-- Components: the More sheet (opens, lists the three items, links correctly, closes on navigation); the bottom tab highlighting More for its three routes; each Insights section rendered with fixture data (values, the empty-state message, the group drill-down sheet); the span control changing `from`/`to`.
+- Components: the More sheet (opens, lists the three items, links correctly, closes on navigation); the bottom tab highlighting More for its three routes; each Insights section rendered with fixture data (values, the empty-state message, the group drill-down sheet); the span control changing `from`/`to`; the left/right arrows changing the anchor by the current span's length; the right arrow disabled at the current month and re-enabled after paging back; switching the span keeps the anchor month.
 - `@mantine/charts` under Vitest needs a `ResizeObserver` stub and a fixed container size; add this once to the test setup file rather than per test.
 - Existing suites stay green; `yarn typecheck` is clean.
 
-**Verification the executing agent runs:** the stubbed headless-browser pass at 390px and 1280px (the recipe recorded from F1/F2): the More tab and sheet, the Insights page's six sections rendering real charts (not just their test doubles), the span control, the group drill-down, and the desktop sidebar's new Insights link.
+**Verification the executing agent runs:** the stubbed headless-browser pass at 390px and 1280px (the recipe recorded from F1/F2): the More tab and sheet, the Insights page's six sections rendering real charts (not just their test doubles), the span control, paging back and forward with the arrows, the group drill-down, and the desktop sidebar's new Insights link.
 
 **Rollout:** a code deploy with two new dependencies (`@mantine/charts`, `recharts`) and no infra or IAM change. `yarn audit` is checked against the new dependencies as part of the security checklist. Rollback is a revert.
 
@@ -87,7 +90,7 @@ A section with nothing to show for the chosen span (for example Biggest Movers w
 
 ## Follow-ups
 
-- Looking at an older, non-current-month-anchored window.
+- A free date range instead of paging by fixed span lengths.
 - A stored monthly summary if the full-history read (shared with pots) ever gets slow.
 - Drill-down past a group into a single transaction.
 - Exporting the page (CSV or PDF).
