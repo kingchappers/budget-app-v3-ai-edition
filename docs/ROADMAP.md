@@ -10,10 +10,10 @@ Bank sync was dropped (see `DECISIONS.md`), so manual entry is the core interact
 | D | PWA and add shortcut | Merged ([PR #36](https://github.com/kingchappers/budget-app-v3-ai-edition/pull/36)). Spec: `superpowers/specs/2026-09-23-pwa-add-shortcut-design.md`, plan: `superpowers/plans/2026-09-23-pwa-add-shortcut.md` |
 | E | CSV/OFX import | Dropped: manual CSV/OFX import was judged clunky and would not be used. |
 | F1 | Category groups and YNAB defaults | Implemented on `feat/category-groups` ([PR #37](https://github.com/kingchappers/budget-app-v3-ai-edition/pull/37)). Spec: `superpowers/specs/2026-09-24-category-groups-design.md`, plan: `superpowers/plans/2026-09-24-category-groups.md` |
-| F2 | Savings and sinking-fund pots | Merged ([PR #38](https://github.com/kingchappers/budget-app-v3-ai-edition/pull/38)). Spec: `superpowers/specs/2026-09-25-savings-pots-design.md`, plan: `superpowers/plans/2026-09-25-savings-pots.md` |
-| G | Polish and hardening | Merged ([PR #39](https://github.com/kingchappers/budget-app-v3-ai-edition/pull/39)). Spec: `superpowers/specs/2026-09-26-polish-hardening-design.md`, plan: `superpowers/plans/2026-09-26-polish-hardening.md` |
-| H | Spending insights | Implemented on `feat/spending-insights` (PR pending). Spec: `superpowers/specs/2026-09-27-spending-insights-design.md`, plan: `superpowers/plans/2026-09-27-spending-insights.md` |
-| I | Net worth and accounts | Not started |
+| F2 | Savings and sinking-fund pots | Implemented on `feat/savings-pots` (PR pending). Spec: `superpowers/specs/2026-09-25-savings-pots-design.md`, plan: `superpowers/plans/2026-09-25-savings-pots.md` |
+| G | Polish and hardening | Implemented on `feat/polish-hardening` (PR pending). Spec: `superpowers/specs/2026-09-26-polish-hardening-design.md`, plan: `superpowers/plans/2026-09-26-polish-hardening.md` |
+| H | Spending insights | Not started (after F) |
+| I | Net worth and accounts | Implemented on `feat/net-worth-accounts` (PR pending). Spec: `superpowers/specs/2026-09-27-net-worth-accounts-design.md`, plan: `superpowers/plans/2026-09-27-net-worth-accounts.md` |
 | J | Offline entry queue | Not started |
 
 ## B: Smart prefill
@@ -151,6 +151,18 @@ Implemented on `feat/spending-insights`. Spec: `superpowers/specs/2026-09-27-spe
   - Drill-down past a group into a single transaction.
   - Exporting the page.
   - **Fixed post-review:** Task 7's real-browser pass found that the Later arrow's guard (`canGoNewer`) only checked whether the anchor was before the current month, not whether the anchor plus the *current* span length would land in the future — paging Earlier, widening the span, then paging Later could push the anchor months into the future and lock the page into a permanent error state. The final whole-branch review also found: the summary row's change indicator coloured every increase green regardless of whether that direction was good for the figure, and divided by a negative previous value in a way that could invert the sign of a genuine improvement; pot trend charts had no name label and drew a pot's entire history instead of clipping to the chosen span; and spend on a removed or ungrouped category vanished from "Spending by group" instead of appearing under Other, so the group bars didn't add up to the "Spent" total. All four are fixed, with tests pinning each one.
+## I: Net worth and accounts
+
+Implemented on `feat/net-worth-accounts`. Spec: `superpowers/specs/2026-09-27-net-worth-accounts-design.md`, plan: `superpowers/plans/2026-09-27-net-worth-accounts.md`.
+
+- **Built:** an accounts API (`GET/POST /api/accounts`, `PUT/DELETE /api/accounts/{accountId}`, `POST /api/accounts/{accountId}/balances`) storing dated balance entries per account; an Accounts page (More sheet) listing assets and liabilities with totals, per-account history and a trend chart, and hand-entered balance updates; a Net worth section on the Insights page.
+- **Decisions:** balances are manually entered, dated points, never auto-fetched (see `docs/DECISIONS.md`'s bank-sync entry); every account is a fixed Asset or Liability, with a small fixed type list per kind; a liability is entered as a positive amount owed and subtracted when computing net worth; net worth is a stock figure on its own section, not folded into the flow-based summary row.
+- **Follow-ups:**
+  - Attaching accounts to transactions so balances are derived rather than entered.
+  - Multi-currency.
+  - A finer breakdown than the asset/liability split.
+  - Reminders to update a stale account.
+  - `openAccount`/`updatingAccount` on the Accounts page hold stale data once `accounts` refetches after a mutation (the object reference from the list at open time); acceptable since the sheet closes on a successful update, but worth fixing properly later.
 
 ## Later ideas
 
