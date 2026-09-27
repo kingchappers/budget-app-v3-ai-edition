@@ -106,16 +106,20 @@ describe('pots invalidation', () => {
   it('invalidates pots when a transaction is created', async () => {
     request.mockResolvedValue({ transaction: { ...existing, transactionId: 'real' } });
     client.setQueryData(potsKey, []);
+    client.setQueryData(['transactionsRange', '2026-01', '2026-07'], []);
     const { result } = renderHook(() => useCreateTransaction(), { wrapper });
     await act(async () => { await result.current.mutateAsync(input); });
     expect(client.getQueryState(potsKey)?.isInvalidated).toBe(true);
+    expect(client.getQueryState(['transactionsRange', '2026-01', '2026-07'])?.isInvalidated).toBe(true);
   });
 
   it('invalidates pots when a transaction is deleted', async () => {
     request.mockResolvedValue(undefined);
     client.setQueryData(potsKey, []);
+    client.setQueryData(['transactionsRange', '2026-01', '2026-07'], []);
     const { result } = renderHook(() => useDeleteTransaction(), { wrapper });
     await act(async () => { await result.current.mutateAsync({ transactionId: 't1', yearMonth: '2026-07' }); });
     expect(client.getQueryState(potsKey)?.isInvalidated).toBe(true);
+    expect(client.getQueryState(['transactionsRange', '2026-01', '2026-07'])?.isInvalidated).toBe(true);
   });
 });

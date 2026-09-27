@@ -7,10 +7,12 @@ import { getCategories, createCategory, deleteCategory } from './src/api/categor
 import { getTransactions, createTransaction, deleteTransaction, updateTransaction } from './src/api/transactions';
 import { getTargets, upsertTarget, deleteTarget } from './src/api/targets';
 import { getPots, putPot } from './src/api/pots';
+import { getTransactionsRange } from './src/api/transactionsRange';
 import { reassignCategory } from './src/api/reassign';
 import {
   getRecurring, createRecurring, updateRecurring, deleteRecurring, setRecurringHandled,
 } from './src/api/recurring';
+import { getAccounts, createAccount, updateAccount, deleteAccount, addBalance } from './src/api/accounts';
 
 const AUTH0_DOMAIN = process.env.AUTH0_DOMAIN || '';
 const AUTH0_AUDIENCE = process.env.AUTH0_AUDIENCE || '';
@@ -37,6 +39,7 @@ router.get('/api/transactions', getTransactions);
 router.post('/api/transactions', createTransaction);
 router.delete('/api/transactions/{yearMonth}/{transactionId}', deleteTransaction);
 router.put('/api/transactions/{yearMonth}/{transactionId}', updateTransaction);
+router.get('/api/transactions/range', getTransactionsRange);
 router.get('/api/targets', getTargets);
 router.put('/api/targets/{categoryId}', upsertTarget);
 router.delete('/api/targets/{categoryId}', deleteTarget);
@@ -47,6 +50,11 @@ router.post('/api/recurring', createRecurring);
 router.put('/api/recurring/{recurringId}', updateRecurring);
 router.delete('/api/recurring/{recurringId}', deleteRecurring);
 router.post('/api/recurring/{recurringId}/handled', setRecurringHandled);
+router.get('/api/accounts', getAccounts);
+router.post('/api/accounts', createAccount);
+router.put('/api/accounts/{accountId}', updateAccount);
+router.delete('/api/accounts/{accountId}', deleteAccount);
+router.post('/api/accounts/{accountId}/balances', addBalance);
 
 export const handler: APIGatewayProxyHandlerV2 = async (event) => {
   try {

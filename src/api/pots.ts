@@ -29,7 +29,7 @@ function isOptionalAmount(value: unknown): value is number | null {
   return typeof value === 'number' && Number.isInteger(value) && value > 0 && value <= MAX_AMOUNT_PENCE;
 }
 
-async function queryAll(userId: string, prefix: string): Promise<Record<string, unknown>[]> {
+export async function queryAll(userId: string, prefix: string): Promise<Record<string, unknown>[]> {
   const items: Record<string, unknown>[] = [];
   let lastEvaluatedKey: Record<string, unknown> | undefined;
   do {
@@ -45,7 +45,7 @@ async function queryAll(userId: string, prefix: string): Promise<Record<string, 
   return items;
 }
 
-async function queryOne(userId: string, sk: string): Promise<Record<string, unknown> | undefined> {
+export async function queryOne(userId: string, sk: string): Promise<Record<string, unknown> | undefined> {
   const result = await docClient.send(new QueryCommand({
     TableName: TABLE,
     KeyConditionExpression: 'PK = :pk AND SK = :sk',

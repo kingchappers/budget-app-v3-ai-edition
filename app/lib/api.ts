@@ -1,4 +1,4 @@
-import type { Category, CategoryGroup, CategoryTarget, PotSettingsInput, PotSummary, Recurring, TargetPeriod, Transaction, TransactionType } from './types';
+import type { Account, AccountKind, AccountType, Category, CategoryGroup, CategoryTarget, PotSettingsInput, PotSummary, Recurring, TargetPeriod, Transaction, TransactionType } from './types';
 
 type Request = (endpoint: string, options?: RequestInit) => Promise<unknown>;
 
@@ -47,6 +47,10 @@ export function createApi(request: Request) {
     getTransactions: async (yearMonth: string): Promise<Transaction[]> => {
       const [year, month] = yearMonth.split('-');
       const res = await request(`/api/transactions?year=${year}&month=${Number(month)}`) as { transactions: Transaction[] };
+      return res.transactions;
+    },
+    getTransactionsRange: async (from: string, to: string): Promise<Transaction[]> => {
+      const res = await request(`/api/transactions/range?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`) as { transactions: Transaction[] };
       return res.transactions;
     },
     createTransaction: async (input: TransactionInput): Promise<Transaction> => {
@@ -120,6 +124,32 @@ export function createApi(request: Request) {
         body: JSON.stringify({ period }),
       }) as { recurring: Recurring };
       return res.recurring;
+    },
+
+    getAccounts: async (): Promise<Account[]> => {
+      const res = await request('/api/accounts') as { accounts: Account[] };
+      return res.accounts;
+    },
+    createAccount: async (input: { name: string; kind: AccountKind; type: AccountType }): Promise<Account> => {
+      const res = await request('/api/accounts', { method: 'POST', body: JSON.stringify(input) }) as { account: Account };
+      return res.account;
+    },
+    updateAccount: async (accountId: string, input: { name: string; type: AccountType }): Promise<Account> => {
+      const res = await request(`/api/accounts/${encodeURIComponent(accountId)}`, {
+        method: 'PUT',
+        body: JSON.stringify(input),
+      }) as { account: Account };
+      return res.account;
+    },
+    deleteAccount: async (accountId: string): Promise<void> => {
+      await request(`/api/accounts/${encodeURIComponent(accountId)}`, { method: 'DELETE' });
+    },
+    addBalance: async (accountId: string, input: { date: string; pence: number }): Promise<Account> => {
+      const res = await request(`/api/accounts/${encodeURIComponent(accountId)}/balances`, {
+        method: 'POST',
+        body: JSON.stringify(input),
+      }) as { account: Account };
+      return res.account;
     },
   };
 }

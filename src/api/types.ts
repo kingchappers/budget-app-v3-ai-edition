@@ -73,3 +73,20 @@ export interface PotSummary {
   thisMonth: { setAside: number; autoAdded: number; takeOut: number; spent: number };
   months: PotMonth[];
 }
+
+export type AccountKind = 'ASSET' | 'LIABILITY';
+export type AccountType = 'CASH' | 'SAVINGS' | 'INVESTMENT' | 'CREDIT_CARD' | 'LOAN';
+
+export interface BalanceEntry {
+  date: string;
+  pence: number;
+}
+
+export interface Account {
+  accountId: string;
+  name: string;
+  kind: AccountKind;
+  type: AccountType;
+  balances: BalanceEntry[];
+  createdAt: string;
+}
