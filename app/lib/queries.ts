@@ -3,7 +3,7 @@ import { useMemo } from 'react';
 import { useAuth0 } from '@auth0/auth0-react';
 import { useProtectedApi } from '~/hooks/useProtectedApi';
 import { createApi, type RecurringInput, type TransactionInput } from './api';
-import type { Category, CategoryGroup, PotSettingsInput, Recurring, TargetPeriod, Transaction } from './types';
+import type { Account, Category, CategoryGroup, PotSettingsInput, Recurring, TargetPeriod, Transaction } from './types';
 
 export const queryKeys = {
   categories: ['categories'] as const,
@@ -12,6 +12,7 @@ export const queryKeys = {
   transactionsRange: (from: string, to: string) => ['transactionsRange', from, to] as const,
   recurring: ['recurring'] as const,
   pots: (asOf: string) => ['pots', asOf] as const,
+  accounts: ['accounts'] as const,
 };
 
 function useApi() {
@@ -286,5 +287,53 @@ export function useSetRecurringHandled() {
     onSettled: () => {
       qc.invalidateQueries({ queryKey: queryKeys.recurring });
     },
+  });
+}
+
+export function useAccounts() {
+  const api = useApi();
+  const enabled = useAuthReady();
+  return useQuery({
+    queryKey: queryKeys.accounts,
+    queryFn: () => api.getAccounts(),
+    enabled,
+  });
+}
+
+export function useCreateAccount() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { name: string; kind: Account['kind']; type: Account['type'] }) => api.createAccount(input),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.accounts }),
+  });
+}
+
+export function useUpdateAccount() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { accountId: string; input: { name: string; type: Account['type'] } }) =>
+      api.updateAccount(vars.accountId, vars.input),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.accounts }),
+  });
+}
+
+export function useDeleteAccount() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (accountId: string) => api.deleteAccount(accountId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.accounts }),
+  });
+}
+
+export function useAddBalance() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { accountId: string; input: { date: string; pence: number } }) =>
+      api.addBalance(vars.accountId, vars.input),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.accounts }),
   });
 }
