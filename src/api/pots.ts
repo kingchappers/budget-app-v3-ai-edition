@@ -45,7 +45,7 @@ export async function queryAll(userId: string, prefix: string): Promise<Record<s
   return items;
 }
 
-async function queryOne(userId: string, sk: string): Promise<Record<string, unknown> | undefined> {
+export async function queryOne(userId: string, sk: string): Promise<Record<string, unknown> | undefined> {
   const result = await docClient.send(new QueryCommand({
     TableName: TABLE,
     KeyConditionExpression: 'PK = :pk AND SK = :sk',
