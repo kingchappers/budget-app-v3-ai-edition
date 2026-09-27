@@ -8,6 +8,7 @@ const data = vi.hoisted(() => ({
   targets: [] as unknown[],
   transactions: [] as unknown[],
   pots: [] as unknown[],
+  accounts: [] as unknown[],
   rangeCalls: [] as [string, string][],
 }));
 
@@ -18,6 +19,7 @@ vi.mock('~/lib/queries', () => ({
   useCategories: () => ({ data: data.categories, isLoading: false, error: null, refetch: vi.fn() }),
   useTargets: () => ({ data: data.targets, isLoading: false, error: null, refetch: vi.fn() }),
   usePots: () => ({ data: data.pots, isLoading: false, error: null, refetch: vi.fn() }),
+  useAccounts: () => ({ data: data.accounts, isLoading: false, error: null, refetch: vi.fn() }),
   useTransactionsRange: (from: string, to: string) => {
     data.rangeCalls.push([from, to]);
     return { data: data.transactions, isLoading: false, error: null, refetch: vi.fn() };
@@ -40,6 +42,7 @@ beforeEach(() => {
   data.targets = [];
   data.transactions = [];
   data.pots = [];
+  data.accounts = [];
   data.rangeCalls = [];
   vi.useFakeTimers({ shouldAdvanceTime: true });
   vi.setSystemTime(new Date('2026-09-15T12:00:00'));
@@ -106,5 +109,11 @@ describe('Insights page', () => {
     renderPage();
     expect(screen.getByRole('heading', { name: 'Targets' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Pots' })).toBeInTheDocument();
+  });
+
+  it('shows the Net worth section', () => {
+    data.accounts = [{ accountId: 'a', name: 'Lloyds', kind: 'ASSET', type: 'CASH', balances: [{ date: '2026-09-01', pence: 100000 }], createdAt: '' }];
+    renderPage();
+    expect(screen.getByRole('heading', { name: 'Net worth' })).toBeInTheDocument();
   });
 });

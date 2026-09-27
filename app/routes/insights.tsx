@@ -9,12 +9,13 @@ import { MonthlyTrendChart } from '~/components/insights/MonthlyTrendChart';
 import { BiggestMoversList } from '~/components/insights/BiggestMovers';
 import { TargetAdherence } from '~/components/insights/TargetAdherence';
 import { PotsTrend } from '~/components/insights/PotsTrend';
+import { NetWorth } from '~/components/insights/NetWorth';
 import {
   biggestMovers, canGoNewer, categoriesInGroup, fetchRangeForAnchor, groupBreakdown, monthlyTrend, monthsInPeriod, splitPeriods, summaryTotals, targetAdherence,
 } from '~/lib/insights';
 import { currentYearMonth, formatMonthLabel, shiftMonth } from '~/lib/months';
 import { formatPence } from '~/lib/money';
-import { useCategories, usePots, useTargets, useTransactionsRange } from '~/lib/queries';
+import { useAccounts, useCategories, usePots, useTargets, useTransactionsRange } from '~/lib/queries';
 
 const SPAN_OPTIONS = [
   { label: 'This month', value: '1' },
@@ -38,6 +39,7 @@ function InsightsContent() {
   const targets = useTargets();
   const pots = usePots(anchor);
   const range = useTransactionsRange(from, to);
+  const accounts = useAccounts();
 
   if (categories.error || targets.error || pots.error || range.error) {
     return (
@@ -96,6 +98,9 @@ function InsightsContent() {
 
       <Title order={5} mt="md">Pots</Title>
       <PotsTrend pots={pots.data ?? []} categories={categories.data ?? []} current={current} />
+
+      <Title order={5} mt="md">Net worth</Title>
+      <NetWorth accounts={accounts.data ?? []} months={monthsInPeriod(current)} />
 
       <ResponsiveSheet opened={openGroup !== null} onClose={() => setOpenGroup(null)} title={openGroupLabel}>
         <Stack>
