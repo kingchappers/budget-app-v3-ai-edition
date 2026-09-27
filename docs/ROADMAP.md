@@ -10,11 +10,11 @@ Bank sync was dropped (see `DECISIONS.md`), so manual entry is the core interact
 | D | PWA and add shortcut | Merged ([PR #36](https://github.com/kingchappers/budget-app-v3-ai-edition/pull/36)). Spec: `superpowers/specs/2026-09-23-pwa-add-shortcut-design.md`, plan: `superpowers/plans/2026-09-23-pwa-add-shortcut.md` |
 | E | CSV/OFX import | Dropped: manual CSV/OFX import was judged clunky and would not be used. |
 | F1 | Category groups and YNAB defaults | Implemented on `feat/category-groups` ([PR #37](https://github.com/kingchappers/budget-app-v3-ai-edition/pull/37)). Spec: `superpowers/specs/2026-09-24-category-groups-design.md`, plan: `superpowers/plans/2026-09-24-category-groups.md` |
-| F2 | Savings and sinking-fund pots | Implemented on `feat/savings-pots` (PR pending). Spec: `superpowers/specs/2026-09-25-savings-pots-design.md`, plan: `superpowers/plans/2026-09-25-savings-pots.md` |
-| G | Polish and hardening | Implemented on `feat/polish-hardening` (PR pending). Spec: `superpowers/specs/2026-09-26-polish-hardening-design.md`, plan: `superpowers/plans/2026-09-26-polish-hardening.md` |
-| H | Spending insights | Not started (after F) |
-| I | Net worth and accounts | Implemented on `feat/net-worth-accounts` (PR pending). Spec: `superpowers/specs/2026-09-27-net-worth-accounts-design.md`, plan: `superpowers/plans/2026-09-27-net-worth-accounts.md` |
-| J | Offline entry queue | Not started |
+| F2 | Savings and sinking-fund pots | Merged ([PR #38](https://github.com/kingchappers/budget-app-v3-ai-edition/pull/38)). Spec: `superpowers/specs/2026-09-25-savings-pots-design.md`, plan: `superpowers/plans/2026-09-25-savings-pots.md` |
+| G | Polish and hardening | Merged ([PR #39](https://github.com/kingchappers/budget-app-v3-ai-edition/pull/39)). Spec: `superpowers/specs/2026-09-26-polish-hardening-design.md`, plan: `superpowers/plans/2026-09-26-polish-hardening.md` |
+| H | Spending insights | Merged ([PR #40](https://github.com/kingchappers/budget-app-v3-ai-edition/pull/40)). Spec: `superpowers/specs/2026-09-27-spending-insights-design.md`, plan: `superpowers/plans/2026-09-27-spending-insights.md` |
+| I | Net worth and accounts | Merged ([PR #41](https://github.com/kingchappers/budget-app-v3-ai-edition/pull/41)). Spec: `superpowers/specs/2026-09-27-net-worth-accounts-design.md`, plan: `superpowers/plans/2026-09-27-net-worth-accounts.md` |
+| J | Offline entry queue | Implemented on `feat/offline-queue` ([PR #43](https://github.com/kingchappers/budget-app-v3-ai-edition/pull/43)). Spec: `superpowers/specs/2026-09-27-offline-entry-queue-design.md`, plan: `superpowers/plans/2026-09-27-offline-entry-queue.md` |
 
 ## B: Smart prefill
 
@@ -67,7 +67,7 @@ Implemented on `feat/pwa-add-shortcut`. Spec: `superpowers/specs/2026-09-23-pwa-
 - **Decisions:** installable only, no service worker; launch behaviour is a per-device toggle rather than a second icon; no infra change (the static handler stays on the Lambda).
 - **Follow-ups:**
   - Confirm on a real iPhone whether an Auth0 login stays inside the installed app.
-  - Offline launch and an offline entry queue (see Later ideas).
+  - Offline launch (an offline entry queue, once the app is already open, is covered by J).
   - Replace the first-draft icon with a designed one (swap `public/icons/icon.svg` and regenerate the PNGs).
   - The static Lambda handler is served publicly at `/index.js`, because it lives inside the served `build/client` directory (pre-existing, low impact since the repo is public). Move the entry file out of the served root or answer that path with a 404.
   - Static responses carry no Content-Security-Policy (SECURITY.md WEB-A05). A CSP needs the Google Fonts and Auth0 origins allowed, so it was left out of D on purpose.
@@ -165,9 +165,33 @@ Implemented on `feat/net-worth-accounts`. Spec: `superpowers/specs/2026-09-27-ne
   - `openAccount`/`updatingAccount` on the Accounts page hold stale data once `accounts` refetches after a mutation (the object reference from the list at open time); acceptable since the sheet closes on a successful update, but worth fixing properly later.
   - **Fixed post-review:** the net worth change figure measured from the end of the span's first month instead of before it, so "This month" always read +£0.00 regardless of what happened; the update-balance form didn't reset between accounts, so updating one account's balance could leave that amount sitting in the form when a different account's sheet was opened next; the API returned raw DynamoDB items (leaking `PK`/`SK`) instead of a clean shape; an out-of-range date such as `2026-02-31` was accepted because `new Date` silently rolls it over instead of rejecting it; and a £0 or negative balance was rejected everywhere, so paying off a credit card or closing an account left its last non-zero balance stuck in net worth forever — a new `parseBalance` (client) and a relaxed `isValidPence` (server) now allow `pence >= 0` and negative (an overdrawn account), while transaction amounts are unaffected and still require `> 0`. All fixed, with tests pinning each one.
 
-## Later ideas
+## J: Offline entry queue
 
-- **Offline entry queue:** enter transactions with no signal and sync later. Needs a service worker, a persistent queue, idempotent creates and token refresh while offline. Tracked as sub-project J.
+Implemented on `feat/offline-queue`. Spec: `superpowers/specs/2026-09-27-offline-entry-queue-design.md`, plan: `superpowers/plans/2026-09-27-offline-entry-queue.md`.
+
+- **Built:**
+  - Client-generated transaction ids from the start, replacing the old temp-id swap.
+  - An IndexedDB-backed offline queue for new-transaction creates, with a reentrancy-guarded flush.
+  - Automatic sync on `online`, tab focus and app launch, plus a manual "Sync now" button.
+  - A pending badge on queued rows and an offline-queue banner in the UI.
+- **Fixed post-review (a real redesign, not point fixes):**
+  - **Critical:** TanStack Query's default `networkMode: 'online'` paused a mutation while the browser reported itself offline instead of letting it fail, so the rejection handler that queues an entry never ran — a create attempted with no signal was silently lost the moment the app closed. `useCreateTransaction` now sets `networkMode: 'always'`.
+  - Pending rows were one-off inserts into the transaction query cache, which any later refetch (a second create, a focus refetch, an invalidation) silently wiped while the banner still claimed they were waiting. Replaced with a live overlay: `useTransactions` merges a reactive pending-entries map onto the server's rows on every read, so a pending row survives any refetch instead of depending on a cache write nothing else knows about.
+  - A permanently-failing entry (its category deleted, say) could never leave the queue — added a "Discard" action on a pending row.
+  - Edit and Delete worked on a pending row, which would resurrect a discarded entry or silently revert an edit on the next sync — both are hidden while pending; only Discard is offered.
+  - Undo's real window was milliseconds for a queued entry, because the Saved toast was hidden the instant the request rejected. It now stays open (relabelled "Saved offline") through the queue transition, giving Undo the same window as an ordinary save.
+  - The queue wasn't scoped per user: on a shared device, a second account signing in could flush the first account's unsent entries into its own. Every entry now carries the Auth0 sub that queued it; flush and hydration only ever touch entries for the current user, and signing out clears the reactive pending state (never the durable IndexedDB queue, which stays correctly tagged for whoever signs back in).
+  - A genuine race let an already-undone entry still reach the server if a flush ran between its enqueue and its discard; closed by checking "already undone" before ever enqueueing, rather than enqueueing and immediately discarding again.
+- **Fixed in a follow-up scoped re-review of the redesign above:**
+  - `onSettled` was awaiting the month's refetch even on the failure path, which (since TanStack awaits `onSettled` before a rejected `mutateAsync` settles) delayed reaching `useSaveWithUndo`'s decision to queue an entry by a full failed-fetch-plus-retry cycle — reopening a narrower version of the original Critical's silent-loss window on a flaky-but-technically-online connection. Now only the success path awaits its invalidation; the failure path fires it without waiting.
+  - `flushQueue` sent a stale snapshot: Discard or Undo on an entry the flush hadn't reached yet had no effect, since the server's create is an unconditional upsert. A `wasDiscarded` in-memory check (populated by `discardQueuedEntry`) is consulted right before each send.
+  - Every ordinary *online* save also spent a moment in the pending map, which briefly showed the banner, the pending badge and a Discard-only menu on a completely normal save. Pending entries now carry `queued: boolean`; only a durably-queued (actually offline) entry counts toward any of the three.
+  - `hydrateOnce` replaced the whole pending map instead of merging onto it, and had no error handling; both fixed.
+- **Follow-ups:**
+  - Queuing edits and deletes made offline, with a conflict-resolution story for data that changed server-side in the meantime.
+  - A full offline app shell (service worker, cold-launch support) if that ever becomes worth the cost.
+  - The "Sync now" button test only proves a flush happens, not that the click itself caused one (the automatic launch flush already would have) — worth strengthening later.
+  - Task 8's browser-verification pass (Playwright, offline simulation) could not be completed in this environment — no headless Auth0 login stub exists in this repo yet — so the queue/banner/sync flow, including this fix wave, is unverified in a real browser. Remains outstanding, and is the check that would have caught the Critical finding above in the first place.
 
 ## Deliberately excluded
 

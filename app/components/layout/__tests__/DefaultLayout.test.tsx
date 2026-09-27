@@ -14,6 +14,7 @@ vi.mock('../../authentication/Authentication', () => ({ default: () => null }));
 vi.mock('../../transactions/TransactionSheet', () => ({
   TransactionSheet: ({ opened }: { opened: boolean }) => (opened ? <div>Add sheet open</div> : null),
 }));
+vi.mock('../OfflineQueueBanner', () => ({ OfflineQueueBanner: () => null }));
 
 import { DefaultLayout } from '../DefaultLayout';
 

@@ -6,6 +6,7 @@ import { MonthHeader } from '~/components/budget/MonthHeader';
 import { RecurringForm, type RecurringDraft } from '~/components/recurring/RecurringForm';
 import { TransactionRow } from '~/components/transactions/TransactionRow';
 import { TransactionSheet } from '~/components/transactions/TransactionSheet';
+import { useOfflineQueue } from '~/hooks/useOfflineQueue';
 import { filterTransactions, type TransactionFilter } from '~/lib/transactions';
 import { formatPence } from '~/lib/money';
 import { currentYearMonth } from '~/lib/months';
@@ -39,6 +40,7 @@ function TransactionsContent() {
   const categories = useCategories();
   const transactions = useTransactions(yearMonth);
   const remove = useDeleteTransaction();
+  const { pendingMap, discard } = useOfflineQueue();
 
   const nameFor = (id: string) =>
     categories.data?.find(c => c.categoryId === id)?.name ?? 'Unknown category';
@@ -125,10 +127,13 @@ function TransactionsContent() {
               transaction={t}
               categoryName={nameFor(t.categoryId)}
               categoryIcon={iconFor(t.categoryId)}
+              pending={pendingMap[t.transactionId]?.queued === true}
+              pendingError={pendingMap[t.transactionId]?.lastError}
               onEdit={setEditing}
               onDuplicate={setDuplicating}
               onRepeat={setRepeating}
               onDelete={(item) => remove.mutate({ transactionId: item.transactionId, yearMonth: item.yearMonth })}
+              onDiscard={(item) => void discard(item.transactionId)}
             />
           ))}
         </div>

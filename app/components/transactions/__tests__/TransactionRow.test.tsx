@@ -66,3 +66,49 @@ describe('TransactionRow menu', () => {
     expect(screen.getByRole('button', { name: 'Actions for Weekly Shop' })).toBeInTheDocument();
   });
 });
+
+describe('TransactionRow pending badge', () => {
+  it('shows a pending clock icon when pending is true', () => {
+    renderRow({ pending: true });
+    expect(screen.getByLabelText('Waiting to sync')).toBeInTheDocument();
+  });
+
+  it('shows the queued error as a tooltip label when pendingError is set', () => {
+    renderRow({ pending: true, pendingError: 'categoryId must be an existing category' });
+    expect(screen.getByLabelText('categoryId must be an existing category')).toBeInTheDocument();
+  });
+
+  it('shows no pending icon when pending is false or omitted', () => {
+    renderRow();
+    expect(screen.queryByLabelText('Waiting to sync')).not.toBeInTheDocument();
+  });
+});
+
+describe('TransactionRow pending row actions', () => {
+  it('offers only Discard while pending, never Edit or Delete', async () => {
+    const user = userEvent.setup();
+    renderRow({ pending: true, onEdit: vi.fn(), onDelete: vi.fn(), onDiscard: vi.fn() });
+
+    await user.click(screen.getByRole('button', { name: 'Actions for Weekly Shop' }));
+
+    expect(await screen.findByRole('menuitem', { name: 'Discard' })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Edit' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Delete' })).not.toBeInTheDocument();
+  });
+
+  it('calls onDiscard with the transaction', async () => {
+    const user = userEvent.setup();
+    const onDiscard = vi.fn();
+    renderRow({ pending: true, onDiscard });
+
+    await user.click(screen.getByRole('button', { name: 'Actions for Weekly Shop' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Discard' }));
+
+    expect(onDiscard).toHaveBeenCalledWith(transaction);
+  });
+
+  it('shows no actions menu at all while pending if no onDiscard is given', () => {
+    renderRow({ pending: true, onEdit: vi.fn(), onDelete: vi.fn() });
+    expect(screen.queryByRole('button', { name: 'Actions for Weekly Shop' })).not.toBeInTheDocument();
+  });
+});

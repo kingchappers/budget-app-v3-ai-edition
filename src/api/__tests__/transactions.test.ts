@@ -148,6 +148,42 @@ describe('createTransaction', () => {
     }), 'user-1', {});
     expect(res.statusCode).toBe(400);
   });
+
+  it('uses a client-supplied transactionId when present', async () => {
+    const clientId = '11111111-1111-4111-8111-111111111111';
+    const event = makeEvent({
+      body: {
+        amount: 500, type: 'EXPENSE', categoryId: 'cat-1', description: '', date: '2025-01-05',
+        transactionId: clientId,
+      },
+    });
+    mockSend.mockResolvedValueOnce({});
+    const res = await createTransaction(event, 'user-1', {});
+    const body = JSON.parse(res.body);
+    expect(res.statusCode).toBe(201);
+    expect(body.transaction.transactionId).toBe(clientId);
+  });
+
+  it('rejects a malformed transactionId', async () => {
+    const event = makeEvent({
+      body: {
+        amount: 500, type: 'EXPENSE', categoryId: 'cat-1', description: '', date: '2025-01-05',
+        transactionId: 'not-a-uuid',
+      },
+    });
+    const res = await createTransaction(event, 'user-1', {});
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toMatch(/transactionId/);
+  });
+
+  it('still generates its own id when transactionId is absent', async () => {
+    mockSend.mockResolvedValueOnce({});
+    const event = makeEvent({ body: { amount: 500, type: 'EXPENSE', categoryId: 'cat-1', description: '', date: '2025-01-05' } });
+    const res = await createTransaction(event, 'user-1', {});
+    const body = JSON.parse(res.body);
+    expect(res.statusCode).toBe(201);
+    expect(body.transaction.transactionId).toMatch(/^[0-9a-f-]{36}$/);
+  });
 });
 
 describe('validateTransactionInput', () => {

@@ -23,6 +23,7 @@ const input = {
   categoryId: 'cat-dining',
   description: '',
   date: '2026-07-10',
+  transactionId: 'client-1',
 };
 
 const existing: Transaction = {
@@ -45,59 +46,19 @@ beforeEach(() => {
 });
 
 describe('useCreateTransaction', () => {
-  it('adds a temporary row to the date\'s month while the request is in flight', async () => {
-    const pending = deferred<{ transaction: Transaction }>();
-    request.mockReturnValue(pending.promise);
-    client.setQueryData(july, [existing]);
+  // The optimistic row and its ApiError-vs-network-failure handling are no
+  // longer this mutation's own job (there is no onMutate/onError here any
+  // more) — that responsibility moved to useSaveWithUndo's pending-entry
+  // map and the useTransactions overlay, covered in useSaveWithUndo.test.tsx
+  // and queries.test.tsx. This file now only covers the plain mutation.
+
+  it('sends the request to the date\'s own month, not the current one', async () => {
+    request.mockResolvedValue({ transaction: { ...existing, transactionId: 'real', yearMonth: '2026-06', date: '2026-06-30' } });
     const { result } = renderHook(() => useCreateTransaction(), { wrapper });
 
-    act(() => { result.current.mutate(input); });
+    await act(async () => { await result.current.mutateAsync({ ...input, date: '2026-06-30' }); });
 
-    await waitFor(() => expect(client.getQueryData<Transaction[]>(july)).toHaveLength(2));
-    const rows = client.getQueryData<Transaction[]>(july)!;
-    expect(rows[1]).toMatchObject({ amount: 480, categoryId: 'cat-dining', yearMonth: '2026-07' });
-    expect(rows[1].transactionId).toMatch(/^temp-/);
-
-    pending.resolve({ transaction: { ...existing, transactionId: 'real' } });
-  });
-
-  it('writes a backdated entry to its own month, not the current one', async () => {
-    const pending = deferred<{ transaction: Transaction }>();
-    request.mockReturnValue(pending.promise);
-    client.setQueryData(june, []);
-    client.setQueryData(july, [existing]);
-    const { result } = renderHook(() => useCreateTransaction(), { wrapper });
-
-    act(() => { result.current.mutate({ ...input, date: '2026-06-30' }); });
-
-    await waitFor(() => expect(client.getQueryData<Transaction[]>(june)).toHaveLength(1));
-    expect(client.getQueryData<Transaction[]>(july)).toEqual([existing]);
-
-    pending.resolve({ transaction: { ...existing, transactionId: 'real' } });
-  });
-
-  it('removes only the temporary row when the request fails', async () => {
-    request.mockRejectedValue(new Error('boom'));
-    client.setQueryData(july, [existing]);
-    const { result } = renderHook(() => useCreateTransaction(), { wrapper });
-
-    act(() => { result.current.mutate(input); });
-
-    await waitFor(() => expect(result.current.isError).toBe(true));
-    expect(client.getQueryData<Transaction[]>(july)).toEqual([existing]);
-  });
-
-  it('does not write a partial cache when the month is not loaded', async () => {
-    const pending = deferred<{ transaction: Transaction }>();
-    request.mockReturnValue(pending.promise);
-    const { result } = renderHook(() => useCreateTransaction(), { wrapper });
-
-    act(() => { result.current.mutate(input); });
-
-    await waitFor(() => expect(request).toHaveBeenCalled());
-    expect(client.getQueryData(july)).toBeUndefined();
-
-    pending.resolve({ transaction: { ...existing, transactionId: 'real' } });
+    expect(request).toHaveBeenCalledWith('/api/transactions', expect.objectContaining({ body: expect.stringContaining('2026-06-30') }));
   });
 
   it('invalidates the date\'s month once the request settles', async () => {
@@ -108,6 +69,20 @@ describe('useCreateTransaction', () => {
     act(() => { result.current.mutate(input); });
 
     await waitFor(() => expect(invalidate).toHaveBeenCalledWith({ queryKey: july }));
+  });
+
+  it('does not pause while offline (networkMode: always)', async () => {
+    const { onlineManager } = await import('@tanstack/react-query');
+    request.mockRejectedValue(new TypeError('Failed to fetch'));
+    onlineManager.setOnline(false);
+    try {
+      const { result } = renderHook(() => useCreateTransaction(), { wrapper });
+      act(() => { result.current.mutate(input); });
+      await waitFor(() => expect(result.current.isError).toBe(true));
+      expect(request).toHaveBeenCalled();
+    } finally {
+      onlineManager.setOnline(true);
+    }
   });
 });
 

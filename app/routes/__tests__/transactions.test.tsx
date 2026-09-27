@@ -48,6 +48,7 @@ vi.mock('~/lib/queries', () => ({
   useTransactions: () => ({ data: transactions, isLoading: false, error: null }),
   useDeleteTransaction: () => ({ mutate: vi.fn() }),
 }));
+vi.mock('~/hooks/useOfflineQueue', () => ({ useOfflineQueue: () => ({ pendingMap: {}, flushNow: vi.fn(), discard: vi.fn() }) }));
 
 import Transactions from '../transactions';
 

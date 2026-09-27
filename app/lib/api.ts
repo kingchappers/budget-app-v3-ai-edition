@@ -8,6 +8,7 @@ export interface TransactionInput {
   categoryId: string;
   description: string;
   date: string;
+  transactionId?: string;
 }
 
 export interface RecurringInput {
