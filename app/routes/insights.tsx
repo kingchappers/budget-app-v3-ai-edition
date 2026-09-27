@@ -1,0 +1,75 @@
+import { useState } from 'react';
+import { ActionIcon, Alert, Button, Group, Loader, SegmentedControl, Stack, Text, Title } from '@mantine/core';
+import { IconChevronLeft, IconChevronRight } from '@tabler/icons-react';
+import { DefaultLayout } from '~/components/layout/DefaultLayout';
+import { SummaryRow } from '~/components/insights/SummaryRow';
+import { canGoNewer, fetchRangeForAnchor, splitPeriods, summaryTotals } from '~/lib/insights';
+import { currentYearMonth, formatMonthLabel, shiftMonth } from '~/lib/months';
+import { useCategories, usePots, useTargets, useTransactionsRange } from '~/lib/queries';
+
+const SPAN_OPTIONS = [
+  { label: 'This month', value: '1' },
+  { label: '3M', value: '3' },
+  { label: '6M', value: '6' },
+  { label: '12M', value: '12' },
+];
+
+function periodLabel(from: string, to: string): string {
+  return from === to ? formatMonthLabel(from) : `${formatMonthLabel(from)} – ${formatMonthLabel(to)}`;
+}
+
+function InsightsContent() {
+  const [months, setMonths] = useState(6);
+  const [anchor, setAnchor] = useState(currentYearMonth());
+  const { from, to } = fetchRangeForAnchor(anchor, months);
+  const { current, previous } = splitPeriods(from, to);
+
+  const categories = useCategories();
+  const targets = useTargets();
+  const pots = usePots(anchor);
+  const range = useTransactionsRange(from, to);
+
+  if (categories.error || targets.error || pots.error || range.error) {
+    return (
+      <Alert color="danger" title="Could not load insights">
+        <Button onClick={() => { categories.refetch(); targets.refetch(); pots.refetch(); range.refetch(); }}>Try again</Button>
+      </Alert>
+    );
+  }
+  if (categories.isLoading || targets.isLoading || pots.isLoading || range.isLoading) {
+    return <Group justify="center" py="xl"><Loader /></Group>;
+  }
+
+  const transactions = range.data ?? [];
+  const currentTotals = summaryTotals(transactions, current);
+  const previousTotals = summaryTotals(transactions, previous);
+
+  return (
+    <Stack>
+      <Title order={3}>Insights</Title>
+      <SegmentedControl
+        value={String(months)}
+        onChange={value => setMonths(Number(value))}
+        data={SPAN_OPTIONS}
+      />
+      <Group justify="space-between">
+        <ActionIcon variant="subtle" aria-label="Earlier" onClick={() => setAnchor(shiftMonth(anchor, -months))}>
+          <IconChevronLeft size={20} />
+        </ActionIcon>
+        <Text fw={600}>{periodLabel(current[0], current[1])}</Text>
+        <ActionIcon variant="subtle" aria-label="Later" disabled={!canGoNewer(anchor)} onClick={() => setAnchor(shiftMonth(anchor, months))}>
+          <IconChevronRight size={20} />
+        </ActionIcon>
+      </Group>
+      <SummaryRow current={currentTotals} previous={previousTotals} />
+    </Stack>
+  );
+}
+
+export default function Insights() {
+  return (
+    <DefaultLayout>
+      <InsightsContent />
+    </DefaultLayout>
+  );
+}
