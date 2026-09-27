@@ -354,6 +354,16 @@ describe('buildCsp', () => {
     expect(directive(policy, 'connect-src')).toBe("connect-src 'self'");
   });
 
+  it('allows the avatar hosts including the Auth0 Gravatar redirect', () => {
+    const imgSrc = directive(buildCsp(html, undefined), 'img-src');
+
+    expect(imgSrc).toContain('https://s.gravatar.com');
+    expect(imgSrc).toContain('https://*.gravatar.com');
+    expect(imgSrc).toContain('https://*.googleusercontent.com');
+    expect(imgSrc).toContain('https://cdn.auth0.com');
+    expect(imgSrc).toContain('https://i0.wp.com');
+  });
+
   it('locks down objects, base URIs and framing', () => {
     const policy = buildCsp(html, undefined);
 

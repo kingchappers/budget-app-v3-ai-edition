@@ -46,6 +46,7 @@ const PICTURE_HOSTS = [
   'https://*.gravatar.com',
   'https://*.googleusercontent.com',
   'https://cdn.auth0.com',
+  'https://i0.wp.com',
 ];
 
 function auth0Origins(domain: string | undefined): string[] {
