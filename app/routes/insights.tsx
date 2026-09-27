@@ -2,9 +2,15 @@ import { useState } from 'react';
 import { ActionIcon, Alert, Button, Group, Loader, SegmentedControl, Stack, Text, Title } from '@mantine/core';
 import { IconChevronLeft, IconChevronRight } from '@tabler/icons-react';
 import { DefaultLayout } from '~/components/layout/DefaultLayout';
+import { ResponsiveSheet } from '~/components/layout/ResponsiveSheet';
 import { SummaryRow } from '~/components/insights/SummaryRow';
-import { canGoNewer, fetchRangeForAnchor, splitPeriods, summaryTotals } from '~/lib/insights';
+import { GroupBreakdownChart } from '~/components/insights/GroupBreakdownChart';
+import { MonthlyTrendChart } from '~/components/insights/MonthlyTrendChart';
+import {
+  canGoNewer, categoriesInGroup, fetchRangeForAnchor, groupBreakdown, monthlyTrend, monthsInPeriod, splitPeriods, summaryTotals,
+} from '~/lib/insights';
 import { currentYearMonth, formatMonthLabel, shiftMonth } from '~/lib/months';
+import { formatPence } from '~/lib/money';
 import { useCategories, usePots, useTargets, useTransactionsRange } from '~/lib/queries';
 
 const SPAN_OPTIONS = [
@@ -21,6 +27,7 @@ function periodLabel(from: string, to: string): string {
 function InsightsContent() {
   const [months, setMonths] = useState(6);
   const [anchor, setAnchor] = useState(currentYearMonth());
+  const [openGroup, setOpenGroup] = useState<string | null>(null);
   const { from, to } = fetchRangeForAnchor(anchor, months);
   const { current, previous } = splitPeriods(from, to);
 
@@ -43,6 +50,10 @@ function InsightsContent() {
   const transactions = range.data ?? [];
   const currentTotals = summaryTotals(transactions, current);
   const previousTotals = summaryTotals(transactions, previous);
+  const breakdown = groupBreakdown(transactions, categories.data ?? [], current, previous);
+  const trend = monthlyTrend(transactions, monthsInPeriod(current));
+  const drillDown = openGroup ? categoriesInGroup(transactions, categories.data ?? [], openGroup, current) : [];
+  const openGroupLabel = breakdown.find(row => row.group === openGroup)?.label ?? '';
 
   return (
     <Stack>
@@ -62,6 +73,23 @@ function InsightsContent() {
         </ActionIcon>
       </Group>
       <SummaryRow current={currentTotals} previous={previousTotals} />
+
+      <Title order={5} mt="md">Spending by group</Title>
+      <GroupBreakdownChart rows={breakdown} onSelectGroup={setOpenGroup} />
+
+      <Title order={5} mt="md">Monthly trend</Title>
+      <MonthlyTrendChart rows={trend} />
+
+      <ResponsiveSheet opened={openGroup !== null} onClose={() => setOpenGroup(null)} title={openGroupLabel}>
+        <Stack>
+          {drillDown.map(row => (
+            <Group key={row.categoryId} justify="space-between">
+              <Text>{row.name}</Text>
+              <Text>{formatPence(row.spentPence)}</Text>
+            </Group>
+          ))}
+        </Stack>
+      </ResponsiveSheet>
     </Stack>
   );
 }

@@ -30,6 +30,11 @@ function renderPage() {
   return render(<MantineProvider><Insights /></MantineProvider>);
 }
 
+function renderInsightsUser() {
+  renderPage();
+  return userEvent.setup();
+}
+
 beforeEach(() => {
   data.categories = [];
   data.targets = [];
@@ -73,5 +78,13 @@ describe('Insights page', () => {
     await user.click(screen.getByRole('button', { name: 'Earlier' }));
     await user.click(screen.getByRole('radio', { name: 'This month' }));
     expect(data.rangeCalls.at(-1)).toEqual(['2026-02', '2026-03']);
+  });
+
+  it('opens a group drill-down sheet listing its categories for the current period', async () => {
+    data.categories = [{ categoryId: 'cat-mortgage', name: 'Mortgage', type: 'EXPENSE', group: 'BILLS', icon: 'tag', isDefault: true, createdAt: '' }];
+    data.transactions = [{ transactionId: 't1', yearMonth: '2026-09', amount: 100000, type: 'EXPENSE', categoryId: 'cat-mortgage', description: '', date: '2026-09-01', createdAt: '' }];
+    const user = renderInsightsUser();
+    await user.click(await screen.findByText('Bills'));
+    expect(await screen.findByText('Mortgage')).toBeInTheDocument();
   });
 });
