@@ -12,9 +12,10 @@ export const queryKeys = {
   transactions: (yearMonth: string) => ['transactions', yearMonth] as const,
   recurring: ['recurring'] as const,
   pots: (asOf: string) => ['pots', asOf] as const,
+  offlineQueue: ['offlineQueue'] as const,
 };
 
-function useApi() {
+export function useApi() {
   const { request } = useProtectedApi();
   return useMemo(() => createApi(request), [request]);
 }
