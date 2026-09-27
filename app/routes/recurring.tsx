@@ -20,6 +20,10 @@ function byDay(a: Recurring, b: Recurring): number {
   return a.description.localeCompare(b.description);
 }
 
+function recurringLabel(item: Recurring, category: Category | undefined): string {
+  return item.description || category?.name || 'Recurring item';
+}
+
 interface RecurringRowProps {
   item: Recurring;
   category: Category | undefined;
@@ -29,7 +33,7 @@ interface RecurringRowProps {
 }
 
 function RecurringRow({ item, category, categoriesLoaded, onEdit, onDelete }: RecurringRowProps) {
-  const label = item.description || category?.name || 'Recurring item';
+  const label = recurringLabel(item, category);
 
   return (
     <Group justify="space-between" wrap="nowrap" py={4}>
@@ -66,6 +70,12 @@ function RecurringContent() {
   const [editing, setEditing] = useState<Recurring | null>(null);
   const [creating, setCreating] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<Recurring | null>(null);
+  const [deletingLabel, setDeletingLabel] = useState<string | null>(null);
+
+  function requestDelete(item: Recurring): void {
+    setPendingDelete(item);
+    setDeletingLabel(recurringLabel(item, categories.data?.find(c => c.categoryId === item.categoryId)));
+  }
 
   function confirmDelete(): void {
     if (!pendingDelete) return;
@@ -107,7 +117,7 @@ function RecurringContent() {
           category={categories.data?.find(c => c.categoryId === item.categoryId)}
           categoriesLoaded={categories.data !== undefined}
           onEdit={setEditing}
-          onDelete={setPendingDelete}
+          onDelete={requestDelete}
         />
       ))}
 
@@ -123,11 +133,12 @@ function RecurringContent() {
       <Modal
         opened={pendingDelete !== null}
         onClose={() => setPendingDelete(null)}
+        onExitTransitionEnd={() => setDeletingLabel(null)}
         title="Delete recurring item"
         centered
       >
         <Stack>
-          <Text>Delete {pendingDelete?.description || 'this item'}? This can't be undone.</Text>
+          <Text>Delete {deletingLabel}? This can't be undone.</Text>
           <Group justify="flex-end">
             <Button variant="default" onClick={() => setPendingDelete(null)}>Cancel</Button>
             <Button color="danger" onClick={confirmDelete}>Delete</Button>

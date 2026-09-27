@@ -113,10 +113,14 @@ describe('Recurring page', () => {
     expect(screen.getByText('Form editing Salary')).toBeInTheDocument();
   });
 
-  async function chooseDelete(user: ReturnType<typeof userEvent.setup>): Promise<HTMLElement> {
-    await user.click(screen.getByRole('button', { name: 'Actions for Salary' }));
+  async function chooseDeleteFor(user: ReturnType<typeof userEvent.setup>, label: string): Promise<HTMLElement> {
+    await user.click(screen.getByRole('button', { name: `Actions for ${label}` }));
     await user.click(await screen.findByRole('menuitem', { name: 'Delete' }));
     return screen.findByRole('dialog', { name: 'Delete recurring item' });
+  }
+
+  async function chooseDelete(user: ReturnType<typeof userEvent.setup>): Promise<HTMLElement> {
+    return chooseDeleteFor(user, 'Salary');
   }
 
   it('asks for confirmation before deleting and names the item', async () => {
@@ -128,6 +132,30 @@ describe('Recurring page', () => {
 
     expect(within(dialog).getByText("Delete Salary? This can't be undone.")).toBeInTheDocument();
     expect(mockDelete).not.toHaveBeenCalled();
+  });
+
+  it('names the delete dialog after the category when there is no description', async () => {
+    const user = userEvent.setup();
+    mockQuery.data = [rec({ recurringId: 'r9', description: '', categoryId: 'cat-housing' })];
+    renderPage();
+
+    await user.click(screen.getByRole('button', { name: 'Actions for Housing' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Delete' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Delete recurring item' });
+
+    expect(within(dialog).getByText("Delete Housing? This can't be undone.")).toBeInTheDocument();
+  });
+
+  it('keeps showing the item label while the dialog closes', async () => {
+    const user = userEvent.setup();
+    mockQuery.data = [rec({ recurringId: 'r9', description: '', categoryId: 'cat-housing' })];
+    renderPage();
+
+    const dialog = await chooseDeleteFor(user, 'Housing');
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+
+    expect(within(dialog).getByText("Delete Housing? This can't be undone.")).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   });
 
   it('deletes the item when Delete is confirmed', async () => {
