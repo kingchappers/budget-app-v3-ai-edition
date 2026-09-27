@@ -26,6 +26,7 @@ import { useSaveWithUndo } from '../useSaveWithUndo';
 import { queryKeys } from '~/lib/queries';
 import { ApiError } from '~/lib/apiError';
 import { dequeue, listQueue } from '~/lib/offlineQueue';
+import * as offlineQueueModule from '~/lib/offlineQueue';
 import type { Transaction } from '~/lib/types';
 
 function renderSaveWithUndo() {
@@ -197,23 +198,35 @@ describe('useSaveWithUndo', () => {
   // queued state. Neither branch may leave the entry stranded — not shown as saved,
   // and not left orphaned in the offline queue or its pending map.
   describe('Undo pressed before the create settles', () => {
-    it('eventual network failure: the entry is queued then immediately discarded, never left pending', async () => {
+    it('eventual network failure: the entry never reaches the queue at all, once already undone', async () => {
       const uuidSpy = vi.spyOn(crypto, 'randomUUID');
       uuidSpy.mockReturnValueOnce('00000000-0000-0000-0000-000000000001');
       uuidSpy.mockReturnValueOnce('00000000-0000-0000-0000-000000000002');
-      mockCreate.mutateAsync.mockImplementation(() => new Promise((_resolve, reject) => {
-        setTimeout(() => reject(new TypeError('Failed to fetch')), 5);
-      }));
+      const enqueueSpy = vi.spyOn(offlineQueueModule, 'enqueue');
+      // A manually-controlled rejection, not a wall-clock setTimeout: a fixed
+      // delay races against however long `findByText('Undo')` and the click
+      // actually take under CPU load, which a busy full-suite run can lose.
+      let rejectCreate!: (reason: unknown) => void;
+      mockCreate.mutateAsync.mockImplementation(() => new Promise((_resolve, reject) => { rejectCreate = reject; }));
       const { result, qc } = renderSaveWithUndo();
 
       act(() => { void result.current({ amount: 500, type: 'EXPENSE', categoryId: 'cat-1', description: '', date: '2025-01-05' }); });
       fireEvent.click(await screen.findByText('Undo'));
+      await act(async () => {
+        rejectCreate(new TypeError('Failed to fetch'));
+        await new Promise(resolve => setTimeout(resolve, 0));
+      });
 
-      await waitFor(async () => expect(await listQueue()).toHaveLength(0));
       await waitFor(() => expect(qc.getQueryData(queryKeys.offlineQueue)).toEqual({}));
+      expect(await listQueue()).toHaveLength(0);
+      // The old code enqueued the entry unconditionally and only discarded it
+      // right after — a real gap a concurrent flush could win. It's never
+      // enqueued at all now, since `undone` is checked first.
+      expect(enqueueSpy).not.toHaveBeenCalled();
       expect(mockRemove.mutate).not.toHaveBeenCalled();
 
       uuidSpy.mockRestore();
+      enqueueSpy.mockRestore();
     });
 
     it('eventual success: a real delete is issued, and the entry is never treated as queued', async () => {

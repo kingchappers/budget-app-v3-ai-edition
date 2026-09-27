@@ -65,6 +65,49 @@ describe('useTransactions', () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(fetch).toHaveBeenCalledWith('/api/transactions?year=2026&month=9', expect.anything());
   });
+
+  it('overlays a pending entry for the month onto the server rows', async () => {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    qc.setQueryData(queryKeys.offlineQueue, {
+      'pending-1': {
+        id: 'pending-1',
+        queued: true,
+        userSub: 'u1',
+        queuedAt: '2026-09-01T00:00:00.000Z',
+        input: { amount: 500, type: 'EXPENSE', categoryId: 'cat-1', description: 'coffee', date: '2026-09-05' },
+      },
+    });
+    function localWrapper({ children }: { children: React.ReactNode }) {
+      return <QueryClientProvider client={qc}>{children}</QueryClientProvider>;
+    }
+    const { result } = renderHook(() => useTransactions('2026-09'), { wrapper: localWrapper });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data?.some(t => t.transactionId === 'pending-1')).toBe(true);
+  });
+
+  it('does not duplicate a row once the server has it too (same transactionId)', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+      transactions: [{ transactionId: 'same-id', yearMonth: '2026-09', amount: 500, type: 'EXPENSE', categoryId: 'cat-1', description: '', date: '2026-09-05', createdAt: '' }],
+    }))));
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    qc.setQueryData(queryKeys.offlineQueue, {
+      'same-id': {
+        id: 'same-id',
+        queued: true,
+        userSub: 'u1',
+        queuedAt: '2026-09-01T00:00:00.000Z',
+        input: { amount: 500, type: 'EXPENSE', categoryId: 'cat-1', description: '', date: '2026-09-05' },
+      },
+    });
+    function localWrapper({ children }: { children: React.ReactNode }) {
+      return <QueryClientProvider client={qc}>{children}</QueryClientProvider>;
+    }
+    const { result } = renderHook(() => useTransactions('2026-09'), { wrapper: localWrapper });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data?.filter(t => t.transactionId === 'same-id')).toHaveLength(1);
+  });
 });
 
 describe('useCreateTransaction', () => {
@@ -129,13 +172,11 @@ describe('useCreateTransaction', () => {
     onlineManager.setOnline(false);
     try {
       const { result } = renderCreateTransactionHook();
-      await act(async () => {
-        await result.current.mutateAsync({ ...baseInput, transactionId: 'id-c' }).catch(() => {});
-      });
+      act(() => { result.current.mutate({ ...baseInput, transactionId: 'id-c' }); });
       // A paused mutation never calls its mutationFn at all; the default
       // 'online' networkMode would have left this pending forever instead.
-      expect(fetchMock).toHaveBeenCalled();
-      expect(result.current.isError).toBe(true);
+      await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+      await waitFor(() => expect(result.current.isError).toBe(true));
     } finally {
       onlineManager.setOnline(true);
     }

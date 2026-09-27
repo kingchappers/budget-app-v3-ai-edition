@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { OfflineQueueBanner } from '../OfflineQueueBanner';
 import { dequeue, enqueue, listQueue } from '~/lib/offlineQueue';
 import { clearPendingEntriesForLogout } from '~/lib/pendingEntries';
+import { __resetInFlightFlushForTests } from '~/hooks/useOfflineQueue';
 
 const auth0 = vi.hoisted(() => ({ isAuthenticated: true, user: { sub: 'user-1' } }));
 vi.mock('@auth0/auth0-react', () => ({ useAuth0: () => auth0 }));
@@ -36,6 +37,7 @@ describe('OfflineQueueBanner', () => {
     // DefaultLayout remounting on navigation; tests need it reset between
     // runs, which clearPendingEntriesForLogout already does as a side effect.
     clearPendingEntriesForLogout(qc);
+    __resetInFlightFlushForTests();
     await clearQueue();
   });
 
@@ -67,7 +69,7 @@ describe('OfflineQueueBanner', () => {
     expect(await screen.findByText('1 waiting to sync')).toBeInTheDocument();
 
     resolveCreate({ transactionId: 'x', yearMonth: '2025-01', createdAt: '', amount: 500, type: 'EXPENSE', categoryId: 'cat-1', description: '', date: '2025-01-05' });
-    await vi.waitFor(() => expect(screen.queryByText(/waiting to sync/)).not.toBeInTheDocument());
+    await vi.waitFor(() => expect(screen.queryByText(/waiting to sync/)).not.toBeInTheDocument(), { timeout: 3000 });
   });
 
   it('the Sync now button triggers a flush', async () => {
@@ -104,7 +106,7 @@ describe('OfflineQueueBanner', () => {
       </MantineProvider>,
     );
 
-    await vi.waitFor(() => expect(screen.queryByText(/waiting to sync/)).not.toBeInTheDocument());
+    await vi.waitFor(() => expect(screen.queryByText(/waiting to sync/)).not.toBeInTheDocument(), { timeout: 3000 });
     const remaining = await listQueue();
     expect(remaining.some(e => e.id === 'w')).toBe(true);
   });

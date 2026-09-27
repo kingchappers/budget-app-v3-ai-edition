@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { useOfflineQueue } from '../useOfflineQueue';
+import { useOfflineQueue, __resetInFlightFlushForTests } from '../useOfflineQueue';
 import { queryKeys } from '~/lib/queries';
 import { dequeue, enqueue, listQueue } from '~/lib/offlineQueue';
 
@@ -28,6 +28,7 @@ describe('useOfflineQueue', () => {
   beforeEach(async () => {
     qc = new QueryClient();
     mockCreateTransaction.mockReset();
+    __resetInFlightFlushForTests();
     await clearQueue();
   });
 

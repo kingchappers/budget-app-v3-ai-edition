@@ -55,8 +55,10 @@ export function useSaveWithUndo(): (input: TransactionInput, options?: SaveOptio
     // Show the row immediately, the same instant Save is pressed, whether
     // this ends up an ordinary online create or a queued offline one — there
     // is only this one mechanism for "show it now", not a separate optimistic
-    // insert plus a separate queued-row insert.
-    setPendingEntry(qc, { id: transactionId, input, queuedAt, userSub });
+    // insert plus a separate queued-row insert. `queued: false` here: this is
+    // still just an in-flight attempt, not yet a durable offline entry, so it
+    // must not show the banner, the pending badge, or a Discard action.
+    setPendingEntry(qc, { id: transactionId, input, queuedAt, userSub, queued: false });
 
     const outcome = create.mutateAsync(withId).then(
       created => created,
@@ -85,6 +87,7 @@ export function useSaveWithUndo(): (input: TransactionInput, options?: SaveOptio
         // here — that used to happen on every rejection, which for an
         // offline failure (near-instant) left Undo a window of milliseconds.
         await enqueue({ id: transactionId, input, queuedAt, userSub });
+        setPendingEntry(qc, { id: transactionId, input, queuedAt, userSub, queued: true });
         notifications.update({
           id: toastId,
           message: (

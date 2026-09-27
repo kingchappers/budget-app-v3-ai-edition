@@ -45,7 +45,9 @@ export function OfflineQueueBanner() {
     };
   }, [flushNow]);
 
-  const count = Object.keys(pendingMap).length;
+  // Only a durably queued entry counts here — an ordinary online save also
+  // spends a moment in pendingMap, and shouldn't flash the banner too.
+  const count = Object.values(pendingMap).filter(entry => entry.queued).length;
   if (count === 0) return null;
 
   return (

@@ -13,9 +13,19 @@ export const OFFLINE_QUEUE_KEY = ['offlineQueue'] as const;
 // transaction list — there is no separate "optimistic row written into the
 // cache" step anymore, which is what let a refetch silently wipe a pending
 // row before.
-export type PendingMap = Record<string, QueuedEntry>;
+//
+// `queued` distinguishes a genuinely durable (in IndexedDB) offline entry
+// from the split-second an ordinary online save spends here before its
+// request resolves. Only a `queued: true` entry counts toward the banner,
+// the row's pending badge, or the Discard action — otherwise every normal
+// save would flash all three for the length of its round trip.
+export interface PendingEntry extends QueuedEntry {
+  queued: boolean;
+}
 
-export function setPendingEntry(qc: QueryClient, entry: QueuedEntry): void {
+export type PendingMap = Record<string, PendingEntry>;
+
+export function setPendingEntry(qc: QueryClient, entry: PendingEntry): void {
   qc.setQueryData<PendingMap>(OFFLINE_QUEUE_KEY, (current = {}) => ({ ...current, [entry.id]: entry }));
 }
 
@@ -26,9 +36,22 @@ export function clearPendingEntry(qc: QueryClient, id: string): void {
   });
 }
 
+// Discard/Undo can land while flushQueue is midway through a run it already
+// took a snapshot of (a flush of several entries takes real time). This set
+// is how flushQueue learns "skip this one" without a second IndexedDB read
+// per entry — an in-memory check right before sending, not a race-prone
+// round trip against storage that could itself go stale between the check
+// and the send.
+const discardedIds = new Set<string>();
+
+export function wasDiscarded(id: string): boolean {
+  return discardedIds.has(id);
+}
+
 // Undo on an entry that never reached the server: drop it from IndexedDB and
 // the reactive map. Nothing to invalidate — it was never written server-side.
 export async function discardQueuedEntry(qc: QueryClient, id: string): Promise<void> {
+  discardedIds.add(id);
   await dequeue(id);
   clearPendingEntry(qc, id);
 }
@@ -36,14 +59,31 @@ export async function discardQueuedEntry(qc: QueryClient, id: string): Promise<v
 // Guards against re-running on every DefaultLayout remount (every route
 // renders its own <DefaultLayout>, so a per-component ref resets on each
 // navigation). A module-level flag, like flushQueue's own in-flight guard,
-// is what actually makes this run once per app lifetime.
+// is what makes this run once per signed-in user, not once per remount;
+// clearPendingEntriesForLogout resets it so a later sign-in (same user or a
+// different one) hydrates again.
 let hydratedForSub: string | null = null;
 
 export async function hydrateOnce(qc: QueryClient, userSub: string): Promise<void> {
   if (hydratedForSub === userSub) return;
   hydratedForSub = userSub;
-  const entries = (await listQueue()).filter(entry => entry.userSub === userSub);
-  qc.setQueryData<PendingMap>(OFFLINE_QUEUE_KEY, () => Object.fromEntries(entries.map(e => [e.id, e])));
+  try {
+    const entries = (await listQueue()).filter(entry => entry.userSub === userSub);
+    // Merge onto whatever is already there rather than replacing the map
+    // outright: a save made in the moment between this function being called
+    // and listQueue() resolving would otherwise have its (still in-flight,
+    // not-yet-queued) overlay row wiped out from under it.
+    qc.setQueryData<PendingMap>(OFFLINE_QUEUE_KEY, (current = {}) => ({
+      ...current,
+      ...Object.fromEntries(entries.map(e => [e.id, { ...e, queued: true }])),
+    }));
+  } catch (error) {
+    // IndexedDB unavailable or the read otherwise failed: allow a later
+    // trigger (a sign-out/sign-in, a fresh mount) to retry instead of
+    // silently never hydrating again for this user for the rest of the session.
+    console.error('Failed to hydrate the offline transaction queue:', error);
+    hydratedForSub = null;
+  }
 }
 
 // Only the reactive map is cleared, never the durable IndexedDB queue: user

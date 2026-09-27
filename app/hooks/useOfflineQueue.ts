@@ -23,6 +23,15 @@ export interface OfflineQueueState {
 // two concurrent `flushQueue` runs that could send the same queued entry twice.
 let inFlightFlush: Promise<void> | null = null;
 
+// Test-only: this module-level guard is shared by every test file that
+// exercises useOfflineQueue/OfflineQueueBanner, and if vitest happens to
+// share a module instance across files in one worker, a flush left
+// genuinely in-flight (a mocked API call that deliberately never resolves)
+// in one file's test can otherwise make the next file's first flush a no-op.
+export function __resetInFlightFlushForTests(): void {
+  inFlightFlush = null;
+}
+
 function runFlush(api: Api, qc: QueryClient, userSub: string): Promise<void> {
   if (inFlightFlush) return inFlightFlush;
   const run = flushQueue(api, qc, userSub).finally(() => {

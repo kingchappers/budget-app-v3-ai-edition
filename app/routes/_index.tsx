@@ -108,7 +108,7 @@ function HomeContent() {
                 transaction={t}
                 categoryName={nameFor(t.categoryId)}
                 categoryIcon={iconFor(t.categoryId)}
-                pending={t.transactionId in pendingMap}
+                pending={pendingMap[t.transactionId]?.queued === true}
                 pendingError={pendingMap[t.transactionId]?.lastError}
               />
             ))}

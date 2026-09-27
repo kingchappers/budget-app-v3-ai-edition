@@ -93,12 +93,23 @@ export function useCreateTransaction() {
     // lost when the app closes. 'always' lets it fail immediately instead.
     networkMode: 'always',
     onSettled: async (created, _error, input) => {
+      if (!created) {
+        // A rejected mutation: fire the invalidation without awaiting it.
+        // useSaveWithUndo's own rejection handler is what decides whether to
+        // queue this entry, and TanStack awaits onSettled before mutateAsync
+        // rejects — awaiting the invalidation here (plus its own retry) would
+        // delay that decision, leaving an entry that should already be
+        // safely in IndexedDB sitting only in memory for longer.
+        qc.invalidateQueries({ queryKey: queryKeys.transactions(input.date.slice(0, 7)) });
+        qc.invalidateQueries({ queryKey: ['pots'] });
+        return;
+      }
       // Wait for the refetch before clearing the pending overlay row for a
       // successful create, so the real server row is already in place and
       // nothing blinks out in between.
       await qc.invalidateQueries({ queryKey: queryKeys.transactions(input.date.slice(0, 7)) });
       qc.invalidateQueries({ queryKey: ['pots'] });
-      if (created && input.transactionId) clearPendingEntry(qc, input.transactionId);
+      if (input.transactionId) clearPendingEntry(qc, input.transactionId);
     },
   });
 }
