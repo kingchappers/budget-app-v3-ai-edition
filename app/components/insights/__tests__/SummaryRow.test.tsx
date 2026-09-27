@@ -21,13 +21,33 @@ describe('SummaryRow', () => {
     expect(screen.getByText('£1,600.00')).toBeInTheDocument();
   });
 
-  it('shows a percentage change against the previous period', () => {
+  it('shows the pence and percentage change against the previous period', () => {
     renderRow(totals({ spent: 11000 }), totals({ spent: 10000 }));
-    expect(screen.getByText('+10%')).toBeInTheDocument();
+    expect(screen.getByText('+£10.00 (+10%)')).toBeInTheDocument();
   });
 
   it('shows no change indicator when the previous period was zero', () => {
     renderRow(totals({ spent: 5000 }), totals({ spent: 0 }));
     expect(screen.queryByText(/%/)).not.toBeInTheDocument();
+  });
+
+  it('flags a spending increase as bad, since spending up is flagged', () => {
+    renderRow(totals({ spent: 11000 }), totals({ spent: 10000 }));
+    expect(screen.getByText('+£10.00 (+10%)').closest('[data-tone]')).toHaveAttribute('data-tone', 'bad');
+  });
+
+  it('flags an income increase as good', () => {
+    renderRow(totals({ income: 11000 }), totals({ income: 10000 }));
+    expect(screen.getByText('+£10.00 (+10%)').closest('[data-tone]')).toHaveAttribute('data-tone', 'good');
+  });
+
+  it('flags a spending decrease as good', () => {
+    renderRow(totals({ spent: 9000 }), totals({ spent: 10000 }));
+    expect(screen.getByText('−£10.00 (−10%)').closest('[data-tone]')).toHaveAttribute('data-tone', 'good');
+  });
+
+  it('flags net going up as good even when the previous period was negative', () => {
+    renderRow(totals({ net: 5000 }), totals({ net: -10000 }));
+    expect(screen.getByText('+£150.00 (+150%)').closest('[data-tone]')).toHaveAttribute('data-tone', 'good');
   });
 });

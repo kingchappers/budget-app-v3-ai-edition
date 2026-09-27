@@ -72,6 +72,16 @@ describe('Insights page', () => {
     expect(screen.getByRole('button', { name: 'Later' })).toBeDisabled();
   });
 
+  it('clamps the anchor to the current month when paging forward would move past it', async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await user.click(screen.getByRole('button', { name: 'Earlier' }));
+    await user.click(screen.getByRole('radio', { name: '12M' }));
+    await user.click(screen.getByRole('button', { name: 'Later' }));
+    expect(data.rangeCalls.at(-1)).toEqual(['2024-10', '2026-09']);
+    expect(screen.getByRole('button', { name: 'Later' })).toBeDisabled();
+  });
+
   it('keeps the anchor month when the span changes', async () => {
     const user = userEvent.setup();
     renderPage();

@@ -73,7 +73,10 @@ function InsightsContent() {
           <IconChevronLeft size={20} />
         </ActionIcon>
         <Text fw={600}>{periodLabel(current[0], current[1])}</Text>
-        <ActionIcon variant="subtle" aria-label="Later" disabled={!canGoNewer(anchor)} onClick={() => setAnchor(shiftMonth(anchor, months))}>
+        <ActionIcon variant="subtle" aria-label="Later" disabled={!canGoNewer(anchor)} onClick={() => {
+          const next = shiftMonth(anchor, months);
+          setAnchor(next > currentYearMonth() ? currentYearMonth() : next);
+        }}>
           <IconChevronRight size={20} />
         </ActionIcon>
       </Group>
@@ -92,7 +95,7 @@ function InsightsContent() {
       <TargetAdherence rows={adherence} />
 
       <Title order={5} mt="md">Pots</Title>
-      <PotsTrend pots={pots.data ?? []} />
+      <PotsTrend pots={pots.data ?? []} categories={categories.data ?? []} current={current} />
 
       <ResponsiveSheet opened={openGroup !== null} onClose={() => setOpenGroup(null)} title={openGroupLabel}>
         <Stack>

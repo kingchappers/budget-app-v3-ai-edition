@@ -1,6 +1,8 @@
 import { shiftMonth, currentYearMonth } from './months';
 import { normaliseTargetToMonth } from './summary';
-import { groupCategories, bucketKeyFor } from './categoryGroups';
+import { BUCKET_LABELS, bucketKeyFor, type BucketKey } from './categoryGroups';
+
+const SPEND_BUCKET_KEYS: BucketKey[] = ['BILLS', 'SINKING_FUNDS', 'EVERYDAY', 'SAVING_INVESTMENT', 'OTHER'];
 import type { Category, CategoryTarget, Transaction } from './types';
 
 export type Period = [string, string];
@@ -70,8 +72,11 @@ function spendByGroup(transactions: Transaction[], categories: Category[], curre
   for (const t of transactions) {
     if (t.type !== 'EXPENSE') continue;
     const category = categoryById.get(t.categoryId);
-    if (!category) continue;
-    const key = bucketKeyFor(category);
+    // A transaction on a category that no longer exists (a removed default,
+    // or one deleted after the fact) still counts toward "Spent" in the
+    // summary row, so it must land somewhere here too, rather than vanish
+    // and leave the group bars adding up to less than that total.
+    const key = category ? bucketKeyFor(category) : 'OTHER';
     const entry = totals.get(key) ?? { current: 0, previous: 0 };
     if (inPeriod(t.yearMonth, current)) entry.current += t.amount;
     else if (inPeriod(t.yearMonth, previous)) entry.previous += t.amount;
@@ -94,11 +99,10 @@ export function groupBreakdown(
   previous: Period,
 ): GroupBreakdownRow[] {
   const totals = spendByGroup(transactions, categories, current, previous);
-  return groupCategories(categories)
-    .filter(bucket => bucket.key !== 'INCOME' && bucket.key !== 'OTHER')
-    .map(bucket => {
-      const entry = totals.get(bucket.key) ?? { current: 0, previous: 0 };
-      return { group: bucket.key, label: bucket.label, current: entry.current, previous: entry.previous };
+  return SPEND_BUCKET_KEYS
+    .map(key => {
+      const entry = totals.get(key) ?? { current: 0, previous: 0 };
+      return { group: key, label: BUCKET_LABELS[key], current: entry.current, previous: entry.previous };
     })
     .filter(row => row.current > 0 || row.previous > 0);
 }
@@ -116,14 +120,21 @@ export function categoriesInGroup(
   period: Period,
 ): CategorySpend[] {
   const inGroup = categories.filter(c => bucketKeyFor(c) === group);
-  return inGroup
-    .map(category => ({
-      categoryId: category.categoryId,
-      name: category.name,
-      spentPence: transactions
-        .filter(t => t.type === 'EXPENSE' && t.categoryId === category.categoryId && inPeriod(t.yearMonth, period))
-        .reduce((sum, t) => sum + t.amount, 0),
-    }))
+  const rows = inGroup.map(category => ({
+    categoryId: category.categoryId,
+    name: category.name,
+    spentPence: transactions
+      .filter(t => t.type === 'EXPENSE' && t.categoryId === category.categoryId && inPeriod(t.yearMonth, period))
+      .reduce((sum, t) => sum + t.amount, 0),
+  }));
+  if (group === 'OTHER') {
+    const knownIds = new Set(categories.map(c => c.categoryId));
+    const unknownPence = transactions
+      .filter(t => t.type === 'EXPENSE' && !knownIds.has(t.categoryId) && inPeriod(t.yearMonth, period))
+      .reduce((sum, t) => sum + t.amount, 0);
+    if (unknownPence > 0) rows.push({ categoryId: 'unknown', name: 'Unknown category', spentPence: unknownPence });
+  }
+  return rows
     .filter(row => row.spentPence > 0)
     .sort((a, b) => b.spentPence - a.spentPence);
 }

@@ -81,9 +81,24 @@ describe('groupBreakdown', () => {
     ]);
   });
 
-  it('ignores non-EXPENSE transactions and unknown categories', () => {
-    const transactions = [txn('2026-09', 'SET_ASIDE', 5000, 'cat-mortgage'), txn('2026-09', 'EXPENSE', 1000, 'cat-missing')];
+  it('ignores non-EXPENSE transactions', () => {
+    const transactions = [txn('2026-09', 'SET_ASIDE', 5000, 'cat-mortgage')];
     expect(groupBreakdown(transactions, categories, ['2026-09', '2026-09'], ['2026-08', '2026-08'])).toEqual([]);
+  });
+
+  it('puts spend on a removed or unrecognised category under Other, so the total still matches Spent', () => {
+    const transactions = [txn('2026-09', 'EXPENSE', 1000, 'cat-missing')];
+    expect(groupBreakdown(transactions, categories, ['2026-09', '2026-09'], ['2026-08', '2026-08'])).toEqual([
+      { group: 'OTHER', label: 'Other', current: 1000, previous: 0 },
+    ]);
+  });
+
+  it('puts spend on an ungrouped custom category under Other too', () => {
+    const ungrouped = [...categories, cat('cat-custom', 'Custom', undefined)];
+    const transactions = [txn('2026-09', 'EXPENSE', 2000, 'cat-custom')];
+    expect(groupBreakdown(transactions, ungrouped, ['2026-09', '2026-09'], ['2026-08', '2026-08'])).toEqual([
+      { group: 'OTHER', label: 'Other', current: 2000, previous: 0 },
+    ]);
   });
 });
 
@@ -98,6 +113,18 @@ describe('categoriesInGroup', () => {
     expect(categoriesInGroup(transactions, categories, 'EVERYDAY', ['2026-09', '2026-09'])).toEqual([
       { categoryId: 'cat-b', name: 'B', spentPence: 1500 },
       { categoryId: 'cat-a', name: 'A', spentPence: 500 },
+    ]);
+  });
+
+  it('includes spend on a removed category as "Unknown category" when drilling into Other', () => {
+    const categories = [cat('cat-custom', 'Custom', undefined)];
+    const transactions = [
+      txn('2026-09', 'EXPENSE', 300, 'cat-custom'),
+      txn('2026-09', 'EXPENSE', 700, 'cat-missing'),
+    ];
+    expect(categoriesInGroup(transactions, categories, 'OTHER', ['2026-09', '2026-09'])).toEqual([
+      { categoryId: 'unknown', name: 'Unknown category', spentPence: 700 },
+      { categoryId: 'cat-custom', name: 'Custom', spentPence: 300 },
     ]);
   });
 });
