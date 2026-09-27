@@ -5,6 +5,8 @@ import { MAX_AMOUNT_PENCE, SECURITY_HEADERS, VALID_TRANSACTION_TYPES } from './c
 import type { Transaction, ApiResponse } from './types';
 import { ok, err } from './http';
 
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export async function getTransactions(
   event: APIGatewayProxyEventV2,
   userId: string,
@@ -95,8 +97,13 @@ export async function createTransaction(
   }
   const { amount, type, categoryId, description, date } = validation.value;
 
+  const clientTransactionId = body.transactionId;
+  if (clientTransactionId !== undefined && (typeof clientTransactionId !== 'string' || !UUID_PATTERN.test(clientTransactionId))) {
+    return err(400, 'transactionId must be a valid UUID');
+  }
+
   const yearMonth = date.slice(0, 7);
-  const transactionId = crypto.randomUUID();
+  const transactionId = typeof clientTransactionId === 'string' ? clientTransactionId : crypto.randomUUID();
 
   const transaction: Transaction = {
     transactionId,
