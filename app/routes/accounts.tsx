@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { Alert, Button, Group, Loader, Modal, Select, SimpleGrid, Stack, Text, TextInput, Title } from '@mantine/core';
 import { DefaultLayout } from '~/components/layout/DefaultLayout';
 import { AccountRow } from '~/components/accounts/AccountRow';
+import { AccountHistorySheet } from '~/components/accounts/AccountHistorySheet';
+import { UpdateBalanceSheet } from '~/components/accounts/UpdateBalanceSheet';
 import { balanceAsOf, netWorthAsOf, typeOptionsForKind } from '~/lib/accounts';
 import { todayIso } from '~/lib/months';
 import { formatPence } from '~/lib/money';
@@ -17,6 +19,8 @@ function AccountsContent() {
   const [kind, setKind] = useState<AccountKind>('ASSET');
   const [type, setType] = useState<AccountType>('CASH');
   const [pendingDelete, setPendingDelete] = useState<Account | null>(null);
+  const [openAccount, setOpenAccount] = useState<Account | null>(null);
+  const [updatingAccount, setUpdatingAccount] = useState<Account | null>(null);
 
   if (accounts.error) {
     return (
@@ -82,7 +86,13 @@ function AccountsContent() {
         <div>
           <Title order={5} mt="md" mb="xs">Assets</Title>
           {assets.map(account => (
-            <AccountRow key={account.accountId} account={account} onOpen={() => {}} onDelete={() => setPendingDelete(account)} />
+            <AccountRow
+              key={account.accountId}
+              account={account}
+              onOpen={() => setOpenAccount(account)}
+              onDelete={() => setPendingDelete(account)}
+              onUpdate={() => setUpdatingAccount(account)}
+            />
           ))}
         </div>
       )}
@@ -91,7 +101,13 @@ function AccountsContent() {
         <div>
           <Title order={5} mt="md" mb="xs">Liabilities</Title>
           {liabilities.map(account => (
-            <AccountRow key={account.accountId} account={account} onOpen={() => {}} onDelete={() => setPendingDelete(account)} />
+            <AccountRow
+              key={account.accountId}
+              account={account}
+              onOpen={() => setOpenAccount(account)}
+              onDelete={() => setPendingDelete(account)}
+              onUpdate={() => setUpdatingAccount(account)}
+            />
           ))}
         </div>
       )}
@@ -109,6 +125,13 @@ function AccountsContent() {
           </Group>
         </Stack>
       </Modal>
+
+      <AccountHistorySheet
+        account={openAccount}
+        onClose={() => setOpenAccount(null)}
+        onUpdate={() => { setUpdatingAccount(openAccount); setOpenAccount(null); }}
+      />
+      <UpdateBalanceSheet account={updatingAccount} onClose={() => setUpdatingAccount(null)} />
     </Stack>
   );
 }

@@ -17,6 +17,7 @@ vi.mock('~/lib/queries', () => ({
   useAccounts: () => ({ data: state.accounts, isLoading: false, error: null, refetch: vi.fn() }),
   useCreateAccount: () => ({ mutate: state.create, isPending: false }),
   useDeleteAccount: () => ({ mutate: state.remove, isPending: false }),
+  useAddBalance: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
 import Accounts from '../accounts';
@@ -27,6 +28,11 @@ function account(overrides: Partial<Account> = {}): Account {
 
 function renderPage() {
   return render(<MantineProvider><Accounts /></MantineProvider>);
+}
+
+function renderPageAsUser() {
+  renderPage();
+  return userEvent.setup();
 }
 
 beforeEach(() => {
@@ -83,5 +89,17 @@ describe('Accounts page', () => {
     expect(state.remove).not.toHaveBeenCalled();
     await user.click(within(dialog).getByRole('button', { name: 'Delete' }));
     expect(state.remove).toHaveBeenCalledWith('acc-1');
+  });
+
+  it('opens the history sheet when a row is tapped, and the update sheet from its own button', async () => {
+    state.accounts = [account()];
+    const user = renderPageAsUser();
+    await user.click(screen.getByRole('button', { name: 'Open Lloyds history' }));
+    expect(await screen.findByRole('dialog', { name: 'Lloyds' })).toBeInTheDocument();
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog', { name: 'Lloyds' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Update Lloyds' }));
+    expect(await screen.findByLabelText('Balance')).toBeInTheDocument();
   });
 });

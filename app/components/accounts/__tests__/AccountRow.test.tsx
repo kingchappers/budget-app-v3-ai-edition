@@ -12,8 +12,9 @@ function account(overrides: Partial<Account> = {}): Account {
 function renderRow(data: Account = account()) {
   const onOpen = vi.fn();
   const onDelete = vi.fn();
-  render(<MantineProvider><AccountRow account={data} onOpen={onOpen} onDelete={onDelete} /></MantineProvider>);
-  return { onOpen, onDelete };
+  const onUpdate = vi.fn();
+  render(<MantineProvider><AccountRow account={data} onOpen={onOpen} onDelete={onDelete} onUpdate={onUpdate} /></MantineProvider>);
+  return { onOpen, onDelete, onUpdate };
 }
 
 describe('AccountRow', () => {
@@ -41,5 +42,14 @@ describe('AccountRow', () => {
     await user.click(screen.getByRole('button', { name: 'Actions for Lloyds' }));
     await user.click(await screen.findByRole('menuitem', { name: 'Delete' }));
     expect(onDelete).toHaveBeenCalled();
+  });
+
+  it('opens the update form from its own button, separately from opening history', async () => {
+    const onUpdate = vi.fn();
+    const onOpen = vi.fn();
+    render(<MantineProvider><AccountRow account={account()} onOpen={onOpen} onDelete={vi.fn()} onUpdate={onUpdate} /></MantineProvider>);
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Update Lloyds' }));
+    expect(onUpdate).toHaveBeenCalled();
+    expect(onOpen).not.toHaveBeenCalled();
   });
 });
