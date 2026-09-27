@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, waitFor, act } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { ApiError } from '../apiError';
 import type { Transaction } from '../types';
 
 const request = vi.fn();
@@ -23,6 +24,7 @@ const input = {
   categoryId: 'cat-dining',
   description: '',
   date: '2026-07-10',
+  transactionId: 'client-1',
 };
 
 const existing: Transaction = {
@@ -45,7 +47,7 @@ beforeEach(() => {
 });
 
 describe('useCreateTransaction', () => {
-  it('adds a temporary row to the date\'s month while the request is in flight', async () => {
+  it('adds an optimistic row keyed by the input\'s transactionId while the request is in flight', async () => {
     const pending = deferred<{ transaction: Transaction }>();
     request.mockReturnValue(pending.promise);
     client.setQueryData(july, [existing]);
@@ -56,7 +58,7 @@ describe('useCreateTransaction', () => {
     await waitFor(() => expect(client.getQueryData<Transaction[]>(july)).toHaveLength(2));
     const rows = client.getQueryData<Transaction[]>(july)!;
     expect(rows[1]).toMatchObject({ amount: 480, categoryId: 'cat-dining', yearMonth: '2026-07' });
-    expect(rows[1].transactionId).toMatch(/^temp-/);
+    expect(rows[1].transactionId).toBe('client-1');
 
     pending.resolve({ transaction: { ...existing, transactionId: 'real' } });
   });
@@ -76,8 +78,8 @@ describe('useCreateTransaction', () => {
     pending.resolve({ transaction: { ...existing, transactionId: 'real' } });
   });
 
-  it('removes only the temporary row when the request fails', async () => {
-    request.mockRejectedValue(new Error('boom'));
+  it('removes only the temporary row when the request fails with an ApiError', async () => {
+    request.mockRejectedValue(new ApiError(400, 'Bad Request'));
     client.setQueryData(july, [existing]);
     const { result } = renderHook(() => useCreateTransaction(), { wrapper });
 
@@ -85,6 +87,18 @@ describe('useCreateTransaction', () => {
 
     await waitFor(() => expect(result.current.isError).toBe(true));
     expect(client.getQueryData<Transaction[]>(july)).toEqual([existing]);
+  });
+
+  it('leaves the optimistic row in place when the request fails with a network error', async () => {
+    request.mockRejectedValue(new TypeError('Failed to fetch'));
+    client.setQueryData(july, [existing]);
+    const { result } = renderHook(() => useCreateTransaction(), { wrapper });
+
+    act(() => { result.current.mutate(input); });
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    const rows = client.getQueryData<Transaction[]>(july)!;
+    expect(rows.some(t => t.transactionId === 'client-1')).toBe(true);
   });
 
   it('does not write a partial cache when the month is not loaded', async () => {

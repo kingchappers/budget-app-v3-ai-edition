@@ -3,6 +3,7 @@ import { useMemo } from 'react';
 import { useAuth0 } from '@auth0/auth0-react';
 import { useProtectedApi } from '~/hooks/useProtectedApi';
 import { createApi, type RecurringInput, type TransactionInput } from './api';
+import { ApiError } from './apiError';
 import type { Category, CategoryGroup, PotSettingsInput, Recurring, TargetPeriod, Transaction } from './types';
 
 export const queryKeys = {
@@ -57,7 +58,6 @@ export function useTransactions(yearMonth: string, enabled: boolean = true) {
 
 interface CreateContext {
   yearMonth: string;
-  tempId: string;
 }
 
 export function useCreateTransaction() {
@@ -66,22 +66,23 @@ export function useCreateTransaction() {
   return useMutation<Transaction, Error, TransactionInput, CreateContext>({
     mutationFn: (input) => api.createTransaction(input),
     onMutate: async (input) => {
+      const transactionId = input.transactionId;
+      if (!transactionId) throw new Error('useCreateTransaction requires input.transactionId');
       const yearMonth = input.date.slice(0, 7);
       const key = queryKeys.transactions(yearMonth);
-      const tempId = `temp-${crypto.randomUUID()}`;
       await qc.cancelQueries({ queryKey: key });
       const previous = qc.getQueryData<Transaction[]>(key);
       if (previous !== undefined) {
-        const temp: Transaction = { ...input, transactionId: tempId, yearMonth, createdAt: new Date().toISOString() };
-        qc.setQueryData<Transaction[]>(key, [...previous, temp]);
+        const temp: Transaction = { ...input, transactionId, yearMonth, createdAt: new Date().toISOString() };
+        qc.setQueryData<Transaction[]>(key, [...previous.filter(t => t.transactionId !== transactionId), temp]);
       }
-      return { yearMonth, tempId };
+      return { yearMonth };
     },
-    onError: (_error, _input, context) => {
-      if (!context) return;
+    onError: (error, input, context) => {
+      if (!context || !(error instanceof ApiError)) return;
       qc.setQueryData<Transaction[]>(
         queryKeys.transactions(context.yearMonth),
-        (rows) => rows?.filter(t => t.transactionId !== context.tempId),
+        (rows) => rows?.filter(t => t.transactionId !== input.transactionId),
       );
     },
     onSettled: (_created, _error, input) => {
