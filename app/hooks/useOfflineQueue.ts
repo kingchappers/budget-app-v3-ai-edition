@@ -1,13 +1,19 @@
+import { useCallback } from 'react';
 import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { useAuth0 } from '@auth0/auth0-react';
 import { flushQueue } from '~/lib/flushQueue';
-import { queryKeys, useApi } from '~/lib/queries';
+import { discardQueuedEntry, OFFLINE_QUEUE_KEY, type PendingMap } from '~/lib/pendingEntries';
+import { useApi } from '~/lib/queries';
 import type { Api } from '~/lib/api';
-
-type PendingMap = Record<string, { lastError?: string }>;
 
 export interface OfflineQueueState {
   pendingMap: PendingMap;
   flushNow: () => Promise<void>;
+  // Removes a still-unsent entry (a row's "Discard" menu action). Exposed
+  // here, rather than making every caller import discardQueuedEntry and
+  // useQueryClient itself, so a component using this hook needs no
+  // QueryClientProvider of its own in tests that already mock this hook.
+  discard: (transactionId: string) => Promise<void>;
 }
 
 // Module-level, not per-hook-instance: there is only ever one IndexedDB queue
@@ -17,9 +23,9 @@ export interface OfflineQueueState {
 // two concurrent `flushQueue` runs that could send the same queued entry twice.
 let inFlightFlush: Promise<void> | null = null;
 
-function runFlush(api: Api, qc: QueryClient): Promise<void> {
+function runFlush(api: Api, qc: QueryClient, userSub: string): Promise<void> {
   if (inFlightFlush) return inFlightFlush;
-  const run = flushQueue(api, qc).finally(() => {
+  const run = flushQueue(api, qc, userSub).finally(() => {
     inFlightFlush = null;
   });
   inFlightFlush = run;
@@ -29,17 +35,27 @@ function runFlush(api: Api, qc: QueryClient): Promise<void> {
 export function useOfflineQueue(): OfflineQueueState {
   const api = useApi();
   const qc = useQueryClient();
+  const userSub = useAuth0().user?.sub ?? '';
   const { data: pendingMap = {} } = useQuery<PendingMap>({
-    queryKey: queryKeys.offlineQueue,
+    queryKey: OFFLINE_QUEUE_KEY,
     queryFn: () => ({}),
     initialData: {},
     staleTime: Infinity,
     gcTime: Infinity,
   });
 
-  async function flushNow(): Promise<void> {
-    await runFlush(api, qc);
-  }
+  // Stable across renders: OfflineQueueBanner's hydration effect depends on
+  // flushNow, and a new function identity every render would re-run that
+  // effect on every render too — including right after a sign-out clears
+  // the pending map, which would immediately re-hydrate it straight back.
+  const flushNow = useCallback(async (): Promise<void> => {
+    if (!userSub) return;
+    await runFlush(api, qc, userSub);
+  }, [api, qc, userSub]);
 
-  return { pendingMap, flushNow };
+  const discard = useCallback(async (transactionId: string): Promise<void> => {
+    await discardQueuedEntry(qc, transactionId);
+  }, [qc]);
+
+  return { pendingMap, flushNow, discard };
 }

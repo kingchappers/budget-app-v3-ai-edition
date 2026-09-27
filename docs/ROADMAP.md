@@ -148,11 +148,19 @@ Implemented on `feat/offline-queue`. Spec: `superpowers/specs/2026-09-27-offline
   - An IndexedDB-backed offline queue for new-transaction creates, with a reentrancy-guarded flush.
   - Automatic sync on `online`, tab focus and app launch, plus a manual "Sync now" button.
   - A pending badge on queued rows and an offline-queue banner in the UI.
+- **Fixed post-review (a real redesign, not point fixes):**
+  - **Critical:** TanStack Query's default `networkMode: 'online'` paused a mutation while the browser reported itself offline instead of letting it fail, so the rejection handler that queues an entry never ran — a create attempted with no signal was silently lost the moment the app closed. `useCreateTransaction` now sets `networkMode: 'always'`.
+  - Pending rows were one-off inserts into the transaction query cache, which any later refetch (a second create, a focus refetch, an invalidation) silently wiped while the banner still claimed they were waiting. Replaced with a live overlay: `useTransactions` merges a reactive pending-entries map onto the server's rows on every read, so a pending row survives any refetch instead of depending on a cache write nothing else knows about.
+  - A permanently-failing entry (its category deleted, say) could never leave the queue — added a "Discard" action on a pending row.
+  - Edit and Delete worked on a pending row, which would resurrect a discarded entry or silently revert an edit on the next sync — both are hidden while pending; only Discard is offered.
+  - Undo's real window was milliseconds for a queued entry, because the Saved toast was hidden the instant the request rejected. It now stays open (relabelled "Saved offline") through the queue transition, giving Undo the same window as an ordinary save.
+  - The queue wasn't scoped per user: on a shared device, a second account signing in could flush the first account's unsent entries into its own. Every entry now carries the Auth0 sub that queued it; flush and hydration only ever touch entries for the current user, and signing out clears the reactive pending state (never the durable IndexedDB queue, which stays correctly tagged for whoever signs back in).
+  - A genuine race let an already-undone entry still reach the server if a flush ran between its enqueue and its discard; closed by checking "already undone" before ever enqueueing, rather than enqueueing and immediately discarding again.
 - **Follow-ups:**
   - Queuing edits and deletes made offline, with a conflict-resolution story for data that changed server-side in the meantime.
   - A full offline app shell (service worker, cold-launch support) if that ever becomes worth the cost.
-  - Surfacing a queued entry's error detail somewhere more visible than "tap to see why" (the pending badge's tooltip already does tap-to-see; a persistent detail view is the deferred part).
-  - Task 8's browser-verification pass (Playwright, offline simulation) could not be completed in this environment — no headless Auth0 login stub exists in this repo yet — so the queue/banner/sync flow is unverified in a real browser. Remains outstanding.
+  - The "Sync now" button test only proves a flush happens, not that the click itself caused one (the automatic launch flush already would have) — worth strengthening later.
+  - Task 8's browser-verification pass (Playwright, offline simulation) could not be completed in this environment — no headless Auth0 login stub exists in this repo yet — so the queue/banner/sync flow, including this fix wave, is unverified in a real browser. Remains outstanding, and is the check that would have caught the Critical finding above in the first place.
 
 ## Deliberately excluded
 

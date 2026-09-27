@@ -1,40 +1,36 @@
 import { useEffect, useRef } from 'react';
 import { Button, Group, Paper, Text } from '@mantine/core';
+import { useAuth0 } from '@auth0/auth0-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useOfflineQueue } from '~/hooks/useOfflineQueue';
-import { listQueue } from '~/lib/offlineQueue';
-import { queryKeys } from '~/lib/queries';
-import type { Transaction } from '~/lib/types';
+import { clearPendingEntriesForLogout, hydrateOnce } from '~/lib/pendingEntries';
 
 export function OfflineQueueBanner() {
   const { pendingMap, flushNow } = useOfflineQueue();
   const qc = useQueryClient();
-  const hydrated = useRef(false);
+  const { isAuthenticated, user } = useAuth0();
+  const userSub = user?.sub;
+  const wasAuthenticated = useRef(isAuthenticated);
 
   useEffect(() => {
-    if (hydrated.current) return;
-    hydrated.current = true;
+    if (!userSub) return;
+    // hydrateOnce guards itself at module level (per userSub), not with a
+    // component ref, because every route renders its own <DefaultLayout> and
+    // therefore its own instance of this banner: a ref-based guard would
+    // reset, and re-hydrate, on every navigation.
+    void hydrateOnce(qc, userSub).then(() => flushNow());
+  }, [qc, userSub, flushNow]);
 
-    async function hydrateThenFlush(): Promise<void> {
-      const entries = await listQueue();
-      for (const entry of entries) {
-        const yearMonth = entry.input.date.slice(0, 7);
-        const key = queryKeys.transactions(yearMonth);
-        const previous = qc.getQueryData<Transaction[]>(key);
-        if (previous !== undefined) {
-          const row: Transaction = { ...entry.input, transactionId: entry.id, yearMonth, createdAt: entry.queuedAt };
-          qc.setQueryData<Transaction[]>(key, [...previous.filter(t => t.transactionId !== entry.id), row]);
-        }
-      }
-      qc.setQueryData<Record<string, { lastError?: string }>>(
-        queryKeys.offlineQueue,
-        () => Object.fromEntries(entries.map(e => [e.id, { lastError: e.lastError }])),
-      );
-      await flushNow();
+  useEffect(() => {
+    if (wasAuthenticated.current && !isAuthenticated) {
+      // Signed out: drop the reactive pending state so a different account
+      // signing in on this device never sees it. The durable IndexedDB queue
+      // is untouched — it's still tagged with the previous user's sub and
+      // will hydrate back in correctly if they sign in again.
+      clearPendingEntriesForLogout(qc);
     }
-
-    void hydrateThenFlush();
-  }, [qc, flushNow]);
+    wasAuthenticated.current = isAuthenticated;
+  }, [isAuthenticated, qc]);
 
   useEffect(() => {
     function handleOnline(): void { void flushNow(); }

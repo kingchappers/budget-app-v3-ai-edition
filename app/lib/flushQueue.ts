@@ -2,33 +2,24 @@ import type { QueryClient } from '@tanstack/react-query';
 import { ApiError } from './apiError';
 import type { Api } from './api';
 import { dequeue, listQueue, markQueueEntryError } from './offlineQueue';
+import { clearPendingEntry, setPendingEntry } from './pendingEntries';
 import { queryKeys } from './queries';
 
-type PendingMap = Record<string, { lastError?: string }>;
-
-function setPending(qc: QueryClient, id: string, entry: { lastError?: string } | null): void {
-  qc.setQueryData<PendingMap>(queryKeys.offlineQueue, (current = {}) => {
-    if (entry === null) {
-      const { [id]: _removed, ...rest } = current;
-      return rest;
-    }
-    return { ...current, [id]: entry };
-  });
-}
-
-export async function flushQueue(api: Api, qc: QueryClient): Promise<void> {
-  const entries = await listQueue();
+export async function flushQueue(api: Api, qc: QueryClient, userSub: string): Promise<void> {
+  const entries = (await listQueue()).filter(entry => entry.userSub === userSub);
   for (const entry of entries) {
     try {
       const created = await api.createTransaction({ ...entry.input, transactionId: entry.id });
       await dequeue(entry.id);
-      setPending(qc, entry.id, null);
-      qc.invalidateQueries({ queryKey: queryKeys.transactions(created.yearMonth) });
+      // Wait for the refetch to land before dropping the pending overlay row,
+      // so the real row is already in place and nothing blinks out.
+      await qc.invalidateQueries({ queryKey: queryKeys.transactions(created.yearMonth) });
       qc.invalidateQueries({ queryKey: ['pots'] });
+      clearPendingEntry(qc, entry.id);
     } catch (error) {
       if (error instanceof ApiError) {
         await markQueueEntryError(entry.id, error.message);
-        setPending(qc, entry.id, { lastError: error.message });
+        setPendingEntry(qc, { ...entry, lastError: error.message });
         continue;
       }
       return;

@@ -40,7 +40,7 @@ function TransactionsContent() {
   const categories = useCategories();
   const transactions = useTransactions(yearMonth);
   const remove = useDeleteTransaction();
-  const { pendingMap } = useOfflineQueue();
+  const { pendingMap, discard } = useOfflineQueue();
 
   const nameFor = (id: string) =>
     categories.data?.find(c => c.categoryId === id)?.name ?? 'Unknown category';
@@ -133,6 +133,7 @@ function TransactionsContent() {
               onDuplicate={setDuplicating}
               onRepeat={setRepeating}
               onDelete={(item) => remove.mutate({ transactionId: item.transactionId, yearMonth: item.yearMonth })}
+              onDiscard={(item) => void discard(item.transactionId)}
             />
           ))}
         </div>

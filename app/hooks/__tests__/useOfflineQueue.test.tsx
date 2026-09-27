@@ -5,10 +5,13 @@ import { useOfflineQueue } from '../useOfflineQueue';
 import { queryKeys } from '~/lib/queries';
 import { dequeue, enqueue, listQueue } from '~/lib/offlineQueue';
 
+vi.mock('@auth0/auth0-react', () => ({ useAuth0: () => ({ user: { sub: 'user-1' } }) }));
+
 const mockCreateTransaction = vi.fn();
+const mockApi = { createTransaction: mockCreateTransaction };
 vi.mock('~/lib/queries', async () => {
   const actual = await vi.importActual('~/lib/queries');
-  return { ...actual, useApi: () => ({ createTransaction: mockCreateTransaction }) };
+  return { ...actual, useApi: () => mockApi };
 });
 
 function wrapper(qc: QueryClient) {
@@ -51,6 +54,7 @@ describe('useOfflineQueue', () => {
     await enqueue({
       id: 'r1',
       queuedAt: '2025-01-05T10:00:00.000Z',
+      userSub: 'user-1',
       input: { amount: 100, type: 'EXPENSE', categoryId: 'cat-1', description: '', date: '2025-01-05' },
     });
     let releaseCreate: () => void = () => {};

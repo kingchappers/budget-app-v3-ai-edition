@@ -5,6 +5,7 @@ function makeEntry(id: string, queuedAt: string): QueuedEntry {
   return {
     id,
     queuedAt,
+    userSub: 'user-1',
     input: { amount: 500, type: 'EXPENSE', categoryId: 'cat-1', description: '', date: '2025-01-05' },
   };
 }

@@ -5,6 +5,10 @@ export interface QueuedEntry {
   input: TransactionInput;
   queuedAt: string;
   lastError?: string;
+  // The Auth0 sub of the user who queued this entry. IndexedDB is per
+  // browser origin, not per user, so on a shared device a second account
+  // signing in must never see or flush entries someone else queued.
+  userSub: string;
 }
 
 const DB_NAME = 'offline-transaction-queue';

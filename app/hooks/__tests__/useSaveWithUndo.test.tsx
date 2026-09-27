@@ -5,6 +5,8 @@ import { MantineProvider } from '@mantine/core';
 import { Notifications, notifications } from '@mantine/notifications';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
+vi.mock('@auth0/auth0-react', () => ({ useAuth0: () => ({ user: { sub: 'user-1' } }) }));
+
 const mockCreate = { mutateAsync: vi.fn() };
 const mockRemove = { mutate: vi.fn() };
 
@@ -153,6 +155,16 @@ describe('useSaveWithUndo', () => {
     expect(screen.queryByText(/Couldn't save/)).not.toBeInTheDocument();
   });
 
+  it('keeps the Saved toast open (relabelled) once queued, instead of closing it within milliseconds', async () => {
+    mockCreate.mutateAsync.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    const { result } = renderSaveWithUndo();
+    await act(async () => {
+      await result.current({ amount: 500, type: 'EXPENSE', categoryId: 'cat-1', description: '', date: '2025-01-05' });
+    });
+    expect(await screen.findByText(/Saved offline/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Undo' })).toBeInTheDocument();
+  });
+
   it('still shows the failure toast and does not queue on a real ApiError', async () => {
     mockCreate.mutateAsync.mockRejectedValueOnce(new ApiError(400, 'Bad Request'));
     const { result } = renderSaveWithUndo();
@@ -193,17 +205,12 @@ describe('useSaveWithUndo', () => {
         setTimeout(() => reject(new TypeError('Failed to fetch')), 5);
       }));
       const { result, qc } = renderSaveWithUndo();
-      qc.setQueryData<Transaction[]>(queryKeys.transactions('2025-01'), [
-        { transactionId: '00000000-0000-0000-0000-000000000002', yearMonth: '2025-01', amount: 500, type: 'EXPENSE', categoryId: 'cat-1', description: '', date: '2025-01-05', createdAt: '' },
-      ]);
 
       act(() => { void result.current({ amount: 500, type: 'EXPENSE', categoryId: 'cat-1', description: '', date: '2025-01-05' }); });
       fireEvent.click(await screen.findByText('Undo'));
 
       await waitFor(async () => expect(await listQueue()).toHaveLength(0));
       await waitFor(() => expect(qc.getQueryData(queryKeys.offlineQueue)).toEqual({}));
-      const rows = qc.getQueryData<Transaction[]>(queryKeys.transactions('2025-01')) ?? [];
-      expect(rows.some(t => t.transactionId === '00000000-0000-0000-0000-000000000002')).toBe(false);
       expect(mockRemove.mutate).not.toHaveBeenCalled();
 
       uuidSpy.mockRestore();
@@ -212,7 +219,7 @@ describe('useSaveWithUndo', () => {
     it('eventual success: a real delete is issued, and the entry is never treated as queued', async () => {
       let resolveCreate!: (value: unknown) => void;
       mockCreate.mutateAsync.mockImplementation(() => new Promise((resolve) => { resolveCreate = resolve; }));
-      const { result, qc } = renderSaveWithUndo();
+      const { result } = renderSaveWithUndo();
 
       act(() => { void result.current({ amount: 500, type: 'EXPENSE', categoryId: 'cat-1', description: '', date: '2025-01-05' }); });
       fireEvent.click(await screen.findByText('Undo'));
@@ -222,9 +229,12 @@ describe('useSaveWithUndo', () => {
         await new Promise(resolve => setTimeout(resolve, 0));
       });
 
+      // Clearing the pending overlay row on a genuine online success is
+      // useCreateTransaction's own job (covered in queries.test.tsx) — this
+      // hook's own responsibility, exercised here, is issuing the real
+      // delete and never treating an eventual success as a queued entry.
       await waitFor(() => expect(mockRemove.mutate).toHaveBeenCalledWith({ transactionId: 't-race', yearMonth: '2025-01' }));
       expect(await listQueue()).toHaveLength(0);
-      expect(qc.getQueryData(queryKeys.offlineQueue) ?? {}).toEqual({});
     });
   });
 });

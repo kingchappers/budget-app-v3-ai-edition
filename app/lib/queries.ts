@@ -3,7 +3,7 @@ import { useMemo } from 'react';
 import { useAuth0 } from '@auth0/auth0-react';
 import { useProtectedApi } from '~/hooks/useProtectedApi';
 import { createApi, type RecurringInput, type TransactionInput } from './api';
-import { ApiError } from './apiError';
+import { clearPendingEntry, OFFLINE_QUEUE_KEY, pendingRowsForMonth, type PendingMap } from './pendingEntries';
 import type { Category, CategoryGroup, PotSettingsInput, Recurring, TargetPeriod, Transaction } from './types';
 
 export const queryKeys = {
@@ -12,7 +12,7 @@ export const queryKeys = {
   transactions: (yearMonth: string) => ['transactions', yearMonth] as const,
   recurring: ['recurring'] as const,
   pots: (asOf: string) => ['pots', asOf] as const,
-  offlineQueue: ['offlineQueue'] as const,
+  offlineQueue: OFFLINE_QUEUE_KEY,
 };
 
 export function useApi() {
@@ -47,48 +47,58 @@ export function useTargets() {
   });
 }
 
+// Merges any still-pending (unsent or queued-offline) entries for this month
+// on top of whatever the server returned, so a pending row survives any
+// refetch instead of depending on a one-off cache write that a later
+// invalidation would silently erase.
+function useTransactionsOverlay(yearMonth: string, serverRows: Transaction[] | undefined): Transaction[] | undefined {
+  const { data: pendingMap = {} } = useQuery<PendingMap>({
+    queryKey: OFFLINE_QUEUE_KEY,
+    queryFn: () => ({}),
+    initialData: {},
+    staleTime: Infinity,
+    gcTime: Infinity,
+  });
+  return useMemo(() => {
+    const pendingRows = pendingRowsForMonth(pendingMap, yearMonth);
+    if (pendingRows.length === 0) return serverRows;
+    const knownIds = new Set((serverRows ?? []).map(t => t.transactionId));
+    const extra = pendingRows.filter(row => !knownIds.has(row.transactionId));
+    if (extra.length === 0) return serverRows;
+    return [...(serverRows ?? []), ...extra];
+  }, [pendingMap, yearMonth, serverRows]);
+}
+
 export function useTransactions(yearMonth: string, enabled: boolean = true) {
   const api = useApi();
   const authReady = useAuthReady();
-  return useQuery({
+  const query = useQuery({
     queryKey: queryKeys.transactions(yearMonth),
     queryFn: () => api.getTransactions(yearMonth),
     enabled: authReady && enabled,
   });
-}
-
-interface CreateContext {
-  yearMonth: string;
+  const data = useTransactionsOverlay(yearMonth, query.data);
+  return { ...query, data };
 }
 
 export function useCreateTransaction() {
   const api = useApi();
   const qc = useQueryClient();
-  return useMutation<Transaction, Error, TransactionInput, CreateContext>({
+  return useMutation<Transaction, Error, TransactionInput>({
     mutationFn: (input) => api.createTransaction(input),
-    onMutate: async (input) => {
-      const transactionId = input.transactionId;
-      if (!transactionId) throw new Error('useCreateTransaction requires input.transactionId');
-      const yearMonth = input.date.slice(0, 7);
-      const key = queryKeys.transactions(yearMonth);
-      await qc.cancelQueries({ queryKey: key });
-      const previous = qc.getQueryData<Transaction[]>(key);
-      if (previous !== undefined) {
-        const temp: Transaction = { ...input, transactionId, yearMonth, createdAt: new Date().toISOString() };
-        qc.setQueryData<Transaction[]>(key, [...previous.filter(t => t.transactionId !== transactionId), temp]);
-      }
-      return { yearMonth };
-    },
-    onError: (error, input, context) => {
-      if (!context || !(error instanceof ApiError)) return;
-      qc.setQueryData<Transaction[]>(
-        queryKeys.transactions(context.yearMonth),
-        (rows) => rows?.filter(t => t.transactionId !== input.transactionId),
-      );
-    },
-    onSettled: (_created, _error, input) => {
-      qc.invalidateQueries({ queryKey: queryKeys.transactions(input.date.slice(0, 7)) });
+    // The default 'online' mode PAUSES a mutation while the browser reports
+    // itself offline rather than letting it fail — so useSaveWithUndo's
+    // rejection handler (the thing that queues the entry) would never run,
+    // and a create attempted with no signal would just sit in memory and be
+    // lost when the app closes. 'always' lets it fail immediately instead.
+    networkMode: 'always',
+    onSettled: async (created, _error, input) => {
+      // Wait for the refetch before clearing the pending overlay row for a
+      // successful create, so the real server row is already in place and
+      // nothing blinks out in between.
+      await qc.invalidateQueries({ queryKey: queryKeys.transactions(input.date.slice(0, 7)) });
       qc.invalidateQueries({ queryKey: ['pots'] });
+      if (created && input.transactionId) clearPendingEntry(qc, input.transactionId);
     },
   });
 }

@@ -83,3 +83,32 @@ describe('TransactionRow pending badge', () => {
     expect(screen.queryByLabelText('Waiting to sync')).not.toBeInTheDocument();
   });
 });
+
+describe('TransactionRow pending row actions', () => {
+  it('offers only Discard while pending, never Edit or Delete', async () => {
+    const user = userEvent.setup();
+    renderRow({ pending: true, onEdit: vi.fn(), onDelete: vi.fn(), onDiscard: vi.fn() });
+
+    await user.click(screen.getByRole('button', { name: 'Actions for Weekly Shop' }));
+
+    expect(await screen.findByRole('menuitem', { name: 'Discard' })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Edit' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Delete' })).not.toBeInTheDocument();
+  });
+
+  it('calls onDiscard with the transaction', async () => {
+    const user = userEvent.setup();
+    const onDiscard = vi.fn();
+    renderRow({ pending: true, onDiscard });
+
+    await user.click(screen.getByRole('button', { name: 'Actions for Weekly Shop' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Discard' }));
+
+    expect(onDiscard).toHaveBeenCalledWith(transaction);
+  });
+
+  it('shows no actions menu at all while pending if no onDiscard is given', () => {
+    renderRow({ pending: true, onEdit: vi.fn(), onDelete: vi.fn() });
+    expect(screen.queryByRole('button', { name: 'Actions for Weekly Shop' })).not.toBeInTheDocument();
+  });
+});

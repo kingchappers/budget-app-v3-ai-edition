@@ -10,9 +10,8 @@ const auth0 = {
 
 vi.mock('@auth0/auth0-react', () => ({ useAuth0: () => auth0 }));
 
-import { ApiError } from '~/lib/apiError';
+import { onlineManager } from '@tanstack/react-query';
 import { queryKeys, useCategories, useCreateTransaction, useTransactions } from '../queries';
-import type { Transaction } from '../types';
 
 function wrapper({ children }: { children: React.ReactNode }) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -93,70 +92,52 @@ describe('useCreateTransaction', () => {
     auth0.getAccessTokenSilently.mockClear();
   });
 
-  it('uses input.transactionId as the optimistic row id, not a generated temp id', async () => {
-    vi.stubGlobal('fetch', vi.fn(() => new Promise(() => {})));
+  it('clears the pending overlay entry once the create succeeds and the refetch lands', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => (
+      url.startsWith('/api/transactions?')
+        ? new Response(JSON.stringify({ transactions: [] }))
+        : new Response(JSON.stringify({ transaction: { ...baseInput, transactionId: 'fixed-id-1', yearMonth: '2025-01', createdAt: '' } }))
+    )));
     const { result } = renderCreateTransactionHook();
-    queryClient.setQueryData(queryKeys.transactions('2025-01'), []);
-    const input = { ...baseInput, description: 'coffee', transactionId: 'fixed-id-1' };
+    queryClient.setQueryData(queryKeys.offlineQueue, { 'fixed-id-1': { id: 'fixed-id-1', input: baseInput, queuedAt: '', userSub: 'u1' } });
+    const input = { ...baseInput, transactionId: 'fixed-id-1' };
 
-    act(() => { result.current.mutate(input); });
+    await act(async () => { await result.current.mutateAsync(input); });
 
     await waitFor(() => {
-      const rows = queryClient.getQueryData(queryKeys.transactions('2025-01')) as Transaction[] | undefined;
-      expect(rows?.some(r => r.transactionId === 'fixed-id-1')).toBe(true);
+      expect(queryClient.getQueryData(queryKeys.offlineQueue)).toEqual({});
     });
   });
 
-  it('replaces rather than duplicates a row that already has this transactionId', async () => {
-    vi.stubGlobal('fetch', vi.fn(() => new Promise(() => {})));
-    const { result } = renderCreateTransactionHook();
-    queryClient.setQueryData(queryKeys.transactions('2025-01'), [
-      { transactionId: 'fixed-id-1', amount: 100, type: 'EXPENSE', categoryId: 'cat-1', description: 'old', date: '2025-01-05', yearMonth: '2025-01', createdAt: '' },
-    ]);
-    const input = { ...baseInput, description: 'new', transactionId: 'fixed-id-1' };
-
-    act(() => { result.current.mutate(input); });
-
-    await waitFor(() => {
-      const rows = queryClient.getQueryData(queryKeys.transactions('2025-01')) as Transaction[];
-      expect(rows).toHaveLength(1);
-      expect(rows[0].description).toBe('new');
-    });
-  });
-
-  it('rolls back the optimistic row on an ApiError but not on a network failure', async () => {
-    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(new Response(null, { status: 400, statusText: 'Bad Request' }))));
-    const { result: apiErrorHook } = renderCreateTransactionHook();
-    const apiErrorClient = queryClient;
-    apiErrorClient.setQueryData(queryKeys.transactions('2025-01'), []);
-
-    await act(async () => {
-      await apiErrorHook.current.mutateAsync({ ...baseInput, transactionId: 'id-a' }).catch(() => {});
-    });
-
-    expect((apiErrorClient.getQueryData(queryKeys.transactions('2025-01')) as Transaction[] ?? []).some(r => r.transactionId === 'id-a')).toBe(false);
-
+  it('does not clear the pending overlay entry when the create fails', async () => {
     vi.stubGlobal('fetch', vi.fn(() => Promise.reject(new TypeError('Failed to fetch'))));
-    const { result: networkErrorHook } = renderCreateTransactionHook();
-    const networkErrorClient = queryClient;
-    networkErrorClient.setQueryData(queryKeys.transactions('2025-01'), []);
+    const { result } = renderCreateTransactionHook();
+    queryClient.setQueryData(queryKeys.offlineQueue, { 'id-b': { id: 'id-b', input: baseInput, queuedAt: '', userSub: 'u1' } });
 
     await act(async () => {
-      await networkErrorHook.current.mutateAsync({ ...baseInput, transactionId: 'id-b' }).catch(() => {});
+      await result.current.mutateAsync({ ...baseInput, transactionId: 'id-b' }).catch(() => {});
     });
 
-    expect((networkErrorClient.getQueryData(queryKeys.transactions('2025-01')) as Transaction[] ?? []).some(r => r.transactionId === 'id-b')).toBe(true);
+    expect(queryClient.getQueryData(queryKeys.offlineQueue)).toEqual({
+      'id-b': { id: 'id-b', input: baseInput, queuedAt: '', userSub: 'u1' },
+    });
   });
 
-  it('throws a dev-time invariant when input.transactionId is missing', async () => {
-    vi.stubGlobal('fetch', vi.fn(() => new Promise(() => {})));
-    const { result } = renderCreateTransactionHook();
-
-    await act(async () => {
-      await result.current.mutateAsync(baseInput).catch(() => {});
-    });
-
-    await waitFor(() => expect(result.current.isError).toBe(true));
-    expect(result.current.error?.message).toMatch(/transactionId/);
+  it('does not pause while the browser reports itself offline (networkMode: always)', async () => {
+    const fetchMock = vi.fn(() => Promise.reject(new TypeError('Failed to fetch')));
+    vi.stubGlobal('fetch', fetchMock);
+    onlineManager.setOnline(false);
+    try {
+      const { result } = renderCreateTransactionHook();
+      await act(async () => {
+        await result.current.mutateAsync({ ...baseInput, transactionId: 'id-c' }).catch(() => {});
+      });
+      // A paused mutation never calls its mutationFn at all; the default
+      // 'online' networkMode would have left this pending forever instead.
+      expect(fetchMock).toHaveBeenCalled();
+      expect(result.current.isError).toBe(true);
+    } finally {
+      onlineManager.setOnline(true);
+    }
   });
 });
