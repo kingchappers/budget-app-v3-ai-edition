@@ -7,6 +7,7 @@ import { CategoryProgressRow } from '~/components/budget/CategoryProgressRow';
 import { HomePots } from '~/components/pots/HomePots';
 import { DueRecurringCard } from '~/components/recurring/DueRecurringCard';
 import { TransactionRow } from '~/components/transactions/TransactionRow';
+import { useOfflineQueue } from '~/hooks/useOfflineQueue';
 import { groupItems, bucketKeyFor } from '~/lib/categoryGroups';
 import { buildMonthSummary } from '~/lib/summary';
 import type { CategoryProgress } from '~/lib/summary';
@@ -34,6 +35,7 @@ function HomeContent() {
   const transactions = useTransactions(yearMonth);
   const potsEnabled = yearMonth <= shiftMonth(currentYearMonth(), 1);
   const pots = usePots(yearMonth, potsEnabled);
+  const { pendingMap } = useOfflineQueue();
 
   const isLoading = categories.isLoading || targets.isLoading || transactions.isLoading;
   const error = categories.error || targets.error || transactions.error;
@@ -101,7 +103,14 @@ function HomeContent() {
         {summary.recent.length === 0
           ? <Text c="dimmed" size="sm">Nothing logged yet this month.</Text>
           : summary.recent.map(t => (
-              <TransactionRow key={t.transactionId} transaction={t} categoryName={nameFor(t.categoryId)} categoryIcon={iconFor(t.categoryId)} />
+              <TransactionRow
+                key={t.transactionId}
+                transaction={t}
+                categoryName={nameFor(t.categoryId)}
+                categoryIcon={iconFor(t.categoryId)}
+                pending={t.transactionId in pendingMap}
+                pendingError={pendingMap[t.transactionId]?.lastError}
+              />
             ))}
         <Button component={Link} to="/transactions" variant="subtle" mt="xs">See all</Button>
       </div>

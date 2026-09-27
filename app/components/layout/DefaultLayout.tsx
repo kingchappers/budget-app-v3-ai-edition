@@ -9,6 +9,7 @@ import { IconHome, IconList, IconRepeat, IconTarget, IconPlus, IconTag, IconPigM
 import { NavLink as RouterNavLink, useLocation } from 'react-router';
 import { TransactionSheet } from '../transactions/TransactionSheet';
 import { LaunchIntent } from './LaunchIntent';
+import { OfflineQueueBanner } from './OfflineQueueBanner';
 import { currentYearMonth } from '~/lib/months';
 
 const NAV_ITEMS = [
@@ -120,6 +121,7 @@ export function DefaultLayout({ children }: { children: React.ReactNode }) {
             56px diameter, so its top edge reaches bottom:140 — pb must
             clear that or the last card on a page renders underneath it. */}
         <AppShell.Main pb={150}>
+          <OfflineQueueBanner />
           {children}
         </AppShell.Main>
         <Tooltip label="Add transaction (N)" events={{ hover: true, focus: true, touch: false }}>
