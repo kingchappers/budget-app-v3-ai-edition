@@ -1,12 +1,12 @@
 import { QueryCommand, PutCommand } from '@aws-sdk/lib-dynamodb';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { docClient, TABLE, pk, catSk, potSk } from './db';
+import { MAX_AMOUNT_PENCE } from './constants';
 import { DEFAULT_CATEGORIES } from './defaults';
 import { autoAmountFor, computePots } from './potsCalc';
 import type { ApiResponse, Category, PotAutoEntry, PotSettings, Transaction } from './types';
 import { ok, err } from './http';
 
-export const MAX_POT_AMOUNT_PENCE = 1_000_000_000;
 export const MAX_AUTO_ENTRIES = 120;
 const MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
 
@@ -26,7 +26,7 @@ function serverMonthIndex(): number {
 
 function isOptionalAmount(value: unknown): value is number | null {
   if (value === null) return true;
-  return typeof value === 'number' && Number.isInteger(value) && value > 0 && value <= MAX_POT_AMOUNT_PENCE;
+  return typeof value === 'number' && Number.isInteger(value) && value > 0 && value <= MAX_AMOUNT_PENCE;
 }
 
 async function queryAll(userId: string, prefix: string): Promise<Record<string, unknown>[]> {

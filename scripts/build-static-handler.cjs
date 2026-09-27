@@ -18,4 +18,10 @@ execSync(
 fs.copyFileSync(path.join(tmpDir, 'handler.js'), target);
 fs.rmSync(tmpDir, { recursive: true, force: true });
 
+const auth0Domain = (process.env.VITE_AUTH0_DOMAIN || '').replace(/^https?:\/\//, '').replace(/\/+$/, '');
+fs.writeFileSync(path.join(root, 'build/client/csp.json'), JSON.stringify({ auth0Domain }) + '\n');
+if (auth0Domain === '') {
+  console.warn('VITE_AUTH0_DOMAIN is not set; the content security policy will not allow Auth0.');
+}
+
 console.log('✓ Static handler compiled to build/client/index.js');

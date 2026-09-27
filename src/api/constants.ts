@@ -16,3 +16,5 @@ export const VALID_CATEGORY_GROUPS = new Set(['BILLS', 'SINKING_FUNDS', 'EVERYDA
 export const POT_GROUPS = new Set(['SINKING_FUNDS', 'SAVING_INVESTMENT']);
 
 export const VALID_PERIODS = new Set(['MONTHLY', 'WEEKLY']);
+
+export const MAX_AMOUNT_PENCE = 1_000_000_000;

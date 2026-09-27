@@ -2,6 +2,8 @@ export type ParseResult =
   | { ok: true; pence: number }
   | { ok: false; message: string };
 
+export const MAX_AMOUNT_PENCE = 1_000_000_000;
+
 export function parsePounds(input: string): ParseResult {
   const cleaned = input.trim().replace(/^£/, '').replace(/,/g, '').trim();
 
@@ -17,6 +19,10 @@ export function parsePounds(input: string): ParseResult {
 
   const [whole, fraction = ''] = cleaned.split('.');
   const pence = Number(whole) * 100 + Number(fraction.padEnd(2, '0'));
+
+  if (!Number.isSafeInteger(pence) || pence > MAX_AMOUNT_PENCE) {
+    return { ok: false, message: 'Amount is too large' };
+  }
 
   if (pence <= 0) {
     return { ok: false, message: 'Amount must be greater than zero' };

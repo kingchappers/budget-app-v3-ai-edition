@@ -24,16 +24,18 @@ vi.mock('~/lib/queries', () => ({
   useSetRecurringHandled: () => ({ mutate: mockHandled }),
 }));
 vi.mock('~/components/transactions/TransactionSheet', () => ({
-  TransactionSheet: ({ opened, template, templateDate, onSaved }: {
+  TransactionSheet: ({ opened, template, templateDate, onSaved, onUndone }: {
     opened: boolean;
     template?: { description: string; amount: number } | null;
     templateDate?: string;
     onSaved?: (created: unknown) => void;
+    onUndone?: () => void;
   }) => (opened
     ? (
       <div>
         <span>{`Sheet ${template?.description} ${template?.amount} on ${templateDate}`}</span>
         <button onClick={() => onSaved?.({})}>simulate saved</button>
+        <button onClick={() => onUndone?.()}>simulate undone</button>
       </div>
     )
     : null),
@@ -166,6 +168,33 @@ describe('DueRecurringCard', () => {
     await user.click(screen.getByRole('button', { name: 'simulate saved' }));
 
     await waitFor(() => expect(mockHandled).toHaveBeenCalledWith({ recurringId: 'r1', period: '2026-09' }));
+  });
+
+  it('Undo after Edit restores the previous handled period', async () => {
+    const user = userEvent.setup();
+    renderCard();
+
+    await user.click(screen.getByRole('button', { name: 'More actions for Salary' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Edit' }));
+    await user.click(screen.getByRole('button', { name: 'simulate saved' }));
+    await waitFor(() => expect(mockHandled).toHaveBeenCalledWith({ recurringId: 'r1', period: '2026-09' }));
+    mockHandled.mockClear();
+
+    await user.click(screen.getByRole('button', { name: 'simulate undone' }));
+
+    expect(mockHandled).toHaveBeenCalledWith({ recurringId: 'r1', period: '2026-08' });
+  });
+
+  it('Undo after Edit can restore an empty handled marker', async () => {
+    const user = userEvent.setup();
+    dueState.items = [item({}, { handledPeriod: null })];
+    renderCard();
+
+    await user.click(screen.getByRole('button', { name: 'More actions for Salary' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Edit' }));
+    await user.click(screen.getByRole('button', { name: 'simulate undone' }));
+
+    expect(mockHandled).toHaveBeenCalledWith({ recurringId: 'r1', period: null });
   });
 
   it('ignores a second Add while the first is still saving, then allows a retry once it settles', async () => {

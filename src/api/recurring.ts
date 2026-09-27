@@ -1,7 +1,7 @@
 import { QueryCommand, PutCommand, UpdateCommand, DeleteCommand } from '@aws-sdk/lib-dynamodb';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { docClient, TABLE, pk, recurringSk } from './db';
-import { SECURITY_HEADERS, VALID_TRANSACTION_TYPES } from './constants';
+import { MAX_AMOUNT_PENCE, SECURITY_HEADERS, VALID_TRANSACTION_TYPES } from './constants';
 import type { ApiResponse, Recurring, TransactionType } from './types';
 import { ok, err } from './http';
 
@@ -31,8 +31,8 @@ function isIntegerInRange(value: unknown, min: number, max: number): value is nu
 export function validateRecurringInput(body: Record<string, unknown>): Validation {
   const { type, categoryId, amount, description, dayOfMonth, leadDays } = body;
 
-  if (typeof amount !== 'number' || !Number.isInteger(amount) || amount <= 0) {
-    return { ok: false, message: 'amount must be a positive integer representing pence/cents' };
+  if (typeof amount !== 'number' || !Number.isInteger(amount) || amount <= 0 || amount > MAX_AMOUNT_PENCE) {
+    return { ok: false, message: `amount must be a positive integer representing pence/cents, at most ${MAX_AMOUNT_PENCE}` };
   }
   if (typeof type !== 'string' || !VALID_TRANSACTION_TYPES.has(type)) {
     return { ok: false, message: 'type must be EXPENSE, INCOME, SET_ASIDE, or TAKE_OUT' };

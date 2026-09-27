@@ -142,6 +142,13 @@ export function DueRecurringCard() {
         template={template}
         templateDate={editing?.dueDate}
         onSaved={() => { if (editing) markHandled(editing); }}
+        onUndone={() => {
+          if (!editing) return;
+          setHandled.mutate({
+            recurringId: editing.recurring.recurringId,
+            period: editing.recurring.handledPeriod,
+          });
+        }}
       />
     </>
   );

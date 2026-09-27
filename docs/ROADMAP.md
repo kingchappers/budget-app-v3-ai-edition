@@ -11,7 +11,7 @@ Bank sync was dropped (see `DECISIONS.md`), so manual entry is the core interact
 | E | CSV/OFX import | Dropped: manual CSV/OFX import was judged clunky and would not be used. |
 | F1 | Category groups and YNAB defaults | Implemented on `feat/category-groups` ([PR #37](https://github.com/kingchappers/budget-app-v3-ai-edition/pull/37)). Spec: `superpowers/specs/2026-09-24-category-groups-design.md`, plan: `superpowers/plans/2026-09-24-category-groups.md` |
 | F2 | Savings and sinking-fund pots | Implemented on `feat/savings-pots` (PR pending). Spec: `superpowers/specs/2026-09-25-savings-pots-design.md`, plan: `superpowers/plans/2026-09-25-savings-pots.md` |
-| G | Polish and hardening pass | Not started |
+| G | Polish and hardening | Implemented on `feat/polish-hardening` (PR pending). Spec: `superpowers/specs/2026-09-26-polish-hardening-design.md`, plan: `superpowers/plans/2026-09-26-polish-hardening.md` |
 | H | Spending insights | Not started (after F) |
 | I | Net worth and accounts | Not started |
 | J | Offline entry queue | Not started |
@@ -126,6 +126,18 @@ Implemented on `feat/savings-pots`. Spec: `superpowers/specs/2026-09-25-savings-
   - On the Pots page the floating + button covers the Set aside button of a row that scrolls under it (the same fixed-button overlap as elsewhere in the app); scrolling to the end clears it.
   - On a 390px screen the history sheet's month table scrolls sideways (the Closing column is off screen) with no hint, and the sheet is taller than the screen so the settings need scrolling. The trend line's end points are half-clipped at the edge of its box.
   - The client's local month and the server's UTC month can differ for about an hour around midnight on the 1st, so Home's "next month" could hit the API's month bound for that hour.
+
+## G: Polish and hardening
+
+Implemented on `feat/polish-hardening`. Spec: `superpowers/specs/2026-09-26-polish-hardening-design.md`, plan: `superpowers/plans/2026-09-26-polish-hardening.md`.
+
+- **Built:** category recall when note history loads late; mobile bottom sheets sized to their content; a £10,000,000 amount cap on the API and client; the static handler no longer serves `/index.js` and sends a report-only Content-Security-Policy built from the page's inline script hashes and the Auth0 tenant from `csp.json`; Undo after a Due-card Edit restores the item; a confirmation dialog before deleting a recurring item.
+- **Decisions:** the CSP ships report-only with the header name as one constant; the Auth0 domain is read from `VITE_AUTH0_DOMAIN` at build time; delete confirms instead of offering Undo; the floating + button overlap was not changed because `AppShell.Main` already has bottom padding.
+- **Follow-ups:**
+  - Switch the CSP to enforcing once the browser console is quiet after a deploy.
+  - Grouped selects in the recurring form, the Transactions filter and the reassign dialog; group editing; Home emoji (logged under F1).
+  - The bottom-sheet test (`sizes the bottom drawer to its content instead of filling the screen`) passed in jsdom even before the fix, because jsdom returns CSS's initial value (`height: auto`) for an element with no inline height rather than reproducing the full-height bug; a real-browser pass (Task 7) is what actually verified this one.
+  - Task 7's real-browser pass found no CSP violations, in either report-only or enforcing mode, and confirmed both the Add sheet and a pot's history sheet size to content at 390px (each hit the 90dvh cap because their content is genuinely that tall, which is the designed behaviour, not the pre-fix bug).
 
 ## Later ideas
 

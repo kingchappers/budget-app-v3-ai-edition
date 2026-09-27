@@ -84,4 +84,38 @@ describe('useSaveWithUndo', () => {
     expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
     expect(mockRemove).not.toHaveBeenCalled();
   });
+
+  it('calls onUndo after issuing the delete when Undo is pressed', async () => {
+    mockCreate.mockResolvedValue(created);
+    const order: string[] = [];
+    mockRemove.mockImplementation(() => { order.push('remove'); });
+    const onUndo = vi.fn(() => { order.push('undo'); });
+    const { result } = renderHook(() => useSaveWithUndo(), { wrapper });
+
+    await act(async () => { await result.current(input, { onUndo }); });
+    await userEvent.setup().click(await screen.findByRole('button', { name: 'Undo' }));
+
+    await waitFor(() => expect(onUndo).toHaveBeenCalledTimes(1));
+    expect(order).toEqual(['remove', 'undo']);
+  });
+
+  it('does not call onUndo unless Undo is pressed', async () => {
+    mockCreate.mockResolvedValue(created);
+    const onUndo = vi.fn();
+    const { result } = renderHook(() => useSaveWithUndo(), { wrapper });
+
+    await act(async () => { await result.current(input, { onUndo }); });
+
+    expect(onUndo).not.toHaveBeenCalled();
+  });
+
+  it('does not call onUndo when the create failed', async () => {
+    mockCreate.mockRejectedValue(new Error('boom'));
+    const onUndo = vi.fn();
+    const { result } = renderHook(() => useSaveWithUndo(), { wrapper });
+
+    await act(async () => { await result.current(input, { onUndo }); });
+
+    expect(onUndo).not.toHaveBeenCalled();
+  });
 });

@@ -16,6 +16,7 @@ vi.mock('@aws-sdk/lib-dynamodb', () => ({
 }));
 
 import { getTargets, upsertTarget, deleteTarget } from '../targets';
+import { MAX_AMOUNT_PENCE } from '../constants';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 
 function makeEvent(body?: object): APIGatewayProxyEventV2 {
@@ -51,6 +52,26 @@ describe('upsertTarget', () => {
     const body = JSON.parse(res.body);
     expect(body.target.targetAmount).toBe(30000);
     expect(body.target.period).toBe('MONTHLY');
+  });
+
+  it('accepts a targetAmount at the maximum cap', async () => {
+    mockSend.mockResolvedValueOnce({});
+    const res = await upsertTarget(
+      makeEvent({ targetAmount: MAX_AMOUNT_PENCE, period: 'MONTHLY' }),
+      'user-1',
+      { categoryId: 'cat-food' },
+    );
+    expect(res.statusCode).toBe(200);
+  });
+
+  it('returns 400 for a targetAmount over the maximum cap', async () => {
+    const res = await upsertTarget(
+      makeEvent({ targetAmount: MAX_AMOUNT_PENCE + 1, period: 'MONTHLY' }),
+      'user-1',
+      { categoryId: 'cat-food' },
+    );
+    expect(res.statusCode).toBe(400);
+    expect(mockSend).not.toHaveBeenCalled();
   });
 
   it('returns 400 for non-integer targetAmount', async () => {

@@ -1,7 +1,7 @@
 import { QueryCommand, PutCommand, DeleteCommand } from '@aws-sdk/lib-dynamodb';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { docClient, TABLE, pk, targetSk } from './db';
-import { SECURITY_HEADERS, VALID_PERIODS } from './constants';
+import { MAX_AMOUNT_PENCE, SECURITY_HEADERS, VALID_PERIODS } from './constants';
 import type { CategoryTarget, ApiResponse } from './types';
 import { ok, err } from './http';
 
@@ -39,8 +39,8 @@ export async function upsertTarget(
 
   const { targetAmount, period } = body;
 
-  if (typeof targetAmount !== 'number' || !Number.isInteger(targetAmount) || targetAmount <= 0) {
-    return err(400, 'targetAmount must be a positive integer representing pence/cents');
+  if (typeof targetAmount !== 'number' || !Number.isInteger(targetAmount) || targetAmount <= 0 || targetAmount > MAX_AMOUNT_PENCE) {
+    return err(400, `targetAmount must be a positive integer representing pence/cents, at most ${MAX_AMOUNT_PENCE}`);
   }
   if (!period || !VALID_PERIODS.has(period as string)) {
     return err(400, 'period must be MONTHLY or WEEKLY');

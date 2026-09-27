@@ -172,6 +172,16 @@ describe('applyAutoContribute', () => {
 describe('putPot', () => {
   const valid = { monthlyAmount: 5000, goalAmount: 300000, autoContribute: false, month: '2026-09' };
 
+  it('accepts amounts of exactly the cap', async () => {
+    useStore({});
+    const res = await putPot(
+      putEvent({ ...valid, monthlyAmount: 1_000_000_000, goalAmount: 1_000_000_000 }),
+      'user-1',
+      { categoryId: 'cat-holidays' },
+    );
+    expect(res.statusCode).toBe(200);
+  });
+
   it.each([
     ['missing monthlyAmount', { ...valid, monthlyAmount: undefined }],
     ['zero monthlyAmount', { ...valid, monthlyAmount: 0 }],

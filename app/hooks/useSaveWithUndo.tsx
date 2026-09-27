@@ -5,7 +5,11 @@ import { formatPence } from '~/lib/money';
 import { useCategories, useCreateTransaction, useDeleteTransaction } from '~/lib/queries';
 import type { Transaction } from '~/lib/types';
 
-export function useSaveWithUndo(): (input: TransactionInput) => Promise<Transaction | null> {
+export interface SaveOptions {
+  onUndo?: () => void;
+}
+
+export function useSaveWithUndo(): (input: TransactionInput, options?: SaveOptions) => Promise<Transaction | null> {
   const { data: categories = [] } = useCategories();
   const create = useCreateTransaction();
   const remove = useDeleteTransaction();
@@ -15,7 +19,7 @@ export function useSaveWithUndo(): (input: TransactionInput) => Promise<Transact
     return `${formatPence(input.amount)} · ${categoryName}`;
   }
 
-  function showFailureToast(input: TransactionInput): void {
+  function showFailureToast(input: TransactionInput, options?: SaveOptions): void {
     const toastId = `failed-${crypto.randomUUID()}`;
     notifications.show({
       id: toastId,
@@ -27,14 +31,14 @@ export function useSaveWithUndo(): (input: TransactionInput) => Promise<Transact
           actionLabel="Retry"
           onAction={() => {
             notifications.hide(toastId);
-            void save(input);
+            void save(input, options);
           }}
         />
       ),
     });
   }
 
-  function save(input: TransactionInput): Promise<Transaction | null> {
+  function save(input: TransactionInput, options?: SaveOptions): Promise<Transaction | null> {
     const toastId = `saved-${crypto.randomUUID()}`;
     let undone = false;
     const outcome = create.mutateAsync(input).then(
@@ -42,7 +46,7 @@ export function useSaveWithUndo(): (input: TransactionInput) => Promise<Transact
       () => {
         notifications.hide(toastId);
         // A cancelled entry must not offer Retry, or one tap would re-create it.
-        if (!undone) showFailureToast(input);
+        if (!undone) showFailureToast(input, options);
         return null;
       },
     );
@@ -60,6 +64,7 @@ export function useSaveWithUndo(): (input: TransactionInput) => Promise<Transact
             void outcome.then(created => {
               if (!created) return;
               remove.mutate({ transactionId: created.transactionId, yearMonth: created.yearMonth });
+              options?.onUndo?.();
             });
           }}
         />
