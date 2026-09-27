@@ -1,56 +1,68 @@
 import { useCallback, useState } from 'react';
-import { ActionIcon, AppShell, Flex, Text, NavLink, Group, Paper, Tooltip } from '@mantine/core';
+import { ActionIcon, AppShell, Flex, Text, NavLink, Group, Paper, Tooltip, UnstyledButton } from '@mantine/core';
 import { useHotkeys } from '@mantine/hooks';
 import { Auth0Provider } from '@auth0/auth0-react';
 import Authentication from "../authentication/Authentication";
 import { ColorSchemeToggle } from './ColorSchemeToggle';
 import { QuickEntryTips } from './QuickEntryTips';
-import { IconHome, IconList, IconRepeat, IconTarget, IconPlus, IconTag, IconPigMoney } from '@tabler/icons-react';
+import { IconHome, IconList, IconTarget, IconPlus, IconPigMoney, IconMenu2 } from '@tabler/icons-react';
 import { NavLink as RouterNavLink, useLocation } from 'react-router';
 import { TransactionSheet } from '../transactions/TransactionSheet';
 import { LaunchIntent } from './LaunchIntent';
 import { currentYearMonth } from '~/lib/months';
+import { MoreSheet, MORE_ITEMS } from './MoreSheet';
 
 const NAV_ITEMS = [
   { to: '/', label: 'Home', Icon: IconHome },
   { to: '/transactions', label: 'Transactions', Icon: IconList },
   { to: '/targets', label: 'Targets', Icon: IconTarget },
   { to: '/pots', label: 'Pots', Icon: IconPigMoney },
-  { to: '/categories', label: 'Categories', Icon: IconTag },
-];
-
-const SIDEBAR_ONLY_ITEMS = [
-  { to: '/recurring', label: 'Recurring', Icon: IconRepeat },
 ];
 
 function isNavItemActive(pathname: string, to: string) {
   return to === '/' ? pathname === '/' : pathname.startsWith(to);
 }
 
+function isMoreActive(pathname: string): boolean {
+  return MORE_ITEMS.some(item => isNavItemActive(pathname, item.to));
+}
+
 function BottomTabs() {
   const { pathname } = useLocation();
+  const [moreOpen, setMoreOpen] = useState(false);
+  const moreActive = isMoreActive(pathname);
   return (
-    <Paper
-      component="nav"
-      withBorder
-      hiddenFrom="sm"
-      style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 100 }}
-      p="xs"
-    >
-      <Group justify="space-around">
-        {NAV_ITEMS.map(({ to, label, Icon }) => {
-          const active = isNavItemActive(pathname, to);
-          return (
-            <RouterNavLink key={to} to={to} style={{ textDecoration: 'none' }} aria-label={label}>
-              <Group gap={2} justify="center" style={{ flexDirection: 'column' }}>
-                <Icon size={22} stroke={active ? 2.4 : 1.6} />
-                <Text size="xs" fw={active ? 700 : 400}>{label}</Text>
-              </Group>
-            </RouterNavLink>
-          );
-        })}
-      </Group>
-    </Paper>
+    <>
+      <Paper
+        component="nav"
+        aria-label="Primary"
+        withBorder
+        hiddenFrom="sm"
+        style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 100 }}
+        p="xs"
+      >
+        <Group justify="space-around">
+          {NAV_ITEMS.map(({ to, label, Icon }) => {
+            const active = isNavItemActive(pathname, to);
+            return (
+              <RouterNavLink key={to} to={to} style={{ textDecoration: 'none' }} aria-label={label}>
+                <Group gap={2} justify="center" style={{ flexDirection: 'column' }}>
+                  <Icon size={22} stroke={active ? 2.4 : 1.6} />
+                  <Text size="xs" fw={active ? 700 : 400}>{label}</Text>
+                </Group>
+              </RouterNavLink>
+            );
+          })}
+          <UnstyledButton onClick={() => setMoreOpen(true)} aria-label="More">
+            <Group gap={2} justify="center" style={{ flexDirection: 'column' }}>
+              <IconMenu2 size={22} stroke={moreActive ? 2.4 : 1.6} />
+              <Text size="xs" fw={moreActive ? 700 : 400}>More</Text>
+            </Group>
+          </UnstyledButton>
+        </Group>
+      </Paper>
+      <MoreSheet opened={moreOpen} onClose={() => setMoreOpen(false)} />
+    </>
   );
 }
 
@@ -58,7 +70,7 @@ function SidebarNav() {
   const { pathname } = useLocation();
   return (
     <>
-      {[...NAV_ITEMS, ...SIDEBAR_ONLY_ITEMS].map(({ to, label, Icon }) => (
+      {[...NAV_ITEMS, ...MORE_ITEMS].map(({ to, label, Icon }) => (
         <NavLink
           key={to}
           component={RouterNavLink}
