@@ -9,6 +9,7 @@ export const queryKeys = {
   categories: ['categories'] as const,
   targets: ['targets'] as const,
   transactions: (yearMonth: string) => ['transactions', yearMonth] as const,
+  transactionsRange: (from: string, to: string) => ['transactionsRange', from, to] as const,
   recurring: ['recurring'] as const,
   pots: (asOf: string) => ['pots', asOf] as const,
 };
@@ -55,6 +56,16 @@ export function useTransactions(yearMonth: string, enabled: boolean = true) {
   });
 }
 
+export function useTransactionsRange(from: string, to: string) {
+  const api = useApi();
+  const authReady = useAuthReady();
+  return useQuery({
+    queryKey: queryKeys.transactionsRange(from, to),
+    queryFn: () => api.getTransactionsRange(from, to),
+    enabled: authReady,
+  });
+}
+
 interface CreateContext {
   yearMonth: string;
   tempId: string;
@@ -87,6 +98,7 @@ export function useCreateTransaction() {
     onSettled: (_created, _error, input) => {
       qc.invalidateQueries({ queryKey: queryKeys.transactions(input.date.slice(0, 7)) });
       qc.invalidateQueries({ queryKey: ['pots'] });
+      qc.invalidateQueries({ queryKey: ['transactionsRange'] });
     },
   });
 }
@@ -103,6 +115,7 @@ export function useUpdateTransaction(yearMonth: string) {
         qc.invalidateQueries({ queryKey: queryKeys.transactions(updated.yearMonth) });
       }
       qc.invalidateQueries({ queryKey: ['pots'] });
+      qc.invalidateQueries({ queryKey: ['transactionsRange'] });
     },
   });
 }
@@ -116,6 +129,7 @@ export function useDeleteTransaction() {
     onSuccess: (_data, vars) => {
       qc.invalidateQueries({ queryKey: queryKeys.transactions(vars.yearMonth) });
       qc.invalidateQueries({ queryKey: ['pots'] });
+      qc.invalidateQueries({ queryKey: ['transactionsRange'] });
     },
   });
 }
@@ -147,6 +161,7 @@ export function useCreateCategory() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.categories });
       qc.invalidateQueries({ queryKey: ['pots'] });
+      qc.invalidateQueries({ queryKey: ['transactionsRange'] });
     },
   });
 }
@@ -161,6 +176,7 @@ export function useReassignCategory() {
       qc.invalidateQueries({ queryKey: queryKeys.recurring });
       qc.invalidateQueries({ queryKey: ['transactions'] });
       qc.invalidateQueries({ queryKey: ['pots'] });
+      qc.invalidateQueries({ queryKey: ['transactionsRange'] });
     },
   });
 }
@@ -176,6 +192,7 @@ export function useDeleteCategory() {
       qc.invalidateQueries({ queryKey: ['transactions'] });
       qc.invalidateQueries({ queryKey: queryKeys.recurring });
       qc.invalidateQueries({ queryKey: ['pots'] });
+      qc.invalidateQueries({ queryKey: ['transactionsRange'] });
     },
   });
 }
@@ -196,7 +213,10 @@ export function useSavePot() {
   return useMutation({
     mutationFn: (vars: { categoryId: string; input: PotSettingsInput }) =>
       api.savePot(vars.categoryId, vars.input),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['pots'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['pots'] });
+      qc.invalidateQueries({ queryKey: ['transactionsRange'] });
+    },
   });
 }
 

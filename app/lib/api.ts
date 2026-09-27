@@ -48,6 +48,10 @@ export function createApi(request: Request) {
       const res = await request(`/api/transactions?year=${year}&month=${Number(month)}`) as { transactions: Transaction[] };
       return res.transactions;
     },
+    getTransactionsRange: async (from: string, to: string): Promise<Transaction[]> => {
+      const res = await request(`/api/transactions/range?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`) as { transactions: Transaction[] };
+      return res.transactions;
+    },
     createTransaction: async (input: TransactionInput): Promise<Transaction> => {
       const res = await request('/api/transactions', {
         method: 'POST',
