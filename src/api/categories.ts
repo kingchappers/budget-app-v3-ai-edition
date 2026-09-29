@@ -1,6 +1,7 @@
 import { QueryCommand, PutCommand, DeleteCommand } from '@aws-sdk/lib-dynamodb';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { docClient, TABLE, pk, catSk } from './db';
+import { queryOne } from './pots';
 import { DEFAULT_CATEGORIES, DEFAULT_CATEGORY_IDS } from './defaults';
 import { SECURITY_HEADERS, VALID_CATEGORY_TYPES, VALID_CATEGORY_GROUPS, POT_GROUPS } from './constants';
 import type { Category, CategoryGroup, CategoryType, ApiResponse } from './types';
@@ -19,6 +20,19 @@ export async function getCategories(
 
   const custom = (result.Items || []) as Category[];
   return ok({ categories: [...DEFAULT_CATEGORIES, ...custom] });
+}
+
+function toCategory(item: Record<string, unknown>): Category {
+  const category: Category = {
+    categoryId: String(item.categoryId),
+    name: String(item.name),
+    type: item.type as CategoryType,
+    icon: String(item.icon),
+    isDefault: Boolean(item.isDefault),
+    createdAt: typeof item.createdAt === 'string' ? item.createdAt : '',
+  };
+  if (typeof item.group === 'string') category.group = item.group as CategoryGroup;
+  return category;
 }
 
 function defaultGroupFor(type: CategoryType): CategoryGroup | undefined {
@@ -102,4 +116,45 @@ export async function deleteCategory(
   }));
 
   return { statusCode: 204, headers: SECURITY_HEADERS, body: '' };
+}
+
+export async function updateCategory(
+  event: APIGatewayProxyEventV2,
+  userId: string,
+  params: Record<string, string>,
+): Promise<ApiResponse> {
+  const { categoryId } = params;
+
+  if (!categoryId) {
+    return err(400, 'categoryId is required');
+  }
+  if (DEFAULT_CATEGORY_IDS.has(categoryId)) {
+    return err(403, 'Cannot rename a default category');
+  }
+
+  let body: Record<string, unknown>;
+  try {
+    body = JSON.parse(event.body || '{}');
+  } catch {
+    return err(400, 'Invalid JSON body');
+  }
+
+  const { name } = body;
+  if (!name || typeof name !== 'string' || name.trim().length === 0 || name.length > 50) {
+    return err(400, 'name must be a non-empty string of at most 50 characters');
+  }
+
+  const existingItem = await queryOne(userId, catSk(categoryId));
+  if (!existingItem) {
+    return err(404, 'Category not found');
+  }
+
+  const category: Category = { ...toCategory(existingItem), name: name.trim() };
+
+  await docClient.send(new PutCommand({
+    TableName: TABLE,
+    Item: { PK: pk(userId), SK: catSk(categoryId), ...category },
+  }));
+
+  return ok({ category });
 }

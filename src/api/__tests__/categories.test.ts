@@ -15,7 +15,7 @@ vi.mock('@aws-sdk/lib-dynamodb', () => ({
   DeleteCommand: vi.fn(function (i: unknown) { return i; }),
 }));
 
-import { getCategories, createCategory, deleteCategory } from '../categories';
+import { getCategories, createCategory, deleteCategory, updateCategory } from '../categories';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 
 function makeEvent(body?: object, params?: Record<string, string>): APIGatewayProxyEventV2 {
@@ -165,5 +165,67 @@ describe('deleteCategory', () => {
   it('returns 400 when categoryId is missing', async () => {
     const res = await deleteCategory(makeEvent(), 'user-1', {});
     expect(res.statusCode).toBe(400);
+  });
+});
+
+describe('updateCategory', () => {
+  beforeEach(() => { mockSend.mockReset(); });
+
+  const existingCategory = {
+    categoryId: 'custom-abc', name: 'Old Name', type: 'EXPENSE', icon: 'star',
+    group: 'EVERYDAY', isDefault: false, createdAt: '2026-01-01T00:00:00.000Z',
+  };
+
+  it('renames a custom category and returns 200, preserving other fields', async () => {
+    mockSend.mockResolvedValueOnce({ Items: [existingCategory] });
+    mockSend.mockResolvedValueOnce({});
+    const res = await updateCategory(makeEvent({ name: 'New Name' }), 'user-1', { categoryId: 'custom-abc' });
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.category).toEqual({ ...existingCategory, name: 'New Name' });
+    expect(mockSend).toHaveBeenCalledTimes(2);
+  });
+
+  it('trims the new name', async () => {
+    mockSend.mockResolvedValueOnce({ Items: [existingCategory] });
+    mockSend.mockResolvedValueOnce({});
+    const res = await updateCategory(makeEvent({ name: '  Padel  ' }), 'user-1', { categoryId: 'custom-abc' });
+    expect(JSON.parse(res.body).category.name).toBe('Padel');
+  });
+
+  it('returns 404 for a category that does not exist for this user', async () => {
+    mockSend.mockResolvedValueOnce({ Items: [] });
+    const res = await updateCategory(makeEvent({ name: 'New Name' }), 'user-1', { categoryId: 'unknown-id' });
+    expect(res.statusCode).toBe(404);
+  });
+
+  it('returns 403 when trying to rename a default category', async () => {
+    const res = await updateCategory(makeEvent({ name: 'New Name' }), 'user-1', { categoryId: 'cat-mortgage' });
+    expect(res.statusCode).toBe(403);
+    expect(mockSend).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when categoryId is missing', async () => {
+    const res = await updateCategory(makeEvent({ name: 'New Name' }), 'user-1', {});
+    expect(res.statusCode).toBe(400);
+    expect(mockSend).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for missing name', async () => {
+    const res = await updateCategory(makeEvent({}), 'user-1', { categoryId: 'custom-abc' });
+    expect(res.statusCode).toBe(400);
+    expect(mockSend).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for an empty name', async () => {
+    const res = await updateCategory(makeEvent({ name: '   ' }), 'user-1', { categoryId: 'custom-abc' });
+    expect(res.statusCode).toBe(400);
+    expect(mockSend).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for name over 50 chars', async () => {
+    const res = await updateCategory(makeEvent({ name: 'a'.repeat(51) }), 'user-1', { categoryId: 'custom-abc' });
+    expect(res.statusCode).toBe(400);
+    expect(mockSend).not.toHaveBeenCalled();
   });
 });

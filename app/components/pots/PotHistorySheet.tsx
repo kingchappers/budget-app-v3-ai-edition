@@ -1,10 +1,11 @@
-import { useState } from 'react';
-import { Alert, Button, Group, Stack, Switch, Table, Text, TextInput } from '@mantine/core';
+import { useRef, useState } from 'react';
+import { ActionIcon, Alert, Button, Group, Stack, Switch, Table, Text, TextInput, UnstyledButton } from '@mantine/core';
+import { IconPencil } from '@tabler/icons-react';
 import { ResponsiveSheet } from '~/components/layout/ResponsiveSheet';
 import { categoryLabel } from '~/lib/categoryIcons';
 import { formatPence, formatPencePlain, parsePounds } from '~/lib/money';
 import { currentYearMonth, formatMonthLabel } from '~/lib/months';
-import { useSavePot } from '~/lib/queries';
+import { useSavePot, useUpdateCategory } from '~/lib/queries';
 import type { Category, PotSummary } from '~/lib/types';
 import { PotTrend } from './PotTrend';
 
@@ -27,15 +28,51 @@ function setAsideCell(setAside: number, autoAdded: number): string {
   return autoAdded > 0 ? `${total} (${formatPence(autoAdded)} auto)` : total;
 }
 
-function PotSettingsForm({ pot, onClose }: { pot: PotSummary; onClose: () => void }) {
+function PotSettingsForm({ pot, category, onClose }: { pot: PotSummary; category: Category | undefined; onClose: () => void }) {
   const save = useSavePot();
+  const updateCategory = useUpdateCategory();
   const [monthly, setMonthly] = useState(pot.monthlyAmount !== null ? formatPencePlain(pot.monthlyAmount) : '');
   const [goal, setGoal] = useState(pot.goalAmount !== null ? formatPencePlain(pot.goalAmount) : '');
   const [auto, setAuto] = useState(pot.autoAmountNow > 0);
   const [error, setError] = useState<string | null>(null);
+  const [renaming, setRenaming] = useState(false);
+  const [nameDraft, setNameDraft] = useState(category?.name ?? '');
+  // Committing on Enter triggers a blur (input unmounts on the next render,
+  // which fires synchronously before React re-renders) — this guards against
+  // that blur re-running the same commit a second time.
+  const renameCommittedRef = useRef(false);
 
   const parsedMonthly = parseOptionalPounds(monthly);
   const hasMonthly = parsedMonthly.ok && parsedMonthly.pence !== null;
+
+  function startRename(): void {
+    if (!category) return;
+    renameCommittedRef.current = false;
+    setNameDraft(category.name);
+    setRenaming(true);
+  }
+
+  function cancelRename(): void {
+    renameCommittedRef.current = true;
+    setRenaming(false);
+  }
+
+  function commitRename(): void {
+    if (renameCommittedRef.current || !category) return;
+    renameCommittedRef.current = true;
+    setRenaming(false);
+
+    const trimmed = nameDraft.trim();
+    if (trimmed === category.name) return;
+    if (trimmed.length === 0 || trimmed.length > 50) {
+      setError('Enter a name from 1 to 50 characters');
+      return;
+    }
+    updateCategory.mutate(
+      { categoryId: category.categoryId, name: trimmed },
+      { onError: () => setError('Could not rename. Try again.') },
+    );
+  }
 
   function submit(event: React.FormEvent): void {
     event.preventDefault();
@@ -62,6 +99,31 @@ function PotSettingsForm({ pot, onClose }: { pot: PotSummary; onClose: () => voi
     <form onSubmit={submit}>
       <Stack gap="sm">
         <Text fw={600}>Settings</Text>
+        {category && !category.isDefault && (
+          renaming ? (
+            <TextInput
+              size="xs"
+              autoFocus
+              aria-label={`Rename ${category.name}`}
+              value={nameDraft}
+              onChange={e => setNameDraft(e.currentTarget.value)}
+              onBlur={commitRename}
+              onKeyDown={e => {
+                if (e.key === 'Enter') { e.preventDefault(); commitRename(); }
+                if (e.key === 'Escape') { e.preventDefault(); cancelRename(); }
+              }}
+            />
+          ) : (
+            <Group gap={4}>
+              <UnstyledButton onClick={startRename}>
+                <Text size="sm" c="dimmed">{categoryLabel(category)}</Text>
+              </UnstyledButton>
+              <ActionIcon size="xs" variant="subtle" aria-label={`Rename ${category.name}`} onClick={startRename}>
+                <IconPencil size={12} />
+              </ActionIcon>
+            </Group>
+          )
+        )}
         <TextInput label="Monthly amount" placeholder="0.00" inputMode="decimal" value={monthly}
           onChange={e => setMonthly(e.currentTarget.value)} />
         <TextInput label="Goal" placeholder="0.00" inputMode="decimal" value={goal}
@@ -131,7 +193,7 @@ export function PotHistorySheet({ pot, category, onClose }: PotHistorySheetProps
               </Table>
             </Table.ScrollContainer>
           )}
-          <PotSettingsForm key={pot.categoryId} pot={pot} onClose={onClose} />
+          <PotSettingsForm key={pot.categoryId} pot={pot} category={category} onClose={onClose} />
         </Stack>
       )}
     </ResponsiveSheet>

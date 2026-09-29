@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { MantineProvider } from '@mantine/core';
 import type { Category } from '~/lib/types';
 
-const state = vi.hoisted(() => ({ categories: [] as unknown[], create: vi.fn() }));
+const state = vi.hoisted(() => ({ categories: [] as unknown[], create: vi.fn(), update: vi.fn() }));
 
 vi.mock('~/components/layout/DefaultLayout', () => ({
   DefaultLayout: ({ children }: { children: React.ReactNode }) => <>{children}</>,
@@ -12,6 +12,7 @@ vi.mock('~/components/layout/DefaultLayout', () => ({
 vi.mock('~/lib/queries', () => ({
   useCategories: () => ({ data: state.categories, isLoading: false, error: null, refetch: vi.fn() }),
   useCreateCategory: () => ({ mutate: state.create, isPending: false }),
+  useUpdateCategory: () => ({ mutate: state.update, isPending: false }),
   useDeleteCategory: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useReassignCategory: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
@@ -28,6 +29,7 @@ function renderPage() {
 
 beforeEach(() => {
   state.create.mockReset();
+  state.update.mockReset();
   state.categories = [
     cat('cat-groceries', 'Groceries', 'EXPENSE', 'EVERYDAY', '🛒'),
     cat('cat-mortgage', 'Mortgage', 'EXPENSE', 'BILLS', '🏠'),
@@ -117,5 +119,108 @@ describe('Categories page', () => {
     await user.click(screen.getByLabelText('Type', { selector: 'input' }));
     await user.click(await screen.findByRole('option', { name: 'Spending', hidden: true }));
     expect(screen.getByLabelText('Group', { selector: 'input' })).toHaveValue('Bills');
+  });
+});
+
+describe('Categories page rename', () => {
+  it('offers a rename control only for non-default categories', () => {
+    renderPage();
+    expect(screen.getByRole('button', { name: 'Rename Padel' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /rename groceries/i })).not.toBeInTheDocument();
+  });
+
+  it('turns the name into a text input when clicked, and saves the new name on Enter', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(screen.getByText('Padel'));
+    const input = screen.getByRole('textbox', { name: 'Rename Padel' });
+    await user.clear(input);
+    await user.type(input, 'Tennis{Enter}');
+
+    expect(state.update).toHaveBeenCalledWith(
+      { categoryId: 'custom-1', name: 'Tennis' },
+      expect.objectContaining({ onError: expect.any(Function) }),
+    );
+  });
+
+  it('saves the new name on blur', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(screen.getByRole('button', { name: 'Rename Padel' }));
+    const input = screen.getByRole('textbox', { name: 'Rename Padel' });
+    await user.clear(input);
+    await user.type(input, 'Tennis');
+    await user.tab();
+
+    expect(state.update).toHaveBeenCalledWith(
+      { categoryId: 'custom-1', name: 'Tennis' },
+      expect.objectContaining({ onError: expect.any(Function) }),
+    );
+  });
+
+  it('cancels editing on Escape without saving', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(screen.getByRole('button', { name: 'Rename Padel' }));
+    const input = screen.getByRole('textbox', { name: 'Rename Padel' });
+    await user.clear(input);
+    await user.type(input, 'Tennis');
+    await user.keyboard('{Escape}');
+
+    expect(state.update).not.toHaveBeenCalled();
+    expect(screen.getByText('Padel')).toBeInTheDocument();
+  });
+
+  it('does not save when the name is unchanged', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(screen.getByRole('button', { name: 'Rename Padel' }));
+    await user.tab();
+
+    expect(state.update).not.toHaveBeenCalled();
+  });
+
+  it('shows a validation error for an empty name and does not save', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(screen.getByRole('button', { name: 'Rename Padel' }));
+    const input = screen.getByRole('textbox', { name: 'Rename Padel' });
+    await user.clear(input);
+    await user.keyboard('{Enter}');
+
+    expect(await screen.findByText(/enter a name from 1 to 50 characters/i)).toBeInTheDocument();
+    expect(state.update).not.toHaveBeenCalled();
+  });
+
+  it('shows a validation error for a name over 50 characters and does not save', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(screen.getByRole('button', { name: 'Rename Padel' }));
+    const input = screen.getByRole('textbox', { name: 'Rename Padel' });
+    await user.clear(input);
+    await user.type(input, 'a'.repeat(51));
+    await user.keyboard('{Enter}');
+
+    expect(await screen.findByText(/enter a name from 1 to 50 characters/i)).toBeInTheDocument();
+    expect(state.update).not.toHaveBeenCalled();
+  });
+
+  it('shows an error banner when the rename request fails', async () => {
+    state.update.mockImplementation((_vars, opts) => opts?.onError?.(new Error('boom')));
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(screen.getByRole('button', { name: 'Rename Padel' }));
+    const input = screen.getByRole('textbox', { name: 'Rename Padel' });
+    await user.clear(input);
+    await user.type(input, 'Tennis{Enter}');
+
+    expect(await screen.findByText(/could not rename the category/i)).toBeInTheDocument();
   });
 });

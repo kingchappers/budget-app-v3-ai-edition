@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { createApi } from '../api';
-import type { Recurring } from '../types';
+import type { Category, Recurring } from '../types';
 
 const recurring: Recurring = {
   recurringId: 'r1', type: 'INCOME', categoryId: 'cat-salary', amount: 240000, description: 'Salary',
@@ -48,5 +48,23 @@ describe('recurring API calls', () => {
     const request = vi.fn().mockResolvedValue(null);
     await createApi(request).deleteRecurring('a/b');
     expect(request).toHaveBeenCalledWith('/api/recurring/a%2Fb', { method: 'DELETE' });
+  });
+});
+
+describe('category API calls', () => {
+  const category: Category = {
+    categoryId: 'cat-1', name: 'New Name', type: 'EXPENSE', icon: 'tag', isDefault: false, createdAt: 'c',
+  };
+
+  it('updates a category name', async () => {
+    const request = vi.fn().mockResolvedValue({ category });
+    expect(await createApi(request).updateCategory('cat-1', 'New Name')).toEqual(category);
+    expect(request).toHaveBeenCalledWith('/api/categories/cat-1', { method: 'PUT', body: JSON.stringify({ name: 'New Name' }) });
+  });
+
+  it('encodes the category id in the path', async () => {
+    const request = vi.fn().mockResolvedValue({ category });
+    await createApi(request).updateCategory('a/b', 'New Name');
+    expect(request).toHaveBeenCalledWith('/api/categories/a%2Fb', { method: 'PUT', body: JSON.stringify({ name: 'New Name' }) });
   });
 });
