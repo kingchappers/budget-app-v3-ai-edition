@@ -139,4 +139,20 @@ describe('CategoryChips', () => {
     renderChips({ chips: [groceries], all: [groceries] });
     expect(screen.getByRole('radio', { name: '🛒 Groceries' })).toBeInTheDocument();
   });
+
+  it('keeps the More button outside the radiogroup', () => {
+    renderChips();
+    const group = screen.getByRole('radiogroup', { name: 'Category' });
+    expect(within(group).queryByRole('button', { name: /more/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /more/i })).toBeInTheDocument();
+  });
+
+  it('associates the radiogroup with the wrapper label instead of duplicating it via aria-label', () => {
+    renderChips();
+    const group = screen.getByRole('radiogroup', { name: 'Category' });
+    expect(group).not.toHaveAttribute('aria-label');
+    const labelledBy = group.getAttribute('aria-labelledby');
+    expect(labelledBy).toBeTruthy();
+    expect(document.getElementById(labelledBy as string)).toHaveTextContent('Category');
+  });
 });
