@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { ActionIcon, Group, Menu, Text, ThemeIcon, Tooltip } from '@mantine/core';
 import { IconClock, IconCopy, IconDots, IconPencil, IconRepeat, IconTrash } from '@tabler/icons-react';
 import { formatPence } from '~/lib/money';
@@ -24,6 +25,8 @@ export function TransactionRow({
 }) {
   const label = transaction.description || categoryName;
   const sign = OUTGOING.has(transaction.type) ? '−' : '+';
+  const actionsRef = useRef<HTMLButtonElement>(null);
+  const opensSheetRef = useRef(false);
 
   return (
     <Group justify="space-between" wrap="nowrap" py={4}>
@@ -63,20 +66,28 @@ export function TransactionRow({
           )
         ) : (
           (onEdit || onDelete || onDuplicate || onRepeat) && (
-            // returnFocus={false}: Edit/Duplicate/Repeat monthly each open a ResponsiveSheet
-            // elsewhere in the tree on the same render this menu closes. Mantine's default
-            // returnFocus schedules a focus() back onto this Actions button 10ms after close
-            // (useFocusReturn), which races the opened sheet's own focus trap and can steal
-            // focus back out of it. Disabling it here leaves the sheet's trap as the only
-            // thing moving focus, so it always wins.
-            <Menu position="bottom-end" returnFocus={false}>
+            // Edit/Duplicate/Repeat monthly each open a ResponsiveSheet elsewhere in the tree
+            // on the same render this menu closes. Mantine's default returnFocus schedules a
+            // focus() back onto this Actions button 10ms after close (useFocusReturn), which
+            // races the opened sheet's own focus trap and can steal focus back out of it. We
+            // disable the built-in returnFocus and restore it ourselves in onClose, but only
+            // when the item that closed the menu isn't about to open a sheet -- Delete and a
+            // plain Escape/outside-click dismissal still get the normal focus-return behaviour.
+            <Menu
+              position="bottom-end"
+              returnFocus={false}
+              onClose={() => {
+                if (!opensSheetRef.current) actionsRef.current?.focus();
+                opensSheetRef.current = false;
+              }}
+            >
               <Menu.Target>
-                <ActionIcon variant="subtle" aria-label={`Actions for ${label}`}><IconDots size={16} /></ActionIcon>
+                <ActionIcon ref={actionsRef} variant="subtle" aria-label={`Actions for ${label}`}><IconDots size={16} /></ActionIcon>
               </Menu.Target>
               <Menu.Dropdown>
-                {onEdit && <Menu.Item leftSection={<IconPencil size={14} />} onClick={() => onEdit(transaction)}>Edit</Menu.Item>}
-                {onDuplicate && <Menu.Item leftSection={<IconCopy size={14} />} onClick={() => onDuplicate(transaction)}>Duplicate</Menu.Item>}
-                {onRepeat && <Menu.Item leftSection={<IconRepeat size={14} />} onClick={() => onRepeat(transaction)}>Repeat monthly</Menu.Item>}
+                {onEdit && <Menu.Item leftSection={<IconPencil size={14} />} onClick={() => { opensSheetRef.current = true; onEdit(transaction); }}>Edit</Menu.Item>}
+                {onDuplicate && <Menu.Item leftSection={<IconCopy size={14} />} onClick={() => { opensSheetRef.current = true; onDuplicate(transaction); }}>Duplicate</Menu.Item>}
+                {onRepeat && <Menu.Item leftSection={<IconRepeat size={14} />} onClick={() => { opensSheetRef.current = true; onRepeat(transaction); }}>Repeat monthly</Menu.Item>}
                 {onDelete && <Menu.Item color="danger" leftSection={<IconTrash size={14} />} onClick={() => onDelete(transaction)}>Delete</Menu.Item>}
               </Menu.Dropdown>
             </Menu>

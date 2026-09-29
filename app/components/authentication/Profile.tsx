@@ -44,6 +44,7 @@ export const Profile = () => {
                     radius="xl"
                     color="primary"
                     size="2.2rem"
+                    aria-label={user.name || user.email || 'User'}
                     style={{ border: '3px solid var(--mantine-color-primary-6)' }}
                   >
                     {initialsFor(user.name, user.email) || <IconUser size={16} />}

@@ -27,7 +27,7 @@ function toCategory(item: Record<string, unknown>): Category {
     categoryId: String(item.categoryId),
     name: String(item.name),
     type: item.type as CategoryType,
-    icon: String(item.icon),
+    icon: typeof item.icon === 'string' ? item.icon : 'default',
     isDefault: Boolean(item.isDefault),
     createdAt: typeof item.createdAt === 'string' ? item.createdAt : '',
   };

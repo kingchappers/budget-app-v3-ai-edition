@@ -123,6 +123,29 @@ describe('TransactionRow menu focus handoff', () => {
     expect(focusSpy).toHaveBeenCalledTimes(1);
     expect(dialog.contains(document.activeElement)).toBe(true);
   });
+
+  it('still returns focus to the Actions button after Delete, which opens no sheet', async () => {
+    const user = userEvent.setup();
+    renderRow({ onDelete: vi.fn() });
+
+    const actionsButton = screen.getByRole('button', { name: 'Actions for Weekly Shop' });
+    await user.click(actionsButton);
+    await user.click(await screen.findByRole('menuitem', { name: 'Delete' }));
+
+    expect(actionsButton).toHaveFocus();
+  });
+
+  it('still returns focus to the Actions button after dismissing the menu with Escape', async () => {
+    const user = userEvent.setup();
+    renderRow({ onEdit: vi.fn() });
+
+    const actionsButton = screen.getByRole('button', { name: 'Actions for Weekly Shop' });
+    await user.click(actionsButton);
+    await screen.findByRole('menuitem', { name: 'Edit' });
+    await user.keyboard('{Escape}');
+
+    expect(actionsButton).toHaveFocus();
+  });
 });
 
 describe('TransactionRow pending row actions', () => {

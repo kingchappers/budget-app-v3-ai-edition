@@ -228,4 +228,12 @@ describe('updateCategory', () => {
     expect(res.statusCode).toBe(400);
     expect(mockSend).not.toHaveBeenCalled();
   });
+
+  it('falls back to a default icon instead of the string "undefined" for a legacy item with no icon', async () => {
+    const { icon: _icon, ...noIcon } = existingCategory;
+    mockSend.mockResolvedValueOnce({ Items: [noIcon] });
+    mockSend.mockResolvedValueOnce({});
+    const res = await updateCategory(makeEvent({ name: 'New Name' }), 'user-1', { categoryId: 'custom-abc' });
+    expect(JSON.parse(res.body).category.icon).toBe('default');
+  });
 });
