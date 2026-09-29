@@ -1,47 +1,16 @@
 import { useAuth0 } from "@auth0/auth0-react";
-import { Box, Group, Avatar, Menu, Switch, UnstyledButton } from '@mantine/core';
-import { IconChevronRight, IconLogout, IconUser } from '@tabler/icons-react';
-import { forwardRef, useState } from 'react';
+import { Box, Avatar, Menu, Switch, UnstyledButton } from '@mantine/core';
+import { IconLogout, IconUser } from '@tabler/icons-react';
+import { useState } from 'react';
 import { readOpenOnLaunch, safeStorage, writeOpenOnLaunch } from '~/lib/launchIntent';
 
-
-interface UserButtonProps extends React.ComponentPropsWithoutRef<'button'> {
-  image: React.ReactNode;
-  name: string;
-  email: string;
-  icon?: React.ReactNode;
+function initialsFor(name?: string, email?: string): string {
+  const source = name?.trim() || email?.trim() || '';
+  if (!source) return '';
+  const words = source.split(/\s+/).filter(Boolean);
+  if (words.length >= 2) return (words[0][0] + words[words.length - 1][0]).toUpperCase();
+  return source.slice(0, 2).toUpperCase();
 }
-
-const UserButton = forwardRef<HTMLButtonElement, UserButtonProps>(
-  ({ image, name, email, icon, ...others }: UserButtonProps, ref) =>
-  (
-    <UnstyledButton
-      ref={ref}
-      style={{
-        padding: 'var(--mantine-spacing-md)',
-        color: 'var(--mantine-color-text)',
-        borderRadius: 'var(--mantine-radius-sm)',
-      }}
-      {...others}
-    >
-      <Group>
-        <Avatar radius="xl" />
-
-        <div style={{ flex: 1 }}>
-          <p>
-            {name}
-          </p>
-
-          <p>
-            {email}
-          </p>
-        </div>
-
-        {icon || <IconChevronRight size={16} />}
-      </Group>
-    </UnstyledButton>
-  )
-);
 
 export const Profile = () => {
   const { user, isAuthenticated, isLoading, logout } = useAuth0();
@@ -57,7 +26,7 @@ export const Profile = () => {
           <Menu.Target>
             <UnstyledButton>
               <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '0.5rem', margin: '0rem' }}>
-                {user.picture && (
+                {user.picture ? (
                   <img
                     src={user.picture}
                     alt={user.name || 'User'}
@@ -70,6 +39,15 @@ export const Profile = () => {
                       border: '3px solid var(--mantine-color-primary-6)'
                     }}
                   />
+                ) : (
+                  <Avatar
+                    radius="xl"
+                    color="primary"
+                    size="2.2rem"
+                    style={{ border: '3px solid var(--mantine-color-primary-6)' }}
+                  >
+                    {initialsFor(user.name, user.email) || <IconUser size={16} />}
+                  </Avatar>
                 )}
                 {/* The name/email pair has no width limit and a real
                     Auth0 identifier can run 40+ characters -- on a phone-
