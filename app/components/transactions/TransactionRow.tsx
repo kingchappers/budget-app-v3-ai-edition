@@ -63,7 +63,13 @@ export function TransactionRow({
           )
         ) : (
           (onEdit || onDelete || onDuplicate || onRepeat) && (
-            <Menu position="bottom-end">
+            // returnFocus={false}: Edit/Duplicate/Repeat monthly each open a ResponsiveSheet
+            // elsewhere in the tree on the same render this menu closes. Mantine's default
+            // returnFocus schedules a focus() back onto this Actions button 10ms after close
+            // (useFocusReturn), which races the opened sheet's own focus trap and can steal
+            // focus back out of it. Disabling it here leaves the sheet's trap as the only
+            // thing moving focus, so it always wins.
+            <Menu position="bottom-end" returnFocus={false}>
               <Menu.Target>
                 <ActionIcon variant="subtle" aria-label={`Actions for ${label}`}><IconDots size={16} /></ActionIcon>
               </Menu.Target>

@@ -1,8 +1,10 @@
+import { useState } from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MantineProvider } from '@mantine/core';
+import { MantineProvider, TextInput } from '@mantine/core';
 import { TransactionRow } from '../TransactionRow';
+import { ResponsiveSheet } from '~/components/layout/ResponsiveSheet';
 import type { Transaction } from '~/lib/types';
 
 const transaction: Transaction = {
@@ -81,6 +83,45 @@ describe('TransactionRow pending badge', () => {
   it('shows no pending icon when pending is false or omitted', () => {
     renderRow();
     expect(screen.queryByLabelText('Waiting to sync')).not.toBeInTheDocument();
+  });
+});
+
+function EditHarness() {
+  const [editing, setEditing] = useState<Transaction | null>(null);
+  return (
+    <>
+      <TransactionRow transaction={transaction} categoryName="Groceries" categoryIcon="shopping-cart" onEdit={setEditing} />
+      <ResponsiveSheet opened={editing !== null} onClose={() => setEditing(null)} title="Edit transaction">
+        <TextInput data-autofocus label="Description" />
+      </ResponsiveSheet>
+    </>
+  );
+}
+
+describe('TransactionRow menu focus handoff', () => {
+  it('never returns focus to the closed Actions button after Edit opens the sheet', async () => {
+    render(
+      <MantineProvider>
+        <EditHarness />
+      </MantineProvider>,
+    );
+    const actionsButton = screen.getByRole('button', { name: 'Actions for Weekly Shop' });
+    // Mantine's Menu returns focus to its target 10ms after it closes (useFocusReturn).
+    // That races the sheet's own focus trap and, uncorrected, steals focus back onto
+    // this now-hidden button after the sheet has already taken it — the spy catches
+    // that second call regardless of which one happens to "win" by the time we look.
+    const focusSpy = vi.spyOn(actionsButton, 'focus');
+
+    const user = userEvent.setup();
+    await user.click(actionsButton);
+    await user.click(await screen.findByRole('menuitem', { name: 'Edit' }));
+
+    const dialog = await screen.findByRole('dialog', { name: 'Edit transaction' });
+    // Give any delayed return-focus timer time to fire before asserting.
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    expect(focusSpy).toHaveBeenCalledTimes(1);
+    expect(dialog.contains(document.activeElement)).toBe(true);
   });
 });
 
