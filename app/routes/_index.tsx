@@ -18,7 +18,7 @@ import { useCategories, usePots, useTargets, useTransactions } from '~/lib/queri
 function GroupedProgress({ items }: { items: CategoryProgress[] }) {
   return (
     <>
-      {groupItems(items, p => bucketKeyFor({ group: p.group, type: 'EXPENSE' })).map(bucket => (
+      {groupItems(items, p => bucketKeyFor({ group: p.group, type: 'EXPENSE' }), p => p.name).map(bucket => (
         <div key={bucket.key}>
           <Text size="xs" fw={600} c="dimmed" tt="uppercase" mb={4}>{bucket.label}</Text>
           {bucket.items.map(p => <CategoryProgressRow key={p.categoryId} progress={p} />)}

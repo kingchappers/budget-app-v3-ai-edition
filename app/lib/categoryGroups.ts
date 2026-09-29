@@ -28,9 +28,13 @@ export const GROUP_OPTIONS: { value: CategoryGroup; label: string }[] = [
 
 const GROUPS = new Set<string>(GROUP_OPTIONS.map(option => option.value));
 
-export function groupItems<T>(items: T[], keyOf: (item: T) => BucketKey): Bucket<T>[] {
+export function groupItems<T>(items: T[], keyOf: (item: T) => BucketKey, labelOf?: (item: T) => string): Bucket<T>[] {
   return BUCKET_ORDER
-    .map(key => ({ key, label: BUCKET_LABELS[key], items: items.filter(item => keyOf(item) === key) }))
+    .map(key => {
+      const bucketItems = items.filter(item => keyOf(item) === key);
+      if (labelOf) bucketItems.sort((a, b) => labelOf(a).localeCompare(labelOf(b), undefined, { sensitivity: 'base' }));
+      return { key, label: BUCKET_LABELS[key], items: bucketItems };
+    })
     .filter(bucket => bucket.items.length > 0);
 }
 
@@ -41,7 +45,7 @@ export function bucketKeyFor(category: { group?: string; type: CategoryType }): 
 }
 
 export function groupCategories(categories: Category[]): Bucket<Category>[] {
-  return groupItems(categories, bucketKeyFor);
+  return groupItems(categories, bucketKeyFor, c => c.name);
 }
 
 export function defaultGroupFor(type: CategoryType): CategoryGroup | null {
