@@ -1,9 +1,10 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { ActionIcon, Alert, Badge, Button, Card, Group, Loader, Select, Stack, Text, TextInput, Title, UnstyledButton } from '@mantine/core';
 import { IconPencil } from '@tabler/icons-react';
 import { DefaultLayout } from '~/components/layout/DefaultLayout';
 import { ReassignDialog } from '~/components/categories/ReassignDialog';
-import { useCategories, useCreateCategory, useUpdateCategory, useDeleteCategory, useReassignCategory } from '~/lib/queries';
+import { useInlineCategoryRename } from '~/hooks/useInlineCategoryRename';
+import { useCategories, useCreateCategory, useDeleteCategory, useReassignCategory } from '~/lib/queries';
 import { defaultGroupFor, groupCategories, groupsForType } from '~/lib/categoryGroups';
 import { categoryLabel } from '~/lib/categoryIcons';
 import type { Category, CategoryGroup, CategoryType } from '~/lib/types';
@@ -14,48 +15,16 @@ const TYPES: { value: CategoryType; label: string }[] = [
   { value: 'POT', label: 'Pot' },
 ];
 
-const NAME_ERROR = 'Enter a name from 1 to 50 characters';
-
 function CategoryRow({ category, onDelete, onError }: {
   category: Category;
   onDelete: (category: Category) => void;
   onError: (message: string) => void;
 }) {
-  const update = useUpdateCategory();
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(category.name);
-  // Committing on Enter triggers a blur (input unmounts on the next render,
-  // which fires synchronously before React re-renders) — this guards against
-  // that blur re-running the same commit a second time.
-  const committedRef = useRef(false);
-
-  function startEdit() {
-    committedRef.current = false;
-    setDraft(category.name);
-    setEditing(true);
-  }
-
-  function cancelEdit() {
-    committedRef.current = true;
-    setEditing(false);
-  }
-
-  function commit() {
-    if (committedRef.current) return;
-    committedRef.current = true;
-    setEditing(false);
-
-    const trimmed = draft.trim();
-    if (trimmed === category.name) return;
-    if (trimmed.length === 0 || trimmed.length > 50) {
-      onError(NAME_ERROR);
-      return;
-    }
-    update.mutate(
-      { categoryId: category.categoryId, name: trimmed },
-      { onError: () => onError('Could not rename the category. Try again.') },
-    );
-  }
+  const { editing, draft, setDraft, start, cancel, commit } = useInlineCategoryRename(
+    category,
+    onError,
+    'Could not rename the category. Try again.',
+  );
 
   if (category.isDefault) {
     return (
@@ -80,7 +49,7 @@ function CategoryRow({ category, onDelete, onError }: {
           onBlur={commit}
           onKeyDown={e => {
             if (e.key === 'Enter') { e.preventDefault(); commit(); }
-            if (e.key === 'Escape') { e.preventDefault(); cancelEdit(); }
+            if (e.key === 'Escape') { e.preventDefault(); cancel(); }
           }}
           style={{ flex: 1 }}
         />
@@ -90,11 +59,11 @@ function CategoryRow({ category, onDelete, onError }: {
 
   return (
     <Group justify="space-between" py={6}>
-      <UnstyledButton onClick={startEdit}>
+      <UnstyledButton onClick={start}>
         <Text>{categoryLabel(category)}</Text>
       </UnstyledButton>
       <Group gap={4}>
-        <ActionIcon size="sm" variant="subtle" aria-label={`Rename ${category.name}`} onClick={startEdit}>
+        <ActionIcon size="sm" variant="subtle" aria-label={`Rename ${category.name}`} onClick={start}>
           <IconPencil size={14} />
         </ActionIcon>
         <Button size="compact-xs" variant="subtle" color="danger" onClick={() => onDelete(category)}>
