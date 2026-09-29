@@ -3,17 +3,20 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MantineProvider } from '@mantine/core';
 
-vi.mock('@auth0/auth0-react', () => ({
-  useAuth0: () => ({
-    user: { name: 'Sam Tester', email: 'sam@example.com', picture: '' },
-    isAuthenticated: true,
-    isLoading: false,
-    logout: vi.fn(),
-  }),
-}));
+const mockUseAuth0 = vi.hoisted(() => vi.fn());
+vi.mock('@auth0/auth0-react', () => ({ useAuth0: mockUseAuth0 }));
 
 import { Profile } from '../Profile';
 import { OPEN_ON_LAUNCH_KEY } from '~/lib/launchIntent';
+
+function mockAuthedUser(overrides: Partial<{ name: string; email: string; picture: string }> = {}) {
+  mockUseAuth0.mockReturnValue({
+    user: { name: 'Sam Tester', email: 'sam@example.com', picture: '', ...overrides },
+    isAuthenticated: true,
+    isLoading: false,
+    logout: vi.fn(),
+  });
+}
 
 async function openMenu() {
   const user = userEvent.setup();
@@ -28,6 +31,7 @@ async function openMenu() {
 
 beforeEach(() => {
   window.localStorage.clear();
+  mockAuthedUser();
 });
 
 describe('Profile launch toggle', () => {
@@ -59,5 +63,30 @@ describe('Profile launch toggle', () => {
 
     expect(screen.getByRole('switch', { name: /open add sheet on launch/i })).not.toBeChecked();
     expect(window.localStorage.getItem(OPEN_ON_LAUNCH_KEY)).toBeNull();
+  });
+});
+
+describe('Profile avatar', () => {
+  it('shows the profile picture when Auth0 has one', () => {
+    mockAuthedUser({ picture: 'https://example.com/avatar.png' });
+    render(
+      <MantineProvider env="test">
+        <Profile />
+      </MantineProvider>,
+    );
+
+    expect(screen.getByRole('img', { name: 'Sam Tester' })).toHaveAttribute('src', 'https://example.com/avatar.png');
+  });
+
+  it('falls back to an initials avatar when Auth0 has no picture', () => {
+    mockAuthedUser({ picture: '' });
+    render(
+      <MantineProvider env="test">
+        <Profile />
+      </MantineProvider>,
+    );
+
+    expect(screen.queryByRole('img', { name: 'Sam Tester' })).not.toBeInTheDocument();
+    expect(screen.getByText('ST')).toBeInTheDocument();
   });
 });

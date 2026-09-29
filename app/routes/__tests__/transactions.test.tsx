@@ -6,7 +6,8 @@ import { MantineProvider } from '@mantine/core';
 import type { Category, Transaction } from '~/lib/types';
 
 const categories: Category[] = [
-  { categoryId: 'cat-food', name: 'Food & Groceries', type: 'EXPENSE', icon: 'shopping-cart', isDefault: true, createdAt: '' },
+  { categoryId: 'cat-food', name: 'Food & Groceries', type: 'EXPENSE', icon: 'shopping-cart', isDefault: true, createdAt: '', group: 'EVERYDAY' },
+  { categoryId: 'cat-mortgage', name: 'Mortgage', type: 'EXPENSE', icon: 'home', isDefault: true, createdAt: '', group: 'BILLS' },
 ];
 
 function txn(over: Partial<Transaction>): Transaction {
@@ -64,6 +65,18 @@ function renderRoute() {
     </StrictMode>,
   );
 }
+
+describe('Transactions route category filter', () => {
+  it('groups the category filter options by category group', async () => {
+    const user = userEvent.setup();
+    renderRoute();
+
+    await user.click(screen.getByRole('textbox', { name: 'Filter by category' }));
+
+    expect(await screen.findByText('Bills')).toBeInTheDocument();
+    expect(screen.getByText('Everyday Spending')).toBeInTheDocument();
+  });
+});
 
 describe('Transactions route search', () => {
   it('filters the list as the user types in the search box', async () => {

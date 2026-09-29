@@ -1,7 +1,9 @@
 import { useState } from 'react';
-import { Alert, Badge, Button, Card, Group, Loader, Select, Stack, Text, TextInput, Title } from '@mantine/core';
+import { ActionIcon, Alert, Badge, Button, Card, Group, Loader, Select, Stack, Text, TextInput, Title, UnstyledButton } from '@mantine/core';
+import { IconPencil } from '@tabler/icons-react';
 import { DefaultLayout } from '~/components/layout/DefaultLayout';
 import { ReassignDialog } from '~/components/categories/ReassignDialog';
+import { useInlineCategoryRename } from '~/hooks/useInlineCategoryRename';
 import { useCategories, useCreateCategory, useDeleteCategory, useReassignCategory } from '~/lib/queries';
 import { defaultGroupFor, groupCategories, groupsForType } from '~/lib/categoryGroups';
 import { categoryLabel } from '~/lib/categoryIcons';
@@ -12,6 +14,65 @@ const TYPES: { value: CategoryType; label: string }[] = [
   { value: 'INCOME', label: 'Income' },
   { value: 'POT', label: 'Pot' },
 ];
+
+function CategoryRow({ category, onDelete, onError }: {
+  category: Category;
+  onDelete: (category: Category) => void;
+  onError: (message: string) => void;
+}) {
+  const { editing, draft, setDraft, start, cancel, commit } = useInlineCategoryRename(
+    category,
+    onError,
+    'Could not rename the category. Try again.',
+  );
+
+  if (category.isDefault) {
+    return (
+      <Group justify="space-between" py={6}>
+        <Group gap="xs">
+          <Text>{categoryLabel(category)}</Text>
+          <Badge size="xs" variant="light">default</Badge>
+        </Group>
+      </Group>
+    );
+  }
+
+  if (editing) {
+    return (
+      <Group justify="space-between" py={6}>
+        <TextInput
+          size="xs"
+          autoFocus
+          aria-label={`Rename ${category.name}`}
+          value={draft}
+          onChange={e => setDraft(e.currentTarget.value)}
+          onBlur={commit}
+          onKeyDown={e => {
+            if (e.key === 'Enter') { e.preventDefault(); commit(); }
+            if (e.key === 'Escape') { e.preventDefault(); cancel(); }
+          }}
+          style={{ flex: 1 }}
+        />
+      </Group>
+    );
+  }
+
+  return (
+    <Group justify="space-between" py={6}>
+      <UnstyledButton onClick={start}>
+        <Text>{categoryLabel(category)}</Text>
+      </UnstyledButton>
+      <Group gap={4}>
+        <ActionIcon size="sm" variant="subtle" aria-label={`Rename ${category.name}`} onClick={start}>
+          <IconPencil size={14} />
+        </ActionIcon>
+        <Button size="compact-xs" variant="subtle" color="danger" onClick={() => onDelete(category)}>
+          Delete
+        </Button>
+      </Group>
+    </Group>
+  );
+}
 
 function CategoriesContent() {
   const categories = useCategories();
@@ -88,17 +149,7 @@ function CategoriesContent() {
         <div key={bucket.key}>
           <Title order={5} mt="md" mb="xs">{bucket.label}</Title>
           {bucket.items.map(c => (
-            <Group key={c.categoryId} justify="space-between" py={6}>
-              <Group gap="xs">
-                <Text>{categoryLabel(c)}</Text>
-                {c.isDefault && <Badge size="xs" variant="light">default</Badge>}
-              </Group>
-              {!c.isDefault && (
-                <Button size="compact-xs" variant="subtle" color="danger" onClick={() => setPendingDelete(c)}>
-                  Delete
-                </Button>
-              )}
-            </Group>
+            <CategoryRow key={c.categoryId} category={c} onDelete={setPendingDelete} onError={setError} />
           ))}
         </div>
       ))}

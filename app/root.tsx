@@ -15,7 +15,7 @@ import {
 import type { Route } from "./+types/root";
 import "./app.css";
 
-import { ColorSchemeScript, MantineProvider, mantineHtmlProps, createTheme, useMantineTheme } from '@mantine/core';
+import { ColorSchemeScript, MantineProvider, mantineHtmlProps, createTheme, useMantineTheme, type CSSVariablesResolver } from '@mantine/core';
 import { DatesProvider } from '@mantine/dates';
 import { useMediaQuery } from '@mantine/hooks';
 import { Notifications } from '@mantine/notifications';
@@ -27,7 +27,7 @@ const queryClient = new QueryClient({
   },
 });
 
-const theme = createTheme({
+export const theme = createTheme({
   primaryColor: 'primary',
   // Mantine's autoContrast text-color decision for a color used without an
   // explicit shade (e.g. color="primary") always reads primaryShade.light's
@@ -65,6 +65,20 @@ const theme = createTheme({
       '#f8fafc', '#f1f5f9', '#e2e8f0', '#cbd5e1', '#94a3b8',
       '#64748b', '#475569', '#334155', '#1e293b', '#0f172a',
     ],
+  },
+});
+
+// This theme customizes gray/primary/danger/warning/success but leaves `dark`
+// as Mantine's own default palette, whose dark.2 backs --mantine-color-dimmed
+// in dark mode. That default (#828282) only reaches ~4.0:1 against this app's
+// dark body background (dark.7, #242424) — under WCAG AA's 4.5:1 for normal
+// text. Override just the CSS variable rather than redefining the whole dark
+// palette, so borders/backgrounds/disabled colors keep Mantine's defaults.
+export const cssVariablesResolver: CSSVariablesResolver = () => ({
+  variables: {},
+  light: {},
+  dark: {
+    '--mantine-color-dimmed': '#909090',
   },
 });
 
@@ -107,7 +121,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       </head>
       <body>
         <QueryClientProvider client={queryClient}>
-          <MantineProvider defaultColorScheme="auto" theme={theme}>
+          <MantineProvider defaultColorScheme="auto" theme={theme} cssVariablesResolver={cssVariablesResolver}>
             <ResponsiveNotifications />
             <DatesProvider settings={{ locale: 'en-gb' }}>{children}</DatesProvider>
           </MantineProvider>

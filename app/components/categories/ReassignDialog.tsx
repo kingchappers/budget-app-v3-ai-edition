@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Button, Group, Modal, Select, Stack, Text } from '@mantine/core';
+import { categorySelectData } from '~/lib/categoryGroups';
 import type { Category } from '~/lib/types';
 
 export function ReassignDialog({
@@ -14,6 +15,8 @@ export function ReassignDialog({
 }) {
   const [target, setTarget] = useState<string | null>(null);
 
+  const data = categorySelectData(candidates);
+
   return (
     <Modal opened={opened} onClose={onCancel} title={`Delete ${category?.name ?? ''}?`}>
       <Stack>
@@ -24,7 +27,7 @@ export function ReassignDialog({
         <Select
           label="Move transactions to"
           placeholder="Choose a category"
-          data={candidates.map(c => ({ value: c.categoryId, label: c.name }))}
+          data={data}
           value={target}
           onChange={setTarget}
           searchable

@@ -33,6 +33,13 @@ export function createApi(request: Request) {
       }) as { category: Category };
       return res.category;
     },
+    updateCategory: async (categoryId: string, name: string): Promise<Category> => {
+      const res = await request(`/api/categories/${encodeURIComponent(categoryId)}`, {
+        method: 'PUT',
+        body: JSON.stringify({ name }),
+      }) as { category: Category };
+      return res.category;
+    },
     deleteCategory: async (categoryId: string): Promise<void> => {
       await request(`/api/categories/${encodeURIComponent(categoryId)}`, { method: 'DELETE' });
     },

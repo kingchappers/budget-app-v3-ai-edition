@@ -8,6 +8,7 @@ import { TransactionRow } from '~/components/transactions/TransactionRow';
 import { TransactionSheet } from '~/components/transactions/TransactionSheet';
 import { useOfflineQueue } from '~/hooks/useOfflineQueue';
 import { filterTransactions, type TransactionFilter } from '~/lib/transactions';
+import { categorySelectData } from '~/lib/categoryGroups';
 import { formatPence } from '~/lib/money';
 import { currentYearMonth } from '~/lib/months';
 import { useCategories, useDeleteTransaction, useTransactions } from '~/lib/queries';
@@ -69,7 +70,7 @@ function TransactionsContent() {
     return acc;
   }, {});
 
-  const categoryOptions = (categories.data ?? []).map(c => ({ value: c.categoryId, label: c.name }));
+  const categoryOptions = categorySelectData(categories.data ?? []);
   const isFiltering = filter.query !== '' || filter.categoryId !== null || filter.type !== null;
 
   return (

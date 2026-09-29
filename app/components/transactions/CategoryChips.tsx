@@ -1,6 +1,6 @@
 import { useId, useState } from 'react';
-import { Button, Chip, Group, Input, Select, Text } from '@mantine/core';
-import { groupCategories } from '~/lib/categoryGroups';
+import { Button, Chip, Group, Input, Select, Text, useInputWrapperContext } from '@mantine/core';
+import { categorySelectData } from '~/lib/categoryGroups';
 import { categoryLabel } from '~/lib/categoryIcons';
 import type { Category } from '~/lib/types';
 
@@ -11,6 +11,31 @@ export interface CategoryChipsProps {
   onChange: (categoryId: string) => void;
   loading?: boolean;
   error?: string | null;
+}
+
+interface CategoryRadiosProps {
+  groupName: string;
+  visible: Category[];
+  value: string | null;
+  onChange: (categoryId: string) => void;
+}
+
+// A separate component so useInputWrapperContext() reads the labelId from the
+// surrounding Input.Wrapper (only visible to descendants of its provider).
+function CategoryRadios({ groupName, visible, value, onChange }: CategoryRadiosProps) {
+  const labelId = useInputWrapperContext()?.labelId;
+  return (
+    <Chip.Group multiple={false} value={value ?? ''} onChange={onChange}>
+      {/* display: contents keeps these chips as flex items of the parent Group
+          (so the "More…" button still sits inline after them) while giving
+          screen readers a radiogroup that contains only the chips. */}
+      <Group role="radiogroup" aria-labelledby={labelId} style={{ display: 'contents' }}>
+        {visible.map(c => (
+          <Chip key={c.categoryId} name={groupName} value={c.categoryId} variant="outline">{categoryLabel(c)}</Chip>
+        ))}
+      </Group>
+    </Chip.Group>
+  );
 }
 
 export function CategoryChips({ chips, all, value, onChange, loading = false, error = null }: CategoryChipsProps) {
@@ -25,24 +50,16 @@ export function CategoryChips({ chips, all, value, onChange, loading = false, er
     : undefined;
   const visible = chosenOutsideChips ? [...chips, chosenOutsideChips] : chips;
 
-  const toOption = (c: Category): { value: string; label: string } => ({ value: c.categoryId, label: categoryLabel(c) });
-  const buckets = groupCategories(all);
-  const selectData = buckets.length > 1
-    ? buckets.map(b => ({ group: b.label, items: b.items.map(toOption) }))
-    : all.map(toOption);
+  const selectData = categorySelectData(all);
 
   return (
     <Input.Wrapper label="Category">
-      <Chip.Group multiple={false} value={value ?? ''} onChange={onChange}>
-        <Group gap="xs" mt={4} role="radiogroup" aria-label="Category">
-          {visible.map(c => (
-            <Chip key={c.categoryId} name={groupName} value={c.categoryId} variant="outline">{categoryLabel(c)}</Chip>
-          ))}
-          <Button variant="subtle" size="compact-sm" aria-expanded={showAll} onClick={() => setShowAll(open => !open)}>
-            More…
-          </Button>
-        </Group>
-      </Chip.Group>
+      <Group gap="xs" mt={4}>
+        <CategoryRadios groupName={groupName} visible={visible} value={value} onChange={onChange} />
+        <Button variant="subtle" size="compact-sm" aria-expanded={showAll} onClick={() => setShowAll(open => !open)}>
+          More…
+        </Button>
+      </Group>
       {showAll && (
         <Select
           mt="xs"

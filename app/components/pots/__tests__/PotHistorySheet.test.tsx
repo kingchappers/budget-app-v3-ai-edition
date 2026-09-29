@@ -6,9 +6,11 @@ import type { Category, PotSummary } from '~/lib/types';
 import { currentYearMonth } from '~/lib/months';
 
 const save = vi.hoisted(() => ({ mutate: vi.fn() }));
+const rename = vi.hoisted(() => ({ mutate: vi.fn() }));
 
 vi.mock('~/lib/queries', () => ({
   useSavePot: () => ({ mutate: save.mutate, isPending: false }),
+  useUpdateCategory: () => ({ mutate: rename.mutate, isPending: false }),
 }));
 vi.mock('~/components/layout/ResponsiveSheet', () => ({
   ResponsiveSheet: ({ opened, title, children }: { opened: boolean; title: string; children: React.ReactNode }) =>
@@ -20,6 +22,8 @@ import { PotHistorySheet, parseOptionalPounds } from '../PotHistorySheet';
 const category: Category = {
   categoryId: 'cat-holidays', name: 'Holidays', type: 'POT', group: 'SINKING_FUNDS', icon: '✈️', isDefault: true, createdAt: '',
 };
+
+const customCategory: Category = { ...category, categoryId: 'custom-boiler', name: 'Boiler', icon: '🔧', isDefault: false };
 
 function makePot(overrides: Partial<PotSummary> = {}): PotSummary {
   return {
@@ -33,17 +37,20 @@ function makePot(overrides: Partial<PotSummary> = {}): PotSummary {
   };
 }
 
-function renderSheet(pot: PotSummary | null) {
+function renderSheet(pot: PotSummary | null, cat: Category = category) {
   const onClose = vi.fn();
   render(
     <MantineProvider>
-      <PotHistorySheet pot={pot} category={category} onClose={onClose} />
+      <PotHistorySheet pot={pot} category={cat} onClose={onClose} />
     </MantineProvider>,
   );
   return onClose;
 }
 
-beforeEach(() => { save.mutate.mockReset(); });
+beforeEach(() => {
+  save.mutate.mockReset();
+  rename.mutate.mockReset();
+});
 
 describe('parseOptionalPounds', () => {
   it('treats blank as null', () => {
@@ -160,5 +167,71 @@ describe('PotHistorySheet', () => {
     await user.click(screen.getByRole('button', { name: 'Save' }));
     expect(save.mutate).not.toHaveBeenCalled();
     expect(screen.getByRole('alert')).toBeInTheDocument();
+  });
+});
+
+describe('PotHistorySheet rename', () => {
+  it('offers no rename control for a default pot category', () => {
+    renderSheet(makePot());
+    expect(screen.queryByRole('button', { name: /rename/i })).not.toBeInTheDocument();
+  });
+
+  it('offers a rename control for a custom pot category', () => {
+    renderSheet(makePot({ categoryId: 'custom-boiler' }), customCategory);
+    expect(screen.getByRole('button', { name: 'Rename Boiler' })).toBeInTheDocument();
+  });
+
+  it('renames the pot category on Enter', async () => {
+    const user = userEvent.setup();
+    renderSheet(makePot({ categoryId: 'custom-boiler' }), customCategory);
+
+    await user.click(screen.getByRole('button', { name: 'Rename Boiler' }));
+    const input = screen.getByRole('textbox', { name: 'Rename Boiler' });
+    await user.clear(input);
+    await user.type(input, 'New Boiler{Enter}');
+
+    expect(rename.mutate).toHaveBeenCalledWith(
+      { categoryId: 'custom-boiler', name: 'New Boiler' },
+      expect.objectContaining({ onError: expect.any(Function) }),
+    );
+  });
+
+  it('cancels renaming on Escape without saving', async () => {
+    const user = userEvent.setup();
+    renderSheet(makePot({ categoryId: 'custom-boiler' }), customCategory);
+
+    await user.click(screen.getByRole('button', { name: 'Rename Boiler' }));
+    const input = screen.getByRole('textbox', { name: 'Rename Boiler' });
+    await user.type(input, ' extra');
+    await user.keyboard('{Escape}');
+
+    expect(rename.mutate).not.toHaveBeenCalled();
+    expect(screen.getByText('🔧 Boiler')).toBeInTheDocument();
+  });
+
+  it('shows a validation error for an empty name and does not save', async () => {
+    const user = userEvent.setup();
+    renderSheet(makePot({ categoryId: 'custom-boiler' }), customCategory);
+
+    await user.click(screen.getByRole('button', { name: 'Rename Boiler' }));
+    const input = screen.getByRole('textbox', { name: 'Rename Boiler' });
+    await user.clear(input);
+    await user.keyboard('{Enter}');
+
+    expect(await screen.findByText(/enter a name from 1 to 50 characters/i)).toBeInTheDocument();
+    expect(rename.mutate).not.toHaveBeenCalled();
+  });
+
+  it('shows an error when the rename request fails', async () => {
+    rename.mutate.mockImplementation((_vars, opts) => opts?.onError?.(new Error('boom')));
+    const user = userEvent.setup();
+    renderSheet(makePot({ categoryId: 'custom-boiler' }), customCategory);
+
+    await user.click(screen.getByRole('button', { name: 'Rename Boiler' }));
+    const input = screen.getByRole('textbox', { name: 'Rename Boiler' });
+    await user.clear(input);
+    await user.type(input, 'New Boiler{Enter}');
+
+    expect(await screen.findByText(/could not rename/i)).toBeInTheDocument();
   });
 });

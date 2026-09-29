@@ -10,8 +10,8 @@ const mockUpdate = vi.fn();
 vi.mock('~/lib/queries', () => ({
   useCategories: () => ({
     data: [
-      { categoryId: 'cat-housing', name: 'Housing', type: 'EXPENSE', icon: 'x', isDefault: true, createdAt: '' },
-      { categoryId: 'cat-food', name: 'Food', type: 'EXPENSE', icon: 'x', isDefault: true, createdAt: '' },
+      { categoryId: 'cat-housing', name: 'Housing', type: 'EXPENSE', icon: 'x', isDefault: true, createdAt: '', group: 'BILLS' },
+      { categoryId: 'cat-food', name: 'Food', type: 'EXPENSE', icon: 'x', isDefault: true, createdAt: '', group: 'EVERYDAY' },
       { categoryId: 'cat-salary', name: 'Salary', type: 'INCOME', icon: 'x', isDefault: true, createdAt: '' },
     ],
     isLoading: false,
@@ -92,6 +92,16 @@ describe('RecurringForm', () => {
     await user.click(screen.getByRole('radio', { name: 'Income' }));
     await user.click(screen.getByPlaceholderText('Choose'));
     expect((await screen.findAllByRole('option', { hidden: true })).map(option => option.textContent)).toEqual(['Salary']);
+  });
+
+  it('groups the category options by category group when more than one applies', async () => {
+    const user = userEvent.setup();
+    renderForm();
+
+    await user.click(screen.getByPlaceholderText('Choose'));
+
+    expect(await screen.findByText('Bills')).toBeInTheDocument();
+    expect(screen.getByText('Everyday Spending')).toBeInTheDocument();
   });
 
   it('prefills a new template from a draft (Repeat monthly)', async () => {

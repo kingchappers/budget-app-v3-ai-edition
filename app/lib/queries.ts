@@ -206,6 +206,22 @@ export function useReassignCategory() {
   });
 }
 
+export function useUpdateCategory() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { categoryId: string; name: string }) => api.updateCategory(vars.categoryId, vars.name),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.categories });
+      qc.invalidateQueries({ queryKey: queryKeys.targets });
+      qc.invalidateQueries({ queryKey: ['transactions'] });
+      qc.invalidateQueries({ queryKey: queryKeys.recurring });
+      qc.invalidateQueries({ queryKey: ['pots'] });
+      qc.invalidateQueries({ queryKey: ['transactionsRange'] });
+    },
+  });
+}
+
 export function useDeleteCategory() {
   const api = useApi();
   const qc = useQueryClient();

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Button, Group, NumberInput, SegmentedControl, Select, Stack, Text, TextInput } from '@mantine/core';
 import { ResponsiveSheet } from '~/components/layout/ResponsiveSheet';
+import { categorySelectData } from '~/lib/categoryGroups';
 import { formatPencePlain } from '~/lib/money';
 import { todayIso } from '~/lib/months';
 import { useCategories, useCreateRecurring, useUpdateRecurring } from '~/lib/queries';
@@ -52,13 +53,12 @@ export function RecurringForm({ opened, onClose, editing, draft }: RecurringForm
     setFormError(null);
   }, [opened, editing, draft]);
 
-  const options = categories
-    .filter(c => categoryTypesFor(type).includes(c.type))
-    .map(c => ({ value: c.categoryId, label: c.name }));
+  const filteredCategories = categories.filter(c => categoryTypesFor(type).includes(c.type));
+  const options = categorySelectData(filteredCategories);
   const pending = create.isPending || update.isPending;
 
   async function handleSubmit(): Promise<void> {
-    const validCategoryId = options.some(o => o.value === categoryId) ? categoryId : null;
+    const validCategoryId = filteredCategories.some(c => c.categoryId === categoryId) ? categoryId : null;
     const result = validateRecurringForm({ type, categoryId: validCategoryId, amount, description, dayOfMonth, leadDays });
     if (!result.ok) {
       setErrors(result.errors);
