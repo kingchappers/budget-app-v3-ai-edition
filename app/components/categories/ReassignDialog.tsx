@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Button, Group, Modal, Select, Stack, Text } from '@mantine/core';
-import { groupCategories } from '~/lib/categoryGroups';
+import { categorySelectData } from '~/lib/categoryGroups';
 import type { Category } from '~/lib/types';
 
 export function ReassignDialog({
@@ -15,11 +15,7 @@ export function ReassignDialog({
 }) {
   const [target, setTarget] = useState<string | null>(null);
 
-  const toOption = (c: Category): { value: string; label: string } => ({ value: c.categoryId, label: c.name });
-  const buckets = groupCategories(candidates);
-  const data = buckets.length > 1
-    ? buckets.map(b => ({ group: b.label, items: b.items.map(toOption) }))
-    : candidates.map(toOption);
+  const data = categorySelectData(candidates);
 
   return (
     <Modal opened={opened} onClose={onCancel} title={`Delete ${category?.name ?? ''}?`}>

@@ -1,11 +1,14 @@
-import { QueryCommand, PutCommand, DeleteCommand } from '@aws-sdk/lib-dynamodb';
+import { QueryCommand, PutCommand, UpdateCommand, DeleteCommand } from '@aws-sdk/lib-dynamodb';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { docClient, TABLE, pk, catSk } from './db';
-import { queryOne } from './pots';
 import { DEFAULT_CATEGORIES, DEFAULT_CATEGORY_IDS } from './defaults';
 import { SECURITY_HEADERS, VALID_CATEGORY_TYPES, VALID_CATEGORY_GROUPS, POT_GROUPS } from './constants';
 import type { Category, CategoryGroup, CategoryType, ApiResponse } from './types';
 import { ok, err } from './http';
+
+function isConditionalFailure(error: unknown): boolean {
+  return error instanceof Error && error.name === 'ConditionalCheckFailedException';
+}
 
 export async function getCategories(
   _event: APIGatewayProxyEventV2,
@@ -18,7 +21,7 @@ export async function getCategories(
     ExpressionAttributeValues: { ':pk': pk(userId), ':prefix': 'CAT#' },
   }));
 
-  const custom = (result.Items || []) as Category[];
+  const custom = (result.Items || []).map(toCategory);
   return ok({ categories: [...DEFAULT_CATEGORIES, ...custom] });
 }
 
@@ -41,6 +44,13 @@ function defaultGroupFor(type: CategoryType): CategoryGroup | undefined {
   return 'EVERYDAY';
 }
 
+function validateCategoryName(name: unknown): { ok: true; value: string } | { ok: false } {
+  if (typeof name !== 'string') return { ok: false };
+  const trimmed = name.trim();
+  if (trimmed.length === 0 || trimmed.length > 50) return { ok: false };
+  return { ok: true, value: trimmed };
+}
+
 export async function createCategory(
   event: APIGatewayProxyEventV2,
   userId: string,
@@ -55,7 +65,8 @@ export async function createCategory(
 
   const { name, type, icon, group } = body;
 
-  if (!name || typeof name !== 'string' || name.trim().length === 0 || name.length > 50) {
+  const validName = validateCategoryName(name);
+  if (!validName.ok) {
     return err(400, 'name must be a non-empty string of at most 50 characters');
   }
   if (!type || !VALID_CATEGORY_TYPES.has(type as string)) {
@@ -80,7 +91,7 @@ export async function createCategory(
   const categoryId = crypto.randomUUID();
   const category: Category = {
     categoryId,
-    name: name.trim(),
+    name: validName.value,
     type: type as Category['type'],
     icon: typeof icon === 'string' ? icon.slice(0, 50) : 'default',
     isDefault: false,
@@ -139,22 +150,24 @@ export async function updateCategory(
     return err(400, 'Invalid JSON body');
   }
 
-  const { name } = body;
-  if (!name || typeof name !== 'string' || name.trim().length === 0 || name.length > 50) {
+  const validName = validateCategoryName(body.name);
+  if (!validName.ok) {
     return err(400, 'name must be a non-empty string of at most 50 characters');
   }
 
-  const existingItem = await queryOne(userId, catSk(categoryId));
-  if (!existingItem) {
-    return err(404, 'Category not found');
+  try {
+    const result = await docClient.send(new UpdateCommand({
+      TableName: TABLE,
+      Key: { PK: pk(userId), SK: catSk(categoryId) },
+      UpdateExpression: 'SET #name = :name',
+      ConditionExpression: 'attribute_exists(PK)',
+      ExpressionAttributeNames: { '#name': 'name' },
+      ExpressionAttributeValues: { ':name': validName.value },
+      ReturnValues: 'ALL_NEW',
+    }));
+    return ok({ category: toCategory(result.Attributes ?? {}) });
+  } catch (error) {
+    if (isConditionalFailure(error)) return err(404, 'Category not found');
+    throw error;
   }
-
-  const category: Category = { ...toCategory(existingItem), name: name.trim() };
-
-  await docClient.send(new PutCommand({
-    TableName: TABLE,
-    Item: { PK: pk(userId), SK: catSk(categoryId), ...category },
-  }));
-
-  return ok({ category });
 }

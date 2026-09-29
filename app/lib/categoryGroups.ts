@@ -1,3 +1,4 @@
+import { categoryLabel } from './categoryIcons';
 import type { Category, CategoryGroup, CategoryType } from './types';
 
 export type BucketKey = CategoryGroup | 'INCOME' | 'OTHER';
@@ -46,6 +47,24 @@ export function bucketKeyFor(category: { group?: string; type: CategoryType }): 
 
 export function groupCategories(categories: Category[]): Bucket<Category>[] {
   return groupItems(categories, bucketKeyFor, c => c.name);
+}
+
+export interface CategorySelectOption {
+  value: string;
+  label: string;
+}
+
+export type CategorySelectData = CategorySelectOption[] | { group: string; items: CategorySelectOption[] }[];
+
+// Mantine's <Select> only renders group headers when there's more than one
+// group; a single-bucket list (e.g. filtering to one category type) is
+// flattened so it doesn't show a redundant lone header.
+export function categorySelectData(categories: Category[]): CategorySelectData {
+  const toOption = (c: Category): CategorySelectOption => ({ value: c.categoryId, label: categoryLabel(c) });
+  const buckets = groupCategories(categories);
+  return buckets.length > 1
+    ? buckets.map(b => ({ group: b.label, items: b.items.map(toOption) }))
+    : categories.map(toOption);
 }
 
 export function defaultGroupFor(type: CategoryType): CategoryGroup | null {

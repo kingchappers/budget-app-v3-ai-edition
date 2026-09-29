@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { bucketKeyFor, defaultGroupFor, groupCategories, groupsForType, groupItems } from '../categoryGroups';
+import { bucketKeyFor, categorySelectData, defaultGroupFor, groupCategories, groupsForType, groupItems } from '../categoryGroups';
 import type { Category } from '../types';
 
 function cat(categoryId: string, type: Category['type'], group?: string): Category {
@@ -77,6 +77,27 @@ describe('groupItems', () => {
       i => i.n,
     );
     expect(buckets[0].items.map(i => i.n)).toEqual(['a', 'b']);
+  });
+});
+
+describe('categorySelectData', () => {
+  it('groups options by bucket when more than one bucket is present', () => {
+    const data = categorySelectData([cat('bill', 'EXPENSE', 'BILLS'), cat('day', 'EXPENSE', 'EVERYDAY')]);
+    expect(data).toEqual([
+      { group: 'Bills', items: [{ value: 'bill', label: 'bill' }] },
+      { group: 'Everyday Spending', items: [{ value: 'day', label: 'day' }] },
+    ]);
+  });
+
+  it('flattens to a plain option list when only one bucket is present', () => {
+    const data = categorySelectData([cat('bill', 'EXPENSE', 'BILLS'), cat('rent', 'EXPENSE', 'BILLS')]);
+    expect(data).toEqual([{ value: 'bill', label: 'bill' }, { value: 'rent', label: 'rent' }]);
+  });
+
+  it('prefixes an emoji icon onto the label like categoryLabel does', () => {
+    const withEmoji = { ...cat('fun', 'EXPENSE', 'BILLS'), icon: '🎉' };
+    const data = categorySelectData([withEmoji]);
+    expect(data).toEqual([{ value: 'fun', label: '🎉 fun' }]);
   });
 });
 
