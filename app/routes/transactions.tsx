@@ -8,10 +8,11 @@ import { TransactionRow } from '~/components/transactions/TransactionRow';
 import { TransactionSheet } from '~/components/transactions/TransactionSheet';
 import { useOfflineQueue } from '~/hooks/useOfflineQueue';
 import { filterTransactions, type TransactionFilter } from '~/lib/transactions';
+import { groupCategories } from '~/lib/categoryGroups';
 import { formatPence } from '~/lib/money';
 import { currentYearMonth } from '~/lib/months';
 import { useCategories, useDeleteTransaction, useTransactions } from '~/lib/queries';
-import type { Transaction, TransactionType } from '~/lib/types';
+import type { Category, Transaction, TransactionType } from '~/lib/types';
 
 const TYPE_OPTIONS: { value: TransactionType; label: string }[] = [
   { value: 'EXPENSE', label: 'Expense' },
@@ -69,7 +70,11 @@ function TransactionsContent() {
     return acc;
   }, {});
 
-  const categoryOptions = (categories.data ?? []).map(c => ({ value: c.categoryId, label: c.name }));
+  const toOption = (c: Category): { value: string; label: string } => ({ value: c.categoryId, label: c.name });
+  const categoryBuckets = groupCategories(categories.data ?? []);
+  const categoryOptions = categoryBuckets.length > 1
+    ? categoryBuckets.map(b => ({ group: b.label, items: b.items.map(toOption) }))
+    : (categories.data ?? []).map(toOption);
   const isFiltering = filter.query !== '' || filter.categoryId !== null || filter.type !== null;
 
   return (

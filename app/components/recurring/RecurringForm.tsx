@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Button, Group, NumberInput, SegmentedControl, Select, Stack, Text, TextInput } from '@mantine/core';
 import { ResponsiveSheet } from '~/components/layout/ResponsiveSheet';
+import { groupCategories } from '~/lib/categoryGroups';
 import { formatPencePlain } from '~/lib/money';
 import { todayIso } from '~/lib/months';
 import { useCategories, useCreateRecurring, useUpdateRecurring } from '~/lib/queries';
 import { validateRecurringForm, type RecurringFormErrors } from '~/lib/recurring';
 import { TYPE_OPTIONS, categoryTypesFor } from '~/lib/transactionTypes';
-import type { Recurring, TransactionType } from '~/lib/types';
+import type { Category, Recurring, TransactionType } from '~/lib/types';
 
 const DEFAULT_LEAD_DAYS = 3;
 
@@ -52,13 +53,16 @@ export function RecurringForm({ opened, onClose, editing, draft }: RecurringForm
     setFormError(null);
   }, [opened, editing, draft]);
 
-  const options = categories
-    .filter(c => categoryTypesFor(type).includes(c.type))
-    .map(c => ({ value: c.categoryId, label: c.name }));
+  const filteredCategories = categories.filter(c => categoryTypesFor(type).includes(c.type));
+  const toOption = (c: Category): { value: string; label: string } => ({ value: c.categoryId, label: c.name });
+  const buckets = groupCategories(filteredCategories);
+  const options = buckets.length > 1
+    ? buckets.map(b => ({ group: b.label, items: b.items.map(toOption) }))
+    : filteredCategories.map(toOption);
   const pending = create.isPending || update.isPending;
 
   async function handleSubmit(): Promise<void> {
-    const validCategoryId = options.some(o => o.value === categoryId) ? categoryId : null;
+    const validCategoryId = filteredCategories.some(c => c.categoryId === categoryId) ? categoryId : null;
     const result = validateRecurringForm({ type, categoryId: validCategoryId, amount, description, dayOfMonth, leadDays });
     if (!result.ok) {
       setErrors(result.errors);
