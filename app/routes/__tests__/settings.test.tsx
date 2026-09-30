@@ -31,6 +31,17 @@ describe('Settings page', () => {
     expect(screen.getByRole('heading', { name: 'Settings' })).toBeInTheDocument();
   });
 
+  it('shows the Reduce motion switch off by default and saves it when turned on', async () => {
+    renderSettings();
+    const toggle = screen.getByRole('switch', { name: /^Reduce motion/ });
+    expect(toggle).not.toBeChecked();
+
+    await userEvent.setup().click(toggle);
+
+    expect(screen.getByRole('switch', { name: /^Reduce motion/ })).toBeChecked();
+    expect(readPreferences(window.localStorage).reduceMotion).toBe(true);
+  });
+
   it('shows the N shortcut switch on by default and saves it when turned off', async () => {
     renderSettings();
     const toggle = screen.getByRole('switch', { name: /^Press N to add a transaction/ });

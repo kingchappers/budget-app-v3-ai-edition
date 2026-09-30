@@ -29,7 +29,7 @@ afterEach(() => {
 
 describe('readPreferences', () => {
   it('returns the defaults when nothing is saved', () => {
-    expect(prefs.readPreferences(window.localStorage)).toEqual({ shortcutN: true, openAddOnLaunch: false });
+    expect(prefs.readPreferences(window.localStorage)).toEqual({ shortcutN: true, openAddOnLaunch: false, reduceMotion: false });
   });
 
   it('returns the defaults when storage is unavailable', () => {
@@ -37,18 +37,24 @@ describe('readPreferences', () => {
   });
 
   it('reads back what was written', () => {
-    prefs.writePreferences(window.localStorage, { shortcutN: false, openAddOnLaunch: true });
-    expect(prefs.readPreferences(window.localStorage)).toEqual({ shortcutN: false, openAddOnLaunch: true });
+    prefs.writePreferences(window.localStorage, { shortcutN: false, openAddOnLaunch: true, reduceMotion: false });
+    expect(prefs.readPreferences(window.localStorage)).toEqual({ shortcutN: false, openAddOnLaunch: true, reduceMotion: false });
+  });
+
+  it('keeps reduce motion off until it is turned on, and remembers it', () => {
+    expect(prefs.readPreferences(window.localStorage).reduceMotion).toBe(false);
+    prefs.writePreferences(window.localStorage, { ...prefs.DEFAULT_PREFERENCES, reduceMotion: true });
+    expect(prefs.readPreferences(window.localStorage).reduceMotion).toBe(true);
   });
 
   it('carries over the old launch setting and drops the old value on the next save', () => {
     window.localStorage.setItem('budget.openAddOnLaunch', '1');
     expect(prefs.readPreferences(window.localStorage).openAddOnLaunch).toBe(true);
 
-    prefs.writePreferences(window.localStorage, { shortcutN: false, openAddOnLaunch: true });
+    prefs.writePreferences(window.localStorage, { shortcutN: false, openAddOnLaunch: true, reduceMotion: false });
 
     expect(window.localStorage.getItem('budget.openAddOnLaunch')).toBeNull();
-    expect(prefs.readPreferences(window.localStorage)).toEqual({ shortcutN: false, openAddOnLaunch: true });
+    expect(prefs.readPreferences(window.localStorage)).toEqual({ shortcutN: false, openAddOnLaunch: true, reduceMotion: false });
   });
 
   it('ignores unreadable JSON and values of the wrong type', () => {
@@ -56,18 +62,18 @@ describe('readPreferences', () => {
     expect(prefs.readPreferences(window.localStorage)).toEqual(prefs.DEFAULT_PREFERENCES);
 
     window.localStorage.setItem(prefs.PREFERENCES_KEY, JSON.stringify({ shortcutN: 'no', openAddOnLaunch: true, extra: 1 }));
-    expect(prefs.readPreferences(window.localStorage)).toEqual({ shortcutN: true, openAddOnLaunch: true });
+    expect(prefs.readPreferences(window.localStorage)).toEqual({ shortcutN: true, openAddOnLaunch: true, reduceMotion: false });
   });
 
   it('survives storage that throws', () => {
     expect(prefs.readPreferences(brokenStorage())).toEqual(prefs.DEFAULT_PREFERENCES);
-    expect(prefs.writePreferences(brokenStorage(), { shortcutN: false, openAddOnLaunch: false })).toBe(false);
+    expect(prefs.writePreferences(brokenStorage(), { shortcutN: false, openAddOnLaunch: false, reduceMotion: false })).toBe(false);
   });
 });
 
 describe('usePreferences', () => {
   it('starts from the saved preferences', () => {
-    prefs.writePreferences(window.localStorage, { shortcutN: false, openAddOnLaunch: false });
+    prefs.writePreferences(window.localStorage, { shortcutN: false, openAddOnLaunch: false, reduceMotion: false });
     const { result } = renderHook(() => prefs.usePreferences());
     expect(result.current[0].shortcutN).toBe(false);
   });

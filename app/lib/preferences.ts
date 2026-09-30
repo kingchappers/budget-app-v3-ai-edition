@@ -3,11 +3,14 @@ import { useCallback, useSyncExternalStore } from 'react';
 export interface Preferences {
   shortcutN: boolean;
   openAddOnLaunch: boolean;
+  // Overrides the device's reduced-motion setting for people who don't know it exists.
+  reduceMotion: boolean;
 }
 
 export const DEFAULT_PREFERENCES: Preferences = {
   shortcutN: true,
   openAddOnLaunch: false,
+  reduceMotion: false,
 };
 
 export const PREFERENCES_KEY = 'budget.preferences';

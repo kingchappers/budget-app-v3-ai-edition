@@ -13,6 +13,16 @@ function SettingsContent() {
       <Text size="sm" c="dimmed">Settings are saved on this device.</Text>
 
       <Card withBorder>
+        <Title order={4} mb="sm">Motion</Title>
+        <Switch
+          label="Reduce motion"
+          description="Stops sliding and fading when sheets, menus and messages open. The app already follows your device's setting; this switch turns it on for the app only."
+          checked={preferences.reduceMotion}
+          onChange={event => setPreferences({ reduceMotion: event.currentTarget.checked })}
+        />
+      </Card>
+
+      <Card withBorder>
         <Title order={4} mb="sm">Keyboard shortcut</Title>
         <Switch
           label="Press N to add a transaction"
