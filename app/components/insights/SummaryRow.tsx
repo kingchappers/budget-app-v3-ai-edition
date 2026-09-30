@@ -12,14 +12,26 @@ function percentChange(deltaPence: number, previousPence: number): number | null
   return Math.round((deltaPence / Math.abs(previousPence)) * 100);
 }
 
-function Figure({
-  label, pence, previousPence, higherIsGood,
-}: {
+interface FigureProps {
   label: string;
   pence: number;
-  previousPence: number;
+  // Null when there is nothing fair to compare with.
+  previousPence: number | null;
+  previousLabel: string;
   higherIsGood: boolean;
-}) {
+}
+
+function Figure({ label, pence, previousPence, previousLabel, higherIsGood }: FigureProps) {
+  if (previousPence === null) {
+    return (
+      <Paper withBorder p="sm">
+        <Text size="xs" c="dimmed">{label}</Text>
+        <Text fw={700} size="lg">{formatPence(pence)}</Text>
+        <Text size="xs" c="dimmed">Not compared</Text>
+      </Paper>
+    );
+  }
+
   const deltaPence = pence - previousPence;
   const percent = percentChange(deltaPence, previousPence);
   const up = deltaPence >= 0;
@@ -38,17 +50,36 @@ function Figure({
           </Text>
         </Group>
       )}
+      <Text size="xs" c="dimmed">{previousLabel} {formatPence(previousPence)}</Text>
     </Paper>
   );
 }
 
-export function SummaryRow({ current, previous }: { current: SummaryTotals; previous: SummaryTotals }) {
+export interface SummaryRowProps {
+  current: SummaryTotals;
+  // Null when the period cannot be compared fairly.
+  previous: SummaryTotals | null;
+  // The previous period in words, e.g. "1–15 Aug".
+  previousLabel?: string;
+}
+
+export function SummaryRow({ current, previous, previousLabel = 'Previous period' }: SummaryRowProps) {
+  const figure = (key: keyof SummaryTotals, label: string, higherIsGood: boolean) => (
+    <Figure
+      label={label}
+      pence={current[key]}
+      previousPence={previous ? previous[key] : null}
+      previousLabel={previousLabel}
+      higherIsGood={higherIsGood}
+    />
+  );
+
   return (
     <SimpleGrid cols={{ base: 2, sm: 4 }}>
-      <Figure label="Income" pence={current.income} previousPence={previous.income} higherIsGood />
-      <Figure label="Spent" pence={current.spent} previousPence={previous.spent} higherIsGood={false} />
-      <Figure label="Saved" pence={current.saved} previousPence={previous.saved} higherIsGood />
-      <Figure label="Net" pence={current.net} previousPence={previous.net} higherIsGood />
+      {figure('income', 'Income', true)}
+      {figure('spent', 'Spent', false)}
+      {figure('saved', 'Saved', true)}
+      {figure('net', 'Net', true)}
     </SimpleGrid>
   );
 }
