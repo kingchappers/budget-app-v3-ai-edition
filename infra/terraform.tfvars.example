@@ -9,3 +9,7 @@ auth0_audience = "https://your-api-identifier"
 # only needed for local `tofu plan`/`apply`:
 # auth0_domain    = "your-tenant.eu.auth0.com"
 # auth0_client_id = "your-auth0-client-id"
+
+# Bill reminders (optional). Not read from this file in CI, where it comes from the
+# VAPID_PUBLIC_KEY secret; only needed for a local `tofu plan`/`apply`.
+# vapid_public_key = "the public half of your VAPID key pair"

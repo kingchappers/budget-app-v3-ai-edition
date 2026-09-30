@@ -47,3 +47,18 @@ variable "auth0_audience" {
   description = "Auth0 API audience identifier"
   sensitive   = true
 }
+
+# The public half of the VAPID key pair. Safe to expose in the browser (SEC-05); the
+# private half lives only in SSM Parameter Store. Empty until the key pair is created.
+variable "vapid_public_key" {
+  type        = string
+  description = "VAPID public key for web push. Leave empty until reminders are set up."
+  default     = ""
+}
+
+# Who the push services can contact about this sender, as they require.
+variable "vapid_subject" {
+  type        = string
+  description = "VAPID subject: an https address or mailto address that identifies this app."
+  default     = "https://budget.scgrid.xyz"
+}
