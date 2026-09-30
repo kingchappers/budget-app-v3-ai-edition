@@ -33,6 +33,7 @@ beforeAll(() => {
   fs.writeFileSync(path.join(site, 'manifest.webmanifest'), '{"name":"Budget"}');
   fs.writeFileSync(path.join(site, 'favicon.ico'), BINARY_BYTES);
   fs.writeFileSync(path.join(site, 'index.js'), 'handler source');
+  fs.writeFileSync(path.join(site, 'sw.js'), 'self.addEventListener("push", () => {});');
   fs.writeFileSync(path.join(base, 'site-evil', 'secret.txt'), 'secret');
   fs.writeFileSync(path.join(base, 'secret.txt'), 'secret');
   handle = createStaticHandler(site);
@@ -138,7 +139,7 @@ describe('routing fallback', () => {
     expect(res.body).toBe(INDEX_HTML);
   });
 
-  it.each(['/sw.js', '/icons/missing.png'])('answers a missing file (%s) with 404, not HTML', async (rawPath: string) => {
+  it.each(['/missing-worker.js', '/icons/missing.png'])('answers a missing file (%s) with 404, not HTML', async (rawPath: string) => {
     const res = await handle({ rawPath });
 
     expect(res.statusCode).toBe(404);
@@ -372,3 +373,27 @@ describe('buildCsp', () => {
     expect(policy).toContain("frame-ancestors 'none'");
   });
 });
+
+describe('the service worker', () => {
+  it('is served as JavaScript that is always revalidated, so an update reaches people straight away', async () => {
+    const res = await handle({ rawPath: '/sw.js' });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.headers?.['Content-Type']).toBe('application/javascript');
+    expect(res.headers?.['Cache-Control']).toBe('no-cache');
+    expect(res.body).toContain('addEventListener');
+    expectSecurityHeaders(res.headers);
+  });
+
+  it('is not cached like the hashed assets', async () => {
+    const worker = await handle({ rawPath: '/sw.js' });
+    const asset = await handle({ rawPath: '/assets/index-abc12345.js' });
+
+    expect(worker.headers?.['Cache-Control']).not.toBe(asset.headers?.['Cache-Control']);
+  });
+
+  it('may run from this site only', () => {
+    expect(buildCsp('<html></html>', undefined)).toContain("worker-src 'self'");
+  });
+});
+
