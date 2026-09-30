@@ -37,6 +37,7 @@ export function useSaveWithUndo(): (input: TransactionInput, options?: SaveOptio
       id: toastId,
       color: 'danger',
       autoClose: false,
+      closeButtonProps: { 'aria-label': 'Close notification' },
       message: (
         <ToastAction
           text={`Couldn't save ${describeInput(input)}`}
