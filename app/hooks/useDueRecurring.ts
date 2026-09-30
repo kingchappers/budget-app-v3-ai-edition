@@ -1,7 +1,8 @@
 import { useCallback, useMemo } from 'react';
 import { shiftMonth, todayIso } from '~/lib/months';
 import { useCategories, useRecurring, useTransactions } from '~/lib/queries';
-import { computeDueItems, type DueItem } from '~/lib/recurring';
+import { computeDueItems, LOOK_BACK_MONTHS, type DueItem } from '~/lib/recurring';
+import type { Transaction } from '~/lib/types';
 
 export interface DueRecurringState {
   items: DueItem[];
@@ -10,49 +11,57 @@ export interface DueRecurringState {
   refetch: () => void;
 }
 
+interface Source {
+  isLoading: boolean;
+  error: Error | null;
+  refetch: () => unknown;
+}
+
+// A fixed number of hook calls, in a fixed order: three months back, this month and next.
+function useWindowTransactions(thisMonth: string): Array<Source & { data: Transaction[] | undefined }> {
+  return [
+    useTransactions(shiftMonth(thisMonth, -LOOK_BACK_MONTHS)),
+    useTransactions(shiftMonth(thisMonth, -2)),
+    useTransactions(shiftMonth(thisMonth, -1)),
+    useTransactions(thisMonth),
+    useTransactions(shiftMonth(thisMonth, 1)),
+  ];
+}
+
 export function useDueRecurring(): DueRecurringState {
   const recurring = useRecurring();
   const categories = useCategories();
   const today = todayIso();
-  const thisMonth = today.slice(0, 7);
-  const current = useTransactions(thisMonth);
-  const next = useTransactions(shiftMonth(thisMonth, 1));
+  const months = useWindowTransactions(today.slice(0, 7));
 
-  const error = recurring.error ?? categories.error ?? current.error ?? next.error ?? null;
+  const sources: Source[] = [recurring, categories, ...months];
+  const error = sources.find(source => source.error != null)?.error ?? null;
+  const monthData = months.map(month => month.data);
 
   const items = useMemo(() => {
     if (error) return [];
     return computeDueItems({
       recurring: recurring.data ?? [],
       categories: categories.data ?? [],
-      transactions: [...(current.data ?? []), ...(next.data ?? [])],
+      transactions: monthData.flatMap(rows => rows ?? []),
       today,
     });
-  }, [error, recurring.data, categories.data, current.data, next.data, today]);
+    // monthData is rebuilt each render, so depend on its stable members instead.
+  }, [error, recurring.data, categories.data, today, ...monthData]);
 
-  const refetchRecurring = recurring.refetch;
-  const refetchCategories = categories.refetch;
-  const refetchCurrent = current.refetch;
-  const refetchNext = next.refetch;
-  const recurringFailed = recurring.error != null;
-  const categoriesFailed = categories.error != null;
-  const currentFailed = current.error != null;
-  const nextFailed = next.error != null;
+  const failed = sources.map(source => (source.error != null ? '1' : '0')).join('');
+  const refetchers = sources.map(source => source.refetch);
 
   const refetch = useCallback((): void => {
-    const anyFailed = recurringFailed || categoriesFailed || currentFailed || nextFailed;
-    if (recurringFailed || !anyFailed) void refetchRecurring();
-    if (categoriesFailed || !anyFailed) void refetchCategories();
-    if (currentFailed || !anyFailed) void refetchCurrent();
-    if (nextFailed || !anyFailed) void refetchNext();
-  }, [
-    recurringFailed, categoriesFailed, currentFailed, nextFailed,
-    refetchRecurring, refetchCategories, refetchCurrent, refetchNext,
-  ]);
+    const anyFailed = failed.includes('1');
+    refetchers.forEach((run, index) => {
+      if (!anyFailed || failed[index] === '1') void run();
+    });
+  }, [failed, ...refetchers]);
 
   return {
     items,
-    isLoading: recurring.isLoading || categories.isLoading || current.isLoading || next.isLoading,
+    isLoading: sources.some(source => source.isLoading),
     error,
     refetch,
   };

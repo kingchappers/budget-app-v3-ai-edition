@@ -760,6 +760,28 @@ describe('TransactionSheet', () => {
     expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({ date: '2099-01-15' }));
   });
 
+  it('links the first save to the recurring bill it came from, and only that one', async () => {
+    const user = userEvent.setup();
+    const recurringId = '3f2b8c1e-9a4d-4e7f-b1c2-0d9e8f7a6b5c';
+    renderSheet({ template: editing, templateDate: '2099-01-15', recurringId });
+
+    await user.click(screen.getByRole('button', { name: /save & add another/i }));
+    expect(mockCreate).toHaveBeenLastCalledWith(expect.objectContaining({ recurringId }));
+
+    await user.type(screen.getByLabelText(/amount/i), '2.00');
+    await user.click(screen.getByRole('radio', { name: 'Dining' }));
+    await user.click(screen.getByRole('button', { name: /save & add another/i }));
+    await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(2));
+    expect(mockCreate.mock.calls[1][0]).not.toHaveProperty('recurringId');
+  });
+
+  it('never sends a recurringId without being given one', async () => {
+    const user = userEvent.setup();
+    renderSheet({ template: editing });
+    await user.click(screen.getByRole('button', { name: /^save$/i }));
+    expect(mockCreate.mock.calls[0][0]).not.toHaveProperty('recurringId');
+  });
+
   it('selects Today when the template date is today', () => {
     renderSheet({ template: editing, templateDate: todayIso() });
     expect(screen.getByRole('radio', { name: 'Today' })).toBeChecked();

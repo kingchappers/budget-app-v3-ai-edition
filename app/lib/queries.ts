@@ -147,6 +147,40 @@ export function useUpdateTransaction(yearMonth: string) {
   });
 }
 
+interface LinkTransactionVars {
+  transaction: Transaction;
+  recurringId: string;
+}
+
+function toInput(transaction: Transaction): TransactionInput {
+  const { amount, type, categoryId, description, date } = transaction;
+  return { amount, type, categoryId, description, date };
+}
+
+// Records that a hand-typed transaction is the payment of a recurring bill.
+export function useLinkTransaction() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation<Transaction, Error, LinkTransactionVars, { previous: Transaction[] | undefined }>({
+    mutationFn: ({ transaction, recurringId }) =>
+      api.updateTransaction(transaction.yearMonth, transaction.transactionId, { ...toInput(transaction), recurringId }),
+    onMutate: async ({ transaction, recurringId }) => {
+      const key = queryKeys.transactions(transaction.yearMonth);
+      await qc.cancelQueries({ queryKey: key });
+      const previous = qc.getQueryData<Transaction[]>(key);
+      qc.setQueryData<Transaction[]>(key, rows => rows?.map(row =>
+        (row.transactionId === transaction.transactionId ? { ...row, recurringId } : row)));
+      return { previous };
+    },
+    onError: (_error, { transaction }, context) => {
+      qc.setQueryData(queryKeys.transactions(transaction.yearMonth), context?.previous);
+    },
+    onSettled: (_data, _error, { transaction }) => {
+      qc.invalidateQueries({ queryKey: queryKeys.transactions(transaction.yearMonth) });
+    },
+  });
+}
+
 interface RemovedRow<T> {
   removed: T | undefined;
 }
