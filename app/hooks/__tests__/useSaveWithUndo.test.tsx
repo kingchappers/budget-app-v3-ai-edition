@@ -71,6 +71,49 @@ describe('useSaveWithUndo', () => {
     expect(await screen.findByText('Saved £4.80 · Dining')).toBeInTheDocument();
   });
 
+  it('shows Saving… until the server confirms, then Saved', async () => {
+    let resolveCreate!: (value: unknown) => void;
+    mockCreate.mutateAsync.mockReturnValue(new Promise(resolve => { resolveCreate = resolve; }));
+    const { result } = renderSaveWithUndo();
+
+    act(() => { void result.current(input); });
+    expect(await screen.findByText('Saving £4.80 · Dining…')).toBeInTheDocument();
+    expect(screen.queryByText('Saved £4.80 · Dining')).not.toBeInTheDocument();
+
+    await act(async () => { resolveCreate(created); });
+    expect(await screen.findByText('Saved £4.80 · Dining')).toBeInTheDocument();
+    expect(screen.queryByText('Saving £4.80 · Dining…')).not.toBeInTheDocument();
+  });
+
+  it('keeps the Saved notification open, with a Close button, until dismissed', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      mockCreate.mutateAsync.mockResolvedValue(created);
+      const { result } = renderSaveWithUndo();
+      await act(async () => { await result.current(input); });
+
+      await act(async () => { vi.advanceTimersByTime(60_000); });
+      expect(screen.getByText('Saved £4.80 · Dining')).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Close notification' }));
+      await waitFor(() => expect(screen.queryByText('Saved £4.80 · Dining')).not.toBeInTheDocument());
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('replaces the previous save notification when a new save starts', async () => {
+    mockCreate.mutateAsync.mockResolvedValue(created);
+    const { result } = renderSaveWithUndo();
+
+    await act(async () => { await result.current(input); });
+    await act(async () => { await result.current({ ...input, amount: 1250 }); });
+
+    expect(await screen.findByText('Saved £12.50 · Dining')).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByText('Saved £4.80 · Dining')).not.toBeInTheDocument());
+    expect(screen.getAllByRole('button', { name: 'Undo' })).toHaveLength(1);
+  });
+
   it('Undo deletes the created transaction from its own month', async () => {
     mockCreate.mutateAsync.mockResolvedValue(created);
     const { result } = renderSaveWithUndo();

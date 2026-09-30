@@ -39,7 +39,7 @@ function HomeContent() {
   const transactions = useTransactions(yearMonth);
   const potsEnabled = yearMonth <= shiftMonth(currentYearMonth(), 1);
   const pots = usePots(yearMonth, potsEnabled);
-  const { pendingMap } = useOfflineQueue();
+  const { pendingMap, flushNow } = useOfflineQueue();
 
   const isLoading = categories.isLoading || targets.isLoading || transactions.isLoading;
   const error = categories.error || targets.error || transactions.error;
@@ -112,8 +112,10 @@ function HomeContent() {
                 transaction={t}
                 categoryName={nameFor(t.categoryId)}
                 categoryIcon={iconFor(t.categoryId)}
+                saving={pendingMap[t.transactionId]?.queued === false}
                 pending={pendingMap[t.transactionId]?.queued === true}
                 pendingError={pendingMap[t.transactionId]?.lastError}
+                onRetry={() => void flushNow()}
               />
             ))}
         <Button component={Link} to="/transactions" variant="subtle" mt="xs">See all</Button>

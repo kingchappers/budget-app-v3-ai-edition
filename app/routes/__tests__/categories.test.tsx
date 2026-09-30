@@ -1,10 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MantineProvider } from '@mantine/core';
 import type { Category } from '~/lib/types';
 
-const state = vi.hoisted(() => ({ categories: [] as unknown[], create: vi.fn(), update: vi.fn() }));
+const state = vi.hoisted(() => ({
+  categories: [] as unknown[],
+  create: vi.fn(),
+  update: vi.fn(),
+  reassign: vi.fn(),
+  remove: vi.fn(),
+}));
 
 vi.mock('~/components/layout/DefaultLayout', () => ({
   DefaultLayout: ({ children }: { children: React.ReactNode }) => <>{children}</>,
@@ -13,8 +19,8 @@ vi.mock('~/lib/queries', () => ({
   useCategories: () => ({ data: state.categories, isLoading: false, error: null, refetch: vi.fn() }),
   useCreateCategory: () => ({ mutate: state.create, isPending: false }),
   useUpdateCategory: () => ({ mutate: state.update, isPending: false }),
-  useDeleteCategory: () => ({ mutateAsync: vi.fn(), isPending: false }),
-  useReassignCategory: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useDeleteCategory: () => ({ mutateAsync: state.remove, isPending: false }),
+  useReassignCategory: () => ({ mutateAsync: state.reassign, isPending: false }),
 }));
 
 import Categories from '../categories';
@@ -30,6 +36,8 @@ function renderPage() {
 beforeEach(() => {
   state.create.mockReset();
   state.update.mockReset();
+  state.reassign.mockReset().mockResolvedValue({ reassigned: 3 });
+  state.remove.mockReset().mockResolvedValue(undefined);
   state.categories = [
     cat('cat-groceries', 'Groceries', 'EXPENSE', 'EVERYDAY', '🛒'),
     cat('cat-mortgage', 'Mortgage', 'EXPENSE', 'BILLS', '🏠'),
@@ -55,7 +63,7 @@ describe('Categories page', () => {
     renderPage();
     await user.type(screen.getByLabelText('New category'), 'Joint Account');
     await user.click(screen.getByRole('button', { name: 'Add' }));
-    expect(state.create).toHaveBeenCalledWith({ name: 'Joint Account', type: 'EXPENSE', icon: 'tag', group: 'EVERYDAY' });
+    expect(state.create).toHaveBeenCalledWith({ name: 'Joint Account', type: 'EXPENSE', icon: 'tag', group: 'EVERYDAY' }, expect.anything());
   });
 
   it('disables Group and omits it when the type is Income', async () => {
@@ -67,7 +75,7 @@ describe('Categories page', () => {
 
     await user.type(screen.getByLabelText('New category'), 'Bonus');
     await user.click(screen.getByRole('button', { name: 'Add' }));
-    expect(state.create).toHaveBeenCalledWith({ name: 'Bonus', type: 'INCOME', icon: 'tag' });
+    expect(state.create).toHaveBeenCalledWith({ name: 'Bonus', type: 'INCOME', icon: 'tag' }, expect.anything());
   });
 
   it('switches Group to Sinking Funds when the type is Pot', async () => {
@@ -96,7 +104,7 @@ describe('Categories page', () => {
 
     await user.type(screen.getByLabelText('New category'), 'Boiler');
     await user.click(screen.getByRole('button', { name: 'Add' }));
-    expect(state.create).toHaveBeenCalledWith({ name: 'Boiler', type: 'POT', icon: 'tag', group: 'SINKING_FUNDS' });
+    expect(state.create).toHaveBeenCalledWith({ name: 'Boiler', type: 'POT', icon: 'tag', group: 'SINKING_FUNDS' }, expect.anything());
   });
 
   it('resets Group to Everyday Spending when switching Pot back to Spending', async () => {
@@ -119,6 +127,63 @@ describe('Categories page', () => {
     await user.click(screen.getByLabelText('Type', { selector: 'input' }));
     await user.click(await screen.findByRole('option', { name: 'Spending', hidden: true }));
     expect(screen.getByLabelText('Group', { selector: 'input' })).toHaveValue('Bills');
+  });
+});
+
+type MutateOptions = { onSuccess?: () => void; onError?: (error: Error) => void };
+
+describe('Categories page create outcome', () => {
+  it('keeps the typed name and shows the error with Retry when the create fails', async () => {
+    state.create.mockImplementation((_vars: unknown, options: MutateOptions) => options.onError?.(new Error('boom')));
+    const user = userEvent.setup();
+    renderPage();
+    await user.type(screen.getByLabelText('New category'), 'Padel club');
+    await user.click(screen.getByRole('button', { name: 'Add' }));
+
+    expect(screen.getByLabelText('New category')).toHaveValue('Padel club');
+    expect(screen.getByRole('status')).toHaveTextContent("Couldn't save.");
+
+    await user.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(state.create).toHaveBeenCalledTimes(2);
+  });
+
+  it('clears the name and shows Saved once the create succeeds', async () => {
+    state.create.mockImplementation((_vars: unknown, options: MutateOptions) => options.onSuccess?.());
+    const user = userEvent.setup();
+    renderPage();
+    await user.type(screen.getByLabelText('New category'), 'Padel club');
+    await user.click(screen.getByRole('button', { name: 'Add' }));
+
+    expect(screen.getByLabelText('New category')).toHaveValue('');
+    expect(screen.getByRole('status')).toHaveTextContent('Saved');
+  });
+});
+
+describe('Categories page delete outcome', () => {
+  async function deletePadelMovingTo(targetName: string): Promise<void> {
+    const user = userEvent.setup();
+    renderPage();
+    await user.click(screen.getByRole('button', { name: 'Delete' }));
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByLabelText('Move transactions to'));
+    await user.click(await screen.findByRole('option', { name: targetName, hidden: true }));
+    await user.click(within(dialog).getByRole('button', { name: 'Move and delete' }));
+  }
+
+  it('says the transactions moved when only the delete step fails', async () => {
+    state.remove.mockRejectedValue(new Error('boom'));
+    await deletePadelMovingTo('🛒 Groceries');
+    expect(await screen.findByText("Transactions moved to Groceries; the category wasn't deleted. Try again.")).toBeInTheDocument();
+    expect(state.reassign).toHaveBeenCalledWith({ categoryId: 'custom-1', toCategoryId: 'cat-groceries' });
+  });
+
+  it('says the category was not deleted when moving the transactions fails', async () => {
+    state.reassign.mockRejectedValue(new Error('boom'));
+    await deletePadelMovingTo('🛒 Groceries');
+    expect(await screen.findByText(
+      "Couldn't move the transactions to Groceries, so Padel wasn't deleted. Some transactions may already have moved. Try again.",
+    )).toBeInTheDocument();
+    expect(state.remove).not.toHaveBeenCalled();
   });
 });
 

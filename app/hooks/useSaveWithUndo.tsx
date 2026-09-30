@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth0 } from '@auth0/auth0-react';
 import { notifications } from '@mantine/notifications';
-import { TOAST_MS, ToastAction } from '~/components/layout/ToastAction';
+import { ToastAction } from '~/components/layout/ToastAction';
 import { ApiError } from '~/lib/apiError';
 import type { TransactionInput } from '~/lib/api';
 import { formatPence } from '~/lib/money';
@@ -9,6 +9,11 @@ import { enqueue } from '~/lib/offlineQueue';
 import { clearPendingEntry, discardQueuedEntry, setPendingEntry } from '~/lib/pendingEntries';
 import { useCategories, useCreateTransaction, useDeleteTransaction } from '~/lib/queries';
 import type { Transaction } from '~/lib/types';
+
+// Module-level so that saves made from different components (the Add sheet,
+// the Due card) still replace each other's notification: only the most
+// recent save's Undo is on screen at a time.
+let latestSaveToastId: string | null = null;
 
 export interface SaveOptions {
   onUndo?: () => void;
@@ -32,6 +37,7 @@ export function useSaveWithUndo(): (input: TransactionInput, options?: SaveOptio
       id: toastId,
       color: 'danger',
       autoClose: false,
+      closeButtonProps: { 'aria-label': 'Close notification' },
       message: (
         <ToastAction
           text={`Couldn't save ${describeInput(input)}`}
@@ -45,11 +51,31 @@ export function useSaveWithUndo(): (input: TransactionInput, options?: SaveOptio
     });
   }
 
+  function showSaveToast(toastId: string, text: string, onUndo: () => void): void {
+    if (latestSaveToastId && latestSaveToastId !== toastId) notifications.hide(latestSaveToastId);
+    latestSaveToastId = toastId;
+    notifications.show({
+      id: toastId,
+      autoClose: false,
+      withCloseButton: true,
+      closeButtonProps: { 'aria-label': 'Close notification' },
+      message: <ToastAction text={text} actionLabel="Undo" onAction={onUndo} />,
+    });
+  }
+
+  function relabelSaveToast(toastId: string, text: string, onUndo: () => void): void {
+    notifications.update({
+      id: toastId,
+      message: <ToastAction text={text} actionLabel="Undo" onAction={onUndo} />,
+    });
+  }
+
   function save(input: TransactionInput, options?: SaveOptions): Promise<Transaction | null> {
     const toastId = `saved-${crypto.randomUUID()}`;
     const transactionId = crypto.randomUUID();
     const withId: TransactionInput = { ...input, transactionId };
     const queuedAt = new Date().toISOString();
+    const description = describeInput(input);
     let undone = false;
 
     // Show the row immediately, the same instant Save is pressed, whether
@@ -60,8 +86,11 @@ export function useSaveWithUndo(): (input: TransactionInput, options?: SaveOptio
     // must not show the banner, the pending badge, or a Discard action.
     setPendingEntry(qc, { id: transactionId, input, queuedAt, userSub, queued: false });
 
-    const outcome = create.mutateAsync(withId).then(
-      created => created,
+    const outcome: Promise<Transaction | null> = create.mutateAsync(withId).then(
+      created => {
+        if (!undone) relabelSaveToast(toastId, `Saved ${description}`, undo);
+        return created;
+      },
       async (error: unknown) => {
         if (error instanceof ApiError) {
           notifications.hide(toastId);
@@ -83,59 +112,32 @@ export function useSaveWithUndo(): (input: TransactionInput, options?: SaveOptio
 
         // Network failure: persist it so it survives a reload, and keep the
         // row showing (via the pending map already set above) until the next
-        // successful flush. Deliberately does NOT hide the Saved/Undo toast
-        // here — that used to happen on every rejection, which for an
-        // offline failure (near-instant) left Undo a window of milliseconds.
+        // successful flush. The Undo notification stays open, relabelled.
         await enqueue({ id: transactionId, input, queuedAt, userSub });
         setPendingEntry(qc, { id: transactionId, input, queuedAt, userSub, queued: true });
-        notifications.update({
-          id: toastId,
-          message: (
-            <ToastAction
-              text={`Saved offline · ${describeInput(input)}`}
-              actionLabel="Undo"
-              onAction={() => {
-                undone = true;
-                notifications.hide(toastId);
-                void outcome.then(async created => {
-                  if (created) return;
-                  await discardQueuedEntry(qc, transactionId);
-                  options?.onUndo?.();
-                });
-              }}
-            />
-          ),
-        });
+        relabelSaveToast(toastId, `Saved offline · ${description}`, undo);
         return null;
       },
     );
 
-    notifications.show({
-      id: toastId,
-      autoClose: TOAST_MS,
-      message: (
-        <ToastAction
-          text={`Saved ${describeInput(input)}`}
-          actionLabel="Undo"
-          onAction={() => {
-            undone = true;
-            notifications.hide(toastId);
-            void outcome.then(async created => {
-              if (created) {
-                remove.mutate({ transactionId: created.transactionId, yearMonth: created.yearMonth });
-                options?.onUndo?.();
-                return;
-              }
-              // Not created yet: either still in flight (the rejection
-              // handler above will see `undone` and discard it once it
-              // lands) or already queued (discard it now).
-              await discardQueuedEntry(qc, transactionId);
-              options?.onUndo?.();
-            });
-          }}
-        />
-      ),
-    });
+    function undo(): void {
+      undone = true;
+      notifications.hide(toastId);
+      void outcome.then(async created => {
+        if (created) {
+          remove.mutate({ transactionId: created.transactionId, yearMonth: created.yearMonth });
+          options?.onUndo?.();
+          return;
+        }
+        // Not created yet: either still in flight (the rejection handler
+        // above will see `undone` and discard it once it lands) or already
+        // queued (discard it now).
+        await discardQueuedEntry(qc, transactionId);
+        options?.onUndo?.();
+      });
+    }
+
+    showSaveToast(toastId, `Saving ${description}…`, undo);
 
     return outcome;
   }
