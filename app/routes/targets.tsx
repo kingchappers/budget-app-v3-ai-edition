@@ -7,6 +7,8 @@ import { groupCategories } from '~/lib/categoryGroups';
 import { formatPencePlain, parsePounds } from '~/lib/money';
 import { useCategories, useDeleteTarget, useSetTarget, useTargets } from '~/lib/queries';
 import type { Category, TargetPeriod } from '~/lib/types';
+import { pageTitle } from '~/lib/pageTitle';
+import type { Route } from './+types/targets';
 
 function isDirty(value: string, period: TargetPeriod, savedPence: number | null, savedPeriod: TargetPeriod): boolean {
   if (period !== savedPeriod) return true;
@@ -124,6 +126,8 @@ function TargetsContent() {
     </Stack>
   );
 }
+
+export const meta: Route.MetaFunction = () => [{ title: pageTitle('Targets') }];
 
 export default function Targets() {
   return (

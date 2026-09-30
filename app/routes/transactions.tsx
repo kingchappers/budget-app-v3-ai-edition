@@ -10,9 +10,12 @@ import { useOfflineQueue } from '~/hooks/useOfflineQueue';
 import { filterTransactions, type TransactionFilter } from '~/lib/transactions';
 import { categorySelectData } from '~/lib/categoryGroups';
 import { formatPence } from '~/lib/money';
-import { currentYearMonth } from '~/lib/months';
+import { currentYearMonth, formatMonthLabel } from '~/lib/months';
+import { useDocumentTitle } from '~/hooks/useDocumentTitle';
 import { useCategories, useDeleteTransaction, useTransactions } from '~/lib/queries';
 import type { Transaction, TransactionType } from '~/lib/types';
+import { pageTitle } from '~/lib/pageTitle';
+import type { Route } from './+types/transactions';
 
 const TYPE_OPTIONS: { value: TransactionType; label: string }[] = [
   { value: 'EXPENSE', label: 'Expense' },
@@ -23,6 +26,7 @@ const TYPE_OPTIONS: { value: TransactionType; label: string }[] = [
 
 function TransactionsContent() {
   const [yearMonth, setYearMonth] = useState(currentYearMonth());
+  useDocumentTitle(pageTitle('Transactions', formatMonthLabel(yearMonth)));
   const [editing, setEditing] = useState<Transaction | null>(null);
   const [duplicating, setDuplicating] = useState<Transaction | null>(null);
   const [repeating, setRepeating] = useState<Transaction | null>(null);
@@ -156,6 +160,8 @@ function TransactionsContent() {
     </Stack>
   );
 }
+
+export const meta: Route.MetaFunction = () => [{ title: pageTitle('Transactions') }];
 
 export default function Transactions() {
   return (
