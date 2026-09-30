@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MantineProvider } from '@mantine/core';
 import type { Category, Recurring, Transaction } from '~/lib/types';
@@ -10,7 +10,7 @@ const mockHandled = vi.fn();
 let mockMonthTransactions: Record<string, { data?: Transaction[]; isLoading: boolean }>;
 let mockQuery: { data?: Recurring[]; isLoading: boolean; error: Error | null };
 let mockCategories: Category[] | undefined;
-let mockDeleteError: Error | null;
+const mockUndoableDelete = vi.fn();
 
 const categories: Category[] = [
   { categoryId: 'cat-salary', name: 'Salary', type: 'INCOME', icon: 'briefcase', isDefault: true, createdAt: '' },
@@ -34,10 +34,11 @@ vi.mock('~/components/recurring/RecurringForm', () => ({
 vi.mock('~/lib/queries', () => ({
   useRecurring: () => ({ ...mockQuery, refetch: mockRefetch }),
   useCategories: () => ({ data: mockCategories }),
-  useDeleteRecurring: () => ({ mutate: mockDelete, error: mockDeleteError }),
+  useDeleteRecurring: () => ({ mutateAsync: mockDelete }),
   useSetRecurringHandled: () => ({ mutate: mockHandled }),
   useTransactions: (month: string) => mockMonthTransactions[month] ?? { data: [], isLoading: false },
 }));
+vi.mock('~/hooks/useUndoableDelete', () => ({ useUndoableDelete: () => mockUndoableDelete }));
 
 import RecurringPage from '../recurring';
 
@@ -55,7 +56,7 @@ describe('Recurring page', () => {
     mockRefetch.mockReset();
     mockQuery = { data: [], isLoading: false, error: null };
     mockCategories = categories;
-    mockDeleteError = null;
+    mockUndoableDelete.mockReset();
     mockHandled.mockReset();
     mockMonthTransactions = {};
     vi.useFakeTimers({ toFake: ['Date'] });
@@ -167,103 +168,36 @@ describe('Recurring page', () => {
     expect(screen.getByText('Form editing Salary')).toBeInTheDocument();
   });
 
-  async function chooseDeleteFor(user: ReturnType<typeof userEvent.setup>, label: string): Promise<HTMLElement> {
+  async function chooseDelete(user: ReturnType<typeof userEvent.setup>, label: string): Promise<void> {
     await user.click(screen.getByRole('button', { name: `Actions for ${label}` }));
     await user.click(await screen.findByRole('menuitem', { name: 'Delete' }));
-    return screen.findByRole('dialog', { name: 'Delete recurring item' });
   }
 
-  async function chooseDelete(user: ReturnType<typeof userEvent.setup>): Promise<HTMLElement> {
-    return chooseDeleteFor(user, 'Salary');
-  }
-
-  it('asks for confirmation before deleting and names the item', async () => {
+  it('deletes straight away with an undoable delete, without asking first', async () => {
     const user = userEvent.setup();
     mockQuery.data = [rec({ recurringId: 'r9' })];
     renderPage();
 
-    const dialog = await chooseDelete(user);
+    await chooseDelete(user, 'Salary');
 
-    expect(within(dialog).getByText("Delete Salary? This can't be undone.")).toBeInTheDocument();
-    expect(mockDelete).not.toHaveBeenCalled();
-  });
-
-  it('names the delete dialog after the category when there is no description', async () => {
-    const user = userEvent.setup();
-    mockQuery.data = [rec({ recurringId: 'r9', description: '', categoryId: 'cat-housing' })];
-    renderPage();
-
-    await user.click(screen.getByRole('button', { name: 'Actions for Housing' }));
-    await user.click(await screen.findByRole('menuitem', { name: 'Delete' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Delete recurring item' });
-
-    expect(within(dialog).getByText("Delete Housing? This can't be undone.")).toBeInTheDocument();
-  });
-
-  it('keeps showing the item label while the dialog closes', async () => {
-    const user = userEvent.setup();
-    mockQuery.data = [rec({ recurringId: 'r9', description: '', categoryId: 'cat-housing' })];
-    renderPage();
-
-    const dialog = await chooseDeleteFor(user, 'Housing');
-    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
-
-    expect(within(dialog).getByText("Delete Housing? This can't be undone.")).toBeInTheDocument();
-    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
-  });
-
-  it('deletes the item when Delete is confirmed', async () => {
-    const user = userEvent.setup();
-    mockQuery.data = [rec({ recurringId: 'r9' })];
-    renderPage();
-
-    const dialog = await chooseDelete(user);
-    await user.click(within(dialog).getByRole('button', { name: 'Delete' }));
-
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(mockUndoableDelete).toHaveBeenCalledWith(expect.objectContaining({
+      label: '£2,400.00 · Salary',
+      name: 'Salary',
+      ref: { entityType: 'RECURRING', id: 'r9' },
+    }));
+    await mockUndoableDelete.mock.calls[0][0].run();
     expect(mockDelete).toHaveBeenCalledWith('r9');
   });
 
-  it('deletes only once even if Delete is clicked twice', async () => {
+  it('names the item after its category when there is no description', async () => {
     const user = userEvent.setup();
-    mockQuery.data = [rec({ recurringId: 'r9' })];
+    mockQuery.data = [rec({ recurringId: 'r9', description: '', categoryId: 'cat-housing', amount: 95000 })];
     renderPage();
 
-    const dialog = await chooseDelete(user);
-    await user.dblClick(within(dialog).getByRole('button', { name: 'Delete' }));
+    await chooseDelete(user, 'Housing');
 
-    expect(mockDelete).toHaveBeenCalledTimes(1);
-  });
-
-  it('does not delete when Cancel is pressed', async () => {
-    const user = userEvent.setup();
-    mockQuery.data = [rec({ recurringId: 'r9' })];
-    renderPage();
-
-    const dialog = await chooseDelete(user);
-    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
-
-    expect(mockDelete).not.toHaveBeenCalled();
-    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Delete recurring item' })).not.toBeInTheDocument());
-  });
-
-  it('does not delete when the dialog is dismissed with Escape', async () => {
-    const user = userEvent.setup();
-    mockQuery.data = [rec({ recurringId: 'r9' })];
-    renderPage();
-
-    await chooseDelete(user);
-    await user.keyboard('{Escape}');
-
-    expect(mockDelete).not.toHaveBeenCalled();
-    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Delete recurring item' })).not.toBeInTheDocument());
-  });
-
-  it('shows why a delete failed', () => {
-    mockQuery.data = [rec({})];
-    mockDeleteError = new Error('nope');
-    renderPage();
-    expect(screen.getByText('Could not delete the recurring item')).toBeInTheDocument();
-    expect(screen.getByText('nope')).toBeInTheDocument();
+    expect(mockUndoableDelete).toHaveBeenCalledWith(expect.objectContaining({ label: '£950.00 · Housing', name: 'Housing' }));
   });
 
   it('offers a retry when loading fails', async () => {

@@ -1,3 +1,4 @@
+import type { TrashEntityType, TrashEntry } from './trash';
 import type { Account, AccountKind, AccountType, Category, CategoryGroup, CategoryTarget, PotSettingsInput, PotSummary, Recurring, TargetPeriod, Transaction, TransactionType } from './types';
 
 type Request = (endpoint: string, options?: RequestInit) => Promise<unknown>;
@@ -158,6 +159,17 @@ export function createApi(request: Request) {
         body: JSON.stringify(input),
       }) as { account: Account };
       return res.account;
+    },
+
+    getTrash: async (): Promise<TrashEntry[]> => {
+      const res = await request('/api/trash') as { items: TrashEntry[] };
+      return res.items;
+    },
+    restoreFromTrash: async (entityType: TrashEntityType, id: string): Promise<void> => {
+      await request('/api/trash/restore', {
+        method: 'POST',
+        body: JSON.stringify({ entityType, id }),
+      });
     },
   };
 }

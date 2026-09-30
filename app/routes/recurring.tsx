@@ -1,12 +1,14 @@
 import { useState } from 'react';
-import { ActionIcon, Alert, Button, Group, Loader, Menu, Modal, Stack, Text, ThemeIcon, Title } from '@mantine/core';
+import { ActionIcon, Alert, Button, Group, Loader, Menu, Stack, Text, ThemeIcon, Title } from '@mantine/core';
 import { IconDots, IconPencil, IconPlus, IconTrash } from '@tabler/icons-react';
 import { DefaultLayout } from '~/components/layout/DefaultLayout';
 import { RecurringForm } from '~/components/recurring/RecurringForm';
 import { CategoryIcon } from '~/components/categories/CategoryIcon';
+import { useUndoableDelete } from '~/hooks/useUndoableDelete';
 import { formatMonthName, shiftMonth, todayIso } from '~/lib/months';
 import { useCategories, useDeleteRecurring, useRecurring, useSetRecurringHandled, useTransactions } from '~/lib/queries';
 import { formatDayOfMonth, skippedPeriod } from '~/lib/recurring';
+import { transactionLabel } from '~/lib/trash';
 import { formatSignedPence } from '~/lib/transactionTypes';
 import type { Category, Recurring, Transaction } from '~/lib/types';
 import { pageTitle } from '~/lib/pageTitle';
@@ -94,26 +96,24 @@ function RecurringContent() {
   const categories = useCategories();
   const remove = useDeleteRecurring();
   const setHandled = useSetRecurringHandled();
+  const undoableDelete = useUndoableDelete();
   const today = todayIso();
   const windowTransactions = useSkipWindowTransactions(today);
   const [editing, setEditing] = useState<Recurring | null>(null);
   const [creating, setCreating] = useState(false);
-  const [pendingDelete, setPendingDelete] = useState<Recurring | null>(null);
-  const [deletingLabel, setDeletingLabel] = useState<string | null>(null);
-
-  function requestDelete(item: Recurring): void {
-    setPendingDelete(item);
-    setDeletingLabel(recurringLabel(item, categories.data?.find(c => c.categoryId === item.categoryId)));
-  }
 
   function undoSkip(item: Recurring, skipped: string): void {
     setHandled.mutate({ recurringId: item.recurringId, period: shiftMonth(skipped, -1) });
   }
 
-  function confirmDelete(): void {
-    if (!pendingDelete) return;
-    remove.mutate(pendingDelete.recurringId);
-    setPendingDelete(null);
+  function deleteItem(item: Recurring): void {
+    const name = recurringLabel(item, categories.data?.find(c => c.categoryId === item.categoryId));
+    undoableDelete({
+      label: transactionLabel({ amount: item.amount, description: '' }, name),
+      name,
+      ref: { entityType: 'RECURRING', id: item.recurringId },
+      run: () => remove.mutateAsync(item.recurringId),
+    });
   }
 
   if (recurring.error) {
@@ -135,10 +135,6 @@ function RecurringContent() {
         <Button leftSection={<IconPlus size={16} />} onClick={() => setCreating(true)}>New</Button>
       </Group>
 
-      {remove.error && (
-        <Alert color="danger" title="Could not delete the recurring item">{remove.error.message}</Alert>
-      )}
-
       {items.length === 0 && (
         <Text c="dimmed">No recurring items yet. Use Repeat monthly on a transaction, or add one here.</Text>
       )}
@@ -151,7 +147,7 @@ function RecurringContent() {
           categoriesLoaded={categories.data !== undefined}
           skipped={windowTransactions === null ? null : skippedPeriod(item, windowTransactions, today)}
           onEdit={setEditing}
-          onDelete={requestDelete}
+          onDelete={deleteItem}
           onUndoSkip={undoSkip}
         />
       ))}
@@ -164,22 +160,6 @@ function RecurringContent() {
         }}
         editing={editing}
       />
-
-      <Modal
-        opened={pendingDelete !== null}
-        onClose={() => setPendingDelete(null)}
-        onExitTransitionEnd={() => setDeletingLabel(null)}
-        title="Delete recurring item"
-        centered
-      >
-        <Stack>
-          <Text>Delete {deletingLabel}? This can't be undone.</Text>
-          <Group justify="flex-end">
-            <Button variant="default" onClick={() => setPendingDelete(null)}>Cancel</Button>
-            <Button color="danger" onClick={confirmDelete}>Delete</Button>
-          </Group>
-        </Stack>
-      </Modal>
     </Stack>
   );
 }

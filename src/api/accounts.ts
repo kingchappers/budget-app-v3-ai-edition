@@ -1,10 +1,11 @@
-import { PutCommand, DeleteCommand } from '@aws-sdk/lib-dynamodb';
+import { PutCommand } from '@aws-sdk/lib-dynamodb';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { docClient, TABLE, pk, accountSk } from './db';
 import { queryAll, queryOne } from './pots';
 import { ASSET_TYPES, LIABILITY_TYPES, MAX_AMOUNT_PENCE, MAX_BALANCE_ENTRIES, SECURITY_HEADERS } from './constants';
 import type { Account, AccountKind, AccountType, ApiResponse, BalanceEntry } from './types';
 import { ok, err } from './http';
+import { moveToTrash } from './trash';
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const NAME_MAX_LENGTH = 50;
@@ -163,10 +164,7 @@ export async function deleteAccount(
     return err(400, 'accountId is required');
   }
 
-  await docClient.send(new DeleteCommand({
-    TableName: TABLE,
-    Key: { PK: pk(userId), SK: accountSk(accountId) },
-  }));
+  await moveToTrash(userId, 'ACCOUNT', accountSk(accountId));
 
   return { statusCode: 204, headers: SECURITY_HEADERS, body: '' };
 }

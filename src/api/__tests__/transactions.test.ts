@@ -12,7 +12,6 @@ vi.mock('../db', () => ({
 vi.mock('@aws-sdk/lib-dynamodb', () => ({
   QueryCommand: vi.fn(function(i: unknown) { return i; }),
   PutCommand: vi.fn(function(i: unknown) { return i; }),
-  DeleteCommand: vi.fn(function(i: unknown) { return i; }),
   GetCommand: vi.fn(function(i: unknown) { return i; }),
   TransactWriteCommand: vi.fn(function(i: unknown) { return i; }),
 }));
@@ -226,7 +225,20 @@ describe('validateTransactionInput', () => {
 describe('deleteTransaction', () => {
   beforeEach(() => { mockSend.mockReset(); });
 
-  it('deletes a transaction and returns 204', async () => {
+  it('moves the transaction to the trash in one transaction and returns 204', async () => {
+    mockSend.mockResolvedValueOnce({ Item: { PK: 'USER#user-1', SK: 'TXN#2025-01#some-uuid', transactionId: 'some-uuid' } });
+    mockSend.mockResolvedValueOnce({});
+    const res = await deleteTransaction(makeEvent(), 'user-1', { yearMonth: '2025-01', transactionId: 'some-uuid' });
+    expect(res.statusCode).toBe(204);
+    expect(res.body).toBe('');
+    const { TransactItems } = mockSend.mock.calls[1][0];
+    expect(TransactItems[0].Delete.Key).toEqual({ PK: 'USER#user-1', SK: 'TXN#2025-01#some-uuid' });
+    expect(TransactItems[1].Put.Item).toMatchObject({
+      PK: 'USER#user-1', SK: 'TRASH#TRANSACTION#2025-01#some-uuid', entityType: 'TRANSACTION', item: { transactionId: 'some-uuid' },
+    });
+  });
+
+  it('returns 204 without writing when the transaction is already gone', async () => {
     mockSend.mockResolvedValueOnce({});
     const res = await deleteTransaction(makeEvent(), 'user-1', { yearMonth: '2025-01', transactionId: 'some-uuid' });
     expect(res.statusCode).toBe(204);

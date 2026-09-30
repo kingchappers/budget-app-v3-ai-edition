@@ -1,10 +1,11 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient, type QueryClient, type QueryKey } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import { useAuth0 } from '@auth0/auth0-react';
 import { useProtectedApi } from '~/hooks/useProtectedApi';
 import { createApi, type RecurringInput, type TransactionInput } from './api';
 import { clearPendingEntry, OFFLINE_QUEUE_KEY, pendingRowsForMonth, type PendingMap } from './pendingEntries';
-import type { Account, Category, CategoryGroup, PotSettingsInput, Recurring, TargetPeriod, Transaction } from './types';
+import type { TrashEntityType, TrashRef } from './trash';
+import type { Account, Category, CategoryGroup, CategoryTarget, PotSettingsInput, Recurring, TargetPeriod, Transaction } from './types';
 
 export const queryKeys = {
   categories: ['categories'] as const,
@@ -15,6 +16,7 @@ export const queryKeys = {
   pots: (asOf: string) => ['pots', asOf] as const,
   offlineQueue: OFFLINE_QUEUE_KEY,
   accounts: ['accounts'] as const,
+  trash: ['trash'] as const,
 };
 
 export function useApi() {
@@ -179,16 +181,47 @@ export function useLinkTransaction() {
   });
 }
 
+interface RemovedRow<T> {
+  removed: T | undefined;
+}
+
+// Hides a row the instant a delete starts, so it never lingers on screen
+// while the request is in flight. Returns the removed row so a failed
+// delete can put exactly that row back without clobbering other changes.
+async function removeRow<T>(qc: QueryClient, queryKey: QueryKey, matches: (row: T) => boolean): Promise<RemovedRow<T>> {
+  await qc.cancelQueries({ queryKey });
+  const removed = qc.getQueryData<T[]>(queryKey)?.find(matches);
+  qc.setQueryData<T[]>(queryKey, rows => rows?.filter(row => !matches(row)));
+  return { removed };
+}
+
+function restoreRow<T>(qc: QueryClient, queryKey: QueryKey, context: RemovedRow<T> | undefined, matches: (row: T) => boolean): void {
+  const removed = context?.removed;
+  if (removed === undefined) return;
+  qc.setQueryData<T[]>(queryKey, rows => {
+    if (!rows || rows.some(matches)) return rows;
+    return [...rows, removed];
+  });
+}
+
+interface DeleteTransactionVars {
+  transactionId: string;
+  yearMonth: string;
+}
+
 export function useDeleteTransaction() {
   const api = useApi();
   const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (vars: { transactionId: string; yearMonth: string }) =>
-      api.deleteTransaction(vars.yearMonth, vars.transactionId),
-    onSuccess: (_data, vars) => {
+  const matches = (vars: DeleteTransactionVars) => (row: Transaction): boolean => row.transactionId === vars.transactionId;
+  return useMutation<void, Error, DeleteTransactionVars, RemovedRow<Transaction>>({
+    mutationFn: (vars) => api.deleteTransaction(vars.yearMonth, vars.transactionId),
+    onMutate: (vars) => removeRow(qc, queryKeys.transactions(vars.yearMonth), matches(vars)),
+    onError: (_error, vars, context) => restoreRow(qc, queryKeys.transactions(vars.yearMonth), context, matches(vars)),
+    onSettled: (_data, _error, vars) => {
       qc.invalidateQueries({ queryKey: queryKeys.transactions(vars.yearMonth) });
       qc.invalidateQueries({ queryKey: ['pots'] });
       qc.invalidateQueries({ queryKey: ['transactionsRange'] });
+      qc.invalidateQueries({ queryKey: queryKeys.trash });
     },
   });
 }
@@ -206,9 +239,15 @@ export function useSetTarget() {
 export function useDeleteTarget() {
   const api = useApi();
   const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (categoryId: string) => api.deleteTarget(categoryId),
-    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.targets }),
+  const matches = (categoryId: string) => (row: CategoryTarget): boolean => row.categoryId === categoryId;
+  return useMutation<void, Error, string, RemovedRow<CategoryTarget>>({
+    mutationFn: (categoryId) => api.deleteTarget(categoryId),
+    onMutate: (categoryId) => removeRow(qc, queryKeys.targets, matches(categoryId)),
+    onError: (_error, categoryId, context) => restoreRow(qc, queryKeys.targets, context, matches(categoryId)),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.targets });
+      qc.invalidateQueries({ queryKey: queryKeys.trash });
+    },
   });
 }
 
@@ -327,9 +366,15 @@ export function useUpdateRecurring() {
 export function useDeleteRecurring() {
   const api = useApi();
   const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (recurringId: string) => api.deleteRecurring(recurringId),
-    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.recurring }),
+  const matches = (recurringId: string) => (row: Recurring): boolean => row.recurringId === recurringId;
+  return useMutation<void, Error, string, RemovedRow<Recurring>>({
+    mutationFn: (recurringId) => api.deleteRecurring(recurringId),
+    onMutate: (recurringId) => removeRow(qc, queryKeys.recurring, matches(recurringId)),
+    onError: (_error, recurringId, context) => restoreRow(qc, queryKeys.recurring, context, matches(recurringId)),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.recurring });
+      qc.invalidateQueries({ queryKey: queryKeys.trash });
+    },
   });
 }
 
@@ -396,9 +441,15 @@ export function useUpdateAccount() {
 export function useDeleteAccount() {
   const api = useApi();
   const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (accountId: string) => api.deleteAccount(accountId),
-    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.accounts }),
+  const matches = (accountId: string) => (row: Account): boolean => row.accountId === accountId;
+  return useMutation<void, Error, string, RemovedRow<Account>>({
+    mutationFn: (accountId) => api.deleteAccount(accountId),
+    onMutate: (accountId) => removeRow(qc, queryKeys.accounts, matches(accountId)),
+    onError: (_error, accountId, context) => restoreRow(qc, queryKeys.accounts, context, matches(accountId)),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.accounts });
+      qc.invalidateQueries({ queryKey: queryKeys.trash });
+    },
   });
 }
 
@@ -409,5 +460,34 @@ export function useAddBalance() {
     mutationFn: (vars: { accountId: string; input: { date: string; pence: number } }) =>
       api.addBalance(vars.accountId, vars.input),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.accounts }),
+  });
+}
+
+export function useTrash() {
+  const api = useApi();
+  const enabled = useAuthReady();
+  return useQuery({
+    queryKey: queryKeys.trash,
+    queryFn: () => api.getTrash(),
+    enabled,
+  });
+}
+
+const RESTORED_LISTS: Record<TrashEntityType, QueryKey[]> = {
+  TRANSACTION: [['transactions'], ['pots'], ['transactionsRange']],
+  TARGET: [queryKeys.targets],
+  RECURRING: [queryKeys.recurring],
+  ACCOUNT: [queryKeys.accounts],
+};
+
+export function useRestoreFromTrash() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation<void, Error, TrashRef>({
+    mutationFn: (ref) => api.restoreFromTrash(ref.entityType, ref.id),
+    onSettled: (_data, _error, ref) => {
+      qc.invalidateQueries({ queryKey: queryKeys.trash });
+      RESTORED_LISTS[ref.entityType].forEach(queryKey => qc.invalidateQueries({ queryKey }));
+    },
   });
 }
