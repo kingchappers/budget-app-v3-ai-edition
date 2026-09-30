@@ -7,6 +7,7 @@ import { MemoryRouter } from 'react-router';
 vi.mock('~/components/layout/DefaultLayout', () => ({
   DefaultLayout: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
+vi.mock('~/components/layout/GuidedTour', () => ({ GuidedTour: () => null }));
 vi.mock('~/components/recurring/DueRecurringCard', () => ({ DueRecurringCard: () => <div>Due card</div> }));
 vi.mock('~/hooks/useOfflineQueue', () => ({ useOfflineQueue: () => ({ pendingMap: {}, flushNow: vi.fn(), discard: vi.fn() }) }));
 vi.mock('~/components/transactions/TransactionSheet', () => ({

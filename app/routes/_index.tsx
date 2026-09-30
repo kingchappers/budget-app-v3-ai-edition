@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router';
 import { Alert, Button, Group, Loader, Stack, Text, Title } from '@mantine/core';
 import { DefaultLayout } from '~/components/layout/DefaultLayout';
+import { GuidedTour } from '~/components/layout/GuidedTour';
 import { MonthHeader } from '~/components/budget/MonthHeader';
 import { CategoryProgressRow } from '~/components/budget/CategoryProgressRow';
 import { HomeSummary, OtherSpendingRow } from '~/components/budget/HomeSummary';
@@ -139,6 +140,7 @@ export default function Home() {
   return (
     <DefaultLayout>
       <HomeContent />
+      <GuidedTour />
     </DefaultLayout>
   );
 }

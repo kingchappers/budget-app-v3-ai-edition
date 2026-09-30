@@ -59,4 +59,13 @@ describe('Settings page', () => {
     expect(screen.getByRole('switch', { name: /^Press N to add a transaction/ })).not.toBeChecked();
     expect(screen.getByRole('switch', { name: /^Open Add sheet when the installed app starts/ })).toBeChecked();
   });
+
+  it('restarts the guided tour from the beginning', async () => {
+    writePreferences(window.localStorage, { ...DEFAULT_PREFERENCES, tourStep: 3 });
+    renderSettings();
+
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Take the tour again' }));
+
+    expect(readPreferences(window.localStorage).tourStep).toBe(0);
+  });
 });
