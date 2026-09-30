@@ -228,6 +228,20 @@ describe('useSaveWithUndo', () => {
     expect(mockCreate.mutateAsync).toHaveBeenCalledWith(expect.objectContaining({ transactionId: expect.any(String) }));
   });
 
+  it('passes a recurringId through to the create call and the offline queue unchanged', async () => {
+    const recurringId = '3f2b8c1e-9a4d-4e7f-b1c2-0d9e8f7a6b5c';
+    mockCreate.mutateAsync.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    const { result, qc } = renderSaveWithUndo();
+    await act(async () => {
+      await result.current({ amount: 500, type: 'EXPENSE', categoryId: 'cat-1', description: '', date: '2025-01-05', recurringId });
+    });
+    expect(mockCreate.mutateAsync).toHaveBeenCalledWith(expect.objectContaining({ recurringId }));
+    const [queued] = await listQueue();
+    expect(queued.input.recurringId).toBe(recurringId);
+    const pending = qc.getQueryData<Record<string, { input: { recurringId?: string } }>>(queryKeys.offlineQueue) ?? {};
+    expect(Object.values(pending).map(entry => entry.input.recurringId)).toEqual([recurringId]);
+  });
+
   it('Undo on a queued (unsent) entry removes it from the queue with no delete call', async () => {
     mockCreate.mutateAsync.mockImplementation(() => new Promise((_resolve, reject) => setTimeout(() => reject(new TypeError('Failed to fetch')), 5)));
     const { result } = renderSaveWithUndo();

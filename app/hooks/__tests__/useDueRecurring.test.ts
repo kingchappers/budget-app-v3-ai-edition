@@ -27,7 +27,7 @@ import { useDueRecurring } from '../useDueRecurring';
 function rec(over: Partial<Recurring>): Recurring {
   return {
     recurringId: 'r1', type: 'INCOME', categoryId: 'cat-salary', amount: 240000, description: 'Salary',
-    dayOfMonth: 28, leadDays: 3, handledPeriod: null, createdAt: '', updatedAt: '', ...over,
+    dayOfMonth: 28, leadDays: 3, handledPeriod: null, createdAt: '2026-09-01T09:00:00.000Z', updatedAt: '', ...over,
   };
 }
 
@@ -74,8 +74,21 @@ describe('useDueRecurring', () => {
     expect(result.current.items[0]).toMatchObject({ status: 'today', dueDate: '2026-09-28', period: '2026-09' });
   });
 
-  it('drops an item that a transaction this month already covers', () => {
-    monthStates['2026-09'] = { data: [txn({})], isLoading: false };
+  it('asks for the three months before this one as well', () => {
+    renderHook(() => useDueRecurring());
+    expect(requestedMonths).toEqual(expect.arrayContaining(['2026-06', '2026-07', '2026-08']));
+  });
+
+  it('keeps an unlogged bill from an earlier month and clears it once a linked entry exists', () => {
+    recurringState = { data: [rec({ createdAt: '2026-08-01T09:00:00.000Z' })], isLoading: false, error: null, refetch: mockRefetch };
+    expect(renderHook(() => useDueRecurring()).result.current.items[0]).toMatchObject({ period: '2026-08' });
+
+    monthStates['2026-08'] = { data: [txn({ date: '2026-08-28', yearMonth: '2026-08', recurringId: 'r1' })], isLoading: false };
+    expect(renderHook(() => useDueRecurring()).result.current.items[0]).toMatchObject({ period: '2026-09' });
+  });
+
+  it('drops an item that a linked transaction this month already covers', () => {
+    monthStates['2026-09'] = { data: [txn({ recurringId: 'r1' })], isLoading: false };
     const { result } = renderHook(() => useDueRecurring());
     expect(result.current.items).toEqual([]);
   });
@@ -89,7 +102,7 @@ describe('useDueRecurring', () => {
     expect(unpaid.current.items[0]).toMatchObject({ period: '2026-10', dueDate: '2026-10-01' });
 
     monthStates['2026-10'] = {
-      data: [txn({ type: 'EXPENSE', categoryId: 'cat-housing', description: 'Rent', date: '2026-10-01', yearMonth: '2026-10' })],
+      data: [txn({ type: 'EXPENSE', categoryId: 'cat-housing', description: 'Rent', date: '2026-10-01', yearMonth: '2026-10', recurringId: 'rent' })],
       isLoading: false,
     };
     const { result: paid } = renderHook(() => useDueRecurring());

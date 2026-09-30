@@ -8,7 +8,7 @@ const request = vi.fn();
 vi.mock('~/hooks/useProtectedApi', () => ({ useProtectedApi: () => ({ request }) }));
 vi.mock('@auth0/auth0-react', () => ({ useAuth0: () => ({ isAuthenticated: true }) }));
 
-import { queryKeys, useCreateTransaction, useDeleteTransaction } from '../queries';
+import { queryKeys, useCreateTransaction, useDeleteTransaction, useLinkTransaction } from '../queries';
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -121,5 +121,36 @@ describe('pots invalidation', () => {
     await act(async () => { await result.current.mutateAsync({ transactionId: 't1', yearMonth: '2026-07' }); });
     expect(client.getQueryState(potsKey)?.isInvalidated).toBe(true);
     expect(client.getQueryState(['transactionsRange', '2026-01', '2026-07'])?.isInvalidated).toBe(true);
+  });
+});
+
+describe('useLinkTransaction', () => {
+  const recurringId = '3f2b8c1e-9a4d-4e7f-b1c2-0d9e8f7a6b5c';
+
+  it('sends the transaction back unchanged apart from the recurringId', async () => {
+    request.mockResolvedValue({ transaction: { ...existing, recurringId } });
+    const { result } = renderHook(() => useLinkTransaction(), { wrapper });
+
+    await act(async () => { await result.current.mutateAsync({ transaction: existing, recurringId }); });
+
+    const [url, options] = request.mock.calls[0];
+    expect(url).toBe('/api/transactions/2026-07/t1');
+    expect(options.method).toBe('PUT');
+    expect(JSON.parse(options.body)).toEqual({
+      amount: 100, type: 'EXPENSE', categoryId: 'cat-food', description: '', date: '2026-07-01', recurringId,
+    });
+  });
+
+  it('shows the link straight away and rolls it back if the save fails', async () => {
+    client.setQueryData(july, [existing]);
+    const pending = deferred<unknown>();
+    request.mockReturnValue(pending.promise);
+    const { result } = renderHook(() => useLinkTransaction(), { wrapper });
+
+    act(() => { result.current.mutate({ transaction: existing, recurringId }); });
+    await waitFor(() => expect(client.getQueryData<Transaction[]>(july)?.[0].recurringId).toBe(recurringId));
+
+    await act(async () => { pending.reject(new Error('offline')); });
+    await waitFor(() => expect(client.getQueryData<Transaction[]>(july)?.[0].recurringId).toBeUndefined());
   });
 });

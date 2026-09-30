@@ -38,6 +38,17 @@ describe('flushQueue', () => {
     expect(await listQueue()).toHaveLength(0);
   });
 
+  it('sends a queued entry\'s recurringId with it', async () => {
+    const recurringId = '3f2b8c1e-9a4d-4e7f-b1c2-0d9e8f7a6b5c';
+    await enqueue({ id: 'bill', queuedAt: '2025-01-05T10:00:00.000Z', userSub: 'user-1', input: { amount: 100, type: 'EXPENSE', categoryId: 'cat-1', description: '', date: '2025-01-05', recurringId } });
+    const api = makeApi();
+    (api.createTransaction as ReturnType<typeof vi.fn>).mockImplementation(async (input) => ({ ...input, yearMonth: '2025-01', createdAt: '' }));
+
+    await flushQueue(api, qc, 'user-1');
+
+    expect(api.createTransaction).toHaveBeenCalledWith(expect.objectContaining({ recurringId, transactionId: 'bill' }));
+  });
+
   it('never sends the next entry before the previous one settles', async () => {
     await enqueue({ id: 'a', queuedAt: '2025-01-05T10:00:00.000Z', userSub: 'user-1', input: { amount: 100, type: 'EXPENSE', categoryId: 'cat-1', description: '', date: '2025-01-05' } });
     await enqueue({ id: 'b', queuedAt: '2025-01-05T10:00:01.000Z', userSub: 'user-1', input: { amount: 100, type: 'EXPENSE', categoryId: 'cat-1', description: '', date: '2025-01-05' } });
