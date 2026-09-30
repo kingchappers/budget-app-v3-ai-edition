@@ -130,3 +130,11 @@ describe('DefaultLayout launch intent', () => {
     expect(window.sessionStorage.getItem(PENDING_ADD_KEY)).toBe('1');
   });
 });
+
+describe('DefaultLayout signed out (current behaviour)', () => {
+  it('renders the page and the add button as if the budget were empty', () => {
+    renderLayout(<p>Income this month £0.00</p>);
+    expect(screen.getByText('Income this month £0.00')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Add transaction' })).toBeInTheDocument();
+  });
+});
