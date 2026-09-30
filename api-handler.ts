@@ -13,6 +13,7 @@ import {
   getRecurring, createRecurring, updateRecurring, deleteRecurring, setRecurringHandled,
 } from './src/api/recurring';
 import { getAccounts, createAccount, updateAccount, deleteAccount, addBalance } from './src/api/accounts';
+import { getTrash, restoreFromTrash } from './src/api/trash';
 
 const AUTH0_DOMAIN = process.env.AUTH0_DOMAIN || '';
 const AUTH0_AUDIENCE = process.env.AUTH0_AUDIENCE || '';
@@ -56,6 +57,8 @@ router.post('/api/accounts', createAccount);
 router.put('/api/accounts/{accountId}', updateAccount);
 router.delete('/api/accounts/{accountId}', deleteAccount);
 router.post('/api/accounts/{accountId}/balances', addBalance);
+router.get('/api/trash', getTrash);
+router.post('/api/trash/restore', restoreFromTrash);
 
 export const handler: APIGatewayProxyHandlerV2 = async (event) => {
   try {

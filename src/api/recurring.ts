@@ -1,9 +1,10 @@
-import { QueryCommand, PutCommand, UpdateCommand, DeleteCommand } from '@aws-sdk/lib-dynamodb';
+import { QueryCommand, PutCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { docClient, TABLE, pk, recurringSk } from './db';
 import { MAX_AMOUNT_PENCE, SECURITY_HEADERS, VALID_TRANSACTION_TYPES } from './constants';
 import type { ApiResponse, Recurring, TransactionType } from './types';
-import { ok, err } from './http';
+import { ok, err, parseJsonObject } from './http';
+import { moveToTrash } from './trash';
 
 const DEFAULT_LEAD_DAYS = 3;
 const MAX_NOTE_LENGTH = 200;
@@ -63,16 +64,6 @@ export function validateRecurringInput(body: Record<string, unknown>): Validatio
       leadDays: typeof leadDays === 'number' ? leadDays : DEFAULT_LEAD_DAYS,
     },
   };
-}
-
-export function parseJsonObject(event: APIGatewayProxyEventV2): Record<string, unknown> | null {
-  try {
-    const parsed: unknown = JSON.parse(event.body || '{}');
-    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return null;
-    return parsed as Record<string, unknown>;
-  } catch {
-    return null;
-  }
 }
 
 export function toRecurring(item: Record<string, unknown>): Recurring {
@@ -182,10 +173,7 @@ export async function deleteRecurring(
   const { recurringId } = params;
   if (!recurringId) return err(400, 'recurringId is required');
 
-  await docClient.send(new DeleteCommand({
-    TableName: TABLE,
-    Key: { PK: pk(userId), SK: recurringSk(recurringId) },
-  }));
+  await moveToTrash(userId, 'RECURRING', recurringSk(recurringId));
 
   return { statusCode: 204, headers: SECURITY_HEADERS, body: '' };
 }

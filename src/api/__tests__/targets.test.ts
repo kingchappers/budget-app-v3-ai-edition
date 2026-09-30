@@ -12,7 +12,8 @@ vi.mock('../db', () => ({
 vi.mock('@aws-sdk/lib-dynamodb', () => ({
   QueryCommand: vi.fn(function(i: unknown) { return i; }),
   PutCommand: vi.fn(function(i: unknown) { return i; }),
-  DeleteCommand: vi.fn(function(i: unknown) { return i; }),
+  GetCommand: vi.fn(function(i: unknown) { return i; }),
+  TransactWriteCommand: vi.fn(function(i: unknown) { return i; }),
 }));
 
 import { getTargets, upsertTarget, deleteTarget } from '../targets';
@@ -106,11 +107,14 @@ describe('upsertTarget', () => {
 describe('deleteTarget', () => {
   beforeEach(() => { mockSend.mockReset(); });
 
-  it('deletes a target and returns 204', async () => {
+  it('moves the target to the trash and returns 204', async () => {
+    mockSend.mockResolvedValueOnce({ Item: { PK: 'USER#user-1', SK: 'TARGET#cat-food', categoryId: 'cat-food', targetAmount: 30000 } });
     mockSend.mockResolvedValueOnce({});
     const res = await deleteTarget(makeEvent(), 'user-1', { categoryId: 'cat-food' });
     expect(res.statusCode).toBe(204);
-    expect(mockSend).toHaveBeenCalledOnce();
+    const { TransactItems } = mockSend.mock.calls[1][0];
+    expect(TransactItems[0].Delete.Key).toEqual({ PK: 'USER#user-1', SK: 'TARGET#cat-food' });
+    expect(TransactItems[1].Put.Item).toMatchObject({ SK: 'TRASH#TARGET#cat-food', entityType: 'TARGET' });
   });
 
   it('returns 400 when categoryId is missing', async () => {

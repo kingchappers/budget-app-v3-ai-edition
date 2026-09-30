@@ -8,6 +8,7 @@ const state = vi.hoisted(() => ({
   accounts: [] as Account[],
   create: vi.fn(),
   remove: vi.fn(),
+  undoableDelete: vi.fn(),
 }));
 
 vi.mock('~/components/layout/DefaultLayout', () => ({
@@ -16,9 +17,10 @@ vi.mock('~/components/layout/DefaultLayout', () => ({
 vi.mock('~/lib/queries', () => ({
   useAccounts: () => ({ data: state.accounts, isLoading: false, error: null, refetch: vi.fn() }),
   useCreateAccount: () => ({ mutate: state.create, isPending: false }),
-  useDeleteAccount: () => ({ mutate: state.remove, isPending: false }),
+  useDeleteAccount: () => ({ mutateAsync: state.remove, isPending: false }),
   useAddBalance: () => ({ mutate: vi.fn(), isPending: false }),
 }));
+vi.mock('~/hooks/useUndoableDelete', () => ({ useUndoableDelete: () => state.undoableDelete }));
 
 import Accounts from '../accounts';
 
@@ -39,6 +41,7 @@ beforeEach(() => {
   state.accounts = [];
   state.create.mockReset();
   state.remove.mockReset();
+  state.undoableDelete.mockReset();
 });
 
 describe('Accounts page', () => {
@@ -78,17 +81,48 @@ describe('Accounts page', () => {
     expect(state.create).toHaveBeenCalledWith({ name: 'Trading 212', kind: 'LIABILITY', type: 'LOAN' });
   });
 
-  it('asks for confirmation before deleting, naming the account', async () => {
-    state.accounts = [account({ name: 'Premium Bonds' })];
+  it('confirms with a button that states what will be deleted, then deletes with undo', async () => {
+    const balances = Array.from({ length: 14 }, (_, i) => ({ date: `2026-01-${String(i + 1).padStart(2, '0')}`, pence: 100 * i }));
+    state.accounts = [account({ name: 'Lloyds', balances })];
+    const user = userEvent.setup();
+    renderPage();
+    await user.click(screen.getByRole('button', { name: 'Actions for Lloyds' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Delete' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Delete account' });
+    expect(within(dialog).getByText('Lloyds and its 14 balance entries will move to Recently deleted. You can restore them from there for 30 days.')).toBeInTheDocument();
+    expect(within(dialog).queryByText(/can't be undone/)).not.toBeInTheDocument();
+    expect(state.undoableDelete).not.toHaveBeenCalled();
+
+    await user.click(within(dialog).getByRole('button', { name: 'Delete Lloyds and its 14 balance entries' }));
+
+    expect(state.undoableDelete).toHaveBeenCalledWith(expect.objectContaining({
+      label: 'Lloyds and its 14 balance entries',
+      name: 'Lloyds',
+      ref: { entityType: 'ACCOUNT', id: 'acc-1' },
+    }));
+    await state.undoableDelete.mock.calls[0][0].run();
+    expect(state.remove).toHaveBeenCalledWith('acc-1');
+  });
+
+  it('names just the account when it has no balance entries', async () => {
+    state.accounts = [account({ name: 'Premium Bonds', balances: [] })];
     const user = userEvent.setup();
     renderPage();
     await user.click(screen.getByRole('button', { name: 'Actions for Premium Bonds' }));
     await user.click(await screen.findByRole('menuitem', { name: 'Delete' }));
     const dialog = await screen.findByRole('dialog', { name: 'Delete account' });
-    expect(within(dialog).getByText("Delete Premium Bonds? This can't be undone.")).toBeInTheDocument();
-    expect(state.remove).not.toHaveBeenCalled();
-    await user.click(within(dialog).getByRole('button', { name: 'Delete' }));
-    expect(state.remove).toHaveBeenCalledWith('acc-1');
+    expect(within(dialog).getByRole('button', { name: 'Delete Premium Bonds' })).toBeInTheDocument();
+  });
+
+  it('does not delete when the dialog is cancelled', async () => {
+    state.accounts = [account()];
+    const user = userEvent.setup();
+    renderPage();
+    await user.click(screen.getByRole('button', { name: 'Actions for Lloyds' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Delete' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Delete account' });
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    expect(state.undoableDelete).not.toHaveBeenCalled();
   });
 
   it('opens the history sheet when a row is tapped, and the update sheet from its own button', async () => {
