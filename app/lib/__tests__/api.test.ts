@@ -68,3 +68,21 @@ describe('category API calls', () => {
     expect(request).toHaveBeenCalledWith('/api/categories/a%2Fb', { method: 'PUT', body: JSON.stringify({ name: 'New Name' }) });
   });
 });
+
+describe('trash API calls', () => {
+  it('lists recently deleted items', async () => {
+    const items = [{ entityType: 'RECURRING', id: 'r1', item: recurring, deletedAt: 'd', expiresAt: 1 }];
+    const request = vi.fn().mockResolvedValue({ items });
+    expect(await createApi(request).getTrash()).toEqual(items);
+    expect(request).toHaveBeenCalledWith('/api/trash');
+  });
+
+  it('restores an item by type and id', async () => {
+    const request = vi.fn().mockResolvedValue({ entityType: 'TRANSACTION', id: '2026-09#t1', item: {} });
+    await createApi(request).restoreFromTrash('TRANSACTION', '2026-09#t1');
+    expect(request).toHaveBeenCalledWith('/api/trash/restore', {
+      method: 'POST',
+      body: JSON.stringify({ entityType: 'TRANSACTION', id: '2026-09#t1' }),
+    });
+  });
+});
