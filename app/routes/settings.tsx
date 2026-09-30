@@ -31,6 +31,16 @@ function SettingsContent() {
           onChange={event => setPreferences({ openAddOnLaunch: event.currentTarget.checked })}
         />
       </Card>
+
+      <Card withBorder>
+        <Title order={4} mb="sm">Insights</Title>
+        <Switch
+          label="Show milestones"
+          description="A short text note on Insights when a pot reaches its goal or a month finishes under target. No streaks, sounds or animations."
+          checked={preferences.showMilestones}
+          onChange={event => setPreferences({ showMilestones: event.currentTarget.checked })}
+        />
+      </Card>
     </Stack>
   );
 }
