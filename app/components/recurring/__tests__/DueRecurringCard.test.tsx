@@ -126,7 +126,7 @@ describe('DueRecurringCard', () => {
 
   it('links to the Recurring page', () => {
     renderCard();
-    expect(screen.getByRole('link', { name: 'Manage' })).toHaveAttribute('href', '/recurring');
+    expect(screen.getByRole('link', { name: 'Manage' })).toHaveAttribute('href', '/plan?tab=recurring');
   });
 
   it('Add saves the template on its due date, through the undoable save', async () => {
