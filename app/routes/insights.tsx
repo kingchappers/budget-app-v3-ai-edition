@@ -1,3 +1,4 @@
+import { TermHelp } from '~/components/layout/TermHelp';
 import { useState } from 'react';
 import { ActionIcon, Alert, Button, Group, Loader, SegmentedControl, Stack, Text, Title } from '@mantine/core';
 import { IconChevronLeft, IconChevronRight } from '@tabler/icons-react';
@@ -103,7 +104,10 @@ function InsightsContent() {
       <Title order={5} mt="md">Pots</Title>
       <PotsTrend pots={pots.data ?? []} categories={categories.data ?? []} current={current} />
 
-      <Title order={5} mt="md">Net worth</Title>
+      <Group gap={0} mt="md">
+        <Title order={5}>Net worth</Title>
+        <TermHelp terms={['netWorth']} />
+      </Group>
       <NetWorth accounts={accounts.data ?? []} months={monthsInPeriod(current)} />
 
       <ResponsiveSheet opened={openGroup !== null} onClose={() => setOpenGroup(null)} title={openGroupLabel}>
