@@ -69,20 +69,35 @@ describe('TransactionRow menu', () => {
   });
 });
 
-describe('TransactionRow pending badge', () => {
-  it('shows a pending clock icon when pending is true', () => {
+describe('TransactionRow sync status', () => {
+  it('says the row is waiting to sync when it is queued', () => {
     renderRow({ pending: true });
-    expect(screen.getByLabelText('Waiting to sync')).toBeInTheDocument();
+    expect(screen.getByText('Waiting to sync')).toBeVisible();
   });
 
-  it('shows the queued error as a tooltip label when pendingError is set', () => {
-    renderRow({ pending: true, pendingError: 'categoryId must be an existing category' });
-    expect(screen.getByLabelText('categoryId must be an existing category')).toBeInTheDocument();
+  it('shows a sync error as visible text with a focusable Retry that calls onRetry', async () => {
+    const onRetry = vi.fn();
+    const user = userEvent.setup();
+    renderRow({ pending: true, pendingError: 'categoryId must be an existing category', onRetry });
+
+    expect(screen.getByText('Not synced. Tap to retry.')).toBeVisible();
+    const retry = screen.getByRole('button', { name: 'Retry syncing Weekly Shop' });
+    await user.tab();
+    expect(retry).toHaveFocus();
+    await user.keyboard('{Enter}');
+    expect(onRetry).toHaveBeenCalledTimes(1);
   });
 
-  it('shows no pending icon when pending is false or omitted', () => {
+  it('labels a row still waiting for the server as Saving', () => {
+    renderRow({ saving: true });
+    expect(screen.getByText('Saving')).toBeVisible();
+  });
+
+  it('shows no sync status for a confirmed row', () => {
     renderRow();
-    expect(screen.queryByLabelText('Waiting to sync')).not.toBeInTheDocument();
+    expect(screen.queryByText('Waiting to sync')).not.toBeInTheDocument();
+    expect(screen.queryByText('Saving')).not.toBeInTheDocument();
+    expect(screen.queryByText('Not synced. Tap to retry.')).not.toBeInTheDocument();
   });
 });
 

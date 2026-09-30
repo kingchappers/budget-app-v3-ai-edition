@@ -9,12 +9,14 @@ import { transactionLabel, transactionTrashId } from '~/lib/trash';
 import type { Transaction } from '~/lib/types';
 
 export interface TransactionRowActions {
+  saving: boolean;
   pending: boolean;
   pendingError?: string;
   onEdit: (t: Transaction) => void;
   onDuplicate: (t: Transaction) => void;
   onRepeat: (t: Transaction) => void;
   onDelete: (t: Transaction) => void;
+  onRetry: () => void;
   onDiscard: (t: Transaction) => void;
 }
 
@@ -41,7 +43,7 @@ export function useTransactionEditing(yearMonth: string): TransactionEditing {
   const remove = useDeleteTransaction();
   const undoableDelete = useUndoableDelete();
   const { data: categories } = useCategories();
-  const { pendingMap, discard } = useOfflineQueue();
+  const { pendingMap, discard, flushNow } = useOfflineQueue();
 
   function deleteTransaction(item: Transaction): void {
     const categoryName = categories?.find(c => c.categoryId === item.categoryId)?.name ?? 'Unknown category';
@@ -54,12 +56,14 @@ export function useTransactionEditing(yearMonth: string): TransactionEditing {
   }
 
   const rowActions = (t: Transaction): TransactionRowActions => ({
+    saving: pendingMap[t.transactionId]?.queued === false,
     pending: pendingMap[t.transactionId]?.queued === true,
     pendingError: pendingMap[t.transactionId]?.lastError,
     onEdit: setEditing,
     onDuplicate: setDuplicating,
     onRepeat: setRepeating,
     onDelete: deleteTransaction,
+    onRetry: () => void flushNow(),
     onDiscard: item => void discard(item.transactionId),
   });
 

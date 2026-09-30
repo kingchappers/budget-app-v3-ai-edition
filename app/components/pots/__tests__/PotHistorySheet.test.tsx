@@ -103,8 +103,9 @@ describe('PotHistorySheet', () => {
     expect(toggle).toBeEnabled();
   });
 
-  it('saves the settings for the current month', async () => {
+  it('saves the settings for the current month, then shows Saved and stays open', async () => {
     const user = userEvent.setup();
+    save.mutate.mockImplementation((_vars: unknown, options: { onSuccess: () => void }) => options.onSuccess());
     const onClose = renderSheet(makePot());
     await user.type(screen.getByLabelText('Monthly amount'), '50');
     await user.type(screen.getByLabelText('Goal'), '3000');
@@ -118,8 +119,8 @@ describe('PotHistorySheet', () => {
       },
       expect.objectContaining({ onSuccess: expect.any(Function) }),
     );
-    save.mutate.mock.calls[0][1].onSuccess();
-    expect(onClose).toHaveBeenCalled();
+    expect(screen.getByRole('status')).toHaveTextContent('Saved');
+    expect(onClose).not.toHaveBeenCalled();
   });
 
   it('starts from the pot\'s current settings', () => {
@@ -143,9 +144,12 @@ describe('PotHistorySheet', () => {
     const onClose = renderSheet(makePot());
     await user.type(screen.getByLabelText('Monthly amount'), '50');
     await user.click(screen.getByRole('button', { name: 'Save' }));
-    expect(screen.getByRole('alert')).toHaveTextContent('Could not save. Try again.');
+    expect(screen.getByRole('status')).toHaveTextContent("Couldn't save.");
     expect(screen.getByRole('dialog')).toBeInTheDocument();
     expect(onClose).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(save.mutate).toHaveBeenCalledTimes(2);
   });
 
   it('shows a negative balance with a minus sign and the danger colour', () => {
