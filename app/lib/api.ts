@@ -9,6 +9,7 @@ export interface TransactionInput {
   description: string;
   date: string;
   transactionId?: string;
+  recurringId?: string;
 }
 
 export interface RecurringInput {

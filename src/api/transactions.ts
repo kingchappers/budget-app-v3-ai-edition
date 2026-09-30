@@ -42,12 +42,17 @@ export interface ValidTransactionInput {
   categoryId: string;
   description: string;
   date: string;
+  recurringId?: string;
+}
+
+function isValidRecurringId(value: unknown): value is string {
+  return typeof value === 'string' && value.length <= 100 && UUID_PATTERN.test(value);
 }
 
 export function validateTransactionInput(
   body: Record<string, unknown>,
 ): { ok: true; value: ValidTransactionInput } | { ok: false; message: string } {
-  const { amount, type, categoryId, description, date } = body;
+  const { amount, type, categoryId, description, date, recurringId } = body;
 
   if (typeof amount !== 'number' || !Number.isInteger(amount) || amount <= 0 || amount > MAX_AMOUNT_PENCE) {
     return { ok: false, message: `amount must be a positive integer representing pence/cents, at most ${MAX_AMOUNT_PENCE}` };
@@ -66,17 +71,19 @@ export function validateTransactionInput(
   if (!date || typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
     return { ok: false, message: 'date must be in YYYY-MM-DD format' };
   }
+  if (recurringId !== undefined && !isValidRecurringId(recurringId)) {
+    return { ok: false, message: 'recurringId must be a valid UUID' };
+  }
 
-  return {
-    ok: true,
-    value: {
-      amount,
-      type: type as Transaction['type'],
-      categoryId,
-      description: typeof description === 'string' ? description.trim() : '',
-      date,
-    },
+  const value: ValidTransactionInput = {
+    amount,
+    type: type as Transaction['type'],
+    categoryId,
+    description: typeof description === 'string' ? description.trim() : '',
+    date,
   };
+  if (recurringId !== undefined) value.recurringId = recurringId;
+  return { ok: true, value };
 }
 
 export async function createTransaction(
@@ -95,7 +102,7 @@ export async function createTransaction(
   if (validation.ok === false) {
     return err(400, validation.message);
   }
-  const { amount, type, categoryId, description, date } = validation.value;
+  const { amount, type, categoryId, description, date, recurringId } = validation.value;
 
   const clientTransactionId = body.transactionId;
   if (clientTransactionId !== undefined && (typeof clientTransactionId !== 'string' || !UUID_PATTERN.test(clientTransactionId))) {
@@ -115,6 +122,7 @@ export async function createTransaction(
     date,
     createdAt: new Date().toISOString(),
   };
+  if (recurringId !== undefined) transaction.recurringId = recurringId;
 
   await docClient.send(new PutCommand({
     TableName: TABLE,
@@ -171,7 +179,7 @@ export async function updateTransaction(
   if (validation.ok === false) {
     return err(400, validation.message);
   }
-  const { amount, type, categoryId, description, date } = validation.value;
+  const { amount, type, categoryId, description, date, recurringId } = validation.value;
 
   const existingResult = await docClient.send(new GetCommand({
     TableName: TABLE,
@@ -194,6 +202,8 @@ export async function updateTransaction(
     date,
     createdAt: existing.createdAt,
   };
+  const linkedRecurringId = recurringId ?? existing.recurringId;
+  if (linkedRecurringId !== undefined) transaction.recurringId = linkedRecurringId;
 
   if (newYearMonth === yearMonth) {
     await docClient.send(new PutCommand({

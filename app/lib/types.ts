@@ -22,6 +22,7 @@ export interface Transaction {
   description: string;
   date: string;
   createdAt: string;
+  recurringId?: string;
 }
 
 export interface CategoryTarget {

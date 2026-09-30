@@ -319,3 +319,62 @@ describe('validateTransactionInput amount cap', () => {
     expect(result.ok).toBe(false);
   });
 });
+
+describe('recurringId on transactions', () => {
+  beforeEach(() => { mockSend.mockReset(); });
+
+  const recurringId = '3f2b8c1e-9a4d-4e7f-b1c2-0d9e8f7a6b5c';
+  const base = { amount: 1500, type: 'EXPENSE', categoryId: 'cat-food', description: 'Rent', date: '2026-09-01' };
+  const existing = {
+    transactionId: 'txn-1', yearMonth: '2026-09', ...base, createdAt: '2026-09-01T09:00:00.000Z', recurringId,
+  };
+  const params = { yearMonth: '2026-09', transactionId: 'txn-1' };
+
+  it('stores the recurringId a transaction was added from', async () => {
+    mockSend.mockResolvedValueOnce({});
+    const res = await createTransaction(makeEvent({ body: { ...base, recurringId } }), 'user-1', {});
+    expect(res.statusCode).toBe(201);
+    expect(JSON.parse(res.body).transaction.recurringId).toBe(recurringId);
+    expect(mockSend.mock.calls[0][0].Item.recurringId).toBe(recurringId);
+  });
+
+  it('leaves the attribute out when no recurringId is sent', async () => {
+    mockSend.mockResolvedValueOnce({});
+    await createTransaction(makeEvent({ body: base }), 'user-1', {});
+    expect(mockSend.mock.calls[0][0].Item).not.toHaveProperty('recurringId');
+  });
+
+  it.each([
+    ['a number', 42],
+    ['an empty string', ''],
+    ['a non-UUID string', 'rent-bill'],
+    ['a string over 100 characters', `${recurringId}${'a'.repeat(70)}`],
+  ])('rejects %s', async (_label, value) => {
+    const res = await createTransaction(makeEvent({ body: { ...base, recurringId: value } }), 'user-1', {});
+    expect(res.statusCode).toBe(400);
+    expect(mockSend).not.toHaveBeenCalled();
+  });
+
+  it('keeps the stored recurringId when an update omits it', async () => {
+    mockSend.mockResolvedValueOnce({ Item: existing });
+    mockSend.mockResolvedValueOnce({});
+    const res = await updateTransaction(makeEvent({ body: { ...base, amount: 1600 } }), 'user-1', params);
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body).transaction.recurringId).toBe(recurringId);
+    expect(mockSend.mock.calls[1][0].Item.recurringId).toBe(recurringId);
+  });
+
+  it('links a manual transaction when an update sends a recurringId', async () => {
+    const { recurringId: _omit, ...manual } = existing;
+    mockSend.mockResolvedValueOnce({ Item: manual });
+    mockSend.mockResolvedValueOnce({});
+    const res = await updateTransaction(makeEvent({ body: { ...base, recurringId } }), 'user-1', params);
+    expect(JSON.parse(res.body).transaction.recurringId).toBe(recurringId);
+  });
+
+  it('rejects an invalid recurringId on update without reading the item', async () => {
+    const res = await updateTransaction(makeEvent({ body: { ...base, recurringId: 'nope' } }), 'user-1', params);
+    expect(res.statusCode).toBe(400);
+    expect(mockSend).not.toHaveBeenCalled();
+  });
+});
