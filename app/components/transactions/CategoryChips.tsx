@@ -11,6 +11,7 @@ export interface CategoryChipsProps {
   onChange: (categoryId: string) => void;
   loading?: boolean;
   error?: string | null;
+  fieldError?: string | null;
 }
 
 interface CategoryRadiosProps {
@@ -18,18 +19,26 @@ interface CategoryRadiosProps {
   visible: Category[];
   value: string | null;
   onChange: (categoryId: string) => void;
+  invalid: boolean;
 }
 
 // A separate component so useInputWrapperContext() reads the labelId from the
-// surrounding Input.Wrapper (only visible to descendants of its provider).
-function CategoryRadios({ groupName, visible, value, onChange }: CategoryRadiosProps) {
-  const labelId = useInputWrapperContext()?.labelId;
+// surrounding Input.Wrapper (only visible to descendants of its provider),
+// along with describedBy, which points at the wrapper's error message.
+function CategoryRadios({ groupName, visible, value, onChange, invalid }: CategoryRadiosProps) {
+  const wrapper = useInputWrapperContext();
   return (
     <Chip.Group multiple={false} value={value ?? ''} onChange={onChange}>
       {/* display: contents keeps these chips as flex items of the parent Group
           (so the "More…" button still sits inline after them) while giving
           screen readers a radiogroup that contains only the chips. */}
-      <Group role="radiogroup" aria-labelledby={labelId} style={{ display: 'contents' }}>
+      <Group
+        role="radiogroup"
+        aria-labelledby={wrapper?.labelId}
+        aria-describedby={wrapper?.describedBy}
+        aria-invalid={invalid || undefined}
+        style={{ display: 'contents' }}
+      >
         {visible.map(c => (
           <Chip key={c.categoryId} name={groupName} value={c.categoryId} variant="outline">{categoryLabel(c)}</Chip>
         ))}
@@ -38,7 +47,7 @@ function CategoryRadios({ groupName, visible, value, onChange }: CategoryRadiosP
   );
 }
 
-export function CategoryChips({ chips, all, value, onChange, loading = false, error = null }: CategoryChipsProps) {
+export function CategoryChips({ chips, all, value, onChange, loading = false, error = null, fieldError = null }: CategoryChipsProps) {
   const groupName = useId();
   const [showAll, setShowAll] = useState(false);
 
@@ -53,9 +62,9 @@ export function CategoryChips({ chips, all, value, onChange, loading = false, er
   const selectData = categorySelectData(all);
 
   return (
-    <Input.Wrapper label="Category">
+    <Input.Wrapper label="Category" error={fieldError} errorProps={{ role: 'alert' }}>
       <Group gap="xs" mt={4}>
-        <CategoryRadios groupName={groupName} visible={visible} value={value} onChange={onChange} />
+        <CategoryRadios groupName={groupName} visible={visible} value={value} onChange={onChange} invalid={fieldError !== null} />
         <Button variant="subtle" size="compact-sm" aria-expanded={showAll} onClick={() => setShowAll(open => !open)}>
           More…
         </Button>

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useAuth0 } from '@auth0/auth0-react';
 import { Button, Group, SegmentedControl, Stack, Text, TextInput } from '@mantine/core';
 import { DateInput } from '@mantine/dates';
 import { ResponsiveSheet } from '~/components/layout/ResponsiveSheet';
@@ -11,6 +12,14 @@ import { currentYearMonth, dateChoiceFor, todayIso, yesterdayIso, type DateChoic
 import { categoryForNote } from '~/lib/noteMemory';
 import { parseQuickAdd } from '~/lib/quickAdd';
 import { useCategories, useTransactions, useUpdateTransaction } from '~/lib/queries';
+import {
+  EMPTY_DRAFT,
+  clearTransactionDraft,
+  isEmptyDraft,
+  loadTransactionDraft,
+  saveTransactionDraft,
+  type TransactionDraftFields,
+} from '~/lib/transactionDraft';
 import { topCategories } from '~/lib/transactions';
 import { TYPE_OPTIONS, categoryTypesFor } from '~/lib/transactionTypes';
 import type { Transaction, TransactionType } from '~/lib/types';
@@ -24,8 +33,25 @@ const DATE_OPTIONS: { label: string; value: DateChoice }[] = [
   { label: 'Other…', value: 'other' },
 ];
 
+const CATEGORY_ERROR = 'Choose a category';
+const DATE_ERROR = 'Enter a date, for example 27/09/2026';
+const FIELD_ERROR_PROPS = { role: 'alert' };
+
 type SaveMode = 'close' | 'addAnother';
 type CategorySource = 'none' | 'memory' | 'user';
+type ErrorField = 'amount' | 'category' | 'date';
+type FieldErrors = Partial<Record<ErrorField, string>>;
+
+function dateForChoice(choice: DateChoice, date: string): string {
+  if (choice === 'today') return todayIso();
+  if (choice === 'yesterday') return yesterdayIso();
+  return date;
+}
+
+interface Validation {
+  input: TransactionInput | null;
+  errors: FieldErrors;
+}
 
 export interface TransactionSheetProps {
   opened: boolean;
@@ -46,7 +72,12 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, preset, 
   const noteIndex = useNoteHistory(opened);
   const update = useUpdateTransaction(yearMonth);
   const saveWithUndo = useSaveWithUndo();
+  const draftOwner = useAuth0().user?.sub ?? '';
+  const draftOwnerRef = useRef(draftOwner);
+  draftOwnerRef.current = draftOwner;
+  const isAddFlow = !editing && !template && !preset;
   const amountRef = useRef<HTMLInputElement>(null);
+  const dateRef = useRef<HTMLInputElement>(null);
   const createSubmittedRef = useRef(false);
   const recurringLinkUsedRef = useRef(false);
   const saveAnotherRef = useRef<HTMLButtonElement>(null);
@@ -60,7 +91,8 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, preset, 
   const [date, setDate] = useState(todayIso());
   const [dateChoice, setDateChoice] = useState<DateChoice>('today');
   const [noteOpen, setNoteOpen] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [categorySource, setCategorySource] = useState<CategorySource>('none');
   const [quickAdd, setQuickAdd] = useState('');
   const [quickAddError, setQuickAddError] = useState<string | null>(null);
@@ -68,6 +100,7 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, preset, 
   useEffect(() => {
     if (!opened) return;
     createSubmittedRef.current = false;
+    let draft: TransactionDraftFields | null = null;
     recurringLinkUsedRef.current = false;
     if (editing) {
       setAmount(formatPencePlain(editing.amount));
@@ -94,17 +127,14 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, preset, 
       setDateChoice('today');
       setCategorySource('user');
     } else {
-      setAmount('');
-      setType('EXPENSE');
-      setCategoryId(null);
-      setDescription('');
-      setDate(todayIso());
-      setDateChoice('today');
-      setCategorySource('none');
+      draft = loadTransactionDraft(draftOwnerRef.current) ?? EMPTY_DRAFT;
+      applyDraftFields(draft);
     }
-    setNoteOpen(!editing && template != null && template.description !== '');
-    setError(null);
-    setQuickAdd('');
+    const templateNote = !editing && template != null && template.description !== '';
+    setNoteOpen(templateNote || (draft !== null && draft.description !== ''));
+    setFieldErrors({});
+    setSaveError(null);
+    setQuickAdd(draft?.quickAdd ?? '');
     setQuickAddError(null);
   }, [opened, editing, preset, template, templateDate]);
 
@@ -128,18 +158,66 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, preset, 
     setCategorySource('memory');
   }, [noteIndex, categoriesLoaded, opened, editing, categorySource, description, type, categories]);
 
+  const draftFields: TransactionDraftFields = { amount, type, categoryId, dateChoice, date, description, quickAdd };
+  const draftKey = JSON.stringify(draftFields);
+  const lastDraftKeyRef = useRef(draftKey);
+  // Only a change to a field is saved. The render that opens the sheet still
+  // holds the previous session's values until the effect above replaces them.
+  useEffect(() => {
+    if (draftKey === lastDraftKeyRef.current) return;
+    lastDraftKeyRef.current = draftKey;
+    if (!opened || !isAddFlow || createSubmittedRef.current) return;
+    saveTransactionDraft(draftOwner, draftFields);
+  }, [draftKey, opened, isAddFlow, draftOwner]);
+
   const eligible = categories.filter(c => categoryTypesFor(type).includes(c.type));
   const chips = topCategories(monthTransactions ?? [], categories, type, CHIP_LIMIT);
 
+  function applyDraftFields(fields: TransactionDraftFields): void {
+    setAmount(fields.amount);
+    setType(fields.type);
+    setCategoryId(fields.categoryId);
+    setCategorySource(fields.categoryId ? 'user' : 'none');
+    setDescription(fields.description);
+    setDateChoice(fields.dateChoice);
+    setDate(dateForChoice(fields.dateChoice, fields.date));
+  }
+
+  function handleClear(): void {
+    clearTransactionDraft();
+    applyDraftFields(EMPTY_DRAFT);
+    setNoteOpen(false);
+    setQuickAdd('');
+    setQuickAddError(null);
+    setFieldErrors({});
+    amountRef.current?.focus();
+  }
+
+  function clearFieldError(field: ErrorField): void {
+    setFieldErrors(current => (current[field] === undefined ? current : { ...current, [field]: undefined }));
+  }
+
   function chooseDate(choice: DateChoice): void {
     setDateChoice(choice);
+    clearFieldError('date');
     if (choice === 'today') setDate(todayIso());
     if (choice === 'yesterday') setDate(yesterdayIso());
+  }
+
+  function handleAmountChange(value: string): void {
+    setAmount(value);
+    clearFieldError('amount');
+  }
+
+  function handleDateChange(value: string | null): void {
+    setDate(value ?? '');
+    clearFieldError('date');
   }
 
   function handleCategoryChange(id: string): void {
     setCategoryId(id);
     setCategorySource('user');
+    clearFieldError('category');
   }
 
   function handleNoteChange(note: string): void {
@@ -187,7 +265,7 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, preset, 
     if (parsed.note !== '') setNoteOpen(true);
     setCategoryId(recalled);
     setCategorySource(recalled ? 'memory' : 'none');
-    setError(null);
+    setFieldErrors({});
     setQuickAdd('');
     setQuickAddError(null);
 
@@ -198,21 +276,31 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, preset, 
     focusChipsAfterRenderRef.current = true;
   }
 
-  function validate(): TransactionInput | null {
+  function validate(): Validation {
     const parsed = parsePounds(amount);
-    if (!parsed.ok) {
-      setError(parsed.message);
-      return null;
+    const dateValid = /^\d{4}-\d{2}-\d{2}$/.test(date);
+    const categoryGone = isAddFlow && categoriesLoaded && !categories.some(c => c.categoryId === categoryId);
+    const errors: FieldErrors = {};
+    if (!parsed.ok) errors.amount = parsed.message;
+    if (!categoryId || categoryGone) errors.category = CATEGORY_ERROR;
+    if (!dateValid) errors.date = DATE_ERROR;
+
+    if (!parsed.ok || !categoryId || categoryGone || !dateValid) return { input: null, errors };
+    return { input: { amount: parsed.pence, type, categoryId, description, date }, errors };
+  }
+
+  function focusFirstError(errors: FieldErrors): void {
+    if (errors.amount) {
+      amountRef.current?.focus();
+      return;
     }
-    if (!categoryId) {
-      setError('Choose a category');
-      return null;
+    if (errors.category) {
+      const radios = chipsRef.current?.querySelectorAll<HTMLInputElement>('input[type="radio"]');
+      const target = Array.from(radios ?? []).find(radio => radio.checked) ?? radios?.[0];
+      target?.focus();
+      return;
     }
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-      setError('Date must be YYYY-MM-DD');
-      return null;
-    }
-    return { amount: parsed.pence, type, categoryId, description, date };
+    if (errors.date) dateRef.current?.focus();
   }
 
   function resetForNextEntry(): void {
@@ -224,26 +312,33 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, preset, 
     setNoteOpen(false);
     setQuickAdd('');
     setQuickAddError(null);
-    setError(null);
+    setFieldErrors({});
     amountRef.current?.focus();
   }
 
   async function handleSubmit(mode: SaveMode): Promise<void> {
-    const input = validate();
-    if (!input) return;
+    const { input, errors } = validate();
+    setFieldErrors(errors);
+    setSaveError(null);
+    if (!input) {
+      focusFirstError(errors);
+      return;
+    }
 
     if (editing) {
       try {
         await update.mutateAsync({ transactionId: editing.transactionId, input });
         onClose();
-      } catch {
-        setError('Could not save. Check your connection and try again.');
+      } catch (error) {
+        console.error('TransactionSheet: could not update transaction', editing.transactionId, error);
+        setSaveError('Could not save. Check your connection and try again.');
       }
       return;
     }
 
     if (createSubmittedRef.current) return;
     createSubmittedRef.current = true;
+    clearTransactionDraft();
     const linked = recurringId && !recurringLinkUsedRef.current ? { ...input, recurringId } : input;
     recurringLinkUsedRef.current = true;
     void saveWithUndo(linked, { onUndo: onUndone }).then(created => {
@@ -278,8 +373,9 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, preset, 
           inputMode="decimal"
           data-autofocus
           value={amount}
-          onChange={e => setAmount(e.currentTarget.value)}
-          error={error}
+          onChange={e => handleAmountChange(e.currentTarget.value)}
+          error={fieldErrors.amount}
+          errorProps={FIELD_ERROR_PROPS}
         />
         <SegmentedControl
           fullWidth
@@ -295,6 +391,7 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, preset, 
             onChange={handleCategoryChange}
             loading={categoriesLoading}
             error={categoriesError ? 'Could not load categories' : null}
+            fieldError={fieldErrors.category ?? null}
           />
         </div>
         {categorySource === 'memory' && description.trim() !== '' && (
@@ -304,8 +401,12 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, preset, 
           <DateInput
             label="Date"
             valueFormat="DD/MM/YYYY"
-            value={date}
-            onChange={value => setDate(value ?? '')}
+            allowDeselect
+            ref={dateRef}
+            value={date || null}
+            onChange={handleDateChange}
+            error={fieldErrors.date}
+            errorProps={FIELD_ERROR_PROPS}
           />
         ) : (
           <>
@@ -320,8 +421,12 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, preset, 
               <DateInput
                 label="Date"
                 valueFormat="DD/MM/YYYY"
-                value={date}
-                onChange={value => setDate(value ?? '')}
+                allowDeselect
+                ref={dateRef}
+                value={date || null}
+                onChange={handleDateChange}
+                error={fieldErrors.date}
+                errorProps={FIELD_ERROR_PROPS}
               />
             )}
           </>
@@ -338,15 +443,21 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, preset, 
             + Add note
           </Button>
         )}
+        {saveError && <Text size="sm" role="alert">{saveError}</Text>}
         <Group justify="flex-end">
-          <Button variant="subtle" onClick={onClose}>Cancel</Button>
+          <Group gap="xs">
+            {isAddFlow && !isEmptyDraft(draftFields) && (
+              <Button variant="subtle" color="gray" onClick={handleClear}>Clear</Button>
+            )}
+            <Button variant="subtle" onClick={onClose}>Cancel</Button>
+          </Group>
           {editing ? (
             <Button type="submit" loading={update.isPending}>Save</Button>
           ) : (
-            <>
+            <Group gap="xs">
               <Button ref={saveAnotherRef} type="submit" variant="light">Save & add another</Button>
               <Button onClick={() => void handleSubmit('close')}>Save</Button>
-            </>
+            </Group>
           )}
         </Group>
       </Stack>
