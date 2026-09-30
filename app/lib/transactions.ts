@@ -51,20 +51,30 @@ export function filterTransactions(
   });
 }
 
+// The categories offered as chips: the user's pinned ones first, in the order
+// they pinned them, then the rest by how often they've been used. Ties keep the
+// list's own order, so the result only changes when the history really does.
 export function topCategories(
   transactions: Transaction[],
   categories: Category[],
   type: TransactionType,
   limit: number,
+  pinnedIds: readonly string[] = [],
 ): Category[] {
   const categoryTypes = categoryTypesFor(type);
+  const eligible = categories.filter(c => categoryTypes.includes(c.type));
+  const byId = new Map(eligible.map(c => [c.categoryId, c]));
+
+  const pinned = [...new Set(pinnedIds)].flatMap(id => byId.get(id) ?? []).slice(0, limit);
+  const pinnedSet = new Set(pinned.map(c => c.categoryId));
+
   const counts = new Map<string, number>();
   for (const t of transactions) {
     counts.set(t.categoryId, (counts.get(t.categoryId) ?? 0) + 1);
   }
+  const ranked = eligible
+    .filter(c => !pinnedSet.has(c.categoryId))
+    .sort((a, b) => (counts.get(b.categoryId) ?? 0) - (counts.get(a.categoryId) ?? 0));
 
-  return categories
-    .filter(c => categoryTypes.includes(c.type))
-    .sort((a, b) => (counts.get(b.categoryId) ?? 0) - (counts.get(a.categoryId) ?? 0))
-    .slice(0, limit);
+  return [...pinned, ...ranked].slice(0, limit);
 }
