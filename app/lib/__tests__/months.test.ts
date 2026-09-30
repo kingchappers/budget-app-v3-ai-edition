@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   currentYearMonth, shiftMonth, formatMonthLabel, todayIso, yesterdayIso, dateChoiceFor,
-  lastDayOfMonth, addDaysIso, daysBetweenIso, formatShortDate,
+  lastDayOfMonth, addDaysIso, daysBetweenIso, formatShortDate, monthName, monthPhrase, daysLeftInMonth,
 } from '../months';
 
 describe('currentYearMonth', () => {
@@ -106,5 +106,40 @@ describe('formatShortDate', () => {
   it('formats as day and abbreviated month', () => {
     expect(formatShortDate('2026-09-28')).toBe('28 Sep');
     expect(formatShortDate('2026-01-05')).toBe('5 Jan');
+  });
+});
+
+describe('monthName', () => {
+  const now = new Date(2026, 8, 12);
+
+  it('gives just the month name within the current year', () => {
+    expect(monthName('2026-08', now)).toBe('August');
+  });
+
+  it('adds the year for another year', () => {
+    expect(monthName('2025-12', now)).toBe('December 2025');
+  });
+});
+
+describe('monthPhrase', () => {
+  const now = new Date(2026, 8, 12);
+
+  it('says "this month" for the current month', () => {
+    expect(monthPhrase('2026-09', now)).toBe('this month');
+  });
+
+  it('names another month', () => {
+    expect(monthPhrase('2026-08', now)).toBe('in August');
+    expect(monthPhrase('2027-01', now)).toBe('in January 2027');
+  });
+});
+
+describe('daysLeftInMonth', () => {
+  it('counts today and the days after it', () => {
+    expect(daysLeftInMonth(new Date(2026, 8, 12))).toBe(19);
+  });
+
+  it('is 1 on the last day', () => {
+    expect(daysLeftInMonth(new Date(2026, 1, 28))).toBe(1);
   });
 });
