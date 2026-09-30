@@ -26,6 +26,15 @@ html {
   scroll-padding-bottom: 16px;
 }
 
+/* Text size (Settings). Mantine sizes are in rem, so scaling the root scales the text. */
+html[data-text-size='large'] {
+  font-size: 112.5%;
+}
+
+html[data-text-size='largest'] {
+  font-size: 125%;
+}
+
 @media (max-width: 47.99em) {
   :root {
     --tab-bar-height: calc(68px + env(safe-area-inset-bottom, 0px));
@@ -46,6 +55,6 @@ html {
   input,
   select,
   textarea {
-    font-size: 16px !important;
+    font-size: 1rem !important;
   }
 }
