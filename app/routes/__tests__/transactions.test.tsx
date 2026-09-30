@@ -23,7 +23,7 @@ const transactions: Transaction[] = [
   txn({ transactionId: 't2', description: 'Petrol' }),
   txn({ transactionId: 't3', description: 'Mortgage payment', categoryId: 'cat-mortgage' }),
 ];
-const data = vi.hoisted(() => ({ monthsRequested: [] as string[] }));
+const data = vi.hoisted(() => ({ monthsRequested: [] as string[], targetsLoading: false }));
 
 vi.mock('~/components/layout/DefaultLayout', () => ({
   DefaultLayout: ({ children }: { children: React.ReactNode }) => <>{children}</>,
@@ -53,7 +53,7 @@ vi.mock('~/lib/queries', () => ({
     data.monthsRequested.push(yearMonth);
     return { data: transactions, isLoading: false, error: null };
   },
-  useTargets: () => ({ data: [{ categoryId: 'cat-mortgage', targetAmount: 100000, period: 'MONTHLY', updatedAt: '' }] }),
+  useTargets: () => ({ isLoading: data.targetsLoading, data: data.targetsLoading ? undefined : [{ categoryId: 'cat-mortgage', targetAmount: 100000, period: 'MONTHLY', updatedAt: '' }] }),
   useDeleteTransaction: () => ({ mutate: vi.fn() }),
 }));
 vi.mock('~/hooks/useOfflineQueue', () => ({ useOfflineQueue: () => ({ pendingMap: {}, flushNow: vi.fn(), discard: vi.fn() }) }));
@@ -165,6 +165,13 @@ describe('Transactions route query parameters', () => {
     expect(screen.getByRole('textbox', { name: 'Filter by category' })).toHaveValue('Other spending (no target)');
     expect(screen.getByText('Weekly Shop')).toBeInTheDocument();
     expect(screen.queryByText('Mortgage payment')).not.toBeInTheDocument();
+  });
+
+  it('waits for targets before listing untargeted spending', () => {
+    data.targetsLoading = true;
+    renderRoute('/transactions?spending=untargeted');
+    expect(screen.queryByText('Mortgage payment')).not.toBeInTheDocument();
+    data.targetsLoading = false;
   });
 
   it('ignores a month that is not valid', () => {

@@ -51,7 +51,8 @@ function TransactionsContent() {
     );
   }
 
-  if (transactions.isLoading) return <Group justify="center" py="xl"><Loader /></Group>;
+  const waitingForTargets = filter.categoryId === UNTARGETED_FILTER && targets.isLoading;
+  if (transactions.isLoading || waitingForTargets) return <Group justify="center" py="xl"><Loader /></Group>;
 
   const all = transactions.data ?? [];
   const targetedIds = targetedExpenseCategoryIds(categories.data ?? [], targets.data ?? []);
