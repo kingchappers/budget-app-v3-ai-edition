@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ActionIcon, Alert, Button, Card, Group, Loader, Menu, SegmentedControl, Stack, Text, TextInput, Title } from '@mantine/core';
+import { ActionIcon, Alert, Button, Card, Group, Loader, Menu, Paper, SegmentedControl, Stack, Text, TextInput, Title } from '@mantine/core';
 import { IconDots, IconTrash } from '@tabler/icons-react';
 import { DefaultLayout } from '~/components/layout/DefaultLayout';
 import { SaveStatus, type SaveState } from '~/components/layout/SaveStatus';
@@ -8,8 +8,11 @@ import { categoryLabel } from '~/lib/categoryIcons';
 import { groupCategories } from '~/lib/categoryGroups';
 import { formatPencePlain, parsePounds } from '~/lib/money';
 import { targetLabel } from '~/lib/trash';
-import { useCategories, useDeleteTarget, useSetTarget, useTargets } from '~/lib/queries';
-import type { Category, TargetPeriod } from '~/lib/types';
+import { useCategories, useDeleteTarget, useSetTarget, useTargets, useTransactions } from '~/lib/queries';
+import { describePlan, planTargets } from '~/lib/targetPlan';
+import { currentYearMonth, shiftMonth } from '~/lib/months';
+import { TermHelp } from '~/components/layout/TermHelp';
+import type { Category, CategoryTarget, TargetPeriod } from '~/lib/types';
 import { pageTitle } from '~/lib/pageTitle';
 import type { Route } from './+types/targets';
 
@@ -114,6 +117,25 @@ function TargetRow({ category, amountPence, period }: {
   );
 }
 
+function PlanFooter({ targets }: { targets: CategoryTarget[] }) {
+  const current = currentYearMonth();
+  const lastMonth = useTransactions(shiftMonth(current, -1));
+  const income = (lastMonth.data ?? []).filter(t => t.type === 'INCOME').reduce((sum, t) => sum + t.amount, 0);
+  const plan = planTargets(targets, income, current);
+  return (
+    <Paper
+      withBorder
+      p="sm"
+      role="status"
+      data-testid="plan-footer"
+      // Clears the mobile tab bar, and the floating Add button at the right.
+      style={{ position: 'sticky', bottom: 76, zIndex: 50, paddingRight: 80 }}
+    >
+      <Text fw={600}>{describePlan(plan)}</Text>
+    </Paper>
+  );
+}
+
 function TargetsContent() {
   const categories = useCategories();
   const targets = useTargets();
@@ -134,7 +156,10 @@ function TargetsContent() {
 
   return (
     <Stack>
-      <Title order={3}>Targets</Title>
+      <Group gap={0}>
+        <Title order={3}>Targets</Title>
+        <TermHelp terms={['target']} />
+      </Group>
       <Text c="dimmed" size="sm">Income and pots have no monthly target here. Set a pot's goal and plan on the Pots page.</Text>
 
       {groupCategories(eligible).map(bucket => (
@@ -147,6 +172,7 @@ function TargetsContent() {
           })}
         </div>
       ))}
+      <PlanFooter targets={targets.data ?? []} />
     </Stack>
   );
 }
