@@ -827,4 +827,81 @@ describe('TransactionSheet', () => {
       expect(mockCreate).not.toHaveBeenCalled();
     });
   });
+  describe('field errors', () => {
+    it('shows the category error on the category field and focuses a chip', async () => {
+      const user = userEvent.setup();
+      renderSheet();
+      await user.type(screen.getByLabelText(/amount/i), '4.80');
+      await user.click(screen.getByRole('button', { name: /^save$/i }));
+
+      const group = screen.getByRole('radiogroup', { name: 'Category' });
+      expect(group).toHaveAttribute('aria-invalid', 'true');
+      expect(group).toHaveAccessibleDescription('Choose a category');
+      expect(screen.getByLabelText(/amount/i)).not.toHaveAttribute('aria-invalid', 'true');
+      expect(screen.getByLabelText(/amount/i)).not.toHaveAccessibleDescription();
+      expect(within(group).getAllByRole('radio')).toContain(document.activeElement);
+    });
+
+    it('shows the amount error on the amount field and focuses it', async () => {
+      const user = userEvent.setup();
+      renderSheet();
+      await user.click(screen.getByRole('radio', { name: 'Dining' }));
+      await user.type(screen.getByLabelText(/amount/i), 'abc');
+      await user.click(screen.getByRole('button', { name: /^save$/i }));
+
+      const amount = screen.getByLabelText(/amount/i);
+      expect(amount).toHaveAttribute('aria-invalid', 'true');
+      expect(amount).toHaveAccessibleDescription(/enter a valid amount/i);
+      expect(amount).toHaveFocus();
+      expect(screen.getByRole('radiogroup', { name: 'Category' })).not.toHaveAttribute('aria-invalid');
+    });
+
+    it('shows every error at once and focuses the first', async () => {
+      const user = userEvent.setup();
+      renderSheet();
+      await user.click(screen.getByRole('button', { name: /^save$/i }));
+
+      expect(screen.getAllByRole('alert').map(a => a.textContent)).toEqual([
+        expect.stringMatching(/amount/i),
+        'Choose a category',
+      ]);
+      expect(screen.getByLabelText(/amount/i)).toHaveFocus();
+    });
+
+    it('asks for a date in the picker\'s format and focuses the date field', async () => {
+      const user = userEvent.setup();
+      renderSheet();
+      await user.type(screen.getByLabelText(/amount/i), '4.80');
+      await user.click(screen.getByRole('radio', { name: 'Dining' }));
+      await user.click(screen.getByRole('radio', { name: 'Other…' }));
+      await user.clear(screen.getByLabelText(/^date/i));
+      await user.click(screen.getByRole('button', { name: /^save$/i }));
+
+      const date = screen.getByLabelText(/^date/i);
+      expect(date).toHaveAttribute('aria-invalid', 'true');
+      expect(date).toHaveAccessibleDescription('Enter a date, for example 27/09/2026');
+      expect(date).toHaveFocus();
+      expect(screen.queryByText(/YYYY/)).not.toBeInTheDocument();
+      expect(mockCreate).not.toHaveBeenCalled();
+    });
+
+    it('clears a field\'s error once that field changes', async () => {
+      const user = userEvent.setup();
+      renderSheet();
+      await user.type(screen.getByLabelText(/amount/i), '4.80');
+      await user.click(screen.getByRole('button', { name: /^save$/i }));
+      await user.click(screen.getByRole('radio', { name: 'Dining' }));
+      expect(screen.queryByText('Choose a category')).not.toBeInTheDocument();
+      expect(screen.getByRole('radiogroup', { name: 'Category' })).not.toHaveAttribute('aria-invalid');
+    });
+
+    it('shows an edit save failure apart from the amount field', async () => {
+      const user = userEvent.setup();
+      mockUpdate.mockRejectedValue(new Error('boom'));
+      renderSheet({ editing });
+      await user.click(screen.getByRole('button', { name: /^save$/i }));
+      expect(await screen.findByRole('alert')).toHaveTextContent(/could not save/i);
+      expect(screen.getByLabelText(/amount/i)).not.toHaveAttribute('aria-invalid', 'true');
+    });
+  });
 });

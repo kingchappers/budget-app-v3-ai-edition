@@ -24,8 +24,19 @@ const DATE_OPTIONS: { label: string; value: DateChoice }[] = [
   { label: 'Other…', value: 'other' },
 ];
 
+const CATEGORY_ERROR = 'Choose a category';
+const DATE_ERROR = 'Enter a date, for example 27/09/2026';
+const FIELD_ERROR_PROPS = { role: 'alert' };
+
 type SaveMode = 'close' | 'addAnother';
 type CategorySource = 'none' | 'memory' | 'user';
+type ErrorField = 'amount' | 'category' | 'date';
+type FieldErrors = Partial<Record<ErrorField, string>>;
+
+interface Validation {
+  input: TransactionInput | null;
+  errors: FieldErrors;
+}
 
 export interface TransactionSheetProps {
   opened: boolean;
@@ -46,6 +57,7 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, preset, 
   const update = useUpdateTransaction(yearMonth);
   const saveWithUndo = useSaveWithUndo();
   const amountRef = useRef<HTMLInputElement>(null);
+  const dateRef = useRef<HTMLInputElement>(null);
   const createSubmittedRef = useRef(false);
   const saveAnotherRef = useRef<HTMLButtonElement>(null);
   const chipsRef = useRef<HTMLDivElement>(null);
@@ -58,7 +70,8 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, preset, 
   const [date, setDate] = useState(todayIso());
   const [dateChoice, setDateChoice] = useState<DateChoice>('today');
   const [noteOpen, setNoteOpen] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [categorySource, setCategorySource] = useState<CategorySource>('none');
   const [quickAdd, setQuickAdd] = useState('');
   const [quickAddError, setQuickAddError] = useState<string | null>(null);
@@ -100,7 +113,8 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, preset, 
       setCategorySource('none');
     }
     setNoteOpen(!editing && template != null && template.description !== '');
-    setError(null);
+    setFieldErrors({});
+    setSaveError(null);
     setQuickAdd('');
     setQuickAddError(null);
   }, [opened, editing, preset, template, templateDate]);
@@ -128,15 +142,31 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, preset, 
   const eligible = categories.filter(c => categoryTypesFor(type).includes(c.type));
   const chips = topCategories(monthTransactions ?? [], categories, type, CHIP_LIMIT);
 
+  function clearFieldError(field: ErrorField): void {
+    setFieldErrors(current => (current[field] === undefined ? current : { ...current, [field]: undefined }));
+  }
+
   function chooseDate(choice: DateChoice): void {
     setDateChoice(choice);
+    clearFieldError('date');
     if (choice === 'today') setDate(todayIso());
     if (choice === 'yesterday') setDate(yesterdayIso());
+  }
+
+  function handleAmountChange(value: string): void {
+    setAmount(value);
+    clearFieldError('amount');
+  }
+
+  function handleDateChange(value: string | null): void {
+    setDate(value ?? '');
+    clearFieldError('date');
   }
 
   function handleCategoryChange(id: string): void {
     setCategoryId(id);
     setCategorySource('user');
+    clearFieldError('category');
   }
 
   function handleNoteChange(note: string): void {
@@ -184,7 +214,7 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, preset, 
     if (parsed.note !== '') setNoteOpen(true);
     setCategoryId(recalled);
     setCategorySource(recalled ? 'memory' : 'none');
-    setError(null);
+    setFieldErrors({});
     setQuickAdd('');
     setQuickAddError(null);
 
@@ -195,21 +225,30 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, preset, 
     focusChipsAfterRenderRef.current = true;
   }
 
-  function validate(): TransactionInput | null {
+  function validate(): Validation {
     const parsed = parsePounds(amount);
-    if (!parsed.ok) {
-      setError(parsed.message);
-      return null;
+    const dateValid = /^\d{4}-\d{2}-\d{2}$/.test(date);
+    const errors: FieldErrors = {};
+    if (!parsed.ok) errors.amount = parsed.message;
+    if (!categoryId) errors.category = CATEGORY_ERROR;
+    if (!dateValid) errors.date = DATE_ERROR;
+
+    if (!parsed.ok || !categoryId || !dateValid) return { input: null, errors };
+    return { input: { amount: parsed.pence, type, categoryId, description, date }, errors };
+  }
+
+  function focusFirstError(errors: FieldErrors): void {
+    if (errors.amount) {
+      amountRef.current?.focus();
+      return;
     }
-    if (!categoryId) {
-      setError('Choose a category');
-      return null;
+    if (errors.category) {
+      const radios = chipsRef.current?.querySelectorAll<HTMLInputElement>('input[type="radio"]');
+      const target = Array.from(radios ?? []).find(radio => radio.checked) ?? radios?.[0];
+      target?.focus();
+      return;
     }
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-      setError('Date must be YYYY-MM-DD');
-      return null;
-    }
-    return { amount: parsed.pence, type, categoryId, description, date };
+    if (errors.date) dateRef.current?.focus();
   }
 
   function resetForNextEntry(): void {
@@ -221,20 +260,26 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, preset, 
     setNoteOpen(false);
     setQuickAdd('');
     setQuickAddError(null);
-    setError(null);
+    setFieldErrors({});
     amountRef.current?.focus();
   }
 
   async function handleSubmit(mode: SaveMode): Promise<void> {
-    const input = validate();
-    if (!input) return;
+    const { input, errors } = validate();
+    setFieldErrors(errors);
+    setSaveError(null);
+    if (!input) {
+      focusFirstError(errors);
+      return;
+    }
 
     if (editing) {
       try {
         await update.mutateAsync({ transactionId: editing.transactionId, input });
         onClose();
-      } catch {
-        setError('Could not save. Check your connection and try again.');
+      } catch (error) {
+        console.error('TransactionSheet: could not update transaction', editing.transactionId, error);
+        setSaveError('Could not save. Check your connection and try again.');
       }
       return;
     }
@@ -273,8 +318,9 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, preset, 
           inputMode="decimal"
           data-autofocus
           value={amount}
-          onChange={e => setAmount(e.currentTarget.value)}
-          error={error}
+          onChange={e => handleAmountChange(e.currentTarget.value)}
+          error={fieldErrors.amount}
+          errorProps={FIELD_ERROR_PROPS}
         />
         <SegmentedControl
           fullWidth
@@ -290,6 +336,7 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, preset, 
             onChange={handleCategoryChange}
             loading={categoriesLoading}
             error={categoriesError ? 'Could not load categories' : null}
+            fieldError={fieldErrors.category ?? null}
           />
         </div>
         {categorySource === 'memory' && description.trim() !== '' && (
@@ -299,8 +346,12 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, preset, 
           <DateInput
             label="Date"
             valueFormat="DD/MM/YYYY"
-            value={date}
-            onChange={value => setDate(value ?? '')}
+            allowDeselect
+            ref={dateRef}
+            value={date || null}
+            onChange={handleDateChange}
+            error={fieldErrors.date}
+            errorProps={FIELD_ERROR_PROPS}
           />
         ) : (
           <>
@@ -315,8 +366,12 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, preset, 
               <DateInput
                 label="Date"
                 valueFormat="DD/MM/YYYY"
-                value={date}
-                onChange={value => setDate(value ?? '')}
+                allowDeselect
+                ref={dateRef}
+                value={date || null}
+                onChange={handleDateChange}
+                error={fieldErrors.date}
+                errorProps={FIELD_ERROR_PROPS}
               />
             )}
           </>
@@ -333,6 +388,7 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, preset, 
             + Add note
           </Button>
         )}
+        {saveError && <Text size="sm" role="alert">{saveError}</Text>}
         <Group justify="flex-end">
           <Button variant="subtle" onClick={onClose}>Cancel</Button>
           {editing ? (

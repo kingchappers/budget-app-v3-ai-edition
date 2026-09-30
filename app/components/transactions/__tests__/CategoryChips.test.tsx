@@ -155,4 +155,17 @@ describe('CategoryChips', () => {
     expect(labelledBy).toBeTruthy();
     expect(document.getElementById(labelledBy as string)).toHaveTextContent('Category');
   });
+  it('shows a field error under the chips and marks only the group invalid', () => {
+    renderChips({ fieldError: 'Choose a category' });
+    const group = screen.getByRole('radiogroup', { name: 'Category' });
+    expect(group).toHaveAttribute('aria-invalid', 'true');
+    expect(group).toHaveAccessibleDescription('Choose a category');
+    expect(screen.getByRole('alert')).toHaveTextContent('Choose a category');
+  });
+
+  it('does not mark the group invalid without a field error', () => {
+    renderChips();
+    expect(screen.getByRole('radiogroup', { name: 'Category' })).not.toHaveAttribute('aria-invalid');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
 });
