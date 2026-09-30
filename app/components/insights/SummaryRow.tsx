@@ -24,7 +24,7 @@ function Figure({
   const percent = percentChange(deltaPence, previousPence);
   const up = deltaPence >= 0;
   const good = up === higherIsGood;
-  const color = good ? 'primary' : 'danger';
+  const color = good ? 'success' : 'attention';
   const Arrow = up ? IconArrowUp : IconArrowDown;
   return (
     <Paper withBorder p="sm">
@@ -32,9 +32,9 @@ function Figure({
       <Text fw={700} size="lg">{formatPence(pence)}</Text>
       {deltaPence !== 0 && (
         <Group gap={4} wrap="nowrap" data-tone={good ? 'good' : 'bad'}>
-          <Arrow size={12} color={`var(--mantine-color-${color}-6)`} />
+          <Arrow size={12} color={`var(--mantine-color-${color}-text)`} aria-hidden />
           <Text size="xs" c={color}>
-            {up ? '+' : '−'}{formatPence(Math.abs(deltaPence))}{percent !== null ? ` (${up ? '+' : '−'}${Math.abs(percent)}%)` : ''}
+            {formatPence(Math.abs(deltaPence))} {up ? 'more' : 'less'}{percent !== null ? ` (${Math.abs(percent)}%)` : ''}
           </Text>
         </Group>
       )}
