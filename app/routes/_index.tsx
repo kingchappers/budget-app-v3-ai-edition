@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { Link } from 'react-router';
 import { Alert, Button, Group, Loader, Stack, Text, Title } from '@mantine/core';
 import { DefaultLayout } from '~/components/layout/DefaultLayout';
@@ -16,6 +16,7 @@ import type { CategoryProgress } from '~/lib/summary';
 import { formatPence } from '~/lib/money';
 import { currentYearMonth, formatMonthLabel, monthPhrase, shiftMonth } from '~/lib/months';
 import { useDocumentTitle } from '~/hooks/useDocumentTitle';
+import { useSelectedMonth } from '~/hooks/useSelectedMonth';
 import { useCategories, usePots, useTargets, useTransactions } from '~/lib/queries';
 import { pageTitle } from '~/lib/pageTitle';
 import type { Route } from './+types/_index';
@@ -40,7 +41,7 @@ function GroupedProgress({ items, yearMonth }: { items: CategoryProgress[]; year
 }
 
 function HomeContent() {
-  const [yearMonth, setYearMonth] = useState(currentYearMonth());
+  const [yearMonth, setYearMonth] = useSelectedMonth();
   useDocumentTitle(pageTitle('Home', formatMonthLabel(yearMonth)));
   const categories = useCategories();
   const targets = useTargets();

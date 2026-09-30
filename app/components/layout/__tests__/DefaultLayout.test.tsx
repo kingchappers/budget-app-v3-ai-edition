@@ -25,10 +25,10 @@ vi.mock('../OfflineQueueBanner', () => ({ OfflineQueueBanner: () => null }));
 
 import { DefaultLayout } from '../DefaultLayout';
 
-function renderLayout(children: React.ReactNode = <p>page</p>) {
+function renderLayout(children: React.ReactNode = <p>page</p>, url: string = '/') {
   return render(
     <MantineProvider>
-      <MemoryRouter>
+      <MemoryRouter initialEntries={[url]}>
         <DefaultLayout>{children}</DefaultLayout>
       </MemoryRouter>
     </MantineProvider>,
@@ -233,5 +233,31 @@ describe('DefaultLayout signed out', () => {
     expect(screen.getByRole('status', { name: 'Checking your session' })).toBeInTheDocument();
     expect(screen.queryByText('Income this month £0.00')).not.toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: "You're signed out" })).not.toBeInTheDocument();
+  });
+});
+
+describe('DefaultLayout navigation keeps the month', () => {
+  function hrefsFor(name: string): (string | null)[] {
+    return screen.getAllByRole('link', { name }).map(link => link.getAttribute('href'));
+  }
+
+  it('carries the viewed month to the pages that show one', () => {
+    renderLayout(<p>page</p>, '/transactions?month=2026-08');
+    for (const name of ['Home', 'Transactions', 'Insights']) {
+      const expected = name === 'Home' ? '/?month=2026-08' : `/${name.toLowerCase()}?month=2026-08`;
+      expect(hrefsFor(name)).toContain(expected);
+      expect(hrefsFor(name).every(href => href === expected)).toBe(true);
+    }
+  });
+
+  it('leaves pages without a month alone', () => {
+    renderLayout(<p>page</p>, '/?month=2026-08');
+    expect(hrefsFor('Pots').every(href => href === '/pots')).toBe(true);
+    expect(hrefsFor('Targets').every(href => href === '/targets')).toBe(true);
+  });
+
+  it('adds nothing when no month is selected', () => {
+    renderLayout(<p>page</p>, '/');
+    expect(hrefsFor('Transactions').every(href => href === '/transactions')).toBe(true);
   });
 });

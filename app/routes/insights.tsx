@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useSelectedMonth } from '~/hooks/useSelectedMonth';
 import { ActionIcon, Alert, Button, Group, Loader, SegmentedControl, Stack, Text, Title } from '@mantine/core';
 import { IconChevronLeft, IconChevronRight } from '@tabler/icons-react';
 import { DefaultLayout } from '~/components/layout/DefaultLayout';
@@ -33,7 +34,7 @@ function periodLabel(from: string, to: string): string {
 
 function InsightsContent() {
   const [months, setMonths] = useState(6);
-  const [anchor, setAnchor] = useState(currentYearMonth());
+  const [anchor, setAnchor] = useSelectedMonth();
   const [openGroup, setOpenGroup] = useState<string | null>(null);
   const { from, to } = fetchRangeForAnchor(anchor, months);
   const { current, previous } = splitPeriods(from, to);

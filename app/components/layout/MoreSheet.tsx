@@ -2,6 +2,7 @@ import { Stack } from '@mantine/core';
 import { NavLink } from 'react-router';
 import { IconRepeat, IconTag, IconChartBar, IconWallet, IconTrash } from '@tabler/icons-react';
 import { ResponsiveSheet } from './ResponsiveSheet';
+import { useNavTarget } from '~/hooks/useNavTarget';
 
 export const MORE_ITEMS = [
   { to: '/categories', label: 'Categories', Icon: IconTag },
@@ -12,13 +13,14 @@ export const MORE_ITEMS = [
 ];
 
 export function MoreSheet({ opened, onClose }: { opened: boolean; onClose: () => void }) {
+  const navTarget = useNavTarget();
   return (
     <ResponsiveSheet opened={opened} onClose={onClose} title="More">
       <Stack gap={0}>
         {MORE_ITEMS.map(({ to, label, Icon }) => (
           <NavLink
             key={to}
-            to={to}
+            to={navTarget(to)}
             onClick={onClose}
             style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 4px', textDecoration: 'none', color: 'inherit' }}
           >
