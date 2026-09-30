@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
-import { ActionIcon, AppShell, Flex, Text, NavLink, Group, Paper, Tooltip, UnstyledButton } from '@mantine/core';
+import { ActionIcon, AppShell, Flex, Text, NavLink, Group, Loader, Paper, Tooltip, UnstyledButton } from '@mantine/core';
 import { useHotkeys } from '@mantine/hooks';
-import { Auth0Provider } from '@auth0/auth0-react';
+import { Auth0Provider, useAuth0 } from '@auth0/auth0-react';
 import Authentication from "../authentication/Authentication";
 import { ColorSchemeToggle } from './ColorSchemeToggle';
 import { QuickEntryTips } from './QuickEntryTips';
@@ -12,6 +12,8 @@ import { LaunchIntent } from './LaunchIntent';
 import { OfflineQueueBanner } from './OfflineQueueBanner';
 import { currentYearMonth } from '~/lib/months';
 import { MoreSheet, MORE_ITEMS } from './MoreSheet';
+import { SignedOutPanel, isSessionEndedError } from './SignedOutPanel';
+import { usePreferences } from '~/lib/preferences';
 
 const NAV_ITEMS = [
   { to: '/', label: 'Home', Icon: IconHome },
@@ -85,15 +87,91 @@ function SidebarNav() {
   );
 }
 
-export function DefaultLayout({ children }: { children: React.ReactNode }) {
+type SessionState = 'loading' | 'signedIn' | 'signedOut' | 'sessionEnded';
+
+function useSessionState(): SessionState {
+  const { isAuthenticated, isLoading, error } = useAuth0();
+  const [hadSession, setHadSession] = useState(false);
+  if (isAuthenticated && !hadSession) setHadSession(true);
+
+  if (isLoading) return 'loading';
+  if (isAuthenticated) return 'signedIn';
+  if (hadSession || isSessionEndedError(error)) return 'sessionEnded';
+  return 'signedOut';
+}
+
+function MainContent({ session, children }: { session: SessionState; children: React.ReactNode }) {
+  if (session === 'loading') {
+    return (
+      <Group justify="center" py="xl" role="status" aria-label="Checking your session">
+        <Loader />
+      </Group>
+    );
+  }
+  if (session === 'signedIn') return <>{children}</>;
+  return <SignedOutPanel sessionEnded={session === 'sessionEnded'} />;
+}
+
+function LayoutShell({ children }: { children: React.ReactNode }) {
   const [addOpen, setAddOpen] = useState(false);
   const openAdd = useCallback(() => setAddOpen(true), []);
+  const [{ shortcutN }] = usePreferences();
+  const session = useSessionState();
+  const signedIn = session === 'signedIn';
 
-  useHotkeys([['n', () => {
+  useHotkeys(shortcutN && signedIn ? [['n', () => {
     if (document.querySelector('[role="dialog"]')) return;
     setAddOpen(true);
-  }]]);
+  }]] : []);
 
+  return (
+    <AppShell
+      padding="md"
+      header={{ height: 60 }}
+      navbar={{ width: 260, breakpoint: 'sm', collapsed: { mobile: true, desktop: false } }}
+    >
+      <AppShell.Header>
+        <Flex h="100%" px="md" justify="space-between" align="center">
+          <Text fw={700}>Budget</Text>
+          <Group gap="sm">
+            <QuickEntryTips />
+            <ColorSchemeToggle />
+            <Authentication />
+          </Group>
+        </Flex>
+      </AppShell.Header>
+      <AppShell.Navbar p="md">
+        <SidebarNav />
+      </AppShell.Navbar>
+
+      {/* The floating "Add transaction" button sits at bottom:84 with a
+          56px diameter, so its top edge reaches bottom:140 — pb must
+          clear that or the last card on a page renders underneath it. */}
+      <AppShell.Main pb={150}>
+        <OfflineQueueBanner />
+        <MainContent session={session}>{children}</MainContent>
+      </AppShell.Main>
+      {signedIn && (
+        <>
+          <Tooltip label={shortcutN ? 'Add transaction (N)' : 'Add transaction'} events={{ hover: true, focus: true, touch: false }}>
+            <ActionIcon
+              size={56} radius="xl" variant="filled" aria-label="Add transaction"
+              onClick={() => setAddOpen(true)}
+              style={{ position: 'fixed', right: 16, bottom: 84, zIndex: 101 }}
+            >
+              <IconPlus size={26} />
+            </ActionIcon>
+          </Tooltip>
+          <TransactionSheet opened={addOpen} onClose={() => setAddOpen(false)} yearMonth={currentYearMonth()} />
+        </>
+      )}
+      <LaunchIntent onOpenAdd={openAdd} />
+      <BottomTabs />
+    </AppShell>
+  );
+}
+
+export function DefaultLayout({ children }: { children: React.ReactNode }) {
   return (
     <Auth0Provider
       domain={import.meta.env.VITE_AUTH0_DOMAIN}
@@ -110,45 +188,7 @@ export function DefaultLayout({ children }: { children: React.ReactNode }) {
         scope: 'openid profile email offline_access',
       }}
     >
-      <AppShell
-        padding="md"
-        header={{ height: 60 }}
-        navbar={{ width: 260, breakpoint: 'sm', collapsed: { mobile: true, desktop: false } }}
-      >
-        <AppShell.Header>
-          <Flex h="100%" px="md" justify="space-between" align="center">
-            <Text fw={700}>Budget</Text>
-            <Group gap="sm">
-              <QuickEntryTips />
-              <ColorSchemeToggle />
-              <Authentication />
-            </Group>
-          </Flex>
-        </AppShell.Header>
-        <AppShell.Navbar p="md">
-          <SidebarNav />
-        </AppShell.Navbar>
-
-        {/* The floating "Add transaction" button sits at bottom:84 with a
-            56px diameter, so its top edge reaches bottom:140 — pb must
-            clear that or the last card on a page renders underneath it. */}
-        <AppShell.Main pb={150}>
-          <OfflineQueueBanner />
-          {children}
-        </AppShell.Main>
-        <Tooltip label="Add transaction (N)" events={{ hover: true, focus: true, touch: false }}>
-          <ActionIcon
-            size={56} radius="xl" variant="filled" aria-label="Add transaction"
-            onClick={() => setAddOpen(true)}
-            style={{ position: 'fixed', right: 16, bottom: 84, zIndex: 101 }}
-          >
-            <IconPlus size={26} />
-          </ActionIcon>
-        </Tooltip>
-        <TransactionSheet opened={addOpen} onClose={() => setAddOpen(false)} yearMonth={currentYearMonth()} />
-        <LaunchIntent onOpenAdd={openAdd} />
-        <BottomTabs />
-      </AppShell>
+      <LayoutShell>{children}</LayoutShell>
     </Auth0Provider>
   );
 }

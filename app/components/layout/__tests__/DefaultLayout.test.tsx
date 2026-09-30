@@ -4,8 +4,14 @@ import userEvent from '@testing-library/user-event';
 import { MantineProvider } from '@mantine/core';
 import { MemoryRouter } from 'react-router';
 import { PENDING_ADD_KEY } from '~/lib/launchIntent';
+import { DEFAULT_PREFERENCES, writePreferences } from '~/lib/preferences';
 
-const auth = vi.hoisted(() => ({ isAuthenticated: false, isLoading: false }));
+const auth = vi.hoisted(() => ({
+  isAuthenticated: true,
+  isLoading: false,
+  error: undefined as (Error & { error?: string }) | undefined,
+  loginWithRedirect: vi.fn(),
+}));
 vi.mock('@auth0/auth0-react', () => ({
   Auth0Provider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   useAuth0: () => auth,
@@ -28,9 +34,15 @@ function renderLayout(children: React.ReactNode = <p>page</p>) {
   );
 }
 
+function authError(code: string): Error & { error: string } {
+  return Object.assign(new Error(`${code}: raw provider detail`), { error: code });
+}
+
 beforeEach(() => {
-  auth.isAuthenticated = false;
+  auth.isAuthenticated = true;
   auth.isLoading = false;
+  auth.error = undefined;
+  auth.loginWithRedirect.mockClear();
   window.sessionStorage.clear();
   window.localStorage.clear();
   window.history.replaceState(null, '', '/');
@@ -112,7 +124,6 @@ describe('DefaultLayout add shortcut', () => {
 
 describe('DefaultLayout launch intent', () => {
   it('opens the add sheet from ?add=1 once signed in and cleans the URL', () => {
-    auth.isAuthenticated = true;
     window.history.replaceState(null, '', '/?add=1');
 
     renderLayout();
@@ -122,6 +133,7 @@ describe('DefaultLayout launch intent', () => {
   });
 
   it('does not open the add sheet from ?add=1 while signed out', () => {
+    auth.isAuthenticated = false;
     window.history.replaceState(null, '', '/?add=1');
 
     renderLayout();
@@ -131,10 +143,81 @@ describe('DefaultLayout launch intent', () => {
   });
 });
 
-describe('DefaultLayout signed out (current behaviour)', () => {
-  it('renders the page and the add button as if the budget were empty', () => {
+describe('DefaultLayout N shortcut setting', () => {
+  it('does nothing on N when the shortcut is turned off in Settings', async () => {
+    writePreferences(window.localStorage, { ...DEFAULT_PREFERENCES, shortcutN: false });
+    renderLayout();
+    await userEvent.setup().keyboard('n');
+    expect(screen.queryByText('Add sheet open')).not.toBeInTheDocument();
+  });
+
+  it('only mentions N on the add button tooltip while the shortcut is on', async () => {
+    writePreferences(window.localStorage, { ...DEFAULT_PREFERENCES, shortcutN: false });
+    const user = userEvent.setup();
+    renderLayout();
+    await user.hover(screen.getByRole('button', { name: 'Add transaction' }));
+    expect(await screen.findByText('Add transaction')).toBeInTheDocument();
+    expect(screen.queryByText('Add transaction (N)')).not.toBeInTheDocument();
+  });
+});
+
+describe('DefaultLayout signed out', () => {
+  beforeEach(() => {
+    auth.isAuthenticated = false;
+  });
+
+  it('replaces the page with a signed-out panel and hides the add button', () => {
     renderLayout(<p>Income this month £0.00</p>);
-    expect(screen.getByText('Income this month £0.00')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Add transaction' })).toBeInTheDocument();
+
+    expect(screen.getByRole('heading', { name: "You're signed out" })).toBeInTheDocument();
+    expect(screen.getByText('Your data is safe. Sign in to see it.')).toBeInTheDocument();
+    expect(screen.queryByText('Income this month £0.00')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Add transaction' })).not.toBeInTheDocument();
+  });
+
+  it('starts sign-in from the panel button', async () => {
+    renderLayout();
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Sign in' }));
+    expect(auth.loginWithRedirect).toHaveBeenCalled();
+  });
+
+  it('does not open the add sheet on N', async () => {
+    renderLayout();
+    await userEvent.setup().keyboard('n');
+    expect(screen.queryByText('Add sheet open')).not.toBeInTheDocument();
+  });
+
+  it('says the session has ended when Auth0 needs a new sign-in', () => {
+    auth.error = authError('login_required');
+    renderLayout();
+
+    expect(screen.getByRole('heading', { name: 'Your session has ended' })).toBeInTheDocument();
+    expect(screen.getByText('Your data is safe. Sign in to see it.')).toBeInTheDocument();
+    expect(screen.queryByText(/raw provider detail/)).not.toBeInTheDocument();
+  });
+
+  it('says the session has ended when a signed-in session goes away', () => {
+    auth.isAuthenticated = true;
+    const view = renderLayout();
+
+    auth.isAuthenticated = false;
+    view.rerender(
+      <MantineProvider>
+        <MemoryRouter>
+          <DefaultLayout><p>page</p></DefaultLayout>
+        </MemoryRouter>
+      </MantineProvider>,
+    );
+
+    expect(screen.getByRole('heading', { name: 'Your session has ended' })).toBeInTheDocument();
+  });
+
+  it('shows a loading indicator instead of the page while the session is checked', () => {
+    auth.isLoading = true;
+    renderLayout(<p>Income this month £0.00</p>);
+
+    expect(screen.getByRole('status', { name: 'Checking your session' })).toBeInTheDocument();
+    expect(screen.queryByText('Income this month £0.00')).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: "You're signed out" })).not.toBeInTheDocument();
   });
 });
