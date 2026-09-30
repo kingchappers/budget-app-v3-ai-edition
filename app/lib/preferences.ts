@@ -15,6 +15,10 @@ export interface Preferences {
   keepSheetOpen: KeepSheetOpen;
   entryMode: EntryMode;
   quickAddTipDismissed: boolean;
+  // Days the user said they had nothing to log, by Auth0 user id. Kept on this device for now.
+  nothingToLog: Record<string, string[]>;
+  // The welcome-back card stays hidden until this date (YYYY-MM-DD). Empty means not hidden.
+  welcomeBackHiddenUntil: string;
 }
 
 export const DEFAULT_PREFERENCES: Preferences = {
@@ -24,12 +28,18 @@ export const DEFAULT_PREFERENCES: Preferences = {
   keepSheetOpen: 'ask',
   entryMode: 'form',
   quickAddTipDismissed: false,
+  nothingToLog: {},
+  welcomeBackHiddenUntil: '',
 };
 
 const BOOLEAN_KEYS = ['shortcutN', 'openAddOnLaunch', 'quickAddTipDismissed'] as const;
 const KEEP_SHEET_OPEN_VALUES: readonly KeepSheetOpen[] = ['ask', 'yes', 'no'];
 const ENTRY_MODES: readonly EntryMode[] = ['form', 'quick'];
 const MAX_CATEGORY_ID_LENGTH = 64;
+const MAX_USER_KEY_LENGTH = 128;
+const MAX_NOTHING_TO_LOG_USERS = 20;
+const MAX_NOTHING_TO_LOG_DAYS = 400;
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 export const PREFERENCES_KEY = 'budget.preferences';
 export const LEGACY_OPEN_ON_LAUNCH_KEY = 'budget.openAddOnLaunch';
@@ -78,6 +88,17 @@ function pinnedFrom(value: unknown): string[] {
   return [...new Set(ids)].slice(0, MAX_PINNED_CHIPS);
 }
 
+function nothingToLogFrom(value: unknown): Record<string, string[]> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return {};
+  const result: Record<string, string[]> = {};
+  for (const [user, days] of Object.entries(value).slice(0, MAX_NOTHING_TO_LOG_USERS)) {
+    if (user === '' || user.length > MAX_USER_KEY_LENGTH || !Array.isArray(days)) continue;
+    const valid = days.filter((day): day is string => typeof day === 'string' && ISO_DATE.test(day));
+    result[user] = [...new Set(valid)].sort().slice(-MAX_NOTHING_TO_LOG_DAYS);
+  }
+  return result;
+}
+
 function fromStored(stored: Record<string, unknown>, legacyOpenOnLaunch: string | null): Preferences {
   const result: Preferences = { ...DEFAULT_PREFERENCES };
   for (const key of BOOLEAN_KEYS) {
@@ -87,6 +108,10 @@ function fromStored(stored: Record<string, unknown>, legacyOpenOnLaunch: string 
   result.pinnedCategoryIds = pinnedFrom(stored.pinnedCategoryIds);
   if (KEEP_SHEET_OPEN_VALUES.includes(stored.keepSheetOpen as KeepSheetOpen)) result.keepSheetOpen = stored.keepSheetOpen as KeepSheetOpen;
   if (ENTRY_MODES.includes(stored.entryMode as EntryMode)) result.entryMode = stored.entryMode as EntryMode;
+  result.nothingToLog = nothingToLogFrom(stored.nothingToLog);
+  if (typeof stored.welcomeBackHiddenUntil === 'string' && (stored.welcomeBackHiddenUntil === '' || ISO_DATE.test(stored.welcomeBackHiddenUntil))) {
+    result.welcomeBackHiddenUntil = stored.welcomeBackHiddenUntil;
+  }
   if (typeof stored.openAddOnLaunch !== 'boolean' && legacyOpenOnLaunch === '1') result.openAddOnLaunch = true;
   return result;
 }
