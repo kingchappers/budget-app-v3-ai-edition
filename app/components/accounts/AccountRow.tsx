@@ -1,6 +1,6 @@
 import { ActionIcon, Button, Card, Group, Menu, Text, UnstyledButton } from '@mantine/core';
 import { IconDots, IconTrash } from '@tabler/icons-react';
-import { accountTypeLabel, balanceAsOf } from '~/lib/accounts';
+import { accountTypeLabel, balanceAsOf, updatedAgo } from '~/lib/accounts';
 import { todayIso } from '~/lib/months';
 import { formatPence } from '~/lib/money';
 import type { Account } from '~/lib/types';
@@ -22,7 +22,10 @@ export function AccountRow({
           <Text fw={500}>{account.name}</Text>
           <Text size="xs" c="dimmed">{accountTypeLabel(account.type)}</Text>
         </UnstyledButton>
-        <Text fw={700}>{formatPence(balance)}</Text>
+        <div style={{ textAlign: 'right' }}>
+          <Text fw={700}>{formatPence(balance)}</Text>
+          <Text size="xs" c="dimmed">{updatedAgo(account.balances, todayIso())}</Text>
+        </div>
         <Button size="compact-sm" variant="light" onClick={onUpdate} aria-label={`Update ${account.name}`}>Update</Button>
         <Menu position="bottom-end">
           <Menu.Target>

@@ -1,4 +1,4 @@
-import { lastDayOfMonth } from './months';
+import { daysBetweenIso, lastDayOfMonth } from './months';
 import type { Account, AccountKind, AccountType, BalanceEntry } from './types';
 
 export function balanceAsOf(entries: BalanceEntry[], date: string): number {
@@ -9,6 +9,17 @@ export function balanceAsOf(entries: BalanceEntry[], date: string): number {
     pence = entry.pence;
   }
   return pence;
+}
+
+// When the balance shown was last entered, in words: "Updated today", "Updated 23 days ago".
+export function updatedAgo(entries: BalanceEntry[], today: string): string {
+  const dates = entries.map(entry => entry.date).filter(date => date <= today).sort();
+  const latest = dates[dates.length - 1];
+  if (latest === undefined) return 'Not updated yet';
+  const days = daysBetweenIso(latest, today);
+  if (days === 0) return 'Updated today';
+  if (days === 1) return 'Updated yesterday';
+  return `Updated ${days} days ago`;
 }
 
 export function netWorthAsOf(accounts: Account[], date: string): number {
