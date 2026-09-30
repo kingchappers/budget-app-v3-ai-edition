@@ -1,5 +1,6 @@
 import type { Category, Transaction, TransactionType } from './types';
 import { categoryTypesFor } from './transactionTypes';
+import { isYearMonth } from './months';
 
 export interface TransactionFilter {
   query: string;
@@ -9,7 +10,6 @@ export interface TransactionFilter {
 
 export const UNTARGETED_FILTER = '__untargeted';
 
-const MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
 const CATEGORY_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
 
 export interface TransactionsParams {
@@ -20,7 +20,7 @@ export interface TransactionsParams {
 export function parseTransactionsParams(params: URLSearchParams): TransactionsParams {
   const month = params.get('month');
   const category = params.get('category');
-  const yearMonth = month !== null && MONTH_PATTERN.test(month) ? month : null;
+  const yearMonth = month !== null && isYearMonth(month) ? month : null;
 
   if (category !== null && CATEGORY_ID_PATTERN.test(category)) return { yearMonth, categoryId: category };
   if (params.get('spending') === 'untargeted') return { yearMonth, categoryId: UNTARGETED_FILTER };
