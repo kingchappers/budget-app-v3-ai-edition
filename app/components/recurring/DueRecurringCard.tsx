@@ -8,7 +8,7 @@ import { TransactionSheet } from '~/components/transactions/TransactionSheet';
 import { useDueRecurring } from '~/hooks/useDueRecurring';
 import { useSaveWithUndo } from '~/hooks/useSaveWithUndo';
 import { CategoryIcon } from '~/components/categories/CategoryIcon';
-import { currentYearMonth, formatShortDate } from '~/lib/months';
+import { currentYearMonth } from '~/lib/months';
 import { useCategories, useSetRecurringHandled } from '~/lib/queries';
 import { dueLabel, type DueItem } from '~/lib/recurring';
 import { formatSignedPence } from '~/lib/transactionTypes';
@@ -107,9 +107,7 @@ export function DueRecurringCard() {
                 </ThemeIcon>
                 <div style={{ minWidth: 0 }}>
                   <Text truncate>{label}</Text>
-                  <Text size="xs" truncate c={item.status === 'overdue' ? 'danger' : 'dimmed'}>
-                    {`${dueLabel(item)} · ${formatShortDate(item.dueDate)}`}
-                  </Text>
+                  <Text size="xs" truncate c="dimmed">{dueLabel(item)}</Text>
                 </div>
               </Group>
               <Group gap="xs" wrap="nowrap" style={{ flexShrink: 0 }}>

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   currentYearMonth, shiftMonth, formatMonthLabel, todayIso, yesterdayIso, dateChoiceFor,
-  lastDayOfMonth, addDaysIso, daysBetweenIso, formatShortDate,
+  lastDayOfMonth, addDaysIso, daysBetweenIso, formatShortDate, formatMonthName,
 } from '../months';
 
 describe('currentYearMonth', () => {
@@ -29,6 +29,13 @@ describe('shiftMonth', () => {
 
   it('rolls over the year boundary backward', () => {
     expect(shiftMonth('2026-01', -1)).toBe('2025-12');
+  });
+});
+
+describe('formatMonthName', () => {
+  it('renders the month name alone', () => {
+    expect(formatMonthName('2026-09')).toBe('September');
+    expect(formatMonthName('2027-01')).toBe('January');
   });
 });
 

@@ -52,7 +52,7 @@ function rec(over: Partial<Recurring>): Recurring {
 
 function item(over: Partial<DueItem> = {}, template: Partial<Recurring> = {}): DueItem {
   return {
-    recurring: rec(template), period: '2026-09', dueDate: '2026-09-28', status: 'today', daysAway: 0, ...over,
+    recurring: rec(template), period: '2026-09', dueDate: '2026-09-28', status: 'today', daysAway: 0, likelyMatches: [], ...over,
   };
 }
 
@@ -80,13 +80,13 @@ describe('DueRecurringCard', () => {
 
   it('lists each due item with its status, date and signed amount', () => {
     dueState.items = [
-      item({ status: 'overdue', daysAway: -2, dueDate: '2026-09-26' }, { recurringId: 'a', description: 'Rent', type: 'EXPENSE', categoryId: 'cat-housing', amount: 95000 }),
+      item({ status: 'past', daysAway: -2, dueDate: '2026-09-26' }, { recurringId: 'a', description: 'Rent', type: 'EXPENSE', categoryId: 'cat-housing', amount: 95000 }),
       item({ status: 'upcoming', daysAway: 2, dueDate: '2026-09-30' }, { recurringId: 'b' }),
     ];
     renderCard();
 
     expect(screen.getByText('Rent')).toBeInTheDocument();
-    expect(screen.getByText('2 days overdue · 26 Sep')).toBeInTheDocument();
+    expect(screen.getByText('Due 26 Sep')).toBeInTheDocument();
     expect(screen.getByText('−£950.00')).toBeInTheDocument();
     expect(screen.getByText('Salary')).toBeInTheDocument();
     expect(screen.getByText('Due in 2 days · 30 Sep')).toBeInTheDocument();

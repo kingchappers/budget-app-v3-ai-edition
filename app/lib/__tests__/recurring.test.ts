@@ -1,13 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import {
-  computeDueItems, dueDateFor, dueLabel, formatDayOfMonth, isHandled, validateRecurringForm,
+  computeDueItems, dueDateFor, dueLabel, formatDayOfMonth, groupDueItems, isHandled, likelyMatches,
+  olderGroupHeading, validateRecurringForm,
 } from '../recurring';
 import type { Category, Recurring, Transaction } from '../types';
 
 function rec(over: Partial<Recurring>): Recurring {
   return {
     recurringId: 'r1', type: 'INCOME', categoryId: 'cat-salary', amount: 240000, description: 'Salary',
-    dayOfMonth: 28, leadDays: 3, handledPeriod: null, createdAt: '', updatedAt: '', ...over,
+    dayOfMonth: 28, leadDays: 3, handledPeriod: null, createdAt: '2026-09-01T09:00:00.000Z', updatedAt: '', ...over,
   };
 }
 
@@ -45,23 +46,63 @@ describe('isHandled', () => {
     expect(isHandled(rec({ handledPeriod: null }), '2026-09', [])).toBe(false);
   });
 
-  it('is handled by a matching transaction in the period', () => {
-    expect(isHandled(rec({}), '2026-09', [txn({})])).toBe(true);
+  it('is handled by a transaction in the period that carries its recurringId', () => {
+    expect(isHandled(rec({}), '2026-09', [txn({ recurringId: 'r1' })])).toBe(true);
   });
 
-  it('matches the note ignoring case and spaces', () => {
-    expect(isHandled(rec({ description: 'Salary' }), '2026-09', [txn({ description: '  SALARY ' })])).toBe(true);
+  it('counts a linked transaction whatever its note, amount or category', () => {
+    const linked = txn({ recurringId: 'r1', description: 'Something else', amount: 1, categoryId: 'cat-housing' });
+    expect(isHandled(rec({}), '2026-09', [linked])).toBe(true);
   });
 
-  it('matches any note when the template has none', () => {
-    expect(isHandled(rec({ description: '' }), '2026-09', [txn({ description: 'Bonus' })])).toBe(true);
+  it('is not handled by a transaction linked to another bill or in another month', () => {
+    expect(isHandled(rec({}), '2026-09', [txn({ recurringId: 'r2' })])).toBe(false);
+    expect(isHandled(rec({}), '2026-09', [txn({ recurringId: 'r1', date: '2026-08-28' })])).toBe(false);
   });
 
-  it('is not handled by a different note, type, category or month', () => {
-    expect(isHandled(rec({ description: 'Salary' }), '2026-09', [txn({ description: 'Bonus' })])).toBe(false);
-    expect(isHandled(rec({}), '2026-09', [txn({ type: 'EXPENSE' })])).toBe(false);
-    expect(isHandled(rec({}), '2026-09', [txn({ categoryId: 'cat-housing' })])).toBe(false);
-    expect(isHandled(rec({}), '2026-09', [txn({ date: '2026-08-28' })])).toBe(false);
+  it('never infers payment from the same category when the template has no note', () => {
+    expect(isHandled(rec({ description: '' }), '2026-09', [txn({ description: 'Bonus' })])).toBe(false);
+  });
+
+  it('never infers payment from a matching note', () => {
+    expect(isHandled(rec({ description: 'Salary' }), '2026-09', [txn({ description: '  SALARY ' })])).toBe(false);
+  });
+});
+
+describe('likelyMatches', () => {
+  const netflix = rec({ recurringId: 'nf', type: 'EXPENSE', categoryId: 'cat-subs', amount: 1000, description: 'Netflix' });
+
+  function spend(over: Partial<Transaction>): Transaction {
+    return txn({ type: 'EXPENSE', categoryId: 'cat-subs', amount: 1000, description: 'Netflix sub', date: '2026-09-03', ...over });
+  }
+
+  it('finds a manual entry with a different note, same type and category, in the period', () => {
+    expect(likelyMatches(netflix, '2026-09', [spend({})]).map(t => t.transactionId)).toEqual(['t1']);
+  });
+
+  it('accepts amounts within 10% either way and rejects anything further', () => {
+    expect(likelyMatches(netflix, '2026-09', [spend({ amount: 900 })])).toHaveLength(1);
+    expect(likelyMatches(netflix, '2026-09', [spend({ amount: 1100 })])).toHaveLength(1);
+    expect(likelyMatches(netflix, '2026-09', [spend({ amount: 899 })])).toHaveLength(0);
+    expect(likelyMatches(netflix, '2026-09', [spend({ amount: 1101 })])).toHaveLength(0);
+  });
+
+  it('ignores other types, categories, periods and linked transactions', () => {
+    expect(likelyMatches(netflix, '2026-09', [
+      spend({ transactionId: 'a', type: 'INCOME' }),
+      spend({ transactionId: 'b', categoryId: 'cat-food' }),
+      spend({ transactionId: 'c', date: '2026-08-03' }),
+      spend({ transactionId: 'd', recurringId: 'other' }),
+    ])).toEqual([]);
+  });
+
+  it('puts the closest amount first, then the latest date', () => {
+    const matches = likelyMatches(netflix, '2026-09', [
+      spend({ transactionId: 'far', amount: 1080, date: '2026-09-20' }),
+      spend({ transactionId: 'early', amount: 1010, date: '2026-09-02' }),
+      spend({ transactionId: 'late', amount: 990, date: '2026-09-10' }),
+    ]);
+    expect(matches.map(t => t.transactionId)).toEqual(['late', 'early', 'far']);
   });
 });
 
@@ -79,13 +120,29 @@ describe('computeDueItems visibility', () => {
     expect(due([rec({})], '2026-09-28')[0]).toMatchObject({ status: 'today', daysAway: 0 });
   });
 
-  it('stays until the month ends, as overdue', () => {
-    expect(due([rec({})], '2026-09-30')[0]).toMatchObject({ status: 'overdue', daysAway: -2 });
+  it('stays after the due date as a past item', () => {
+    expect(due([rec({})], '2026-09-30')[0]).toMatchObject({ status: 'past', daysAway: -2 });
   });
 
-  it('drops off in the next month until its own lead time starts', () => {
-    expect(due([rec({})], '2026-10-01')).toEqual([]);
-    expect(due([rec({})], '2026-10-25')[0]).toMatchObject({ period: '2026-10', status: 'upcoming' });
+  it('keeps an unlogged bill after its month ends', () => {
+    expect(due([rec({})], '2026-10-01')[0]).toMatchObject({ period: '2026-09', dueDate: '2026-09-28', status: 'past' });
+    expect(due([rec({})], '2026-12-15')[0]).toMatchObject({ period: '2026-09' });
+  });
+
+  it('looks back three months and no further', () => {
+    const old = rec({ handledPeriod: null, createdAt: '2025-01-01T00:00:00.000Z' });
+    expect(due([old], '2026-12-01')[0]).toMatchObject({ period: '2026-09' });
+    expect(due([{ ...old, handledPeriod: '2026-11' }], '2026-12-01')).toEqual([]);
+  });
+
+  it('never looks back before the month the template was created', () => {
+    const fresh = rec({ createdAt: '2026-10-05T09:00:00.000Z' });
+    expect(due([fresh], '2026-12-01')[0]).toMatchObject({ period: '2026-10' });
+    expect(due([rec({ createdAt: '2026-12-01T09:00:00.000Z', dayOfMonth: 28 })], '2026-12-01')).toEqual([]);
+  });
+
+  it('uses only the three-month window when the creation date is missing', () => {
+    expect(due([rec({ createdAt: '' })], '2026-12-01')[0]).toMatchObject({ period: '2026-09' });
   });
 
   it('honours a lead time of zero', () => {
@@ -100,7 +157,7 @@ describe('computeDueItems visibility', () => {
   });
 
   it('clamps the 31st in a short month', () => {
-    expect(due([rec({ dayOfMonth: 31 })], '2026-02-28')[0]).toMatchObject({ dueDate: '2026-02-28', status: 'today' });
+    expect(due([rec({ dayOfMonth: 31, createdAt: '2026-02-01T09:00:00.000Z' })], '2026-02-28')[0]).toMatchObject({ dueDate: '2026-02-28', status: 'today' });
   });
 
   it('excludes templates whose category no longer exists', () => {
@@ -114,11 +171,16 @@ describe('computeDueItems handled state and one row per template', () => {
   it('shows the earliest unhandled occurrence only', () => {
     const items = due([rent], '2026-09-28');
     expect(items).toHaveLength(1);
-    expect(items[0]).toMatchObject({ period: '2026-09', status: 'overdue' });
+    expect(items[0]).toMatchObject({ period: '2026-09', status: 'past' });
   });
 
-  it('moves on to the next occurrence once the earlier one is handled by a transaction', () => {
-    const paid = txn({ type: 'EXPENSE', categoryId: 'cat-housing', description: 'Rent', date: '2026-09-01' });
+  it('shows the earliest of several unlogged months first', () => {
+    expect(due([rent], '2026-11-15')[0]).toMatchObject({ period: '2026-09' });
+    expect(due([{ ...rent, handledPeriod: '2026-09' }], '2026-11-15')[0]).toMatchObject({ period: '2026-10' });
+  });
+
+  it('moves on to the next occurrence once the earlier one is added from the Due list', () => {
+    const paid = txn({ type: 'EXPENSE', categoryId: 'cat-housing', description: 'Rent', date: '2026-09-01', recurringId: 'rent' });
     expect(due([rent], '2026-09-28', [paid])[0]).toMatchObject({ period: '2026-10', dueDate: '2026-10-01', daysAway: 3 });
   });
 
@@ -130,19 +192,27 @@ describe('computeDueItems handled state and one row per template', () => {
     expect(due([{ ...rent, handledPeriod: '2026-10' }], '2026-09-28')).toEqual([]);
   });
 
-  it('clears a due item when the matching transaction is typed in by hand', () => {
-    expect(due([rec({})], '2026-09-28', [txn({})])).toEqual([]);
+  it('keeps one bill due when another bill in the same category is logged', () => {
+    const phone = rec({ recurringId: 'phone', type: 'EXPENSE', categoryId: 'cat-housing', description: '', amount: 3000, dayOfMonth: 5 });
+    const rentPaid = txn({ type: 'EXPENSE', categoryId: 'cat-housing', amount: 95000, description: 'Rent', date: '2026-09-01', recurringId: 'rent' });
+    expect(due([phone], '2026-09-28', [rentPaid])[0]).toMatchObject({ period: '2026-09', likelyMatches: [] });
+  });
+
+  it('offers a hand-typed entry as a likely match instead of hiding the bill', () => {
+    const typed = txn({ transactionId: 'typed', description: 'salary sept', amount: 238000 });
+    const [item] = due([rec({})], '2026-09-28', [typed]);
+    expect(item.likelyMatches.map(t => t.transactionId)).toEqual(['typed']);
   });
 });
 
 describe('computeDueItems ordering', () => {
-  it('lists overdue first, then today, then upcoming, soonest first', () => {
-    const overdue = rec({ recurringId: 'a', dayOfMonth: 26 });
+  it('lists past items first, then today, then upcoming, soonest first', () => {
+    const past = rec({ recurringId: 'a', dayOfMonth: 26 });
     const today = rec({ recurringId: 'b', dayOfMonth: 28 });
     const upcoming = rec({ recurringId: 'c', dayOfMonth: 30 });
-    const items = due([upcoming, today, overdue], '2026-09-28');
+    const items = due([upcoming, today, past], '2026-09-28');
     expect(items.map(item => item.recurring.recurringId)).toEqual(['a', 'b', 'c']);
-    expect(items.map(item => item.status)).toEqual(['overdue', 'today', 'upcoming']);
+    expect(items.map(item => item.status)).toEqual(['past', 'today', 'upcoming']);
   });
 
   it('breaks ties by note and then id', () => {
@@ -154,13 +224,39 @@ describe('computeDueItems ordering', () => {
   });
 });
 
+describe('groupDueItems', () => {
+  it('keeps this month\'s and next month\'s items together and groups older months, oldest first', () => {
+    const rent = rec({ recurringId: 'rent', type: 'EXPENSE', categoryId: 'cat-housing', description: 'Rent', dayOfMonth: 1, createdAt: '2026-01-01T09:00:00.000Z' });
+    const salary = rec({ recurringId: 'salary', handledPeriod: '2026-08' });
+    const phone = rec({ recurringId: 'phone', type: 'EXPENSE', categoryId: 'cat-housing', description: 'Phone', dayOfMonth: 20, handledPeriod: '2026-10' });
+    const items = due([rent, salary, phone], '2026-11-18');
+    const groups = groupDueItems(items, '2026-11-18');
+
+    expect(groups.current.map(i => i.recurring.recurringId)).toEqual(['phone']);
+    expect(groups.older.map(g => [g.period, g.items.map(i => i.recurring.recurringId)])).toEqual([
+      ['2026-08', ['rent']],
+      ['2026-09', ['salary']],
+    ]);
+  });
+
+  it('returns no groups when nothing is from an earlier month', () => {
+    expect(groupDueItems(due([rec({})], '2026-09-28'), '2026-09-28').older).toEqual([]);
+  });
+});
+
+describe('olderGroupHeading', () => {
+  it('names the month in plain words', () => {
+    expect(olderGroupHeading('2026-09')).toBe('From September, not logged');
+  });
+});
+
 describe('dueLabel', () => {
-  it('describes each status', () => {
-    expect(dueLabel({ status: 'today', daysAway: 0 })).toBe('Due today');
-    expect(dueLabel({ status: 'upcoming', daysAway: 1 })).toBe('Due in 1 day');
-    expect(dueLabel({ status: 'upcoming', daysAway: 3 })).toBe('Due in 3 days');
-    expect(dueLabel({ status: 'overdue', daysAway: -1 })).toBe('1 day overdue');
-    expect(dueLabel({ status: 'overdue', daysAway: -2 })).toBe('2 days overdue');
+  it('describes each status without counting days late', () => {
+    expect(dueLabel({ status: 'today', daysAway: 0, dueDate: '2026-09-28' })).toBe('Due today');
+    expect(dueLabel({ status: 'upcoming', daysAway: 1, dueDate: '2026-09-29' })).toBe('Due in 1 day · 29 Sep');
+    expect(dueLabel({ status: 'upcoming', daysAway: 3, dueDate: '2026-10-01' })).toBe('Due in 3 days · 1 Oct');
+    expect(dueLabel({ status: 'past', daysAway: -1, dueDate: '2026-09-27' })).toBe('Due 27 Sep');
+    expect(dueLabel({ status: 'past', daysAway: -40, dueDate: '2026-09-03' })).toBe('Due 3 Sep');
   });
 });
 
