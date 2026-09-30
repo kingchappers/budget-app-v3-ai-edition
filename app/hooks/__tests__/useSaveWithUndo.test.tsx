@@ -194,6 +194,58 @@ describe('useSaveWithUndo', () => {
     });
   });
 
+  describe('how long the Saved message stays (Settings)', () => {
+    function renderSaver() {
+      const client = new QueryClient();
+      const wrapper = ({ children }: { children: React.ReactNode }) => (
+        <QueryClientProvider client={client}><MantineProvider><Notifications />{children}</MantineProvider></QueryClientProvider>
+      );
+      return renderHook(() => useSaveWithUndo(), { wrapper });
+    }
+
+    async function saveAndGetAutoClose(): Promise<unknown> {
+      const update = vi.spyOn(notifications, 'update');
+      mockCreate.mutateAsync.mockResolvedValue({ transactionId: 't1', yearMonth: input.date.slice(0, 7) });
+      const { result } = renderSaver();
+      await act(async () => { await result.current(input); });
+      return update.mock.calls.at(-1)?.[0].autoClose;
+    }
+
+    afterEach(() => { window.localStorage.removeItem('budget.preferences'); });
+
+    it('stays until closed by default', async () => {
+      expect(await saveAndGetAutoClose()).toBe(false);
+    });
+
+    it.each([['30s', 30000], ['10s', 10000]])('goes after %s once the save has settled, if asked', async (undoDuration, milliseconds) => {
+      window.localStorage.setItem('budget.preferences', JSON.stringify({ undoDuration }));
+      expect(await saveAndGetAutoClose()).toBe(milliseconds);
+    });
+
+    it('waits while still saving, then starts the clock', async () => {
+      window.localStorage.setItem('budget.preferences', JSON.stringify({ undoDuration: '10s' }));
+      const show = vi.spyOn(notifications, 'show');
+      let finish!: (value: unknown) => void;
+      mockCreate.mutateAsync.mockReturnValue(new Promise(resolve => { finish = resolve; }));
+      const { result } = renderSaver();
+      act(() => { void result.current(input); });
+
+      expect(show.mock.calls.at(-1)?.[0].autoClose).toBe(false);
+      await act(async () => { finish({ transactionId: 't1', yearMonth: input.date.slice(0, 7) }); });
+    });
+
+    it('never makes an error message go away by itself', async () => {
+      window.localStorage.setItem('budget.preferences', JSON.stringify({ undoDuration: '10s' }));
+      const show = vi.spyOn(notifications, 'show');
+      mockCreate.mutateAsync.mockRejectedValue(new ApiError(400, 'Bad Request'));
+      const { result } = renderSaver();
+      await act(async () => { await result.current(input); });
+
+      const failure = show.mock.calls.map(call => call[0]).find(options => String(options.id).startsWith('failed-'));
+      expect(failure?.autoClose).toBe(false);
+    });
+  });
+
   describe('undo from outside the toast', () => {
     it('hands the caller a label and an undo as soon as the save starts', async () => {
       mockCreate.mutateAsync.mockResolvedValue(created);

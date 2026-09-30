@@ -8,6 +8,8 @@ import { formatPence } from '~/lib/money';
 import { formatDayLabel, todayIso } from '~/lib/months';
 import { enqueue } from '~/lib/offlineQueue';
 import { clearPendingEntry, discardQueuedEntry, setPendingEntry } from '~/lib/pendingEntries';
+import { usePreferences } from '~/lib/preferences';
+import { undoAutoClose } from '~/lib/undoDuration';
 import { useCategories, useCreateTransaction, useDeleteTransaction } from '~/lib/queries';
 import type { Transaction } from '~/lib/types';
 
@@ -37,6 +39,7 @@ export function useSaveWithUndo(): (input: TransactionInput, options?: SaveOptio
   const remove = useDeleteTransaction();
   const qc = useQueryClient();
   const userSub = useAuth0().user?.sub ?? '';
+  const [{ undoDuration }] = usePreferences();
 
   // "£3.50 · Coffee", with the day added when the entry is not for today: "£3.50 · Coffee · Mon 22 Sep".
   function describeInput(input: TransactionInput, categoryName?: string): string {
@@ -69,6 +72,7 @@ export function useSaveWithUndo(): (input: TransactionInput, options?: SaveOptio
   function showSaveToast(toastId: string, text: string, onUndo: () => void): void {
     if (latestSaveToastId && latestSaveToastId !== toastId) notifications.hide(latestSaveToastId);
     latestSaveToastId = toastId;
+    // While it is still saving the message waits; the chosen time starts once it has settled.
     notifications.show({
       id: toastId,
       autoClose: false,
@@ -81,6 +85,7 @@ export function useSaveWithUndo(): (input: TransactionInput, options?: SaveOptio
   function relabelSaveToast(toastId: string, text: string, onUndo: () => void): void {
     notifications.update({
       id: toastId,
+      autoClose: undoAutoClose(undoDuration),
       message: <ToastAction text={text} actionLabel="Undo" onAction={onUndo} />,
     });
   }

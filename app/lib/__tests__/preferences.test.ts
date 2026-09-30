@@ -157,4 +157,17 @@ describe('usePreferences', () => {
     window.localStorage.setItem(prefs.PREFERENCES_KEY, JSON.stringify({ seenReleases: 'menu' }));
     expect(prefs.readPreferences(window.localStorage).seenReleases).toEqual([]);
   });
+
+  it('defaults to standard text and messages that stay until closed', () => {
+    expect(prefs.DEFAULT_PREFERENCES.textSize).toBe('standard');
+    expect(prefs.DEFAULT_PREFERENCES.undoDuration).toBe('until-closed');
+  });
+
+  it('keeps a valid text size and undo duration, and falls back for anything else', () => {
+    window.localStorage.setItem(prefs.PREFERENCES_KEY, JSON.stringify({ textSize: 'largest', undoDuration: '10s' }));
+    expect(prefs.readPreferences(window.localStorage)).toMatchObject({ textSize: 'largest', undoDuration: '10s' });
+
+    window.localStorage.setItem(prefs.PREFERENCES_KEY, JSON.stringify({ textSize: 'huge', undoDuration: 5000 }));
+    expect(prefs.readPreferences(window.localStorage)).toMatchObject({ textSize: 'standard', undoDuration: 'until-closed' });
+  });
 });
