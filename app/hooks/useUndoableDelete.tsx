@@ -13,7 +13,7 @@ export interface UndoableDelete {
   run: () => Promise<unknown>;
 }
 
-export function restoreFailureMessage(error: unknown, name: string): string {
+function restoreFailureMessage(error: unknown, name: string): string {
   if (error instanceof ApiError && error.status === 409) {
     return `${name} is already in place, so it wasn't restored.`;
   }
