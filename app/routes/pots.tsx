@@ -10,8 +10,10 @@ import { useCategories, usePots } from '~/lib/queries';
 import type { Category, PotSummary } from '~/lib/types';
 import { pageTitle } from '~/lib/pageTitle';
 import type { Route } from './+types/pots';
+import { redirect } from 'react-router';
+import { planPath } from '~/lib/planTabs';
 
-function PotsContent() {
+export function PotsContent() {
   const asOf = currentYearMonth();
   const categories = useCategories();
   const pots = usePots(asOf);
@@ -69,6 +71,11 @@ function PotsContent() {
       />
     </Stack>
   );
+}
+
+// This page now lives under Plan. The old address still works and leads there.
+export function clientLoader({ request }: Route.ClientLoaderArgs) {
+  throw redirect(planPath('pots', new URL(request.url).search));
 }
 
 export const meta: Route.MetaFunction = () => [{ title: pageTitle('Pots') }];
