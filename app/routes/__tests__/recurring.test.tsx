@@ -206,4 +206,18 @@ describe('Recurring page', () => {
     await userEvent.setup().click(within(screen.getByRole('alert')).getByRole('button', { name: /try again/i }));
     expect(mockRefetch).toHaveBeenCalled();
   });
+
+  describe('schedule wording', () => {
+    it('describes a yearly bill in words', () => {
+      mockQuery = { data: [rec({ type: 'EXPENSE', categoryId: 'cat-housing', description: 'Car insurance', frequency: 'YEARLY', anchorDate: '2027-03-14', dayOfMonth: 14, leadDays: 30 })], isLoading: false, error: null };
+      renderPage();
+      expect(screen.getByText('Every year on 14 March · remind 30 days before')).toBeInTheDocument();
+    });
+
+    it('still describes an older item with no frequency as monthly', () => {
+      mockQuery = { data: [rec({})], isLoading: false, error: null };
+      renderPage();
+      expect(screen.getByText('Monthly on the 28th · remind 3 days before')).toBeInTheDocument();
+    });
+  });
 });
