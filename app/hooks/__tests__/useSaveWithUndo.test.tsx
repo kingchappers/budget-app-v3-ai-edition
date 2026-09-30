@@ -154,6 +154,51 @@ describe('useSaveWithUndo', () => {
     expect(mockRemove.mutate).not.toHaveBeenCalled();
   });
 
+  describe('undo from outside the toast', () => {
+    it('hands the caller a label and an undo as soon as the save starts', async () => {
+      mockCreate.mutateAsync.mockResolvedValue(created);
+      const { result } = renderSaveWithUndo();
+      const onSaveStarted = vi.fn();
+
+      await act(async () => { await result.current(input, { onSaveStarted }); });
+
+      expect(onSaveStarted).toHaveBeenCalledTimes(1);
+      expect(onSaveStarted).toHaveBeenCalledWith({ label: '£4.80 · Dining', undo: expect.any(Function) });
+    });
+
+    it('undoes the save when the handle\'s undo is called, closing the notification and calling onUndo', async () => {
+      mockCreate.mutateAsync.mockResolvedValue(created);
+      const { result } = renderSaveWithUndo();
+      const onUndo = vi.fn();
+      let handle: { undo: () => void } | undefined;
+
+      await act(async () => {
+        await result.current(input, { onUndo, onSaveStarted: h => { handle = h; } });
+      });
+      expect(await screen.findByText('Saved £4.80 · Dining')).toBeInTheDocument();
+      await act(async () => { handle?.undo(); });
+
+      await waitFor(() => expect(mockRemove.mutate).toHaveBeenCalledWith({ transactionId: 't-real', yearMonth: '2026-09' }));
+      expect(onUndo).toHaveBeenCalledTimes(1);
+      await waitFor(() => expect(screen.queryByText('Saved £4.80 · Dining')).not.toBeInTheDocument());
+    });
+
+    it('does nothing the second time undo is called, so the toast and the sheet can both offer it', async () => {
+      mockCreate.mutateAsync.mockResolvedValue(created);
+      const { result } = renderSaveWithUndo();
+      const onUndo = vi.fn();
+      let handle: { undo: () => void } | undefined;
+
+      await act(async () => {
+        await result.current(input, { onUndo, onSaveStarted: h => { handle = h; } });
+      });
+      await act(async () => { handle?.undo(); handle?.undo(); });
+
+      await waitFor(() => expect(onUndo).toHaveBeenCalledTimes(1));
+      expect(mockRemove.mutate).toHaveBeenCalledTimes(1);
+    });
+  });
+
   it('calls onUndo after issuing the delete when Undo is pressed', async () => {
     mockCreate.mutateAsync.mockResolvedValue(created);
     const order: string[] = [];
