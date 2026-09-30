@@ -112,7 +112,7 @@ function TransactionsContent() {
         <Text fw={600}>{formatPence(outgoing)} spent</Text>
       </Group>
 
-      {items.length === 0 && all.length === 0 && <Text c="dimmed">Nothing logged {monthPhrase(yearMonth)} yet.</Text>}
+      {items.length === 0 && all.length === 0 && <Text c="dimmed">Nothing logged {monthPhrase(yearMonth)}.</Text>}
       {items.length === 0 && all.length > 0 && isFiltering && <Text c="dimmed">No transactions match your search.</Text>}
 
       {Object.entries(byDate).map(([date, dayItems]) => (
