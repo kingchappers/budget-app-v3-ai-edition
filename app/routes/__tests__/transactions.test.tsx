@@ -47,7 +47,8 @@ vi.mock('~/components/recurring/RecurringForm', () => ({
 vi.mock('~/lib/queries', () => ({
   useCategories: () => ({ data: categories }),
   useTransactions: () => ({ data: transactions, isLoading: false, error: null }),
-  useDeleteTransaction: () => ({ mutate: vi.fn() }),
+  useDeleteTransaction: () => ({ mutate: vi.fn(), mutateAsync: vi.fn() }),
+  useRestoreFromTrash: () => ({ mutateAsync: vi.fn() }),
 }));
 vi.mock('~/hooks/useOfflineQueue', () => ({ useOfflineQueue: () => ({ pendingMap: {}, flushNow: vi.fn(), discard: vi.fn() }) }));
 

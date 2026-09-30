@@ -7,10 +7,12 @@ import { RecurringForm, type RecurringDraft } from '~/components/recurring/Recur
 import { TransactionRow } from '~/components/transactions/TransactionRow';
 import { TransactionSheet } from '~/components/transactions/TransactionSheet';
 import { useOfflineQueue } from '~/hooks/useOfflineQueue';
+import { useUndoableDelete } from '~/hooks/useUndoableDelete';
 import { filterTransactions, type TransactionFilter } from '~/lib/transactions';
 import { categorySelectData } from '~/lib/categoryGroups';
 import { formatPence } from '~/lib/money';
 import { currentYearMonth } from '~/lib/months';
+import { transactionLabel, transactionTrashId } from '~/lib/trash';
 import { useCategories, useDeleteTransaction, useTransactions } from '~/lib/queries';
 import type { Transaction, TransactionType } from '~/lib/types';
 
@@ -41,10 +43,21 @@ function TransactionsContent() {
   const categories = useCategories();
   const transactions = useTransactions(yearMonth);
   const remove = useDeleteTransaction();
+  const undoableDelete = useUndoableDelete();
   const { pendingMap, discard } = useOfflineQueue();
 
   const nameFor = (id: string) =>
     categories.data?.find(c => c.categoryId === id)?.name ?? 'Unknown category';
+
+  function deleteTransaction(item: Transaction): void {
+    const categoryName = nameFor(item.categoryId);
+    undoableDelete({
+      label: transactionLabel(item, categoryName),
+      name: item.description || categoryName,
+      ref: { entityType: 'TRANSACTION', id: transactionTrashId(item) },
+      run: () => remove.mutateAsync({ transactionId: item.transactionId, yearMonth: item.yearMonth }),
+    });
+  }
   const iconFor = (id: string) =>
     categories.data?.find(c => c.categoryId === id)?.icon ?? 'tag';
 
@@ -133,7 +146,7 @@ function TransactionsContent() {
               onEdit={setEditing}
               onDuplicate={setDuplicating}
               onRepeat={setRepeating}
-              onDelete={(item) => remove.mutate({ transactionId: item.transactionId, yearMonth: item.yearMonth })}
+              onDelete={deleteTransaction}
               onDiscard={(item) => void discard(item.transactionId)}
             />
           ))}
