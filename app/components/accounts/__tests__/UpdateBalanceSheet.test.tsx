@@ -30,8 +30,9 @@ describe('UpdateBalanceSheet', () => {
     expect((screen.getByLabelText('Date') as HTMLInputElement).value).toEqual(expect.stringContaining('/'));
   });
 
-  it('saves the entered amount and date', async () => {
+  it('saves the entered amount and date, then shows Saved and stays open', async () => {
     const user = userEvent.setup();
+    save.mutate.mockImplementation((_vars, options) => options.onSuccess());
     const { onClose } = renderSheet();
     await user.type(screen.getByLabelText('Balance'), '2500');
     await user.click(screen.getByRole('button', { name: 'Save' }));
@@ -40,8 +41,8 @@ describe('UpdateBalanceSheet', () => {
       { accountId: 'acc-1', input: { date: expect.any(String), pence: 250000 } },
       expect.objectContaining({ onSuccess: expect.any(Function) }),
     );
-    save.mutate.mock.calls[0][1].onSuccess();
-    expect(onClose).toHaveBeenCalled();
+    expect(screen.getByRole('status')).toHaveTextContent('Saved');
+    expect(onClose).not.toHaveBeenCalled();
   });
 
   it('shows an error and does not save for an invalid amount', async () => {
@@ -53,13 +54,17 @@ describe('UpdateBalanceSheet', () => {
     expect(screen.getByRole('alert')).toBeInTheDocument();
   });
 
-  it('shows an error when the save fails', async () => {
+  it('shows the failure with Retry, keeping the typed amount', async () => {
     const user = userEvent.setup();
     renderSheet();
     await user.type(screen.getByLabelText('Balance'), '100');
     save.mutate.mockImplementation((_vars, options) => options.onError(new Error('boom')));
     await user.click(screen.getByRole('button', { name: 'Save' }));
-    expect(screen.getByRole('alert')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent("Couldn't save.");
+    expect(screen.getByLabelText('Balance')).toHaveValue('100');
+
+    await user.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(save.mutate).toHaveBeenCalledTimes(2);
   });
 
   it('resets the amount, date and error when the target account changes', async () => {
