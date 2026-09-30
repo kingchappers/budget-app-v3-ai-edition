@@ -29,8 +29,8 @@ export function NetWorth({ accounts, months }: { accounts: Account[]; months: st
   return (
     <Stack gap="xs">
       <Group justify="space-between">
-        <Text fw={700} size="lg" c={current < 0 ? 'danger' : undefined}>{current < 0 ? `−${formatPence(-current)}` : formatPence(current)}</Text>
-        <Text size="sm" c={change >= 0 ? 'primary' : 'danger'}>{formatSigned(change)}</Text>
+        <Text fw={700} size="lg">{current < 0 ? `−${formatPence(-current)}` : formatPence(current)}</Text>
+        <Text size="sm">{formatSigned(change)}</Text>
       </Group>
       <LineChart
         h={180}
