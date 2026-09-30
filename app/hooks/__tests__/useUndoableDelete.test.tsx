@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { act, renderHook, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, renderHook, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MantineProvider } from '@mantine/core';
 import { Notifications, notifications } from '@mantine/notifications';
@@ -36,6 +36,9 @@ describe('useUndoableDelete', () => {
   });
 
   afterEach(() => {
+    // Unmount first: clearing while <Notifications /> is mounted starts exit timers
+    // that can fire after the test environment is torn down.
+    cleanup();
     notifications.clean();
     vi.restoreAllMocks();
   });
