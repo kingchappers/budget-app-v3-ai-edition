@@ -1,6 +1,8 @@
 import { Card, Stack, Switch, Text, Title } from '@mantine/core';
 import { DefaultLayout } from '~/components/layout/DefaultLayout';
 import { usePreferences } from '~/lib/preferences';
+import { pageTitle } from '~/lib/pageTitle';
+import type { Route } from './+types/settings';
 
 function SettingsContent() {
   const [preferences, setPreferences] = usePreferences();
@@ -32,6 +34,8 @@ function SettingsContent() {
     </Stack>
   );
 }
+
+export const meta: Route.MetaFunction = () => [{ title: pageTitle('Settings') }];
 
 export default function Settings() {
   return (
