@@ -1,7 +1,8 @@
 import { useId, useState } from 'react';
-import { Button, Chip, Group, Input, Select, Text, useInputWrapperContext } from '@mantine/core';
+import { Button, Chip, Group, Input, MultiSelect, Select, Text, useInputWrapperContext } from '@mantine/core';
 import { categorySelectData } from '~/lib/categoryGroups';
 import { categoryLabel } from '~/lib/categoryIcons';
+import { MAX_PINNED_CHIPS } from '~/lib/preferences';
 import type { Category } from '~/lib/types';
 
 export interface CategoryChipsProps {
@@ -12,6 +13,16 @@ export interface CategoryChipsProps {
   loading?: boolean;
   error?: string | null;
   fieldError?: string | null;
+  // Chips the user has pinned to the front, in their order. Passing
+  // onPinnedChange turns on the "Edit chips" button.
+  pinnedIds?: readonly string[];
+  onPinnedChange?: (ids: string[]) => void;
+}
+
+// Pins for the categories on screen replace the old ones for those categories;
+// pins for other kinds of category (say, income while adding spending) stay.
+function mergePins(selected: string[], existing: readonly string[], onScreen: ReadonlySet<string>): string[] {
+  return [...selected, ...existing.filter(id => !onScreen.has(id))].slice(0, MAX_PINNED_CHIPS);
 }
 
 interface CategoryRadiosProps {
@@ -47,27 +58,40 @@ function CategoryRadios({ groupName, visible, value, onChange, invalid }: Catego
   );
 }
 
-export function CategoryChips({ chips, all, value, onChange, loading = false, error = null, fieldError = null }: CategoryChipsProps) {
+export function CategoryChips({
+  chips, all, value, onChange, loading = false, error = null, fieldError = null, pinnedIds = [], onPinnedChange,
+}: CategoryChipsProps) {
   const groupName = useId();
   const [showAll, setShowAll] = useState(false);
+  const [editingChips, setEditingChips] = useState(false);
 
   if (loading) return <Text size="sm" c="dimmed">Loading categories…</Text>;
   if (error) return <Text size="sm" c="danger">{error}</Text>;
 
+  // A category chosen from outside the chips takes one place at the end of the
+  // row. The buttons below sit on their own row, so nothing here moves them.
   const chosenOutsideChips = value !== null && !chips.some(c => c.categoryId === value)
     ? all.find(c => c.categoryId === value)
     : undefined;
   const visible = chosenOutsideChips ? [...chips, chosenOutsideChips] : chips;
 
   const selectData = categorySelectData(all);
+  const onScreen = new Set(all.map(c => c.categoryId));
 
   return (
     <Input.Wrapper label="Category" error={fieldError} errorProps={{ role: 'alert' }}>
       <Group gap="xs" mt={4}>
         <CategoryRadios groupName={groupName} visible={visible} value={value} onChange={onChange} invalid={fieldError !== null} />
+      </Group>
+      <Group gap="xs" mt={4}>
         <Button variant="subtle" size="compact-sm" aria-expanded={showAll} onClick={() => setShowAll(open => !open)}>
-          More…
+          All categories
         </Button>
+        {onPinnedChange && (
+          <Button variant="subtle" size="compact-sm" aria-expanded={editingChips} onClick={() => setEditingChips(open => !open)}>
+            Edit chips
+          </Button>
+        )}
       </Group>
       {showAll && (
         <Select
@@ -81,6 +105,19 @@ export function CategoryChips({ chips, all, value, onChange, loading = false, er
           value={value}
           onOptionSubmit={() => setShowAll(false)}
           onChange={picked => { if (picked) onChange(picked); }}
+        />
+      )}
+      {editingChips && onPinnedChange && (
+        <MultiSelect
+          mt="xs"
+          label="Your chips"
+          description={`Choose up to ${MAX_PINNED_CHIPS}. They always come first, in the order you pick them.`}
+          placeholder="Search categories"
+          searchable
+          data={selectData}
+          value={pinnedIds.filter(id => onScreen.has(id))}
+          maxValues={MAX_PINNED_CHIPS}
+          onChange={ids => onPinnedChange(mergePins(ids, pinnedIds, onScreen))}
         />
       )}
     </Input.Wrapper>
