@@ -20,11 +20,11 @@ export function AccountRow({
       <Group justify="space-between" wrap="nowrap" align="center">
         <UnstyledButton onClick={onOpen} aria-label={`Open ${account.name} history`} style={{ flex: 1, minWidth: 0 }}>
           <Text fw={500}>{account.name}</Text>
-          <Text size="xs" c="dimmed">{accountTypeLabel(account.type)}</Text>
+          <Text size="sm">{accountTypeLabel(account.type)}</Text>
         </UnstyledButton>
         <div style={{ textAlign: 'right' }}>
           <Text fw={700}>{formatPence(balance)}</Text>
-          <Text size="xs" c="dimmed">{updatedAgo(account.balances, todayIso())}</Text>
+          <Text size="sm">{updatedAgo(account.balances, todayIso())}</Text>
         </div>
         <Button size="compact-sm" variant="light" onClick={onUpdate} aria-label={`Update ${account.name}`}>Update</Button>
         <Menu position="bottom-end">

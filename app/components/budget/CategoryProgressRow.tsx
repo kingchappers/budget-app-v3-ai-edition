@@ -18,7 +18,7 @@ export function CategoryProgressRow({ progress, to }: { progress: CategoryProgre
         <Text fw={600}>{remainingLabel(spent, target)}</Text>
       </Group>
       <Progress value={Math.min(percent, 100)} color={isOver ? 'danger' : 'primary'} aria-label={`${name} progress`} />
-      <Text size="xs" c="dimmed">
+      <Text size="sm">
         {formatPence(spent)} spent of {formatPence(target)}
         {period === 'WEEKLY' && ` · ${formatPence(rawTarget)}/wk`}
       </Text>

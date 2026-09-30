@@ -44,13 +44,13 @@ function DayTile({ day, today, count, nothing, onOpen }: DayTileProps) {
         border: '1px solid var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-md)',
       }}
     >
-      <Text size="xs" c="dimmed">{weekday}</Text>
-      <Text fw={600}>{dayNumber} <Text span size="xs" c="dimmed">{month}</Text></Text>
+      <Text size="sm">{weekday}</Text>
+      <Text fw={600}>{dayNumber} <Text span size="sm">{month}</Text></Text>
       <Group gap={4} justify="center" mih={20} aria-hidden>
         {count > 0 && (
           <>
             <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--mantine-color-primary-7)' }} />
-            <Text size="xs">{count}</Text>
+            <Text size="sm">{count}</Text>
           </>
         )}
         {count === 0 && nothing && <IconCheck size={16} />}
@@ -118,7 +118,7 @@ function LumpSumCard({ categories, today, onSaved, onCovered }: LumpSumProps) {
       <form onSubmit={event => { event.preventDefault(); void submit(); }}>
         <Stack gap="sm">
           <Title order={5}>Add a lump sum as Untracked</Title>
-          <Text size="sm" c="dimmed">
+          <Text size="sm">
             If the details are gone, add what you think you spent over a stretch of days as one entry. Those days then count as covered.
           </Text>
           <TextInput
@@ -201,7 +201,7 @@ function CatchUpContent() {
   return (
     <Stack>
       <Title order={3}>Catch up</Title>
-      <Text size="sm" c="dimmed">
+      <Text size="sm">
         Add what you remember for any of the last {days.length} days. Mark a day “Nothing to log” inside it if there was nothing.
         There is no need to do them all.
       </Text>
@@ -230,7 +230,7 @@ function CatchUpContent() {
             <Group key={t.transactionId} justify="space-between" wrap="nowrap">
               <div style={{ minWidth: 0 }}>
                 <Text truncate>{labelFor(t)}</Text>
-                <Text size="xs" c="dimmed">{formatDayLabel(t.date, today)}</Text>
+                <Text size="sm">{formatDayLabel(t.date, today)}</Text>
               </div>
               <Group gap="xs" wrap="nowrap">
                 <Text fw={500}>{formatSignedPence(t.type, t.amount)}</Text>

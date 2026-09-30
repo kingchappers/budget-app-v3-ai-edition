@@ -52,11 +52,11 @@ function RecurringRow({ item, category, categoriesLoaded, skipped, onEdit, onDel
         </ThemeIcon>
         <div style={{ minWidth: 0 }}>
           <Text truncate>{label}</Text>
-          <Text size="xs" c="dimmed" truncate>{scheduleText(item)}</Text>
-          {categoriesLoaded && !category && <Text size="xs" c="danger">Category deleted</Text>}
+          <Text size="sm">{scheduleText(item)}</Text>
+          {categoriesLoaded && !category && <Text size="sm" c="danger">Category deleted</Text>}
           {skipped && (
             <Group gap={4} wrap="nowrap">
-              <Text size="xs" c="dimmed">{`Skipped for ${formatMonthName(skipped)}`}</Text>
+              <Text size="sm">{`Skipped for ${formatMonthName(skipped)}`}</Text>
               <Button
                 variant="subtle"
                 size="compact-xs"

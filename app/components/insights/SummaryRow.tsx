@@ -28,12 +28,12 @@ function Figure({
   const Arrow = up ? IconArrowUp : IconArrowDown;
   return (
     <Paper withBorder p="sm">
-      <Text size="xs" c="dimmed">{label}</Text>
+      <Text size="sm">{label}</Text>
       <Text fw={700} size="lg">{formatPence(pence)}</Text>
       {deltaPence !== 0 && (
         <Group gap={4} wrap="nowrap" data-tone={good ? 'good' : 'bad'}>
           <Arrow size={12} color={`var(--mantine-color-${color}-6)`} />
-          <Text size="xs" c={color}>
+          <Text size="sm" c={color}>
             {up ? '+' : '−'}{formatPence(Math.abs(deltaPence))}{percent !== null ? ` (${up ? '+' : '−'}${Math.abs(percent)}%)` : ''}
           </Text>
         </Group>

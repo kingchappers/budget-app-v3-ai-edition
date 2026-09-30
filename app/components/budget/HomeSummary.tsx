@@ -11,7 +11,7 @@ export function HomeSummary({ summary, yearMonth }: { summary: MonthSummary; yea
     <Stack gap="xs">
       {sentence && <Text size="lg" fw={600}>{sentence}</Text>}
       <Group justify="space-between">
-        <Text c="dimmed">Spent {monthPhrase(yearMonth)}</Text>
+        <Text>Spent {monthPhrase(yearMonth)}</Text>
         <Text fw={600}>{formatPence(summary.spentTotal)}</Text>
       </Group>
     </Stack>

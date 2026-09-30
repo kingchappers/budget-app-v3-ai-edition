@@ -94,7 +94,7 @@ function TransactionsContent() {
   return (
     <Stack>
       {searching
-        ? <Text size="sm" c="dimmed">Searching the last 2 years. Clear the search to go back to {formatMonthLabel(yearMonth)}.</Text>
+        ? <Text size="sm">Searching the last 2 years. Clear the search to go back to {formatMonthLabel(yearMonth)}.</Text>
         : <MonthHeader yearMonth={yearMonth} onChange={setYearMonth} />}
 
       <TextInput

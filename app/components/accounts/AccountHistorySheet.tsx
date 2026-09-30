@@ -22,9 +22,9 @@ export function AccountHistorySheet({
         <Stack gap="md">
           <Group justify="space-between" align="flex-start">
             <div>
-              <Text size="xs" c="dimmed">Balance</Text>
+              <Text size="sm">Balance</Text>
               <Text fw={700} size="xl">{formatPence(balance)}</Text>
-              <Text size="xs" c="dimmed">{updatedAgo(account.balances, todayIso())}</Text>
+              <Text size="sm">{updatedAgo(account.balances, todayIso())}</Text>
             </div>
             <Button size="compact-sm" onClick={onUpdate}>Update</Button>
           </Group>
