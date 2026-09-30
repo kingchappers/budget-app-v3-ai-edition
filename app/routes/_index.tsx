@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { Link } from 'react-router';
 import { Alert, Button, Group, Loader, Stack, Text, Title } from '@mantine/core';
 import { DefaultLayout } from '~/components/layout/DefaultLayout';
+import { WelcomeBackCard } from '~/components/budget/WelcomeBackCard';
 import { MonthHeader } from '~/components/budget/MonthHeader';
 import { CategoryProgressRow } from '~/components/budget/CategoryProgressRow';
 import { HomeSummary, OtherSpendingRow } from '~/components/budget/HomeSummary';
@@ -84,6 +85,7 @@ function HomeContent() {
 
   return (
     <Stack>
+      <WelcomeBackCard />
       <DueRecurringCard />
       <MonthHeader yearMonth={yearMonth} onChange={setYearMonth} />
       <HomeSummary summary={summary} yearMonth={yearMonth} />
