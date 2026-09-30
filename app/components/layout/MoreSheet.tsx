@@ -1,10 +1,11 @@
 import { Stack } from '@mantine/core';
 import { NavLink } from 'react-router';
-import { IconRepeat, IconTag, IconChartBar, IconWallet, IconTrash } from '@tabler/icons-react';
+import { IconCalendarCheck, IconRepeat, IconTag, IconChartBar, IconWallet, IconTrash } from '@tabler/icons-react';
 import { ResponsiveSheet } from './ResponsiveSheet';
 import { useNavTarget } from '~/hooks/useNavTarget';
 
 export const MORE_ITEMS = [
+  { to: '/catch-up', label: 'Catch up', Icon: IconCalendarCheck },
   { to: '/categories', label: 'Categories', Icon: IconTag },
   { to: '/recurring', label: 'Recurring', Icon: IconRepeat },
   { to: '/insights', label: 'Insights', Icon: IconChartBar },

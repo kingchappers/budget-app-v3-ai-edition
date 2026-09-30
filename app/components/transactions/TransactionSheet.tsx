@@ -8,7 +8,7 @@ import { useSaveWithUndo, type SaveHandle } from '~/hooks/useSaveWithUndo';
 import { useSnapshotWhileOpen } from '~/hooks/useSnapshotWhileOpen';
 import type { TransactionInput } from '~/lib/api';
 import { formatPencePlain, parsePounds } from '~/lib/money';
-import { dateChoiceFor, formatShortDate, todayIso, yesterdayIso, type DateChoice } from '~/lib/months';
+import { dateChoiceFor, formatDayLabel, todayIso, yesterdayIso, type DateChoice } from '~/lib/months';
 import { buildNoteIndex, categoryForNote } from '~/lib/noteMemory';
 import { MAX_PINNED_CHIPS, usePreferences, type EntryMode } from '~/lib/preferences';
 import { parseQuickAdd } from '~/lib/quickAdd';
@@ -64,7 +64,7 @@ function typeLabel(type: TransactionType): string {
 function dateLabel(choice: DateChoice, date: string): string {
   if (choice === 'today') return 'Today';
   if (choice === 'yesterday') return 'Yesterday';
-  return date ? formatShortDate(date) : 'Pick a date';
+  return date ? formatDayLabel(date, todayIso()) : 'Pick a date';
 }
 
 function noteLabel(note: string): string {
@@ -86,12 +86,17 @@ export interface TransactionSheetProps {
   preset?: { type: TransactionType; categoryId: string } | null;
   template?: Transaction | null;
   templateDate?: string;
+  // Open a blank entry for this day (YYYY-MM-DD), as when catching up. The sheet stays open between saves.
+  forDate?: string | null;
+  // Whether that day has been marked "Nothing to log", and how to toggle it.
+  dayMarkedEmpty?: boolean;
+  onToggleNothingToLog?: () => void;
   recurringId?: string;
   onSaved?: (created: Transaction) => void;
   onUndone?: () => void;
 }
 
-export function TransactionSheet({ opened, onClose, yearMonth, editing, preset, template, templateDate, recurringId, onSaved, onUndone }: TransactionSheetProps) {
+export function TransactionSheet({ opened, onClose, yearMonth, editing, preset, template, templateDate, forDate, dayMarkedEmpty, onToggleNothingToLog, recurringId, onSaved, onUndone }: TransactionSheetProps) {
   const { data: categories = [], isLoading: categoriesLoading, error: categoriesError } = useCategories();
   // Chips and category memory both learn from the same snapshot of recent
   // transactions, taken when the sheet opens, so nothing reshuffles while it's open.
@@ -106,6 +111,8 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, preset, 
   const draftOwnerRef = useRef(draftOwner);
   draftOwnerRef.current = draftOwner;
   const isAddFlow = !editing && !template && !preset;
+  // A day chosen in Catch up starts blank and is never mixed with the saved draft.
+  const usesDraft = isAddFlow && !forDate;
   const amountRef = useRef<HTMLInputElement>(null);
   const dateRef = useRef<HTMLInputElement>(null);
   const saveRef = useRef<HTMLButtonElement>(null);
@@ -161,6 +168,8 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, preset, 
       setDescription('');
       setDate(todayIso());
       setDateChoice('today');
+    } else if (forDate) {
+      applyDraftFields({ ...EMPTY_DRAFT, dateChoice: dateChoiceFor(forDate), date: forDate });
     } else {
       draft = loadTransactionDraft(draftOwnerRef.current) ?? EMPTY_DRAFT;
       applyDraftFields(draft);
@@ -174,7 +183,7 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, preset, 
     setLastSave(null);
     setAskKeepOpen(false);
     setMode(!editing && !template && !preset ? preferencesRef.current.entryMode : 'form');
-  }, [opened, editing, preset, template, templateDate]);
+  }, [opened, editing, preset, template, templateDate, forDate]);
 
   useEffect(() => {
     if (focusAmountAfterRenderRef.current && amountRef.current) {
@@ -201,9 +210,9 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, preset, 
   useEffect(() => {
     if (draftKey === lastDraftKeyRef.current) return;
     lastDraftKeyRef.current = draftKey;
-    if (!opened || !isAddFlow || createSubmittedRef.current) return;
+    if (!opened || !usesDraft || createSubmittedRef.current) return;
     saveTransactionDraft(draftOwner, draftFields);
-  }, [draftKey, opened, isAddFlow, draftOwner]);
+  }, [draftKey, opened, usesDraft, draftOwner]);
 
   const eligible = categories.filter(c => categoryTypesFor(type).includes(c.type));
   const chips = topCategories(recent ?? [], categories, type, MAX_PINNED_CHIPS, preferences.pinnedCategoryIds);
@@ -398,7 +407,7 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, preset, 
       if (created) onSaved?.(created);
     });
 
-    const keepOpen = preferences.keepSheetOpen;
+    const keepOpen = forDate ? 'yes' : preferences.keepSheetOpen;
     if (keepOpen === 'ask') {
       setAskKeepOpen(true);
       return;
@@ -602,12 +611,27 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, preset, 
   const form = (
     <form onSubmit={e => { e.preventDefault(); if (quickActive) fillFromQuickAdd(); else void handleSubmit(); }}>
       <Stack>
+        {forDate && !editing && (
+          <Stack gap={4}>
+            <Text fw={700} size="lg">{`Adding to ${formatDayLabel(dateForChoice(dateChoice, date), todayIso())}`}</Text>
+            {onToggleNothingToLog && (
+              <Button
+                variant="subtle"
+                size="compact-sm"
+                style={{ alignSelf: 'flex-start' }}
+                onClick={() => { onToggleNothingToLog(); onClose(); }}
+              >
+                {dayMarkedEmpty ? 'Clear “Nothing to log” for this day' : 'Nothing to log for this day'}
+              </Button>
+            )}
+          </Stack>
+        )}
         {editing ? editFields : quickActive ? quickFields : addFields}
         {saveError && <Text size="sm" role="alert">{saveError}</Text>}
         {!editing && !quickActive && undoButton}
         <Group justify="flex-end">
           <Group gap="xs">
-            {isAddFlow && !isEmptyDraft(draftFields) && (
+            {usesDraft && !isEmptyDraft(draftFields) && (
               <Button variant="subtle" color="gray" onClick={handleClear}>Clear</Button>
             )}
             <Button variant="subtle" onClick={onClose}>Cancel</Button>
