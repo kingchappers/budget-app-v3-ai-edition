@@ -1,5 +1,5 @@
 import { useRef } from 'react';
-import { ActionIcon, Group, Menu, Text, ThemeIcon, Tooltip } from '@mantine/core';
+import { ActionIcon, Button, Group, Loader, Menu, Text, ThemeIcon } from '@mantine/core';
 import { IconClock, IconCopy, IconDots, IconPencil, IconRepeat, IconTrash } from '@tabler/icons-react';
 import { formatPence } from '~/lib/money';
 import { CategoryIcon } from '~/components/categories/CategoryIcon';
@@ -7,8 +7,45 @@ import type { Transaction } from '~/lib/types';
 
 const OUTGOING = new Set(['EXPENSE', 'SET_ASIDE']);
 
+function SyncStatus({ label, saving, pending, pendingError, onRetry }: {
+  label: string;
+  saving?: boolean;
+  pending?: boolean;
+  pendingError?: string;
+  onRetry?: () => void;
+}) {
+  if (pending && pendingError) {
+    return (
+      <Group gap={6} mt={2}>
+        <IconClock size={12} color="var(--mantine-color-warning-6)" aria-hidden />
+        <Text size="xs">Not synced. Tap to retry.</Text>
+        {onRetry && (
+          <Button size="compact-sm" variant="light" aria-label={`Retry syncing ${label}`} onClick={onRetry}>Retry</Button>
+        )}
+      </Group>
+    );
+  }
+  if (pending) {
+    return (
+      <Group gap={4} mt={2}>
+        <IconClock size={12} color="var(--mantine-color-dimmed)" aria-hidden />
+        <Text size="xs" c="dimmed">Waiting to sync</Text>
+      </Group>
+    );
+  }
+  if (saving) {
+    return (
+      <Group gap={4} mt={2}>
+        <Loader size={10} aria-hidden />
+        <Text size="xs" c="dimmed">Saving</Text>
+      </Group>
+    );
+  }
+  return null;
+}
+
 export function TransactionRow({
-  transaction, categoryName, categoryIcon, onEdit, onDelete, onDuplicate, onRepeat, pending, pendingError, onDiscard,
+  transaction, categoryName, categoryIcon, onEdit, onDelete, onDuplicate, onRepeat, saving, pending, pendingError, onRetry, onDiscard,
 }: {
   transaction: Transaction;
   categoryName: string;
@@ -17,8 +54,11 @@ export function TransactionRow({
   onDelete?: (t: Transaction) => void;
   onDuplicate?: (t: Transaction) => void;
   onRepeat?: (t: Transaction) => void;
+  // Sent but not yet confirmed by the server (not queued offline).
+  saving?: boolean;
   pending?: boolean;
   pendingError?: string;
+  onRetry?: () => void;
   // Only meaningful while pending: removes it from the offline queue instead
   // of the normal online delete, which would just recreate it on the next sync.
   onDiscard?: (t: Transaction) => void;
@@ -37,18 +77,10 @@ export function TransactionRow({
         <div style={{ minWidth: 0 }}>
           <Text truncate>{label}</Text>
           <Text size="xs" c="dimmed">{categoryName} · {transaction.date}</Text>
+          <SyncStatus label={label} saving={saving} pending={pending} pendingError={pendingError} onRetry={onRetry} />
         </div>
       </Group>
       <Group gap="xs" wrap="nowrap">
-        {pending && (
-          <Tooltip label={pendingError ?? 'Waiting to sync'} events={{ hover: true, focus: true, touch: true }}>
-            <IconClock
-              size={16}
-              color={pendingError ? 'var(--mantine-color-warning-6)' : 'var(--mantine-color-dimmed)'}
-              aria-label={pendingError ?? 'Waiting to sync'}
-            />
-          </Tooltip>
-        )}
         <Text fw={500}>{sign}{formatPence(transaction.amount)}</Text>
         {pending ? (
           onDiscard && (
