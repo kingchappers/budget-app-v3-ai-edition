@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Alert, Button, Group, Loader, Modal, Select, SimpleGrid, Stack, Text, TextInput, Title } from '@mantine/core';
 import { DefaultLayout } from '~/components/layout/DefaultLayout';
+import { SaveStatus, type SaveState } from '~/components/layout/SaveStatus';
 import { AccountRow } from '~/components/accounts/AccountRow';
 import { AccountHistorySheet } from '~/components/accounts/AccountHistorySheet';
 import { UpdateBalanceSheet } from '~/components/accounts/UpdateBalanceSheet';
@@ -21,6 +22,23 @@ function AccountsContent() {
   const [pendingDelete, setPendingDelete] = useState<Account | null>(null);
   const [openAccount, setOpenAccount] = useState<Account | null>(null);
   const [updatingAccount, setUpdatingAccount] = useState<Account | null>(null);
+  const [createState, setCreateState] = useState<SaveState>('idle');
+
+  function addAccount(): void {
+    const trimmed = name.trim();
+    if (trimmed === '') return;
+    setCreateState('saving');
+    create.mutate({ name: trimmed, kind, type }, {
+      onSuccess: () => {
+        setName('');
+        setCreateState('saved');
+      },
+      onError: (createError: Error) => {
+        console.error(`Failed to create a ${type} account:`, createError);
+        setCreateState('error');
+      },
+    });
+  }
 
   if (accounts.error) {
     return (
@@ -54,7 +72,7 @@ function AccountsContent() {
 
       <Group align="flex-end">
         <TextInput label="Name" placeholder="e.g. Lloyds" style={{ flex: 1, minWidth: 160 }}
-          value={name} onChange={e => setName(e.currentTarget.value)} />
+          value={name} onChange={e => { setName(e.currentTarget.value); setCreateState('idle'); }} />
         <Select
           label="Kind"
           data={[{ value: 'ASSET', label: 'Asset' }, { value: 'LIABILITY', label: 'Liability' }]}
@@ -68,17 +86,11 @@ function AccountsContent() {
         />
         <Select label="Type" data={typeOptionsForKind(kind)} value={type}
           onChange={v => { if (v) setType(v as AccountType); }} allowDeselect={false} />
-        <Button
-          disabled={name.trim() === ''}
-          loading={create.isPending}
-          onClick={() => {
-            create.mutate({ name: name.trim(), kind, type });
-            setName('');
-          }}
-        >
+        <Button disabled={name.trim() === ''} loading={createState === 'saving'} onClick={addAccount}>
           Add
         </Button>
       </Group>
+      <SaveStatus state={createState} onRetry={addAccount} />
 
       {all.length === 0 && <Text c="dimmed">No accounts yet. Add one above.</Text>}
 
