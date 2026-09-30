@@ -440,17 +440,19 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, preset, 
         )}
         {saveError && <Text size="sm" role="alert">{saveError}</Text>}
         <Group justify="flex-end">
-          {isAddFlow && !isEmptyDraft(draftFields) && (
-            <Button variant="subtle" color="gray" onClick={handleClear}>Clear</Button>
-          )}
-          <Button variant="subtle" onClick={onClose}>Cancel</Button>
+          <Group gap="xs">
+            {isAddFlow && !isEmptyDraft(draftFields) && (
+              <Button variant="subtle" color="gray" onClick={handleClear}>Clear</Button>
+            )}
+            <Button variant="subtle" onClick={onClose}>Cancel</Button>
+          </Group>
           {editing ? (
             <Button type="submit" loading={update.isPending}>Save</Button>
           ) : (
-            <>
+            <Group gap="xs">
               <Button ref={saveAnotherRef} type="submit" variant="light">Save & add another</Button>
               <Button onClick={() => void handleSubmit('close')}>Save</Button>
-            </>
+            </Group>
           )}
         </Group>
       </Stack>
