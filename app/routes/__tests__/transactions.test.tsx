@@ -1,5 +1,5 @@
 import { StrictMode, useEffect, useState } from 'react';
-import { afterEach, describe, it, expect, vi } from 'vitest';
+import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MantineProvider } from '@mantine/core';
@@ -24,7 +24,13 @@ const transactions: Transaction[] = [
   txn({ transactionId: 't2', description: 'Petrol' }),
   txn({ transactionId: 't3', description: 'Mortgage payment', categoryId: 'cat-mortgage' }),
 ];
-const data = vi.hoisted(() => ({ monthsRequested: [] as string[], targetsLoading: false }));
+const data = vi.hoisted(() => ({
+  monthsRequested: [] as string[],
+  targetsLoading: false,
+  // What the two-year search returns, and how it was asked for.
+  range: [] as Transaction[],
+  rangeCalls: [] as { from: string; to: string; enabled: boolean }[],
+}));
 
 vi.mock('~/components/layout/DefaultLayout', () => ({
   DefaultLayout: ({ children }: { children: React.ReactNode }) => <>{children}</>,
@@ -53,6 +59,10 @@ vi.mock('~/lib/queries', () => ({
   useTransactions: (yearMonth: string) => {
     data.monthsRequested.push(yearMonth);
     return { data: transactions, isLoading: false, error: null };
+  },
+  useTransactionsRange: (from: string, to: string, enabled: boolean = true) => {
+    data.rangeCalls.push({ from, to, enabled });
+    return { data: enabled ? data.range : undefined, isLoading: false, error: null };
   },
   useTargets: () => ({ isLoading: data.targetsLoading, data: data.targetsLoading ? undefined : [{ categoryId: 'cat-mortgage', targetAmount: 100000, period: 'MONTHLY', updatedAt: '' }] }),
   useDeleteTransaction: () => ({ mutate: vi.fn(), mutateAsync: vi.fn() }),
@@ -93,7 +103,13 @@ describe('Transactions route category filter', () => {
 });
 
 describe('Transactions route search', () => {
+  beforeEach(() => {
+    data.range = [];
+    data.rangeCalls = [];
+  });
+
   it('filters the list as the user types in the search box', async () => {
+    data.range = transactions;
     const user = userEvent.setup();
     renderRoute();
 
@@ -105,6 +121,7 @@ describe('Transactions route search', () => {
   });
 
   it('clears the search with the clear button', async () => {
+    data.range = transactions;
     const user = userEvent.setup();
     renderRoute();
 
@@ -114,6 +131,84 @@ describe('Transactions route search', () => {
     expect(screen.getByLabelText('Search transactions')).toHaveValue('');
     expect(screen.getByText('Petrol')).toBeInTheDocument();
   });
+
+  it('does not fetch two years of transactions until someone searches', async () => {
+    const user = userEvent.setup();
+    renderRoute();
+    expect(data.rangeCalls.every(call => call.enabled === false)).toBe(true);
+
+    await user.type(screen.getByLabelText('Search transactions'), 's');
+    expect(data.rangeCalls.some(call => call.enabled)).toBe(true);
+  });
+
+  it('searches the last 24 months, ending this month, whichever month is on screen', async () => {
+    const user = userEvent.setup();
+    renderRoute('/transactions?month=2020-08');
+    await user.type(screen.getByLabelText('Search transactions'), 's');
+
+    const call = data.rangeCalls.filter(c => c.enabled).at(-1);
+    expect(call?.to).toBe(currentYearMonth());
+    expect(call?.from).toBe(shiftMonth(currentYearMonth(), -23));
+  });
+
+  it('finds matches from other months and groups them under month headings, newest first', async () => {
+    data.range = [
+      txn({ transactionId: 'a', description: 'Coffee beans', date: '2026-09-10', yearMonth: '2026-09' }),
+      txn({ transactionId: 'b', description: 'Coffee machine', date: '2026-06-02', yearMonth: '2026-06' }),
+      txn({ transactionId: 'c', description: 'Coffee filters', date: '2026-09-25', yearMonth: '2026-09' }),
+    ];
+    const user = userEvent.setup();
+    renderRoute();
+    await user.type(screen.getByLabelText('Search transactions'), 'coffee');
+
+    const headings = screen.getAllByRole('heading', { level: 5 }).map(h => h.textContent);
+    expect(headings).toEqual(['September 2026', 'June 2026']);
+    expect(screen.getByText('3 transactions found')).toBeInTheDocument();
+    const order = screen.getAllByText(/^Coffee /).map(node => node.textContent);
+    expect(order).toEqual(['Coffee filters', 'Coffee beans', 'Coffee machine']);
+  });
+
+  it('says it is searching the last two years and hides the month stepper while it does', async () => {
+    const user = userEvent.setup();
+    renderRoute();
+    expect(screen.getByRole('button', { name: 'Previous month' })).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText('Search transactions'), 'x');
+
+    expect(screen.getByText(/Searching the last 2 years/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Previous month' })).not.toBeInTheDocument();
+  });
+
+  it('still applies the category and type filters to search results', async () => {
+    data.range = [
+      txn({ transactionId: 'a', description: 'Rent shop', categoryId: 'cat-food' }),
+      txn({ transactionId: 'b', description: 'Rent payment', categoryId: 'cat-mortgage' }),
+    ];
+    const user = userEvent.setup();
+    renderRoute('/transactions?category=cat-mortgage');
+    await user.type(screen.getByLabelText('Search transactions'), 'rent');
+
+    expect(screen.getByText('Rent payment')).toBeInTheDocument();
+    expect(screen.queryByText('Rent shop')).not.toBeInTheDocument();
+  });
+
+  it('returns to the month view when the search is cleared', async () => {
+    const user = userEvent.setup();
+    renderRoute();
+    await user.type(screen.getByLabelText('Search transactions'), 'x');
+    await user.click(screen.getByRole('button', { name: 'Clear search' }));
+
+    expect(screen.getByRole('button', { name: 'Previous month' })).toBeInTheDocument();
+    expect(screen.queryByText(/Searching the last 2 years/)).not.toBeInTheDocument();
+  });
+});
+
+describe('Transactions route day headings', () => {
+  it('names days in words, not as ISO dates', () => {
+    renderRoute();
+    expect(screen.queryByText('2026-09-10')).not.toBeInTheDocument();
+    expect(screen.getAllByText(/^(Today|Yesterday|(Mon|Tue|Wed|Thu|Fri|Sat|Sun) \d{1,2} [A-Z][a-z]{2})/).length).toBeGreaterThan(0);
+  });
 });
 
 describe('Transactions route duplicate', () => {
@@ -121,8 +216,7 @@ describe('Transactions route duplicate', () => {
     const user = userEvent.setup();
     renderRoute();
 
-    await user.click(screen.getByRole('button', { name: 'Actions for Weekly Shop' }));
-    await user.click(await screen.findByRole('menuitem', { name: 'Duplicate' }));
+    await user.click(screen.getByRole('button', { name: 'Duplicate Weekly Shop' }));
 
     expect(screen.getByText('Sheet template: Weekly Shop')).toBeInTheDocument();
   });
