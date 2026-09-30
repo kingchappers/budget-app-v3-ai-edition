@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ActionIcon, Alert, Button, Group, Stack, Switch, Table, Text, TextInput, UnstyledButton } from '@mantine/core';
 import { IconPencil } from '@tabler/icons-react';
+import { SaveStatus, type SaveState } from '~/components/layout/SaveStatus';
 import { ResponsiveSheet } from '~/components/layout/ResponsiveSheet';
 import { useInlineCategoryRename } from '~/hooks/useInlineCategoryRename';
 import { categoryLabel } from '~/lib/categoryIcons';
@@ -29,24 +30,25 @@ function setAsideCell(setAside: number, autoAdded: number): string {
   return autoAdded > 0 ? `${total} (${formatPence(autoAdded)} auto)` : total;
 }
 
-function PotSettingsForm({ pot, category, onClose }: { pot: PotSummary; category: Category | undefined; onClose: () => void }) {
+function PotSettingsForm({ pot, category }: { pot: PotSummary; category: Category | undefined }) {
   const save = useSavePot();
   const [monthly, setMonthly] = useState(pot.monthlyAmount !== null ? formatPencePlain(pot.monthlyAmount) : '');
   const [goal, setGoal] = useState(pot.goalAmount !== null ? formatPencePlain(pot.goalAmount) : '');
   const [auto, setAuto] = useState(pot.autoAmountNow > 0);
   const [error, setError] = useState<string | null>(null);
+  const [saveState, setSaveState] = useState<SaveState>('idle');
   const rename = useInlineCategoryRename(category, setError);
 
   const parsedMonthly = parseOptionalPounds(monthly);
   const hasMonthly = parsedMonthly.ok && parsedMonthly.pence !== null;
 
-  function submit(event: React.FormEvent): void {
-    event.preventDefault();
+  function send(): void {
     const monthlyResult = parseOptionalPounds(monthly);
     const goalResult = parseOptionalPounds(goal);
     if (!monthlyResult.ok) { setError(monthlyResult.message); return; }
     if (!goalResult.ok) { setError(goalResult.message); return; }
     setError(null);
+    setSaveState('saving');
     save.mutate(
       {
         categoryId: pot.categoryId,
@@ -57,8 +59,19 @@ function PotSettingsForm({ pot, category, onClose }: { pot: PotSummary; category
           month: currentYearMonth(),
         },
       },
-      { onSuccess: onClose, onError: () => setError('Could not save. Try again.') },
+      {
+        onSuccess: () => setSaveState('saved'),
+        onError: (saveError: Error) => {
+          console.error(`Failed to save settings for pot ${pot.categoryId}:`, saveError);
+          setSaveState('error');
+        },
+      },
     );
+  }
+
+  function submit(event: React.FormEvent): void {
+    event.preventDefault();
+    send();
   }
 
   return (
@@ -91,19 +104,20 @@ function PotSettingsForm({ pot, category, onClose }: { pot: PotSummary; category
           )
         )}
         <TextInput label="Monthly amount" placeholder="0.00" inputMode="decimal" value={monthly}
-          onChange={e => setMonthly(e.currentTarget.value)} />
+          onChange={e => { setMonthly(e.currentTarget.value); setSaveState('idle'); }} />
         <TextInput label="Goal" placeholder="0.00" inputMode="decimal" value={goal}
-          onChange={e => setGoal(e.currentTarget.value)} />
+          onChange={e => { setGoal(e.currentTarget.value); setSaveState('idle'); }} />
         <Switch
           label="Auto-contribute"
           description={hasMonthly ? 'Adds the monthly amount every month, from this month.' : 'Set a monthly amount first.'}
           checked={auto && hasMonthly}
           disabled={!hasMonthly}
-          onChange={e => setAuto(e.currentTarget.checked)}
+          onChange={e => { setAuto(e.currentTarget.checked); setSaveState('idle'); }}
         />
         {error && <Alert color="danger" role="alert">{error}</Alert>}
         <Group justify="flex-end">
-          <Button type="submit" loading={save.isPending}>Save</Button>
+          <SaveStatus state={saveState} onRetry={send} />
+          <Button type="submit" loading={saveState === 'saving'}>Save</Button>
         </Group>
       </Stack>
     </form>
@@ -159,7 +173,7 @@ export function PotHistorySheet({ pot, category, onClose }: PotHistorySheetProps
               </Table>
             </Table.ScrollContainer>
           )}
-          <PotSettingsForm key={pot.categoryId} pot={pot} category={category} onClose={onClose} />
+          <PotSettingsForm key={pot.categoryId} pot={pot} category={category} />
         </Stack>
       )}
     </ResponsiveSheet>

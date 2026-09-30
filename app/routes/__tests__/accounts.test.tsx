@@ -78,7 +78,7 @@ describe('Accounts page', () => {
     expect(screen.queryByRole('option', { name: 'Cash', hidden: true })).not.toBeInTheDocument();
     await user.click(await screen.findByRole('option', { name: 'Loan', hidden: true }));
     await user.click(screen.getByRole('button', { name: 'Add' }));
-    expect(state.create).toHaveBeenCalledWith({ name: 'Trading 212', kind: 'LIABILITY', type: 'LOAN' });
+    expect(state.create).toHaveBeenCalledWith({ name: 'Trading 212', kind: 'LIABILITY', type: 'LOAN' }, expect.anything());
   });
 
   it('confirms with a button that states what will be deleted, then deletes with undo', async () => {
@@ -135,5 +135,28 @@ describe('Accounts page', () => {
 
     await user.click(screen.getByRole('button', { name: 'Update Lloyds' }));
     expect(await screen.findByLabelText('Balance')).toBeInTheDocument();
+  });
+
+  it('keeps the typed name and shows the error with Retry when the create fails', async () => {
+    state.create.mockImplementation((_vars: unknown, options: { onError?: (e: Error) => void }) => options.onError?.(new Error('boom')));
+    const user = renderPageAsUser();
+    await user.type(screen.getByLabelText('Name'), 'Monzo');
+    await user.click(screen.getByRole('button', { name: 'Add' }));
+
+    expect(screen.getByLabelText('Name')).toHaveValue('Monzo');
+    expect(screen.getByRole('status')).toHaveTextContent("Couldn't save.");
+
+    await user.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(state.create).toHaveBeenCalledTimes(2);
+  });
+
+  it('clears the name and shows Saved once the create succeeds', async () => {
+    state.create.mockImplementation((_vars: unknown, options: { onSuccess?: () => void }) => options.onSuccess?.());
+    const user = renderPageAsUser();
+    await user.type(screen.getByLabelText('Name'), 'Monzo');
+    await user.click(screen.getByRole('button', { name: 'Add' }));
+
+    expect(screen.getByLabelText('Name')).toHaveValue('');
+    expect(screen.getByRole('status')).toHaveTextContent('Saved');
   });
 });
