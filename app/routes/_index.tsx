@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router';
-import { Alert, Button, Group, Loader, Stack, Text, Title } from '@mantine/core';
+import { Button, Group, Loader, Stack, Text, Title } from '@mantine/core';
+import { LoadError } from '~/components/layout/LoadError';
 import { DefaultLayout } from '~/components/layout/DefaultLayout';
 import { MonthHeader } from '~/components/budget/MonthHeader';
 import { CategoryProgressRow } from '~/components/budget/CategoryProgressRow';
@@ -67,12 +68,7 @@ function HomeContent() {
 
   if (error) {
     return (
-      <Alert color="danger" title="Could not load your budget">
-        <Text mb="sm">Something went wrong fetching this month.</Text>
-        <Button onClick={() => { categories.refetch(); targets.refetch(); transactions.refetch(); }}>
-          Try again
-        </Button>
-      </Alert>
+      <LoadError thing="budget" onRetry={() => { categories.refetch(); targets.refetch(); transactions.refetch(); }} />
     );
   }
 
@@ -98,7 +94,7 @@ function HomeContent() {
       )}
 
       {potsEnabled && (pots.error ? (
-        <Text size="sm" c="dimmed">Could not load pots.</Text>
+        <Text size="sm" c="dimmed">We couldn't load your pots. Nothing has been lost.</Text>
       ) : (
         <HomePots pots={pots.data ?? []} categories={categories.data ?? []} />
       ))}

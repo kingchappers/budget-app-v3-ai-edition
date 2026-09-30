@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { ActionIcon, Alert, Button, Group, Loader, SegmentedControl, Stack, Text, Title } from '@mantine/core';
+import { ActionIcon, Group, Loader, SegmentedControl, Stack, Text, Title } from '@mantine/core';
+import { LoadError } from '~/components/layout/LoadError';
 import { IconChevronLeft, IconChevronRight } from '@tabler/icons-react';
 import { DefaultLayout } from '~/components/layout/DefaultLayout';
 import { ResponsiveSheet } from '~/components/layout/ResponsiveSheet';
@@ -47,9 +48,7 @@ function InsightsContent() {
 
   if (categories.error || targets.error || pots.error || range.error) {
     return (
-      <Alert color="danger" title="Could not load insights">
-        <Button onClick={() => { categories.refetch(); targets.refetch(); pots.refetch(); range.refetch(); }}>Try again</Button>
-      </Alert>
+      <LoadError thing="insights" onRetry={() => { categories.refetch(); targets.refetch(); pots.refetch(); range.refetch(); }} />
     );
   }
   if (categories.isLoading || targets.isLoading || pots.isLoading || range.isLoading) {

@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
-import { Alert, Button, Group, Loader, Stack, Text, Title } from '@mantine/core';
+import { Group, Loader, Stack, Text, Title } from '@mantine/core';
+import { LoadError } from '~/components/layout/LoadError';
 import { DefaultLayout } from '~/components/layout/DefaultLayout';
 import { PotHistorySheet } from '~/components/pots/PotHistorySheet';
 import { PotRow } from '~/components/pots/PotRow';
@@ -24,9 +25,7 @@ function PotsContent() {
 
   if (categories.error || pots.error) {
     return (
-      <Alert color="danger" title="Could not load pots">
-        <Button onClick={() => { categories.refetch(); pots.refetch(); }}>Try again</Button>
-      </Alert>
+      <LoadError thing="pots" onRetry={() => { categories.refetch(); pots.refetch(); }} />
     );
   }
   if (categories.isLoading || pots.isLoading) return <Group justify="center" py="xl"><Loader /></Group>;

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { ActionIcon, Alert, Button, Card, Group, Loader, Menu, SegmentedControl, Stack, Text, TextInput, Title } from '@mantine/core';
+import { ActionIcon, Button, Card, Group, Loader, Menu, SegmentedControl, Stack, Text, TextInput, Title } from '@mantine/core';
+import { LoadError } from '~/components/layout/LoadError';
 import { IconDots, IconTrash } from '@tabler/icons-react';
 import { DefaultLayout } from '~/components/layout/DefaultLayout';
 import { SaveStatus, type SaveState } from '~/components/layout/SaveStatus';
@@ -120,9 +121,7 @@ function TargetsContent() {
 
   if (categories.error || targets.error) {
     return (
-      <Alert color="danger" title="Could not load targets">
-        <Button onClick={() => { categories.refetch(); targets.refetch(); }}>Try again</Button>
-      </Alert>
+      <LoadError thing="targets" onRetry={() => { categories.refetch(); targets.refetch(); }} />
     );
   }
   if (categories.isLoading || targets.isLoading) {

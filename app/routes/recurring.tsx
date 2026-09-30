@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { ActionIcon, Alert, Button, Group, Loader, Menu, Stack, Text, ThemeIcon, Title } from '@mantine/core';
+import { ActionIcon, Button, Group, Loader, Menu, Stack, Text, ThemeIcon, Title } from '@mantine/core';
+import { LoadError } from '~/components/layout/LoadError';
 import { IconDots, IconPencil, IconPlus, IconTrash } from '@tabler/icons-react';
 import { DefaultLayout } from '~/components/layout/DefaultLayout';
 import { RecurringForm } from '~/components/recurring/RecurringForm';
@@ -118,9 +119,7 @@ function RecurringContent() {
 
   if (recurring.error) {
     return (
-      <Alert color="danger" title="Could not load recurring items">
-        <Button onClick={() => recurring.refetch()}>Try again</Button>
-      </Alert>
+      <LoadError thing="recurring items" onRetry={() => recurring.refetch()} />
     );
   }
 

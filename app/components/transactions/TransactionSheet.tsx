@@ -390,7 +390,7 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, preset, 
             value={categoryId}
             onChange={handleCategoryChange}
             loading={categoriesLoading}
-            error={categoriesError ? 'Could not load categories' : null}
+            error={categoriesError ? "We couldn't load your categories. Nothing has been lost." : null}
             fieldError={fieldErrors.category ?? null}
           />
         </div>
