@@ -33,6 +33,8 @@ PR-03 of the neurodivergent UX audit programme (wave 1). Branch `nd/03-sheet-err
 - **Stored drafts are validated when read.** Anything that does not match the expected shape (types, lengths, allowed values) is discarded, so a hand-edited or stale entry cannot break the sheet.
 - **All errors show at once** rather than one at a time, matching the GOV.UK pattern; focus goes to the first.
 - **`role="alert"` on each field error** rather than an error summary box, because the sheet is short and a summary would change its layout, which the later PR owns.
+- **The date field can be emptied.** The date pickers get `allowDeselect`, so deleting the date text leaves the field empty and Save shows the date error. Before, Mantine silently put the old date back on blur, and the date error could never appear.
+- **A restored category that no longer exists is asked for again.** In the Add flow, once categories have loaded, a category ID that is not among them gives "Choose a category" instead of saving an unknown ID (a draft can outlive a category deleted in another tab).
 - **No expiry.** `sessionStorage` already ends with the tab.
 - **ResponsiveSheet is unchanged.** Closing on Escape or outside tap stays: the draft makes it harmless, and the finding asks not to add a question.
 

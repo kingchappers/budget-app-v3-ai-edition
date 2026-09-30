@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useAuth0 } from '@auth0/auth0-react';
 import { Button, Group, SegmentedControl, Stack, Text, TextInput } from '@mantine/core';
 import { DateInput } from '@mantine/dates';
 import { ResponsiveSheet } from '~/components/layout/ResponsiveSheet';
@@ -11,6 +12,14 @@ import { currentYearMonth, dateChoiceFor, todayIso, yesterdayIso, type DateChoic
 import { categoryForNote } from '~/lib/noteMemory';
 import { parseQuickAdd } from '~/lib/quickAdd';
 import { useCategories, useTransactions, useUpdateTransaction } from '~/lib/queries';
+import {
+  EMPTY_DRAFT,
+  clearTransactionDraft,
+  isEmptyDraft,
+  loadTransactionDraft,
+  saveTransactionDraft,
+  type TransactionDraftFields,
+} from '~/lib/transactionDraft';
 import { topCategories } from '~/lib/transactions';
 import { TYPE_OPTIONS, categoryTypesFor } from '~/lib/transactionTypes';
 import type { Transaction, TransactionType } from '~/lib/types';
@@ -32,6 +41,12 @@ type SaveMode = 'close' | 'addAnother';
 type CategorySource = 'none' | 'memory' | 'user';
 type ErrorField = 'amount' | 'category' | 'date';
 type FieldErrors = Partial<Record<ErrorField, string>>;
+
+function dateForChoice(choice: DateChoice, date: string): string {
+  if (choice === 'today') return todayIso();
+  if (choice === 'yesterday') return yesterdayIso();
+  return date;
+}
 
 interface Validation {
   input: TransactionInput | null;
@@ -56,6 +71,10 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, preset, 
   const noteIndex = useNoteHistory(opened);
   const update = useUpdateTransaction(yearMonth);
   const saveWithUndo = useSaveWithUndo();
+  const draftOwner = useAuth0().user?.sub ?? '';
+  const draftOwnerRef = useRef(draftOwner);
+  draftOwnerRef.current = draftOwner;
+  const isAddFlow = !editing && !template && !preset;
   const amountRef = useRef<HTMLInputElement>(null);
   const dateRef = useRef<HTMLInputElement>(null);
   const createSubmittedRef = useRef(false);
@@ -79,6 +98,7 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, preset, 
   useEffect(() => {
     if (!opened) return;
     createSubmittedRef.current = false;
+    let draft: TransactionDraftFields | null = null;
     if (editing) {
       setAmount(formatPencePlain(editing.amount));
       setType(editing.type);
@@ -104,18 +124,14 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, preset, 
       setDateChoice('today');
       setCategorySource('user');
     } else {
-      setAmount('');
-      setType('EXPENSE');
-      setCategoryId(null);
-      setDescription('');
-      setDate(todayIso());
-      setDateChoice('today');
-      setCategorySource('none');
+      draft = loadTransactionDraft(draftOwnerRef.current) ?? EMPTY_DRAFT;
+      applyDraftFields(draft);
     }
-    setNoteOpen(!editing && template != null && template.description !== '');
+    const templateNote = !editing && template != null && template.description !== '';
+    setNoteOpen(templateNote || (draft !== null && draft.description !== ''));
     setFieldErrors({});
     setSaveError(null);
-    setQuickAdd('');
+    setQuickAdd(draft?.quickAdd ?? '');
     setQuickAddError(null);
   }, [opened, editing, preset, template, templateDate]);
 
@@ -139,8 +155,40 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, preset, 
     setCategorySource('memory');
   }, [noteIndex, categoriesLoaded, opened, editing, categorySource, description, type, categories]);
 
+  const draftFields: TransactionDraftFields = { amount, type, categoryId, dateChoice, date, description, quickAdd };
+  const draftKey = JSON.stringify(draftFields);
+  const lastDraftKeyRef = useRef(draftKey);
+  // Only a change to a field is saved. The render that opens the sheet still
+  // holds the previous session's values until the effect above replaces them.
+  useEffect(() => {
+    if (draftKey === lastDraftKeyRef.current) return;
+    lastDraftKeyRef.current = draftKey;
+    if (!opened || !isAddFlow || createSubmittedRef.current) return;
+    saveTransactionDraft(draftOwner, draftFields);
+  }, [draftKey, opened, isAddFlow, draftOwner]);
+
   const eligible = categories.filter(c => categoryTypesFor(type).includes(c.type));
   const chips = topCategories(monthTransactions ?? [], categories, type, CHIP_LIMIT);
+
+  function applyDraftFields(fields: TransactionDraftFields): void {
+    setAmount(fields.amount);
+    setType(fields.type);
+    setCategoryId(fields.categoryId);
+    setCategorySource(fields.categoryId ? 'user' : 'none');
+    setDescription(fields.description);
+    setDateChoice(fields.dateChoice);
+    setDate(dateForChoice(fields.dateChoice, fields.date));
+  }
+
+  function handleClear(): void {
+    clearTransactionDraft();
+    applyDraftFields(EMPTY_DRAFT);
+    setNoteOpen(false);
+    setQuickAdd('');
+    setQuickAddError(null);
+    setFieldErrors({});
+    amountRef.current?.focus();
+  }
 
   function clearFieldError(field: ErrorField): void {
     setFieldErrors(current => (current[field] === undefined ? current : { ...current, [field]: undefined }));
@@ -228,12 +276,13 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, preset, 
   function validate(): Validation {
     const parsed = parsePounds(amount);
     const dateValid = /^\d{4}-\d{2}-\d{2}$/.test(date);
+    const categoryGone = isAddFlow && categoriesLoaded && !categories.some(c => c.categoryId === categoryId);
     const errors: FieldErrors = {};
     if (!parsed.ok) errors.amount = parsed.message;
-    if (!categoryId) errors.category = CATEGORY_ERROR;
+    if (!categoryId || categoryGone) errors.category = CATEGORY_ERROR;
     if (!dateValid) errors.date = DATE_ERROR;
 
-    if (!parsed.ok || !categoryId || !dateValid) return { input: null, errors };
+    if (!parsed.ok || !categoryId || categoryGone || !dateValid) return { input: null, errors };
     return { input: { amount: parsed.pence, type, categoryId, description, date }, errors };
   }
 
@@ -286,6 +335,7 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, preset, 
 
     if (createSubmittedRef.current) return;
     createSubmittedRef.current = true;
+    clearTransactionDraft();
     void saveWithUndo(input, { onUndo: onUndone }).then(created => {
       if (created) onSaved?.(created);
     });
@@ -390,6 +440,9 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, preset, 
         )}
         {saveError && <Text size="sm" role="alert">{saveError}</Text>}
         <Group justify="flex-end">
+          {isAddFlow && !isEmptyDraft(draftFields) && (
+            <Button variant="subtle" color="gray" onClick={handleClear}>Clear</Button>
+          )}
           <Button variant="subtle" onClick={onClose}>Cancel</Button>
           {editing ? (
             <Button type="submit" loading={update.isPending}>Save</Button>

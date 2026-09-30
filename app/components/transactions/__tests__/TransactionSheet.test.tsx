@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MantineProvider } from '@mantine/core';
 import { Notifications, notifications } from '@mantine/notifications';
@@ -7,6 +7,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { todayIso, yesterdayIso } from '~/lib/months';
 import type { Transaction } from '~/lib/types';
 import { ApiError } from '~/lib/apiError';
+import { EMPTY_DRAFT, clearTransactionDraft, saveTransactionDraft } from '~/lib/transactionDraft';
 
 const mockCreate = vi.fn();
 const mockUpdate = vi.fn();
@@ -87,6 +88,7 @@ describe('TransactionSheet', () => {
     mockCategoriesLoaded = true;
     mockUseTransactions.mockReset();
     mockUseTransactions.mockImplementation(() => ({ data: mockTransactions }));
+    clearTransactionDraft();
   });
 
   afterEach(() => { notifications.clean(); });
@@ -902,6 +904,170 @@ describe('TransactionSheet', () => {
       await user.click(screen.getByRole('button', { name: /^save$/i }));
       expect(await screen.findByRole('alert')).toHaveTextContent(/could not save/i);
       expect(screen.getByLabelText(/amount/i)).not.toHaveAttribute('aria-invalid', 'true');
+    });
+  });
+  describe('drafts', () => {
+    async function typeDraft(user: ReturnType<typeof userEvent.setup>): Promise<void> {
+      await user.type(screen.getByLabelText(/quick add/i), 'cof');
+      await user.type(screen.getByLabelText(/amount/i), '9.99');
+      await user.click(screen.getByRole('radio', { name: 'Groceries' }));
+      await user.click(screen.getByRole('radio', { name: 'Yesterday' }));
+      await user.click(screen.getByRole('button', { name: /add note/i }));
+      await user.type(screen.getByLabelText(/note/i), 'Market');
+    }
+
+    function expectDraftRestored(): void {
+      expect(screen.getByLabelText(/quick add/i)).toHaveValue('cof');
+      expect(screen.getByLabelText(/amount/i)).toHaveValue('9.99');
+      expect(screen.getByRole('radio', { name: 'Groceries' })).toBeChecked();
+      expect(screen.getByRole('radio', { name: 'Yesterday' })).toBeChecked();
+      expect(screen.getByLabelText(/note/i)).toHaveValue('Market');
+    }
+
+    function expectEmptyForm(): void {
+      expect(screen.getByLabelText(/quick add/i)).toHaveValue('');
+      expect(screen.getByLabelText(/amount/i)).toHaveValue('');
+      within(screen.getByRole('radiogroup', { name: 'Category' })).getAllByRole('radio')
+        .forEach(r => expect(r).not.toBeChecked());
+      expect(screen.getByRole('radio', { name: 'Today' })).toBeChecked();
+    }
+
+    it('restores what was typed when the sheet is closed and reopened', async () => {
+      const user = userEvent.setup();
+      const { setProps } = renderSheet();
+      await typeDraft(user);
+
+      setProps({ opened: false });
+      setProps({ opened: true });
+
+      expectDraftRestored();
+      expect(mockCreate).not.toHaveBeenCalled();
+    });
+
+    it('restores the draft after the app remounts the sheet', async () => {
+      const user = userEvent.setup();
+      renderSheet();
+      await typeDraft(user);
+      cleanup();
+
+      renderSheet();
+      expectDraftRestored();
+    });
+
+    it('restores a typed income entry with its type', async () => {
+      const user = userEvent.setup();
+      const { setProps } = renderSheet();
+      await user.click(screen.getByRole('radio', { name: 'Income' }));
+      await user.click(screen.getByRole('radio', { name: 'Salary' }));
+
+      setProps({ opened: false });
+      setProps({ opened: true });
+
+      expect(screen.getByRole('radio', { name: 'Income' })).toBeChecked();
+      expect(screen.getByRole('radio', { name: 'Salary' })).toBeChecked();
+    });
+
+    it('shows Clear only once something has been entered', async () => {
+      const user = userEvent.setup();
+      renderSheet();
+      expect(screen.queryByRole('button', { name: 'Clear' })).not.toBeInTheDocument();
+      await user.type(screen.getByLabelText(/amount/i), '1');
+      expect(screen.getByRole('button', { name: 'Clear' })).toBeInTheDocument();
+    });
+
+    it('empties the form and the draft on Clear', async () => {
+      const user = userEvent.setup();
+      const { setProps } = renderSheet();
+      await typeDraft(user);
+
+      await user.click(screen.getByRole('button', { name: 'Clear' }));
+      expectEmptyForm();
+      expect(screen.getByLabelText(/amount/i)).toHaveFocus();
+      expect(screen.queryByRole('button', { name: 'Clear' })).not.toBeInTheDocument();
+
+      setProps({ opened: false });
+      setProps({ opened: true });
+      expectEmptyForm();
+    });
+
+    it('removes the draft after a successful Save', async () => {
+      const user = userEvent.setup();
+      const { setProps, onClose } = renderSheet();
+      await typeDraft(user);
+      await user.click(screen.getByRole('button', { name: /^save$/i }));
+      expect(onClose).toHaveBeenCalled();
+
+      setProps({ opened: false });
+      setProps({ opened: true });
+      expectEmptyForm();
+    });
+
+    it('removes the draft after Save & add another', async () => {
+      const user = userEvent.setup();
+      const { setProps } = renderSheet();
+      await typeDraft(user);
+      await user.click(screen.getByRole('button', { name: /save & add another/i }));
+
+      setProps({ opened: false });
+      setProps({ opened: true });
+      expect(screen.getByLabelText(/amount/i)).toHaveValue('');
+      expect(screen.getByLabelText(/quick add/i)).toHaveValue('');
+    });
+
+    it('keeps the draft when Save finds a problem', async () => {
+      const user = userEvent.setup();
+      const { setProps } = renderSheet();
+      await user.type(screen.getByLabelText(/amount/i), '9.99');
+      await user.click(screen.getByRole('button', { name: /^save$/i }));
+
+      setProps({ opened: false });
+      setProps({ opened: true });
+      expect(screen.getByLabelText(/amount/i)).toHaveValue('9.99');
+    });
+
+    it('asks for a category again when the restored one no longer exists', async () => {
+      saveTransactionDraft('', { ...EMPTY_DRAFT, amount: '9.99', categoryId: 'cat-deleted' });
+      const user = userEvent.setup();
+      renderSheet();
+      expect(screen.getByLabelText(/amount/i)).toHaveValue('9.99');
+      await user.click(screen.getByRole('button', { name: /^save$/i }));
+      expect(screen.getByRole('radiogroup', { name: 'Category' })).toHaveAccessibleDescription('Choose a category');
+      expect(mockCreate).not.toHaveBeenCalled();
+    });
+
+    it('never restores a draft while editing, and leaves it for the next Add', async () => {
+      const user = userEvent.setup();
+      const { setProps } = renderSheet();
+      await typeDraft(user);
+      setProps({ opened: false });
+
+      setProps({ opened: true, editing });
+      expect(screen.getByLabelText(/amount/i)).toHaveValue('4.80');
+      expect(screen.getByRole('radio', { name: 'Dining' })).toBeChecked();
+      expect(screen.getByLabelText(/note/i)).toHaveValue('Lunch');
+      expect(screen.queryByRole('button', { name: 'Clear' })).not.toBeInTheDocument();
+      await user.clear(screen.getByLabelText(/amount/i));
+      await user.type(screen.getByLabelText(/amount/i), '5.00');
+
+      setProps({ opened: false, editing: null });
+      setProps({ opened: true, editing: null });
+      expectDraftRestored();
+    });
+
+    it('never restores a draft into a duplicate or a pot entry', async () => {
+      const user = userEvent.setup();
+      const { setProps } = renderSheet();
+      await typeDraft(user);
+      setProps({ opened: false });
+
+      setProps({ opened: true, template: editing });
+      expect(screen.getByLabelText(/amount/i)).toHaveValue('4.80');
+      expect(screen.getByLabelText(/quick add/i)).toHaveValue('');
+      setProps({ opened: false, template: null });
+
+      setProps({ opened: true, preset: { type: 'EXPENSE', categoryId: 'cat-dining' } });
+      expect(screen.getByLabelText(/amount/i)).toHaveValue('');
+      expect(screen.getByRole('radio', { name: 'Dining' })).toBeChecked();
     });
   });
 });
