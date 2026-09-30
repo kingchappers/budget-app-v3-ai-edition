@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { filterTransactions, topCategories } from '../transactions';
+import { filterTransactions, parseTransactionsParams, topCategories, UNTARGETED_FILTER } from '../transactions';
 import type { Category, Transaction } from '../types';
 
 const categories: Category[] = [
@@ -103,5 +103,45 @@ describe('topCategories', () => {
     const items = [txn({ categoryId: 'c' }), txn({ categoryId: 'b' })];
     const result = topCategories(items, list, 'EXPENSE', 2);
     expect(result.map(c => c.categoryId)).toEqual(['b', 'c']);
+  });
+});
+
+describe('filterTransactions untargeted spending', () => {
+  const withDining: Category[] = [
+    ...categories,
+    { categoryId: 'cat-dining', name: 'Dining', type: 'EXPENSE', icon: 'tag', isDefault: true, createdAt: '' },
+  ];
+
+  it('keeps only expenses in categories without a target', () => {
+    const items = [
+      txn({ transactionId: 'food', categoryId: 'cat-food' }),
+      txn({ transactionId: 'dining', categoryId: 'cat-dining' }),
+      txn({ transactionId: 'pay', categoryId: 'cat-salary', type: 'INCOME' }),
+    ];
+    const result = filterTransactions(items, withDining, { ...noFilter, categoryId: UNTARGETED_FILTER }, new Set(['cat-food']));
+    expect(result.map(t => t.transactionId)).toEqual(['dining']);
+  });
+});
+
+describe('parseTransactionsParams', () => {
+  it('reads a month and a category', () => {
+    expect(parseTransactionsParams(new URLSearchParams('month=2026-08&category=cat-food')))
+      .toEqual({ yearMonth: '2026-08', categoryId: 'cat-food' });
+  });
+
+  it('reads untargeted spending', () => {
+    expect(parseTransactionsParams(new URLSearchParams('month=2026-08&spending=untargeted')))
+      .toEqual({ yearMonth: '2026-08', categoryId: UNTARGETED_FILTER });
+  });
+
+  it('ignores values that are not valid', () => {
+    expect(parseTransactionsParams(new URLSearchParams('month=2026-13&category=%3Cscript%3E&spending=other')))
+      .toEqual({ yearMonth: null, categoryId: null });
+    expect(parseTransactionsParams(new URLSearchParams(`category=${'a'.repeat(65)}`)))
+      .toEqual({ yearMonth: null, categoryId: null });
+  });
+
+  it('returns nothing for an empty query string', () => {
+    expect(parseTransactionsParams(new URLSearchParams(''))).toEqual({ yearMonth: null, categoryId: null });
   });
 });

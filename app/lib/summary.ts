@@ -1,3 +1,5 @@
+import { formatPence } from './money';
+import { currentYearMonth, daysLeftInMonth, monthName } from './months';
 import type { Category, CategoryGroup, CategoryTarget, TargetPeriod, Transaction } from './types';
 
 export interface CategoryProgress {
@@ -17,6 +19,11 @@ export interface MonthSummary {
   spending: CategoryProgress[];
   incomeTotal: number;
   recent: Transaction[];
+  budgetedTotal: number;
+  spentInBudgeted: number;
+  spentTotal: number;
+  spentUnbudgeted: number;
+  leftToSpend: number;
 }
 
 export function daysInMonth(yearMonth: string): number {
@@ -60,6 +67,11 @@ function byOverThenPercent(a: CategoryProgress, b: CategoryProgress): number {
   return b.percent - a.percent;
 }
 
+export function targetedExpenseCategoryIds(categories: Category[], targets: CategoryTarget[]): Set<string> {
+  const expenseIds = new Set(categories.filter(c => c.type === 'EXPENSE').map(c => c.categoryId));
+  return new Set(targets.map(t => t.categoryId).filter(id => expenseIds.has(id)));
+}
+
 export function buildMonthSummary(input: {
   transactions: Transaction[];
   categories: Category[];
@@ -90,6 +102,12 @@ export function buildMonthSummary(input: {
     }
   }
 
+  const budgetedTotal = spending.reduce((sum, p) => sum + p.target, 0);
+  const spentInBudgeted = spending.reduce((sum, p) => sum + p.spent, 0);
+  const spentTotal = transactions
+    .filter(t => t.type === 'EXPENSE')
+    .reduce((sum, t) => sum + t.amount, 0);
+
   const recent = [...transactions]
     .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
     .slice(0, recentLimit);
@@ -98,5 +116,37 @@ export function buildMonthSummary(input: {
     spending: spending.sort(byOverThenPercent),
     incomeTotal,
     recent,
+    budgetedTotal,
+    spentInBudgeted,
+    spentTotal,
+    spentUnbudgeted: spentTotal - spentInBudgeted,
+    leftToSpend: budgetedTotal - spentInBudgeted,
   };
+}
+
+function daysToGo(now: Date): string {
+  const days = daysLeftInMonth(now);
+  return days === 1 ? '1 day to go' : `${days} days to go`;
+}
+
+export function leftToSpendSentence(
+  summary: Pick<MonthSummary, 'spending' | 'leftToSpend'>,
+  yearMonth: string,
+  now: Date = new Date(),
+): string | null {
+  if (summary.spending.length === 0) return null;
+
+  const current = currentYearMonth(now);
+  const isOver = summary.leftToSpend < 0;
+  const amount = formatPence(Math.abs(summary.leftToSpend));
+  const name = monthName(yearMonth, now);
+
+  if (yearMonth === current) {
+    return isOver
+      ? `${amount} over so far. Nothing needs doing today.`
+      : `${amount} left to spend this month · ${daysToGo(now)}`;
+  }
+  if (isOver) return `${amount} over in ${name}`;
+  if (yearMonth < current) return `${amount} left at the end of ${name}`;
+  return `${amount} left to spend in ${name}`;
 }

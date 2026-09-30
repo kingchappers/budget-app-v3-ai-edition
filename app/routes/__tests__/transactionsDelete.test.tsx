@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { MantineProvider } from '@mantine/core';
 import { Notifications, notifications } from '@mantine/notifications';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MemoryRouter } from 'react-router';
 import type { Category, Transaction } from '~/lib/types';
 
 const server = vi.hoisted(() => ({
@@ -40,6 +41,7 @@ const lunch: Transaction = { ...coffee, transactionId: 't2', description: 'Lunch
 
 async function handle(endpoint: string, options: RequestInit = {}): Promise<unknown> {
   if (endpoint === '/api/categories') return { categories };
+  if (endpoint === '/api/targets') return { targets: [] };
   if (endpoint.startsWith('/api/transactions?')) return { transactions: [...server.transactions] };
   if (options.method === 'DELETE' && endpoint.startsWith('/api/transactions/')) {
     if (server.failDelete) throw new Error('Network error');
@@ -63,7 +65,9 @@ function renderRoute() {
     <QueryClientProvider client={client}>
       <MantineProvider>
         <Notifications />
-        <Transactions />
+        <MemoryRouter>
+          <Transactions />
+        </MemoryRouter>
       </MantineProvider>
     </QueryClientProvider>,
   );

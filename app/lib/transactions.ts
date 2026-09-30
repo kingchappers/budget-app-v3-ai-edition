@@ -7,16 +7,42 @@ export interface TransactionFilter {
   type: TransactionType | null;
 }
 
+export const UNTARGETED_FILTER = '__untargeted';
+
+const MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
+const CATEGORY_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
+
+export interface TransactionsParams {
+  yearMonth: string | null;
+  categoryId: string | null;
+}
+
+export function parseTransactionsParams(params: URLSearchParams): TransactionsParams {
+  const month = params.get('month');
+  const category = params.get('category');
+  const yearMonth = month !== null && MONTH_PATTERN.test(month) ? month : null;
+
+  if (category !== null && CATEGORY_ID_PATTERN.test(category)) return { yearMonth, categoryId: category };
+  if (params.get('spending') === 'untargeted') return { yearMonth, categoryId: UNTARGETED_FILTER };
+  return { yearMonth, categoryId: null };
+}
+
+function matchesCategory(t: Transaction, categoryId: string, targetedCategoryIds: ReadonlySet<string>): boolean {
+  if (categoryId === UNTARGETED_FILTER) return t.type === 'EXPENSE' && !targetedCategoryIds.has(t.categoryId);
+  return t.categoryId === categoryId;
+}
+
 export function filterTransactions(
   transactions: Transaction[],
   categories: Category[],
   { query, categoryId, type }: TransactionFilter,
+  targetedCategoryIds: ReadonlySet<string> = new Set(),
 ): Transaction[] {
   const q = query.trim().toLowerCase();
   const nameById = new Map(categories.map(c => [c.categoryId, c.name]));
 
   return transactions.filter(t => {
-    if (categoryId && t.categoryId !== categoryId) return false;
+    if (categoryId && !matchesCategory(t, categoryId, targetedCategoryIds)) return false;
     if (type && t.type !== type) return false;
     if (q === '') return true;
 

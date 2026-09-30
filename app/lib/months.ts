@@ -62,3 +62,18 @@ export function formatShortDate(iso: string): string {
   const [, month, day] = iso.split('-').map(Number);
   return `${day} ${MONTH_ABBREVIATIONS[month - 1]}`;
 }
+
+export function monthName(yearMonth: string, now: Date = new Date()): string {
+  const [year, month] = yearMonth.split('-').map(Number);
+  const name = new Date(year, month - 1, 1).toLocaleString('en-GB', { month: 'long' });
+  return year === now.getFullYear() ? name : `${name} ${year}`;
+}
+
+export function monthPhrase(yearMonth: string, now: Date = new Date()): string {
+  if (yearMonth === currentYearMonth(now)) return 'this month';
+  return `in ${monthName(yearMonth, now)}`;
+}
+
+export function daysLeftInMonth(now: Date = new Date()): number {
+  return lastDayOfMonth(currentYearMonth(now)) - now.getDate() + 1;
+}

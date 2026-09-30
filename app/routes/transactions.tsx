@@ -1,20 +1,18 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
+import { useSearchParams } from 'react-router';
 import { ActionIcon, Alert, Button, Divider, Group, Loader, Select, Stack, Text, TextInput } from '@mantine/core';
 import { IconSearch, IconX } from '@tabler/icons-react';
 import { DefaultLayout } from '~/components/layout/DefaultLayout';
 import { MonthHeader } from '~/components/budget/MonthHeader';
-import { RecurringForm, type RecurringDraft } from '~/components/recurring/RecurringForm';
 import { TransactionRow } from '~/components/transactions/TransactionRow';
-import { TransactionSheet } from '~/components/transactions/TransactionSheet';
-import { useOfflineQueue } from '~/hooks/useOfflineQueue';
-import { useUndoableDelete } from '~/hooks/useUndoableDelete';
-import { filterTransactions, type TransactionFilter } from '~/lib/transactions';
+import { useTransactionEditing } from '~/components/transactions/useTransactionEditing';
+import { filterTransactions, parseTransactionsParams, UNTARGETED_FILTER, type TransactionFilter } from '~/lib/transactions';
 import { categorySelectData } from '~/lib/categoryGroups';
 import { formatPence } from '~/lib/money';
-import { currentYearMonth, formatMonthLabel } from '~/lib/months';
-import { transactionLabel, transactionTrashId } from '~/lib/trash';
+import { currentYearMonth, formatMonthLabel, monthPhrase } from '~/lib/months';
 import { useDocumentTitle } from '~/hooks/useDocumentTitle';
-import { useCategories, useDeleteTransaction, useTransactions } from '~/lib/queries';
+import { targetedExpenseCategoryIds } from '~/lib/summary';
+import { useCategories, useTargets, useTransactions } from '~/lib/queries';
 import type { Transaction, TransactionType } from '~/lib/types';
 import { pageTitle } from '~/lib/pageTitle';
 import type { Route } from './+types/transactions';
@@ -26,42 +24,27 @@ const TYPE_OPTIONS: { value: TransactionType; label: string }[] = [
   { value: 'TAKE_OUT', label: 'Take out' },
 ];
 
+const UNTARGETED_OPTION = { value: UNTARGETED_FILTER, label: 'Other spending (no target)' };
+
+function countLine(count: number, yearMonth: string): string {
+  const noun = count === 1 ? 'transaction' : 'transactions';
+  return `${count} ${noun} ${monthPhrase(yearMonth)}`;
+}
+
 function TransactionsContent() {
-  const [yearMonth, setYearMonth] = useState(currentYearMonth());
+  const [searchParams] = useSearchParams();
+  const [initial] = useState(() => parseTransactionsParams(searchParams));
+  const [yearMonth, setYearMonth] = useState(initial.yearMonth ?? currentYearMonth());
   useDocumentTitle(pageTitle('Transactions', formatMonthLabel(yearMonth)));
-  const [editing, setEditing] = useState<Transaction | null>(null);
-  const [duplicating, setDuplicating] = useState<Transaction | null>(null);
-  const [repeating, setRepeating] = useState<Transaction | null>(null);
-  const repeatDraft = useMemo<RecurringDraft | null>(() => (
-    repeating
-      ? {
-          type: repeating.type,
-          categoryId: repeating.categoryId,
-          amount: repeating.amount,
-          description: repeating.description,
-          dayOfMonth: Number(repeating.date.slice(8, 10)),
-        }
-      : null
-  ), [repeating]);
-  const [filter, setFilter] = useState<TransactionFilter>({ query: '', categoryId: null, type: null });
+  const [filter, setFilter] = useState<TransactionFilter>({ query: '', categoryId: initial.categoryId, type: null });
   const categories = useCategories();
+  const targets = useTargets();
   const transactions = useTransactions(yearMonth);
-  const remove = useDeleteTransaction();
-  const undoableDelete = useUndoableDelete();
-  const { pendingMap, discard, flushNow } = useOfflineQueue();
+  const { rowActions, sheets } = useTransactionEditing(yearMonth);
 
   const nameFor = (id: string) =>
     categories.data?.find(c => c.categoryId === id)?.name ?? 'Unknown category';
 
-  function deleteTransaction(item: Transaction): void {
-    const categoryName = nameFor(item.categoryId);
-    undoableDelete({
-      label: transactionLabel(item, categoryName),
-      name: item.description || categoryName,
-      ref: { entityType: 'TRANSACTION', id: transactionTrashId(item) },
-      run: () => remove.mutateAsync({ transactionId: item.transactionId, yearMonth: item.yearMonth }),
-    });
-  }
   const iconFor = (id: string) =>
     categories.data?.find(c => c.categoryId === id)?.icon ?? 'tag';
 
@@ -73,10 +56,12 @@ function TransactionsContent() {
     );
   }
 
-  if (transactions.isLoading) return <Group justify="center" py="xl"><Loader /></Group>;
+  const waitingForTargets = filter.categoryId === UNTARGETED_FILTER && targets.isLoading;
+  if (transactions.isLoading || waitingForTargets) return <Group justify="center" py="xl"><Loader /></Group>;
 
   const all = transactions.data ?? [];
-  const filtered = filterTransactions(all, categories.data ?? [], filter);
+  const targetedIds = targetedExpenseCategoryIds(categories.data ?? [], targets.data ?? []);
+  const filtered = filterTransactions(all, categories.data ?? [], filter, targetedIds);
   const items = [...filtered].sort((a, b) => (a.date < b.date ? 1 : -1));
   const outgoing = items
     .filter(t => t.type === 'EXPENSE')
@@ -87,7 +72,7 @@ function TransactionsContent() {
     return acc;
   }, {});
 
-  const categoryOptions = categorySelectData(categories.data ?? []);
+  const categoryOptions = [UNTARGETED_OPTION, ...categorySelectData(categories.data ?? [])];
   const isFiltering = filter.query !== '' || filter.categoryId !== null || filter.type !== null;
 
   return (
@@ -129,11 +114,11 @@ function TransactionsContent() {
       </Group>
 
       <Group justify="space-between">
-        <Text c="dimmed">{items.length} transactions</Text>
+        <Text c="dimmed">{countLine(items.length, yearMonth)}</Text>
         <Text fw={600}>{formatPence(outgoing)} spent</Text>
       </Group>
 
-      {items.length === 0 && all.length === 0 && <Text c="dimmed">Nothing logged this month yet.</Text>}
+      {items.length === 0 && all.length === 0 && <Text c="dimmed">Nothing logged {monthPhrase(yearMonth)}.</Text>}
       {items.length === 0 && all.length > 0 && isFiltering && <Text c="dimmed">No transactions match your search.</Text>}
 
       {Object.entries(byDate).map(([date, dayItems]) => (
@@ -145,31 +130,13 @@ function TransactionsContent() {
               transaction={t}
               categoryName={nameFor(t.categoryId)}
               categoryIcon={iconFor(t.categoryId)}
-              saving={pendingMap[t.transactionId]?.queued === false}
-              pending={pendingMap[t.transactionId]?.queued === true}
-              pendingError={pendingMap[t.transactionId]?.lastError}
-              onRetry={() => void flushNow()}
-              onEdit={setEditing}
-              onDuplicate={setDuplicating}
-              onRepeat={setRepeating}
-              onDelete={deleteTransaction}
-              onDiscard={(item) => void discard(item.transactionId)}
+              {...rowActions(t)}
             />
           ))}
         </div>
       ))}
 
-      <TransactionSheet
-        opened={editing !== null || duplicating !== null}
-        onClose={() => {
-          setEditing(null);
-          setDuplicating(null);
-        }}
-        yearMonth={yearMonth}
-        editing={editing}
-        template={duplicating}
-      />
-      <RecurringForm opened={repeating !== null} onClose={() => setRepeating(null)} draft={repeatDraft} />
+      {sheets}
     </Stack>
   );
 }

@@ -3,6 +3,7 @@ import { afterEach, describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MantineProvider } from '@mantine/core';
+import { MemoryRouter } from 'react-router';
 import type { Category, Transaction } from '~/lib/types';
 import { currentYearMonth, formatMonthLabel, shiftMonth } from '~/lib/months';
 
@@ -21,7 +22,9 @@ function txn(over: Partial<Transaction>): Transaction {
 const transactions: Transaction[] = [
   txn({ transactionId: 't1', description: 'Weekly Shop' }),
   txn({ transactionId: 't2', description: 'Petrol' }),
+  txn({ transactionId: 't3', description: 'Mortgage payment', categoryId: 'cat-mortgage' }),
 ];
+const data = vi.hoisted(() => ({ monthsRequested: [] as string[], targetsLoading: false }));
 
 vi.mock('~/components/layout/DefaultLayout', () => ({
   DefaultLayout: ({ children }: { children: React.ReactNode }) => <>{children}</>,
@@ -47,7 +50,11 @@ vi.mock('~/components/recurring/RecurringForm', () => ({
 }));
 vi.mock('~/lib/queries', () => ({
   useCategories: () => ({ data: categories }),
-  useTransactions: () => ({ data: transactions, isLoading: false, error: null }),
+  useTransactions: (yearMonth: string) => {
+    data.monthsRequested.push(yearMonth);
+    return { data: transactions, isLoading: false, error: null };
+  },
+  useTargets: () => ({ isLoading: data.targetsLoading, data: data.targetsLoading ? undefined : [{ categoryId: 'cat-mortgage', targetAmount: 100000, period: 'MONTHLY', updatedAt: '' }] }),
   useDeleteTransaction: () => ({ mutate: vi.fn(), mutateAsync: vi.fn() }),
   useRestoreFromTrash: () => ({ mutateAsync: vi.fn() }),
 }));
@@ -61,11 +68,13 @@ import Transactions from '../transactions';
 // The app runs under StrictMode (React Router's default client entry). In dev it
 // re-runs state updaters during render, which is what exposed reading the event
 // inside the search updater; without StrictMode this test passes on the buggy code.
-function renderRoute() {
+function renderRoute(url = '/transactions') {
   return render(
     <StrictMode>
       <MantineProvider>
-        <Transactions />
+        <MemoryRouter initialEntries={[url]}>
+          <Transactions />
+        </MemoryRouter>
       </MantineProvider>
     </StrictMode>,
   );
@@ -141,6 +150,51 @@ describe('Transactions route repeat monthly', () => {
     await user.type(screen.getByLabelText('Search transactions'), 'x');
 
     expect(screen.getByLabelText('Repeat note')).toHaveValue('Rent');
+  });
+});
+
+describe('Transactions route query parameters', () => {
+  it('opens on the month and category given in the link', () => {
+    renderRoute('/transactions?month=2026-08&category=cat-mortgage');
+
+    expect(screen.getByRole('heading', { name: 'August 2026' })).toBeInTheDocument();
+    expect(data.monthsRequested.at(-1)).toBe('2026-08');
+    expect(screen.getByRole('textbox', { name: 'Filter by category' })).toHaveValue('Mortgage');
+    expect(screen.getByText('Mortgage payment')).toBeInTheDocument();
+    expect(screen.queryByText('Weekly Shop')).not.toBeInTheDocument();
+  });
+
+  it('shows only spending without a target for spending=untargeted', () => {
+    renderRoute('/transactions?month=2026-08&spending=untargeted');
+
+    expect(screen.getByRole('textbox', { name: 'Filter by category' })).toHaveValue('Other spending (no target)');
+    expect(screen.getByText('Weekly Shop')).toBeInTheDocument();
+    expect(screen.queryByText('Mortgage payment')).not.toBeInTheDocument();
+  });
+
+  it('waits for targets before listing untargeted spending', () => {
+    data.targetsLoading = true;
+    renderRoute('/transactions?spending=untargeted');
+    expect(screen.queryByText('Mortgage payment')).not.toBeInTheDocument();
+    data.targetsLoading = false;
+  });
+
+  it('ignores a month that is not valid', () => {
+    renderRoute('/transactions?month=nonsense');
+    expect(data.monthsRequested.at(-1)).toMatch(/^\d{4}-\d{2}$/);
+    expect(data.monthsRequested.at(-1)).not.toBe('nonsense');
+  });
+});
+
+describe('Transactions route count line', () => {
+  it('names the month being viewed', () => {
+    renderRoute('/transactions?month=2020-08&category=cat-mortgage');
+    expect(screen.getByText('1 transaction in August 2020')).toBeInTheDocument();
+  });
+
+  it('says "this month" for the current month', () => {
+    renderRoute();
+    expect(screen.getByText('3 transactions this month')).toBeInTheDocument();
   });
 });
 
