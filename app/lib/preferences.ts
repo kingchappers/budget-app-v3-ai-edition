@@ -1,19 +1,36 @@
 import { useCallback, useSyncExternalStore } from 'react';
 
+// The Insights sections that can be opened and closed, in page order.
+export const INSIGHTS_SECTIONS = ['tracking', 'groups', 'trend', 'movers', 'targets', 'pots', 'netWorth', 'milestones'] as const;
+export type InsightsSection = typeof INSIGHTS_SECTIONS[number];
+
+const MAX_NOT_TRACKED_MONTHS = 120;
+const YEAR_MONTH = /^\d{4}-(0[1-9]|1[0-2])$/;
+
 export interface Preferences {
   shortcutN: boolean;
   openAddOnLaunch: boolean;
+  // Outcome-only acknowledgements on Insights. Off unless asked for.
+  showMilestones: boolean;
+  // Months (YYYY-MM) the user said they did not track, left out of comparisons.
+  notTrackedMonths: string[];
+  // Insights sections the user left open. All start closed.
+  insightsOpenSections: InsightsSection[];
 }
 
 export const DEFAULT_PREFERENCES: Preferences = {
   shortcutN: true,
   openAddOnLaunch: false,
+  showMilestones: false,
+  notTrackedMonths: [],
+  insightsOpenSections: [],
 };
+
+const BOOLEAN_KEYS = ['shortcutN', 'openAddOnLaunch', 'showMilestones'] as const;
 
 export const PREFERENCES_KEY = 'budget.preferences';
 export const LEGACY_OPEN_ON_LAUNCH_KEY = 'budget.openAddOnLaunch';
 
-type PreferenceKey = keyof Preferences;
 type Listener = () => void;
 
 const listeners = new Set<Listener>();
@@ -51,12 +68,25 @@ function parseStored(raw: string | null): Record<string, unknown> {
   }
 }
 
+function monthsFrom(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  const months = value.filter((item): item is string => typeof item === 'string' && YEAR_MONTH.test(item));
+  return [...new Set(months)].sort().slice(-MAX_NOT_TRACKED_MONTHS);
+}
+
+function sectionsFrom(value: unknown): InsightsSection[] {
+  if (!Array.isArray(value)) return [];
+  return INSIGHTS_SECTIONS.filter(section => value.includes(section));
+}
+
 function fromStored(stored: Record<string, unknown>, legacyOpenOnLaunch: string | null): Preferences {
   const result: Preferences = { ...DEFAULT_PREFERENCES };
-  for (const key of Object.keys(DEFAULT_PREFERENCES) as PreferenceKey[]) {
+  for (const key of BOOLEAN_KEYS) {
     const value = stored[key];
-    if (typeof value === typeof DEFAULT_PREFERENCES[key]) result[key] = value as Preferences[typeof key];
+    if (typeof value === 'boolean') result[key] = value;
   }
+  result.notTrackedMonths = monthsFrom(stored.notTrackedMonths);
+  result.insightsOpenSections = sectionsFrom(stored.insightsOpenSections);
   if (typeof stored.openAddOnLaunch !== 'boolean' && legacyOpenOnLaunch === '1') result.openAddOnLaunch = true;
   return result;
 }
