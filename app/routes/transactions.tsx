@@ -48,7 +48,7 @@ function TransactionsContent() {
   const transactions = useTransactions(yearMonth);
   const remove = useDeleteTransaction();
   const undoableDelete = useUndoableDelete();
-  const { pendingMap, discard } = useOfflineQueue();
+  const { pendingMap, discard, flushNow } = useOfflineQueue();
 
   const nameFor = (id: string) =>
     categories.data?.find(c => c.categoryId === id)?.name ?? 'Unknown category';
@@ -145,8 +145,10 @@ function TransactionsContent() {
               transaction={t}
               categoryName={nameFor(t.categoryId)}
               categoryIcon={iconFor(t.categoryId)}
+              saving={pendingMap[t.transactionId]?.queued === false}
               pending={pendingMap[t.transactionId]?.queued === true}
               pendingError={pendingMap[t.transactionId]?.lastError}
+              onRetry={() => void flushNow()}
               onEdit={setEditing}
               onDuplicate={setDuplicating}
               onRepeat={setRepeating}

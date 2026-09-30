@@ -1,5 +1,5 @@
 import { StrictMode, useEffect, useState } from 'react';
-import { describe, it, expect, vi } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MantineProvider } from '@mantine/core';
@@ -51,7 +51,10 @@ vi.mock('~/lib/queries', () => ({
   useDeleteTransaction: () => ({ mutate: vi.fn(), mutateAsync: vi.fn() }),
   useRestoreFromTrash: () => ({ mutateAsync: vi.fn() }),
 }));
-vi.mock('~/hooks/useOfflineQueue', () => ({ useOfflineQueue: () => ({ pendingMap: {}, flushNow: vi.fn(), discard: vi.fn() }) }));
+const queue = vi.hoisted(() => ({ pendingMap: {} as Record<string, unknown>, flushNow: vi.fn() }));
+vi.mock('~/hooks/useOfflineQueue', () => ({
+  useOfflineQueue: () => ({ pendingMap: queue.pendingMap, flushNow: queue.flushNow, discard: vi.fn() }),
+}));
 
 import Transactions from '../transactions';
 
@@ -138,6 +141,31 @@ describe('Transactions route repeat monthly', () => {
     await user.type(screen.getByLabelText('Search transactions'), 'x');
 
     expect(screen.getByLabelText('Repeat note')).toHaveValue('Rent');
+  });
+});
+
+describe('Transactions route sync status', () => {
+  afterEach(() => {
+    queue.pendingMap = {};
+    queue.flushNow.mockReset();
+  });
+
+  it('shows a sync error on the row and Retry flushes the offline queue', async () => {
+    queue.pendingMap = {
+      t2: { id: 't2', input: {}, queuedAt: '', userSub: 'u', queued: true, lastError: 'categoryId must be an existing category' },
+    };
+    const user = userEvent.setup();
+    renderRoute();
+
+    expect(screen.getByText('Not synced. Tap to retry.')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Retry syncing Petrol' }));
+    expect(queue.flushNow).toHaveBeenCalledTimes(1);
+  });
+
+  it('labels a row whose save is still in flight as Saving', () => {
+    queue.pendingMap = { t1: { id: 't1', input: {}, queuedAt: '', userSub: 'u', queued: false } };
+    renderRoute();
+    expect(screen.getByText('Saving')).toBeInTheDocument();
   });
 });
 
