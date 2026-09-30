@@ -3,8 +3,6 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MantineProvider } from '@mantine/core';
 import { MemoryRouter } from 'react-router';
-import userEvent from '@testing-library/user-event';
-import { currentYearMonth, formatMonthLabel, shiftMonth } from '~/lib/months';
 
 vi.mock('~/components/layout/DefaultLayout', () => ({
   DefaultLayout: ({ children }: { children: React.ReactNode }) => <>{children}</>,
@@ -28,11 +26,12 @@ vi.mock('~/lib/queries', () => ({
     return { data: data.pots, isLoading: false, error: null };
   },
   useTransactions: () => ({ data: data.transactions, isLoading: false, error: null, refetch: vi.fn() }),
-  useDeleteTransaction: () => ({ mutate: vi.fn() }),
+  useDeleteTransaction: () => ({ mutate: vi.fn(), mutateAsync: vi.fn() }),
+  useRestoreFromTrash: () => ({ mutateAsync: vi.fn() }),
 }));
 
 import Home from '../_index';
-import { currentYearMonth, monthName, shiftMonth } from '~/lib/months';
+import { currentYearMonth, formatMonthLabel, monthName, shiftMonth } from '~/lib/months';
 
 const thisMonth = currentYearMonth();
 const lastMonth = shiftMonth(thisMonth, -1);

@@ -12,7 +12,8 @@ vi.mock('../db', () => ({
 vi.mock('@aws-sdk/lib-dynamodb', () => ({
   QueryCommand: vi.fn(function (i: unknown) { return i; }),
   PutCommand: vi.fn(function (i: unknown) { return i; }),
-  DeleteCommand: vi.fn(function (i: unknown) { return i; }),
+  GetCommand: vi.fn(function (i: unknown) { return i; }),
+  TransactWriteCommand: vi.fn(function (i: unknown) { return i; }),
 }));
 
 import { applyBalanceEntry, balanceAsOf, getAccounts, createAccount, updateAccount, deleteAccount, addBalance } from '../accounts';
@@ -166,10 +167,15 @@ describe('updateAccount', () => {
 });
 
 describe('deleteAccount', () => {
-  it('deletes and returns 204', async () => {
-    useStore({});
+  it('moves the account and its balance history to the trash and returns 204', async () => {
+    const stored = account({ balances: [{ date: '2026-09-01', pence: 250000 }] });
+    mockSend.mockResolvedValueOnce({ Item: { PK: 'USER#user-1', SK: 'ACCOUNT#acc-1', ...stored } });
+    mockSend.mockResolvedValueOnce({});
     const res = await deleteAccount(event(), 'user-1', { accountId: 'acc-1' });
     expect(res.statusCode).toBe(204);
+    const { TransactItems } = mockSend.mock.calls[1][0];
+    expect(TransactItems[0].Delete.Key).toEqual({ PK: 'USER#user-1', SK: 'ACCOUNT#acc-1' });
+    expect(TransactItems[1].Put.Item).toMatchObject({ SK: 'TRASH#ACCOUNT#acc-1', entityType: 'ACCOUNT', item: stored });
   });
 });
 

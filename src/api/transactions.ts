@@ -1,9 +1,10 @@
-import { QueryCommand, PutCommand, DeleteCommand, GetCommand, TransactWriteCommand } from '@aws-sdk/lib-dynamodb';
+import { QueryCommand, PutCommand, GetCommand, TransactWriteCommand } from '@aws-sdk/lib-dynamodb';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { docClient, TABLE, pk, txnSk } from './db';
 import { MAX_AMOUNT_PENCE, SECURITY_HEADERS, VALID_TRANSACTION_TYPES } from './constants';
 import type { Transaction, ApiResponse } from './types';
 import { ok, err } from './http';
+import { moveToTrash } from './trash';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -138,10 +139,7 @@ export async function deleteTransaction(
     return err(400, 'transactionId is required');
   }
 
-  await docClient.send(new DeleteCommand({
-    TableName: TABLE,
-    Key: { PK: pk(userId), SK: txnSk(yearMonth, transactionId) },
-  }));
+  await moveToTrash(userId, 'TRANSACTION', txnSk(yearMonth, transactionId));
 
   return { statusCode: 204, headers: SECURITY_HEADERS, body: '' };
 }

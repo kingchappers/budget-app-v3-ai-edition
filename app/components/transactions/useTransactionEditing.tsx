@@ -3,7 +3,9 @@ import type { ReactNode } from 'react';
 import { RecurringForm, type RecurringDraft } from '~/components/recurring/RecurringForm';
 import { TransactionSheet } from '~/components/transactions/TransactionSheet';
 import { useOfflineQueue } from '~/hooks/useOfflineQueue';
-import { useDeleteTransaction } from '~/lib/queries';
+import { useUndoableDelete } from '~/hooks/useUndoableDelete';
+import { useCategories, useDeleteTransaction } from '~/lib/queries';
+import { transactionLabel, transactionTrashId } from '~/lib/trash';
 import type { Transaction } from '~/lib/types';
 
 export interface TransactionRowActions {
@@ -37,7 +39,19 @@ export function useTransactionEditing(yearMonth: string): TransactionEditing {
   const [repeating, setRepeating] = useState<Transaction | null>(null);
   const repeatDraft = useMemo<RecurringDraft | null>(() => (repeating ? toRecurringDraft(repeating) : null), [repeating]);
   const remove = useDeleteTransaction();
+  const undoableDelete = useUndoableDelete();
+  const { data: categories } = useCategories();
   const { pendingMap, discard } = useOfflineQueue();
+
+  function deleteTransaction(item: Transaction): void {
+    const categoryName = categories?.find(c => c.categoryId === item.categoryId)?.name ?? 'Unknown category';
+    undoableDelete({
+      label: transactionLabel(item, categoryName),
+      name: item.description || categoryName,
+      ref: { entityType: 'TRANSACTION', id: transactionTrashId(item) },
+      run: () => remove.mutateAsync({ transactionId: item.transactionId, yearMonth: item.yearMonth }),
+    });
+  }
 
   const rowActions = (t: Transaction): TransactionRowActions => ({
     pending: pendingMap[t.transactionId]?.queued === true,
@@ -45,7 +59,7 @@ export function useTransactionEditing(yearMonth: string): TransactionEditing {
     onEdit: setEditing,
     onDuplicate: setDuplicating,
     onRepeat: setRepeating,
-    onDelete: item => remove.mutate({ transactionId: item.transactionId, yearMonth: item.yearMonth }),
+    onDelete: deleteTransaction,
     onDiscard: item => void discard(item.transactionId),
   });
 

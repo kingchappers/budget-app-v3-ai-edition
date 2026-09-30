@@ -55,7 +55,8 @@ vi.mock('~/lib/queries', () => ({
     return { data: transactions, isLoading: false, error: null };
   },
   useTargets: () => ({ isLoading: data.targetsLoading, data: data.targetsLoading ? undefined : [{ categoryId: 'cat-mortgage', targetAmount: 100000, period: 'MONTHLY', updatedAt: '' }] }),
-  useDeleteTransaction: () => ({ mutate: vi.fn() }),
+  useDeleteTransaction: () => ({ mutate: vi.fn(), mutateAsync: vi.fn() }),
+  useRestoreFromTrash: () => ({ mutateAsync: vi.fn() }),
 }));
 vi.mock('~/hooks/useOfflineQueue', () => ({ useOfflineQueue: () => ({ pendingMap: {}, flushNow: vi.fn(), discard: vi.fn() }) }));
 

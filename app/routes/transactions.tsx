@@ -44,6 +44,7 @@ function TransactionsContent() {
 
   const nameFor = (id: string) =>
     categories.data?.find(c => c.categoryId === id)?.name ?? 'Unknown category';
+
   const iconFor = (id: string) =>
     categories.data?.find(c => c.categoryId === id)?.icon ?? 'tag';
 
