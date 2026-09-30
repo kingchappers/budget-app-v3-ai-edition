@@ -19,6 +19,8 @@ export interface Preferences {
   nothingToLog: Record<string, string[]>;
   // The welcome-back card stays hidden until this date (YYYY-MM-DD). Empty means not hidden.
   welcomeBackHiddenUntil: string;
+  // "What's changed" notes the user has dismissed, by release key.
+  seenReleases: string[];
 }
 
 export const DEFAULT_PREFERENCES: Preferences = {
@@ -30,6 +32,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   quickAddTipDismissed: false,
   nothingToLog: {},
   welcomeBackHiddenUntil: '',
+  seenReleases: [],
 };
 
 const BOOLEAN_KEYS = ['shortcutN', 'openAddOnLaunch', 'quickAddTipDismissed'] as const;
@@ -38,6 +41,8 @@ const ENTRY_MODES: readonly EntryMode[] = ['form', 'quick'];
 const MAX_CATEGORY_ID_LENGTH = 64;
 const MAX_USER_KEY_LENGTH = 128;
 const MAX_NOTHING_TO_LOG_USERS = 20;
+const MAX_RELEASE_KEYS = 50;
+const MAX_RELEASE_KEY_LENGTH = 64;
 const MAX_NOTHING_TO_LOG_DAYS = 400;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -99,6 +104,12 @@ function nothingToLogFrom(value: unknown): Record<string, string[]> {
   return result;
 }
 
+function releasesFrom(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  const keys = value.filter((key): key is string => typeof key === 'string' && key !== '' && key.length <= MAX_RELEASE_KEY_LENGTH);
+  return [...new Set(keys)].slice(-MAX_RELEASE_KEYS);
+}
+
 function fromStored(stored: Record<string, unknown>, legacyOpenOnLaunch: string | null): Preferences {
   const result: Preferences = { ...DEFAULT_PREFERENCES };
   for (const key of BOOLEAN_KEYS) {
@@ -109,6 +120,7 @@ function fromStored(stored: Record<string, unknown>, legacyOpenOnLaunch: string 
   if (KEEP_SHEET_OPEN_VALUES.includes(stored.keepSheetOpen as KeepSheetOpen)) result.keepSheetOpen = stored.keepSheetOpen as KeepSheetOpen;
   if (ENTRY_MODES.includes(stored.entryMode as EntryMode)) result.entryMode = stored.entryMode as EntryMode;
   result.nothingToLog = nothingToLogFrom(stored.nothingToLog);
+  result.seenReleases = releasesFrom(stored.seenReleases);
   if (typeof stored.welcomeBackHiddenUntil === 'string' && (stored.welcomeBackHiddenUntil === '' || ISO_DATE.test(stored.welcomeBackHiddenUntil))) {
     result.welcomeBackHiddenUntil = stored.welcomeBackHiddenUntil;
   }
