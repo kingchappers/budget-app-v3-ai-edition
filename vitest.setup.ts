@@ -1,10 +1,15 @@
 import 'fake-indexeddb/auto';
 import '@testing-library/jest-dom/vitest';
-import { cleanup } from '@testing-library/react';
+import { cleanup, configure } from '@testing-library/react';
 import { afterEach } from 'vitest';
 
 // Vitest runs without `globals`, so Testing Library's auto-cleanup never registers.
 afterEach(cleanup);
+
+// Mantine menus, dialogs and drawers animate open and closed. CI runs the
+// whole suite in parallel on a slower machine, which can push findBy* and
+// waitFor past Testing Library's 1s default for tests that pass in isolation.
+configure({ asyncUtilTimeout: 3000 });
 
 // Mantine reads matchMedia and ResizeObserver at mount; jsdom provides neither.
 Object.defineProperty(window, 'matchMedia', {
