@@ -91,12 +91,15 @@ describe('open-on-launch setting', () => {
 
   it('persists on and off', () => {
     writeOpenOnLaunch(window.localStorage, true);
-    expect(window.localStorage.getItem(OPEN_ON_LAUNCH_KEY)).toBe('1');
     expect(readOpenOnLaunch(window.localStorage)).toBe(true);
 
     writeOpenOnLaunch(window.localStorage, false);
-    expect(window.localStorage.getItem(OPEN_ON_LAUNCH_KEY)).toBeNull();
     expect(readOpenOnLaunch(window.localStorage)).toBe(false);
+  });
+
+  it('honours the value saved by earlier versions of the app', () => {
+    window.localStorage.setItem(OPEN_ON_LAUNCH_KEY, '1');
+    expect(readOpenOnLaunch(window.localStorage)).toBe(true);
   });
 
   it('degrades to off when storage is missing or blocked', () => {

@@ -4,6 +4,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MantineProvider } from '@mantine/core';
 import type { Category, Transaction } from '~/lib/types';
+import { currentYearMonth, formatMonthLabel, shiftMonth } from '~/lib/months';
 
 const categories: Category[] = [
   { categoryId: 'cat-food', name: 'Food & Groceries', type: 'EXPENSE', icon: 'shopping-cart', isDefault: true, createdAt: '', group: 'EVERYDAY' },
@@ -136,5 +137,16 @@ describe('Transactions route repeat monthly', () => {
     await user.type(screen.getByLabelText('Search transactions'), 'x');
 
     expect(screen.getByLabelText('Repeat note')).toHaveValue('Rent');
+  });
+});
+
+describe('Transactions page title', () => {
+  it('names the month shown and follows month changes', async () => {
+    renderRoute();
+    expect(document.title).toBe(`Transactions – ${formatMonthLabel(currentYearMonth())} – Budget`);
+
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Next month' }));
+
+    expect(document.title).toBe(`Transactions – ${formatMonthLabel(shiftMonth(currentYearMonth(), 1))} – Budget`);
   });
 });

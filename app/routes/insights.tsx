@@ -15,7 +15,10 @@ import {
 } from '~/lib/insights';
 import { currentYearMonth, formatMonthLabel, shiftMonth } from '~/lib/months';
 import { formatPence } from '~/lib/money';
+import { useDocumentTitle } from '~/hooks/useDocumentTitle';
 import { useAccounts, useCategories, usePots, useTargets, useTransactionsRange } from '~/lib/queries';
+import { pageTitle } from '~/lib/pageTitle';
+import type { Route } from './+types/insights';
 
 const SPAN_OPTIONS = [
   { label: 'This month', value: '1' },
@@ -34,6 +37,7 @@ function InsightsContent() {
   const [openGroup, setOpenGroup] = useState<string | null>(null);
   const { from, to } = fetchRangeForAnchor(anchor, months);
   const { current, previous } = splitPeriods(from, to);
+  useDocumentTitle(pageTitle('Insights', periodLabel(current[0], current[1])));
 
   const categories = useCategories();
   const targets = useTargets();
@@ -115,6 +119,8 @@ function InsightsContent() {
     </Stack>
   );
 }
+
+export const meta: Route.MetaFunction = () => [{ title: pageTitle('Insights') }];
 
 export default function Insights() {
   return (

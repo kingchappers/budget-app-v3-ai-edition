@@ -8,6 +8,8 @@ import { bucketKeyFor, groupItems } from '~/lib/categoryGroups';
 import { currentYearMonth } from '~/lib/months';
 import { useCategories, usePots } from '~/lib/queries';
 import type { Category, PotSummary } from '~/lib/types';
+import { pageTitle } from '~/lib/pageTitle';
+import type { Route } from './+types/pots';
 
 function PotsContent() {
   const asOf = currentYearMonth();
@@ -68,6 +70,8 @@ function PotsContent() {
     </Stack>
   );
 }
+
+export const meta: Route.MetaFunction = () => [{ title: pageTitle('Pots') }];
 
 export default function Pots() {
   return (
