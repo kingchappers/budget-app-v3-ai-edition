@@ -1,5 +1,6 @@
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { beforeEach, describe, it, expect, vi } from 'vitest';
+import { render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MantineProvider } from '@mantine/core';
 import type { Category } from '~/lib/types';
 
@@ -14,14 +15,35 @@ const categories: Category[] = [
   { categoryId: 's', name: 'Salary', type: 'INCOME', icon: 'briefcase', isDefault: true, createdAt: '' },
 ];
 
+const state = vi.hoisted(() => ({
+  targets: [] as unknown[],
+  setTarget: vi.fn(),
+}));
+
 vi.mock('~/lib/queries', () => ({
   useCategories: () => ({ data: categories, isLoading: false, error: null, refetch: vi.fn() }),
-  useTargets: () => ({ data: [], isLoading: false, error: null, refetch: vi.fn() }),
-  useSetTarget: () => ({ mutate: vi.fn(), isPending: false }),
+  useTargets: () => ({ data: state.targets, isLoading: false, error: null, refetch: vi.fn() }),
+  useSetTarget: () => ({ mutate: state.setTarget, isPending: false }),
   useDeleteTarget: () => ({ mutate: vi.fn() }),
 }));
 
 import Targets from '../targets';
+
+type MutateOptions = { onSuccess?: () => void; onError?: (error: Error) => void };
+
+beforeEach(() => {
+  state.targets = [{ categoryId: 'g', targetAmount: 30000, period: 'MONTHLY' }];
+  state.setTarget.mockReset();
+});
+
+function groceriesRow(): HTMLElement {
+  return screen.getByLabelText('Target for Groceries').closest('.mantine-Card-root') as HTMLElement;
+}
+
+function renderPage() {
+  render(<MantineProvider><Targets /></MantineProvider>);
+  return userEvent.setup();
+}
 
 describe('Targets page', () => {
   it('has one section per group in order and no Income section', () => {
@@ -34,5 +56,51 @@ describe('Targets page', () => {
   it('shows the emoji before the category name', () => {
     render(<MantineProvider><Targets /></MantineProvider>);
     expect(screen.getByText('🛒 Groceries')).toBeInTheDocument();
+  });
+
+  it('marks a row as not saved yet after the period changes', async () => {
+    const user = renderPage();
+    expect(within(groceriesRow()).queryByText('Not saved yet')).not.toBeInTheDocument();
+    await user.click(within(groceriesRow()).getByText('/wk'));
+    expect(within(groceriesRow()).getByText('Not saved yet')).toBeInTheDocument();
+  });
+
+  it('marks a row as not saved yet after the amount changes', async () => {
+    const user = renderPage();
+    await user.clear(screen.getByLabelText('Target for Groceries'));
+    await user.type(screen.getByLabelText('Target for Groceries'), '350');
+    expect(within(groceriesRow()).getByText('Not saved yet')).toBeInTheDocument();
+  });
+
+  it('shows Saved once the server confirms', async () => {
+    state.setTarget.mockImplementation((_vars: unknown, options: MutateOptions) => options.onSuccess?.());
+    const user = renderPage();
+    await user.click(within(groceriesRow()).getByText('/wk'));
+    await user.click(within(groceriesRow()).getByRole('button', { name: 'Save' }));
+
+    expect(state.setTarget).toHaveBeenCalledWith(
+      { categoryId: 'g', targetAmount: 30000, period: 'WEEKLY' },
+      expect.anything(),
+    );
+    expect(within(groceriesRow()).getByRole('status')).toHaveTextContent('Saved');
+    expect(within(groceriesRow()).queryByText('Not saved yet')).not.toBeInTheDocument();
+  });
+
+  it('shows the failure inline, keeps the typed value, and Retry sends it again', async () => {
+    state.setTarget.mockImplementation((_vars: unknown, options: MutateOptions) => options.onError?.(new Error('boom')));
+    const user = renderPage();
+    await user.clear(screen.getByLabelText('Target for Groceries'));
+    await user.type(screen.getByLabelText('Target for Groceries'), '350');
+    await user.click(within(groceriesRow()).getByRole('button', { name: 'Save' }));
+
+    expect(within(groceriesRow()).getByRole('status')).toHaveTextContent("Couldn't save.");
+    expect(screen.getByLabelText('Target for Groceries')).toHaveValue('350');
+
+    await user.click(within(groceriesRow()).getByRole('button', { name: 'Retry' }));
+    expect(state.setTarget).toHaveBeenCalledTimes(2);
+    expect(state.setTarget).toHaveBeenLastCalledWith(
+      { categoryId: 'g', targetAmount: 35000, period: 'MONTHLY' },
+      expect.anything(),
+    );
   });
 });
