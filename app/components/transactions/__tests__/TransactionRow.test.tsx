@@ -176,3 +176,36 @@ describe('TransactionRow pending row actions', () => {
     expect(screen.queryByRole('button', { name: 'Actions for Weekly Shop' })).not.toBeInTheDocument();
   });
 });
+
+describe('TransactionRow tap to edit', () => {
+  it('opens Edit when the row itself is tapped', async () => {
+    const user = userEvent.setup();
+    const onEdit = vi.fn();
+    renderRow({ onEdit });
+
+    await user.click(screen.getByRole('button', { name: 'Edit Weekly Shop' }));
+
+    expect(onEdit).toHaveBeenCalledWith(transaction);
+  });
+
+  it('opens Edit from the keyboard', async () => {
+    const user = userEvent.setup();
+    const onEdit = vi.fn();
+    renderRow({ onEdit });
+
+    screen.getByRole('button', { name: 'Edit Weekly Shop' }).focus();
+    await user.keyboard('{Enter}');
+
+    expect(onEdit).toHaveBeenCalledWith(transaction);
+  });
+
+  it('is not tappable without an Edit handler', () => {
+    renderRow();
+    expect(screen.queryByRole('button', { name: 'Edit Weekly Shop' })).not.toBeInTheDocument();
+  });
+
+  it('is not tappable while pending', () => {
+    renderRow({ onEdit: vi.fn(), pending: true });
+    expect(screen.queryByRole('button', { name: 'Edit Weekly Shop' })).not.toBeInTheDocument();
+  });
+});

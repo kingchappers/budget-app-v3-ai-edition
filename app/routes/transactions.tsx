@@ -1,17 +1,15 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { ActionIcon, Alert, Button, Divider, Group, Loader, Select, Stack, Text, TextInput } from '@mantine/core';
 import { IconSearch, IconX } from '@tabler/icons-react';
 import { DefaultLayout } from '~/components/layout/DefaultLayout';
 import { MonthHeader } from '~/components/budget/MonthHeader';
-import { RecurringForm, type RecurringDraft } from '~/components/recurring/RecurringForm';
 import { TransactionRow } from '~/components/transactions/TransactionRow';
-import { TransactionSheet } from '~/components/transactions/TransactionSheet';
-import { useOfflineQueue } from '~/hooks/useOfflineQueue';
+import { useTransactionEditing } from '~/components/transactions/useTransactionEditing';
 import { filterTransactions, type TransactionFilter } from '~/lib/transactions';
 import { categorySelectData } from '~/lib/categoryGroups';
 import { formatPence } from '~/lib/money';
 import { currentYearMonth } from '~/lib/months';
-import { useCategories, useDeleteTransaction, useTransactions } from '~/lib/queries';
+import { useCategories, useTransactions } from '~/lib/queries';
 import type { Transaction, TransactionType } from '~/lib/types';
 
 const TYPE_OPTIONS: { value: TransactionType; label: string }[] = [
@@ -23,25 +21,10 @@ const TYPE_OPTIONS: { value: TransactionType; label: string }[] = [
 
 function TransactionsContent() {
   const [yearMonth, setYearMonth] = useState(currentYearMonth());
-  const [editing, setEditing] = useState<Transaction | null>(null);
-  const [duplicating, setDuplicating] = useState<Transaction | null>(null);
-  const [repeating, setRepeating] = useState<Transaction | null>(null);
-  const repeatDraft = useMemo<RecurringDraft | null>(() => (
-    repeating
-      ? {
-          type: repeating.type,
-          categoryId: repeating.categoryId,
-          amount: repeating.amount,
-          description: repeating.description,
-          dayOfMonth: Number(repeating.date.slice(8, 10)),
-        }
-      : null
-  ), [repeating]);
   const [filter, setFilter] = useState<TransactionFilter>({ query: '', categoryId: null, type: null });
   const categories = useCategories();
   const transactions = useTransactions(yearMonth);
-  const remove = useDeleteTransaction();
-  const { pendingMap, discard } = useOfflineQueue();
+  const { rowActions, sheets } = useTransactionEditing(yearMonth);
 
   const nameFor = (id: string) =>
     categories.data?.find(c => c.categoryId === id)?.name ?? 'Unknown category';
@@ -128,29 +111,13 @@ function TransactionsContent() {
               transaction={t}
               categoryName={nameFor(t.categoryId)}
               categoryIcon={iconFor(t.categoryId)}
-              pending={pendingMap[t.transactionId]?.queued === true}
-              pendingError={pendingMap[t.transactionId]?.lastError}
-              onEdit={setEditing}
-              onDuplicate={setDuplicating}
-              onRepeat={setRepeating}
-              onDelete={(item) => remove.mutate({ transactionId: item.transactionId, yearMonth: item.yearMonth })}
-              onDiscard={(item) => void discard(item.transactionId)}
+              {...rowActions(t)}
             />
           ))}
         </div>
       ))}
 
-      <TransactionSheet
-        opened={editing !== null || duplicating !== null}
-        onClose={() => {
-          setEditing(null);
-          setDuplicating(null);
-        }}
-        yearMonth={yearMonth}
-        editing={editing}
-        template={duplicating}
-      />
-      <RecurringForm opened={repeating !== null} onClose={() => setRepeating(null)} draft={repeatDraft} />
+      {sheets}
     </Stack>
   );
 }

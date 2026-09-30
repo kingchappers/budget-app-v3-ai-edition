@@ -1,5 +1,5 @@
 import { useRef } from 'react';
-import { ActionIcon, Group, Menu, Text, ThemeIcon, Tooltip } from '@mantine/core';
+import { ActionIcon, Group, Menu, Text, ThemeIcon, Tooltip, UnstyledButton } from '@mantine/core';
 import { IconClock, IconCopy, IconDots, IconPencil, IconRepeat, IconTrash } from '@tabler/icons-react';
 import { formatPence } from '~/lib/money';
 import { CategoryIcon } from '~/components/categories/CategoryIcon';
@@ -28,17 +28,29 @@ export function TransactionRow({
   const actionsRef = useRef<HTMLButtonElement>(null);
   const opensSheetRef = useRef(false);
 
+  const summary = (
+    <Group gap="sm" wrap="nowrap" style={{ minWidth: 0 }}>
+      <ThemeIcon variant="light" color="primary" radius="xl" size={32}>
+        <CategoryIcon icon={categoryIcon} />
+      </ThemeIcon>
+      <div style={{ minWidth: 0 }}>
+        <Text truncate>{label}</Text>
+        <Text size="xs" c="dimmed">{categoryName} · {transaction.date}</Text>
+      </div>
+    </Group>
+  );
+
   return (
     <Group justify="space-between" wrap="nowrap" py={4}>
-      <Group gap="sm" wrap="nowrap" style={{ minWidth: 0 }}>
-        <ThemeIcon variant="light" color="primary" radius="xl" size={32}>
-          <CategoryIcon icon={categoryIcon} />
-        </ThemeIcon>
-        <div style={{ minWidth: 0 }}>
-          <Text truncate>{label}</Text>
-          <Text size="xs" c="dimmed">{categoryName} · {transaction.date}</Text>
-        </div>
-      </Group>
+      {onEdit && !pending ? (
+        <UnstyledButton
+          aria-label={`Edit ${label}`}
+          onClick={() => onEdit(transaction)}
+          style={{ flex: 1, minWidth: 0, borderRadius: 'var(--mantine-radius-sm)' }}
+        >
+          {summary}
+        </UnstyledButton>
+      ) : summary}
       <Group gap="xs" wrap="nowrap">
         {pending && (
           <Tooltip label={pendingError ?? 'Waiting to sync'} events={{ hover: true, focus: true, touch: true }}>
