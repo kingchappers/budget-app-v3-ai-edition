@@ -1,27 +1,35 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router';
-import { Alert, Button, Card, Group, Loader, Stack, Text, Title } from '@mantine/core';
+import { Alert, Button, Group, Loader, Stack, Text, Title } from '@mantine/core';
 import { DefaultLayout } from '~/components/layout/DefaultLayout';
 import { MonthHeader } from '~/components/budget/MonthHeader';
 import { CategoryProgressRow } from '~/components/budget/CategoryProgressRow';
+import { HomeSummary, OtherSpendingRow } from '~/components/budget/HomeSummary';
+import { TargetsOptionalCard } from '~/components/budget/TargetsOptionalCard';
 import { HomePots } from '~/components/pots/HomePots';
 import { DueRecurringCard } from '~/components/recurring/DueRecurringCard';
 import { TransactionRow } from '~/components/transactions/TransactionRow';
-import { useOfflineQueue } from '~/hooks/useOfflineQueue';
+import { useTransactionEditing } from '~/components/transactions/useTransactionEditing';
 import { groupItems, bucketKeyFor } from '~/lib/categoryGroups';
 import { buildMonthSummary } from '~/lib/summary';
 import type { CategoryProgress } from '~/lib/summary';
 import { formatPence } from '~/lib/money';
-import { currentYearMonth, shiftMonth } from '~/lib/months';
+import { currentYearMonth, monthPhrase, shiftMonth } from '~/lib/months';
 import { useCategories, usePots, useTargets, useTransactions } from '~/lib/queries';
 
-function GroupedProgress({ items }: { items: CategoryProgress[] }) {
+function categoryTransactionsUrl(yearMonth: string, categoryId: string): string {
+  return `/transactions?month=${yearMonth}&category=${encodeURIComponent(categoryId)}`;
+}
+
+function GroupedProgress({ items, yearMonth }: { items: CategoryProgress[]; yearMonth: string }) {
   return (
     <>
       {groupItems(items, p => bucketKeyFor({ group: p.group, type: 'EXPENSE' }), p => p.name).map(bucket => (
         <div key={bucket.key}>
           <Text size="xs" fw={600} c="dimmed" tt="uppercase" mb={4}>{bucket.label}</Text>
-          {bucket.items.map(p => <CategoryProgressRow key={p.categoryId} progress={p} />)}
+          {bucket.items.map(p => (
+            <CategoryProgressRow key={p.categoryId} progress={p} to={categoryTransactionsUrl(yearMonth, p.categoryId)} />
+          ))}
         </div>
       ))}
     </>
@@ -35,7 +43,7 @@ function HomeContent() {
   const transactions = useTransactions(yearMonth);
   const potsEnabled = yearMonth <= shiftMonth(currentYearMonth(), 1);
   const pots = usePots(yearMonth, potsEnabled);
-  const { pendingMap } = useOfflineQueue();
+  const { rowActions, sheets } = useTransactionEditing(yearMonth);
 
   const isLoading = categories.isLoading || targets.isLoading || transactions.isLoading;
   const error = categories.error || targets.error || transactions.error;
@@ -67,23 +75,21 @@ function HomeContent() {
   if (isLoading) return <Group justify="center" py="xl"><Loader /></Group>;
 
   const hasTargets = summary.spending.length > 0;
+  const phrase = monthPhrase(yearMonth);
 
   return (
     <Stack>
       <DueRecurringCard />
       <MonthHeader yearMonth={yearMonth} onChange={setYearMonth} />
+      <HomeSummary summary={summary} yearMonth={yearMonth} />
 
-      {!hasTargets && (
-        <Card withBorder>
-          <Text mb="sm">Set a target on a category to track your spending against it.</Text>
-          <Button component={Link} to="/targets">Set targets</Button>
-        </Card>
-      )}
+      {!hasTargets && <TargetsOptionalCard />}
 
-      {summary.spending.length > 0 && (
+      {hasTargets && (
         <div>
           <Title order={5} mb="xs">Spending vs target</Title>
-          <GroupedProgress items={summary.spending} />
+          <GroupedProgress items={summary.spending} yearMonth={yearMonth} />
+          {summary.spentUnbudgeted > 0 && <OtherSpendingRow amount={summary.spentUnbudgeted} yearMonth={yearMonth} />}
         </div>
       )}
 
@@ -94,30 +100,31 @@ function HomeContent() {
       ))}
 
       <Group justify="space-between">
-        <Text c="dimmed">Income this month</Text>
+        <Text c="dimmed">Income {phrase}</Text>
         <Text fw={600}>{formatPence(summary.incomeTotal)}</Text>
       </Group>
 
       <div>
         <Title order={5} mb="xs">Recent</Title>
         {summary.recent.length === 0
-          ? <Text c="dimmed" size="sm">Nothing logged yet this month.</Text>
+          ? <Text c="dimmed" size="sm">Nothing logged {phrase}.</Text>
           : summary.recent.map(t => (
               <TransactionRow
                 key={t.transactionId}
                 transaction={t}
                 categoryName={nameFor(t.categoryId)}
                 categoryIcon={iconFor(t.categoryId)}
-                pending={pendingMap[t.transactionId]?.queued === true}
-                pendingError={pendingMap[t.transactionId]?.lastError}
+                {...rowActions(t)}
               />
             ))}
-        <Button component={Link} to="/transactions" variant="subtle" mt="xs">See all</Button>
+        <Button component={Link} to={`/transactions?month=${yearMonth}`} variant="subtle" mt="xs">See all</Button>
       </div>
 
       <Button component={Link} to="/recurring" variant="subtle" style={{ alignSelf: 'flex-start' }}>
         Manage recurring
       </Button>
+
+      {sheets}
     </Stack>
   );
 }
