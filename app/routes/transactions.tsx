@@ -9,10 +9,13 @@ import { useTransactionEditing } from '~/components/transactions/useTransactionE
 import { filterTransactions, parseTransactionsParams, UNTARGETED_FILTER, type TransactionFilter } from '~/lib/transactions';
 import { categorySelectData } from '~/lib/categoryGroups';
 import { formatPence } from '~/lib/money';
-import { currentYearMonth, monthPhrase } from '~/lib/months';
+import { currentYearMonth, formatMonthLabel, monthPhrase } from '~/lib/months';
+import { useDocumentTitle } from '~/hooks/useDocumentTitle';
 import { targetedExpenseCategoryIds } from '~/lib/summary';
 import { useCategories, useTargets, useTransactions } from '~/lib/queries';
 import type { Transaction, TransactionType } from '~/lib/types';
+import { pageTitle } from '~/lib/pageTitle';
+import type { Route } from './+types/transactions';
 
 const TYPE_OPTIONS: { value: TransactionType; label: string }[] = [
   { value: 'EXPENSE', label: 'Expense' },
@@ -32,6 +35,7 @@ function TransactionsContent() {
   const [searchParams] = useSearchParams();
   const [initial] = useState(() => parseTransactionsParams(searchParams));
   const [yearMonth, setYearMonth] = useState(initial.yearMonth ?? currentYearMonth());
+  useDocumentTitle(pageTitle('Transactions', formatMonthLabel(yearMonth)));
   const [filter, setFilter] = useState<TransactionFilter>({ query: '', categoryId: initial.categoryId, type: null });
   const categories = useCategories();
   const targets = useTargets();
@@ -135,6 +139,8 @@ function TransactionsContent() {
     </Stack>
   );
 }
+
+export const meta: Route.MetaFunction = () => [{ title: pageTitle('Transactions') }];
 
 export default function Transactions() {
   return (

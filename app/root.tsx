@@ -14,6 +14,7 @@ import {
 
 import type { Route } from "./+types/root";
 import "./app.css";
+import { pageTitle } from "./lib/pageTitle";
 
 import { ColorSchemeScript, MantineProvider, mantineHtmlProps, createTheme, useMantineTheme, type CSSVariablesResolver } from '@mantine/core';
 import { DatesProvider } from '@mantine/dates';
@@ -87,6 +88,8 @@ function ResponsiveNotifications() {
   const isDesktop = useMediaQuery(`(min-width: ${theme.breakpoints.sm})`);
   return <Notifications position={isDesktop ? 'bottom-left' : 'bottom-center'} />;
 }
+
+export const meta: Route.MetaFunction = () => [{ title: pageTitle() }];
 
 export const links: Route.LinksFunction = () => [
   { rel: "preconnect", href: "https://fonts.googleapis.com" },

@@ -3,6 +3,8 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MantineProvider } from '@mantine/core';
 import { MemoryRouter } from 'react-router';
+import userEvent from '@testing-library/user-event';
+import { currentYearMonth, formatMonthLabel, shiftMonth } from '~/lib/months';
 
 vi.mock('~/components/layout/DefaultLayout', () => ({
   DefaultLayout: ({ children }: { children: React.ReactNode }) => <>{children}</>,
@@ -277,5 +279,16 @@ describe('Home without targets', () => {
     expect(screen.getByText(/Targets are optional/)).toBeInTheDocument();
     getItem.mockRestore();
     error.mockRestore();
+  });
+});
+
+describe('Home page title', () => {
+  it('names the month shown and follows month changes', async () => {
+    renderHome();
+    expect(document.title).toBe(`Home – ${formatMonthLabel(currentYearMonth())} – Budget`);
+
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Previous month' }));
+
+    expect(document.title).toBe(`Home – ${formatMonthLabel(shiftMonth(currentYearMonth(), -1))} – Budget`);
   });
 });

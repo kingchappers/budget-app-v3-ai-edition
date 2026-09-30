@@ -2,12 +2,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MantineProvider } from '@mantine/core';
+import { MemoryRouter } from 'react-router';
 
 const mockUseAuth0 = vi.hoisted(() => vi.fn());
 vi.mock('@auth0/auth0-react', () => ({ useAuth0: mockUseAuth0 }));
 
 import { Profile } from '../Profile';
-import { OPEN_ON_LAUNCH_KEY } from '~/lib/launchIntent';
 
 function mockAuthedUser(overrides: Partial<{ name: string; email: string; picture: string }> = {}) {
   mockUseAuth0.mockReturnValue({
@@ -18,15 +18,16 @@ function mockAuthedUser(overrides: Partial<{ name: string; email: string; pictur
   });
 }
 
-async function openMenu() {
+async function openMenu(): Promise<void> {
   const user = userEvent.setup();
   render(
     <MantineProvider env="test">
-      <Profile />
+      <MemoryRouter>
+        <Profile />
+      </MemoryRouter>
     </MantineProvider>,
   );
   await user.click(screen.getByText('Sam Tester'));
-  return user;
 }
 
 beforeEach(() => {
@@ -34,35 +35,18 @@ beforeEach(() => {
   mockAuthedUser();
 });
 
-describe('Profile launch toggle', () => {
-  it('offers an off-by-default switch with a hint', async () => {
+describe('Profile menu', () => {
+  it('links to the Settings page', async () => {
     await openMenu();
-
-    const toggle = await screen.findByRole('switch', { name: /open add sheet on launch/i });
-    expect(toggle).not.toBeChecked();
-    expect(screen.getByText('Installed app only')).toBeInTheDocument();
+    expect(await screen.findByRole('menuitem', { name: 'Settings' })).toHaveAttribute('href', '/settings');
   });
 
-  it('turns on, persists, and keeps the menu open', async () => {
-    const user = await openMenu();
-
-    await user.click(await screen.findByRole('switch', { name: /open add sheet on launch/i }));
-
-    expect(screen.getByRole('switch', { name: /open add sheet on launch/i })).toBeChecked();
-    expect(window.localStorage.getItem(OPEN_ON_LAUNCH_KEY)).toBe('1');
-  });
-
-  it('starts on when it was saved on, and turns off again', async () => {
-    window.localStorage.setItem(OPEN_ON_LAUNCH_KEY, '1');
-    const user = await openMenu();
-
-    const toggle = await screen.findByRole('switch', { name: /open add sheet on launch/i });
-    expect(toggle).toBeChecked();
-
-    await user.click(toggle);
-
-    expect(screen.getByRole('switch', { name: /open add sheet on launch/i })).not.toBeChecked();
-    expect(window.localStorage.getItem(OPEN_ON_LAUNCH_KEY)).toBeNull();
+  it('no longer holds settings or an unclear label itself', async () => {
+    await openMenu();
+    await screen.findByRole('menuitem', { name: 'Settings' });
+    expect(screen.queryByRole('switch')).not.toBeInTheDocument();
+    expect(screen.queryByText('Application')).not.toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Profile' })).not.toBeInTheDocument();
   });
 });
 

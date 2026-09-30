@@ -11,7 +11,7 @@ const LoginButton = () => {
       leftSection={<IconUser size={16} />}
       variant="transparent"
     >
-      Log In
+      Sign in
     </Button>
   );
 };

@@ -1,8 +1,7 @@
 import { useAuth0 } from "@auth0/auth0-react";
-import { Box, Avatar, Menu, Switch, UnstyledButton } from '@mantine/core';
-import { IconLogout, IconUser } from '@tabler/icons-react';
-import { useState } from 'react';
-import { readOpenOnLaunch, safeStorage, writeOpenOnLaunch } from '~/lib/launchIntent';
+import { Box, Avatar, Menu, UnstyledButton } from '@mantine/core';
+import { IconLogout, IconSettings, IconUser } from '@tabler/icons-react';
+import { Link } from 'react-router';
 
 function initialsFor(name?: string, email?: string): string {
   const source = name?.trim() || email?.trim() || '';
@@ -14,7 +13,6 @@ function initialsFor(name?: string, email?: string): string {
 
 export const Profile = () => {
   const { user, isAuthenticated, isLoading, logout } = useAuth0();
-  const [openOnLaunch, setOpenOnLaunch] = useState<boolean>(() => readOpenOnLaunch(safeStorage('local')));
 
   if (isLoading) {
     return <div className="loading-text">Loading profile...</div>;
@@ -68,23 +66,9 @@ export const Profile = () => {
 
           <Menu.Dropdown>
             <Menu.Label hiddenFrom="sm">{user.email}</Menu.Label>
-            <Menu.Label>Application</Menu.Label>
-            <Menu.Item leftSection={<IconUser size={14} />}>
-              Profile
+            <Menu.Item component={Link} to="/settings" leftSection={<IconSettings size={14} />}>
+              Settings
             </Menu.Item>
-            <Menu.Divider />
-            <Box px="sm" py={6}>
-              <Switch
-                label="Open Add sheet on launch"
-                description="Installed app only"
-                checked={openOnLaunch}
-                onChange={event => {
-                  const checked = event.currentTarget.checked;
-                  setOpenOnLaunch(checked);
-                  writeOpenOnLaunch(safeStorage('local'), checked);
-                }}
-              />
-            </Box>
             <Menu.Divider />
             <Menu.Item onClick={() => logout({ logoutParams: { returnTo: window.location.origin } })} component="button" leftSection={<IconLogout size={14} />}>
               Logout
