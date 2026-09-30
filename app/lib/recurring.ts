@@ -154,6 +154,14 @@ export function groupDueItems(items: DueItem[], today: string): GroupedDueItems 
   return { current, older };
 }
 
+export function skippedPeriod(recurring: Recurring, transactions: Transaction[], today: string): string | null {
+  const period = recurring.handledPeriod;
+  const thisMonth = today.slice(0, 7);
+  if (period === null || period < thisMonth || period > shiftMonth(thisMonth, 1)) return null;
+  const logged = transactions.some(t => inPeriod(t, period) && t.recurringId === recurring.recurringId);
+  return logged ? null : period;
+}
+
 export function olderGroupHeading(period: string): string {
   return `From ${formatMonthName(period)}, not logged`;
 }

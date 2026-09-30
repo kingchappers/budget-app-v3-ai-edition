@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   computeDueItems, dueDateFor, dueLabel, formatDayOfMonth, groupDueItems, isHandled, likelyMatches,
-  olderGroupHeading, validateRecurringForm,
+  olderGroupHeading, skippedPeriod, validateRecurringForm,
 } from '../recurring';
 import type { Category, Recurring, Transaction } from '../types';
 
@@ -247,6 +247,28 @@ describe('groupDueItems', () => {
 describe('olderGroupHeading', () => {
   it('names the month in plain words', () => {
     expect(olderGroupHeading('2026-09')).toBe('From September, not logged');
+  });
+});
+
+describe('skippedPeriod', () => {
+  it('reports a marker for this month or next that no linked transaction explains', () => {
+    expect(skippedPeriod(rec({ handledPeriod: '2026-09' }), [], '2026-09-15')).toBe('2026-09');
+    expect(skippedPeriod(rec({ handledPeriod: '2026-10' }), [], '2026-09-30')).toBe('2026-10');
+  });
+
+  it('is nothing once that month has ended, or with no marker', () => {
+    expect(skippedPeriod(rec({ handledPeriod: '2026-08' }), [], '2026-09-01')).toBeNull();
+    expect(skippedPeriod(rec({ handledPeriod: null }), [], '2026-09-01')).toBeNull();
+  });
+
+  it('is nothing when the bill was logged from the Due list that month', () => {
+    const linked = txn({ recurringId: 'r1', date: '2026-09-28' });
+    expect(skippedPeriod(rec({ handledPeriod: '2026-09' }), [linked], '2026-09-30')).toBeNull();
+  });
+
+  it('still counts as skipped when only another bill or another month is linked', () => {
+    const others = [txn({ recurringId: 'r2' }), txn({ recurringId: 'r1', date: '2026-08-28' })];
+    expect(skippedPeriod(rec({ handledPeriod: '2026-09' }), others, '2026-09-30')).toBe('2026-09');
   });
 });
 

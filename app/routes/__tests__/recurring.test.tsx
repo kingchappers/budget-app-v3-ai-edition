@@ -1,11 +1,13 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MantineProvider } from '@mantine/core';
-import type { Category, Recurring } from '~/lib/types';
+import type { Category, Recurring, Transaction } from '~/lib/types';
 
 const mockDelete = vi.fn();
 const mockRefetch = vi.fn();
+const mockHandled = vi.fn();
+let mockMonthTransactions: Record<string, { data?: Transaction[]; isLoading: boolean }>;
 let mockQuery: { data?: Recurring[]; isLoading: boolean; error: Error | null };
 let mockCategories: Category[] | undefined;
 let mockDeleteError: Error | null;
@@ -33,6 +35,8 @@ vi.mock('~/lib/queries', () => ({
   useRecurring: () => ({ ...mockQuery, refetch: mockRefetch }),
   useCategories: () => ({ data: mockCategories }),
   useDeleteRecurring: () => ({ mutate: mockDelete, error: mockDeleteError }),
+  useSetRecurringHandled: () => ({ mutate: mockHandled }),
+  useTransactions: (month: string) => mockMonthTransactions[month] ?? { data: [], isLoading: false },
 }));
 
 import RecurringPage from '../recurring';
@@ -52,6 +56,56 @@ describe('Recurring page', () => {
     mockQuery = { data: [], isLoading: false, error: null };
     mockCategories = categories;
     mockDeleteError = null;
+    mockHandled.mockReset();
+    mockMonthTransactions = {};
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 9, 12, 12));
+  });
+
+  afterEach(() => { vi.useRealTimers(); });
+
+  describe('a skipped bill', () => {
+    it('shows that it was skipped this month, with Undo that restores the month before', async () => {
+      mockQuery.data = [rec({ handledPeriod: '2026-10' })];
+      renderPage();
+
+      expect(screen.getByText('Skipped for October')).toBeInTheDocument();
+      await userEvent.setup().click(screen.getByRole('button', { name: 'Undo skip for Salary' }));
+
+      expect(mockHandled).toHaveBeenCalledWith({ recurringId: 'r1', period: '2026-09' });
+    });
+
+    it('shows a skip made early for next month', () => {
+      mockQuery.data = [rec({ handledPeriod: '2026-11' })];
+      renderPage();
+      expect(screen.getByText('Skipped for November')).toBeInTheDocument();
+    });
+
+    it('says nothing once the skipped month has ended', () => {
+      mockQuery.data = [rec({ handledPeriod: '2026-09' })];
+      renderPage();
+      expect(screen.queryByText(/Skipped for/)).not.toBeInTheDocument();
+    });
+
+    it('says nothing when the bill was logged from the Due list that month', () => {
+      mockQuery.data = [rec({ handledPeriod: '2026-10' })];
+      mockMonthTransactions['2026-10'] = {
+        data: [{
+          transactionId: 't1', yearMonth: '2026-10', amount: 240000, type: 'INCOME', categoryId: 'cat-salary',
+          description: 'Salary', date: '2026-10-28', createdAt: '', recurringId: 'r1',
+        }],
+        isLoading: false,
+      };
+      renderPage();
+      expect(screen.queryByText(/Skipped for/)).not.toBeInTheDocument();
+    });
+
+    it('waits for the month\'s transactions before saying it was skipped', () => {
+      mockQuery.data = [rec({ handledPeriod: '2026-10' })];
+      mockMonthTransactions['2026-10'] = { data: undefined, isLoading: true };
+      renderPage();
+      expect(screen.queryByText(/Skipped for/)).not.toBeInTheDocument();
+    });
   });
 
   it('lists templates by day of month with their schedule and signed amount', () => {

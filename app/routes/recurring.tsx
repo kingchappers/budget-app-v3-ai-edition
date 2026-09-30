@@ -4,10 +4,11 @@ import { IconDots, IconPencil, IconPlus, IconTrash } from '@tabler/icons-react';
 import { DefaultLayout } from '~/components/layout/DefaultLayout';
 import { RecurringForm } from '~/components/recurring/RecurringForm';
 import { CategoryIcon } from '~/components/categories/CategoryIcon';
-import { useCategories, useDeleteRecurring, useRecurring } from '~/lib/queries';
-import { formatDayOfMonth } from '~/lib/recurring';
+import { formatMonthName, shiftMonth, todayIso } from '~/lib/months';
+import { useCategories, useDeleteRecurring, useRecurring, useSetRecurringHandled, useTransactions } from '~/lib/queries';
+import { formatDayOfMonth, skippedPeriod } from '~/lib/recurring';
 import { formatSignedPence } from '~/lib/transactionTypes';
-import type { Category, Recurring } from '~/lib/types';
+import type { Category, Recurring, Transaction } from '~/lib/types';
 
 function scheduleText(item: Recurring): string {
   const day = `Monthly on the ${formatDayOfMonth(item.dayOfMonth)}`;
@@ -28,11 +29,13 @@ interface RecurringRowProps {
   item: Recurring;
   category: Category | undefined;
   categoriesLoaded: boolean;
+  skipped: string | null;
   onEdit: (item: Recurring) => void;
   onDelete: (item: Recurring) => void;
+  onUndoSkip: (item: Recurring, skipped: string) => void;
 }
 
-function RecurringRow({ item, category, categoriesLoaded, onEdit, onDelete }: RecurringRowProps) {
+function RecurringRow({ item, category, categoriesLoaded, skipped, onEdit, onDelete, onUndoSkip }: RecurringRowProps) {
   const label = recurringLabel(item, category);
 
   return (
@@ -45,6 +48,19 @@ function RecurringRow({ item, category, categoriesLoaded, onEdit, onDelete }: Re
           <Text truncate>{label}</Text>
           <Text size="xs" c="dimmed" truncate>{scheduleText(item)}</Text>
           {categoriesLoaded && !category && <Text size="xs" c="danger">Category deleted</Text>}
+          {skipped && (
+            <Group gap={4} wrap="nowrap">
+              <Text size="xs" c="dimmed">{`Skipped for ${formatMonthName(skipped)}`}</Text>
+              <Button
+                variant="subtle"
+                size="compact-xs"
+                aria-label={`Undo skip for ${label}`}
+                onClick={() => onUndoSkip(item, skipped)}
+              >
+                Undo
+              </Button>
+            </Group>
+          )}
         </div>
       </Group>
       <Group gap="xs" wrap="nowrap" style={{ flexShrink: 0 }}>
@@ -63,10 +79,21 @@ function RecurringRow({ item, category, categoriesLoaded, onEdit, onDelete }: Re
   );
 }
 
+function useSkipWindowTransactions(today: string): Transaction[] | null {
+  const thisMonth = today.slice(0, 7);
+  const current = useTransactions(thisMonth);
+  const next = useTransactions(shiftMonth(thisMonth, 1));
+  if (current.data === undefined || next.data === undefined) return null;
+  return [...current.data, ...next.data];
+}
+
 function RecurringContent() {
   const recurring = useRecurring();
   const categories = useCategories();
   const remove = useDeleteRecurring();
+  const setHandled = useSetRecurringHandled();
+  const today = todayIso();
+  const windowTransactions = useSkipWindowTransactions(today);
   const [editing, setEditing] = useState<Recurring | null>(null);
   const [creating, setCreating] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<Recurring | null>(null);
@@ -75,6 +102,10 @@ function RecurringContent() {
   function requestDelete(item: Recurring): void {
     setPendingDelete(item);
     setDeletingLabel(recurringLabel(item, categories.data?.find(c => c.categoryId === item.categoryId)));
+  }
+
+  function undoSkip(item: Recurring, skipped: string): void {
+    setHandled.mutate({ recurringId: item.recurringId, period: shiftMonth(skipped, -1) });
   }
 
   function confirmDelete(): void {
@@ -116,8 +147,10 @@ function RecurringContent() {
           item={item}
           category={categories.data?.find(c => c.categoryId === item.categoryId)}
           categoriesLoaded={categories.data !== undefined}
+          skipped={windowTransactions === null ? null : skippedPeriod(item, windowTransactions, today)}
           onEdit={setEditing}
           onDelete={requestDelete}
+          onUndoSkip={undoSkip}
         />
       ))}
 
