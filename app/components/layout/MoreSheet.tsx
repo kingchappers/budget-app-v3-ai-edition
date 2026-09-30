@@ -1,6 +1,6 @@
 import { Stack } from '@mantine/core';
 import { NavLink } from 'react-router';
-import { IconRepeat, IconTag, IconChartBar, IconWallet } from '@tabler/icons-react';
+import { IconRepeat, IconTag, IconChartBar, IconWallet, IconTrash } from '@tabler/icons-react';
 import { ResponsiveSheet } from './ResponsiveSheet';
 
 export const MORE_ITEMS = [
@@ -8,6 +8,7 @@ export const MORE_ITEMS = [
   { to: '/recurring', label: 'Recurring', Icon: IconRepeat },
   { to: '/insights', label: 'Insights', Icon: IconChartBar },
   { to: '/accounts', label: 'Accounts', Icon: IconWallet },
+  { to: '/deleted', label: 'Recently deleted', Icon: IconTrash },
 ];
 
 export function MoreSheet({ opened, onClose }: { opened: boolean; onClose: () => void }) {

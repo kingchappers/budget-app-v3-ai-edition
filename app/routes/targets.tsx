@@ -1,9 +1,12 @@
-import { useState } from 'react';
-import { Alert, Button, Card, Group, Loader, SegmentedControl, Stack, Text, TextInput, Title } from '@mantine/core';
+import { useEffect, useState } from 'react';
+import { ActionIcon, Alert, Button, Card, Group, Loader, Menu, SegmentedControl, Stack, Text, TextInput, Title } from '@mantine/core';
+import { IconDots, IconTrash } from '@tabler/icons-react';
 import { DefaultLayout } from '~/components/layout/DefaultLayout';
+import { useUndoableDelete } from '~/hooks/useUndoableDelete';
 import { categoryLabel } from '~/lib/categoryIcons';
 import { groupCategories } from '~/lib/categoryGroups';
 import { formatPencePlain, parsePounds } from '~/lib/money';
+import { targetLabel } from '~/lib/trash';
 import { useCategories, useDeleteTarget, useSetTarget, useTargets } from '~/lib/queries';
 import type { Category, TargetPeriod } from '~/lib/types';
 import { pageTitle } from '~/lib/pageTitle';
@@ -18,7 +21,24 @@ function TargetRow({ category, amountPence, period }: {
   const [selectedPeriod, setSelectedPeriod] = useState<TargetPeriod>(period);
   const [error, setError] = useState<string | null>(null);
   const setTarget = useSetTarget();
-  const clearTarget = useDeleteTarget();
+  const removeTarget = useDeleteTarget();
+  const undoableDelete = useUndoableDelete();
+
+  // The saved target changes on save, remove, undo and a failed remove;
+  // the inputs follow it so an Undo puts the amount back in the box.
+  useEffect(() => {
+    setValue(amountPence !== null ? formatPencePlain(amountPence) : '');
+    setSelectedPeriod(period);
+  }, [amountPence, period]);
+
+  function remove(targetAmount: number): void {
+    undoableDelete({
+      label: targetLabel(targetAmount, category.name),
+      name: `the ${category.name} target`,
+      ref: { entityType: 'TARGET', id: category.categoryId },
+      run: () => removeTarget.mutateAsync(category.categoryId),
+    });
+  }
 
   function save() {
     const parsed = parsePounds(value);
@@ -32,10 +52,14 @@ function TargetRow({ category, amountPence, period }: {
       <Group justify="space-between" mb="xs">
         <Text fw={500}>{categoryLabel(category)}</Text>
         {amountPence !== null && (
-          <Button size="compact-xs" variant="subtle" color="danger"
-            onClick={() => { setValue(''); clearTarget.mutate(category.categoryId); }}>
-            Clear
-          </Button>
+          <Menu position="bottom-end">
+            <Menu.Target>
+              <ActionIcon variant="subtle" aria-label={`Actions for ${category.name} target`}><IconDots size={16} /></ActionIcon>
+            </Menu.Target>
+            <Menu.Dropdown>
+              <Menu.Item leftSection={<IconTrash size={14} />} onClick={() => remove(amountPence)}>Remove target</Menu.Item>
+            </Menu.Dropdown>
+          </Menu>
         )}
       </Group>
       <Group align="flex-end">

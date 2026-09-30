@@ -40,4 +40,11 @@ describe('MoreSheet', () => {
     renderSheet();
     expect(screen.getByRole('link', { name: 'Accounts' })).toHaveAttribute('href', '/accounts');
   });
+
+  it('lists Recently deleted last', () => {
+    renderSheet();
+    const links = screen.getAllByRole('link');
+    expect(links[links.length - 1]).toHaveAccessibleName('Recently deleted');
+    expect(links[links.length - 1]).toHaveAttribute('href', '/deleted');
+  });
 });

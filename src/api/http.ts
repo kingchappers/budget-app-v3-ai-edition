@@ -1,3 +1,4 @@
+import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { SECURITY_HEADERS } from './constants';
 import type { ApiResponse } from './types';
 
@@ -7,4 +8,14 @@ export function ok(body: object): ApiResponse {
 
 export function err(status: number, message: string): ApiResponse {
   return { statusCode: status, headers: SECURITY_HEADERS, body: JSON.stringify({ error: message }) };
+}
+
+export function parseJsonObject(event: APIGatewayProxyEventV2): Record<string, unknown> | null {
+  try {
+    const parsed: unknown = JSON.parse(event.body || '{}');
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return null;
+    return parsed as Record<string, unknown>;
+  } catch {
+    return null;
+  }
 }

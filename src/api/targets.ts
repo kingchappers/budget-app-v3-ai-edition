@@ -1,9 +1,10 @@
-import { QueryCommand, PutCommand, DeleteCommand } from '@aws-sdk/lib-dynamodb';
+import { QueryCommand, PutCommand } from '@aws-sdk/lib-dynamodb';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { docClient, TABLE, pk, targetSk } from './db';
 import { MAX_AMOUNT_PENCE, SECURITY_HEADERS, VALID_PERIODS } from './constants';
 import type { CategoryTarget, ApiResponse } from './types';
 import { ok, err } from './http';
+import { moveToTrash } from './trash';
 
 export async function getTargets(
   _event: APIGatewayProxyEventV2,
@@ -72,10 +73,7 @@ export async function deleteTarget(
     return err(400, 'categoryId is required');
   }
 
-  await docClient.send(new DeleteCommand({
-    TableName: TABLE,
-    Key: { PK: pk(userId), SK: targetSk(categoryId) },
-  }));
+  await moveToTrash(userId, 'TARGET', targetSk(categoryId));
 
   return { statusCode: 204, headers: SECURITY_HEADERS, body: '' };
 }
