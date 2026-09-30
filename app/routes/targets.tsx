@@ -9,6 +9,8 @@ import { formatPencePlain, parsePounds } from '~/lib/money';
 import { targetLabel } from '~/lib/trash';
 import { useCategories, useDeleteTarget, useSetTarget, useTargets } from '~/lib/queries';
 import type { Category, TargetPeriod } from '~/lib/types';
+import { pageTitle } from '~/lib/pageTitle';
+import type { Route } from './+types/targets';
 
 function TargetRow({ category, amountPence, period }: {
   category: Category;
@@ -113,6 +115,8 @@ function TargetsContent() {
     </Stack>
   );
 }
+
+export const meta: Route.MetaFunction = () => [{ title: pageTitle('Targets') }];
 
 export default function Targets() {
   return (

@@ -11,6 +11,8 @@ import { formatPence } from '~/lib/money';
 import { accountDeleteSummary } from '~/lib/trash';
 import { useAccounts, useCreateAccount, useDeleteAccount } from '~/lib/queries';
 import type { Account, AccountKind, AccountType } from '~/lib/types';
+import { pageTitle } from '~/lib/pageTitle';
+import type { Route } from './+types/accounts';
 
 function AccountsContent() {
   const accounts = useAccounts();
@@ -163,6 +165,8 @@ function AccountsContent() {
     </Stack>
   );
 }
+
+export const meta: Route.MetaFunction = () => [{ title: pageTitle('Accounts') }];
 
 export default function Accounts() {
   return (

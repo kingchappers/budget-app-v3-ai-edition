@@ -1,6 +1,7 @@
 import { useAuth0 } from '@auth0/auth0-react';
 import { useCallback } from 'react';
 import { ApiError } from '~/lib/apiError';
+import { isSessionEndedError, markSessionEnded } from '~/lib/session';
 
 export function useProtectedApi() {
   const { getAccessTokenSilently } = useAuth0();
@@ -28,6 +29,7 @@ export function useProtectedApi() {
         return text ? JSON.parse(text) : null;
       } catch (error) {
         console.error('Protected API request failed:', error);
+        if (isSessionEndedError(error)) markSessionEnded();
         throw error;
       }
     },

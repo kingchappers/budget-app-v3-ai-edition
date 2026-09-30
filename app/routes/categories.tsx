@@ -8,6 +8,8 @@ import { useCategories, useCreateCategory, useDeleteCategory, useReassignCategor
 import { defaultGroupFor, groupCategories, groupsForType } from '~/lib/categoryGroups';
 import { categoryLabel } from '~/lib/categoryIcons';
 import type { Category, CategoryGroup, CategoryType } from '~/lib/types';
+import { pageTitle } from '~/lib/pageTitle';
+import type { Route } from './+types/categories';
 
 const TYPES: { value: CategoryType; label: string }[] = [
   { value: 'EXPENSE', label: 'Spending' },
@@ -165,6 +167,8 @@ function CategoriesContent() {
     </Stack>
   );
 }
+
+export const meta: Route.MetaFunction = () => [{ title: pageTitle('Categories') }];
 
 export default function Categories() {
   return (
