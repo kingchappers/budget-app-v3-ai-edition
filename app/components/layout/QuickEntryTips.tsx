@@ -13,7 +13,8 @@ export function QuickEntryTips() {
       <Modal opened={opened} onClose={() => setOpened(false)} title="Quick entry tips" centered>
         <Stack gap="sm">
           <Text size="sm">
-            <Kbd>N</Kbd> (keyboard) or the + button opens Add transaction.
+            <Kbd>N</Kbd> (keyboard) or the + button opens Add transaction. You can turn the N shortcut off
+            in Settings.
           </Text>
           <Text size="sm">
             <strong>Quick add:</strong> type coffee 3.50 (or 3.50 coffee) and press Enter to fill the form.
@@ -36,8 +37,8 @@ export function QuickEntryTips() {
           </Text>
           <Text size="sm">
             <strong>Install:</strong> add the app to your home screen for a full-screen version. On Android,
-            long-press the icon for an Add transaction shortcut. Turn on Open Add sheet on launch in your
-            avatar menu to start every launch on the Add sheet.
+            long-press the icon for an Add transaction shortcut. To start every launch on the Add sheet,
+            turn on Open Add sheet when the installed app starts in Settings, from your avatar menu.
           </Text>
         </Stack>
       </Modal>
