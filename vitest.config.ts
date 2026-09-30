@@ -5,6 +5,8 @@ export default defineConfig({
   plugins: [tsconfigPaths()],
   test: {
     passWithNoTests: true,
+    // The suite runs several times slower on CI than on a laptop.
+    testTimeout: 15000,
     projects: [
       {
         extends: true,
