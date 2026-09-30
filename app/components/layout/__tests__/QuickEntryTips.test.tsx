@@ -70,6 +70,6 @@ describe('QuickEntryTips', () => {
 
     expect(within(dialog).getByText('Install:')).toBeInTheDocument();
     expect(within(dialog).getByText(/home screen/i)).toBeInTheDocument();
-    expect(within(dialog).getByText(/Open Add sheet on launch/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/Open Add sheet when the installed app starts in Settings/)).toBeInTheDocument();
   });
 });
