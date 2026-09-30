@@ -97,3 +97,16 @@ export interface Account {
   balances: BalanceEntry[];
   createdAt: string;
 }
+
+// One device that has asked for bill reminders, and when it wants them.
+export interface PushSubscriptionRecord {
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+  // Hours are 0 to 23 in the device's own time zone.
+  hour: number;
+  quietStart: number | null;
+  quietEnd: number | null;
+  timeZone: string;
+}
+
