@@ -13,7 +13,8 @@ vi.mock('@aws-sdk/lib-dynamodb', () => ({
   QueryCommand: vi.fn(function(i: unknown) { return i; }),
   PutCommand: vi.fn(function(i: unknown) { return i; }),
   UpdateCommand: vi.fn(function(i: unknown) { return i; }),
-  DeleteCommand: vi.fn(function(i: unknown) { return i; }),
+  GetCommand: vi.fn(function(i: unknown) { return i; }),
+  TransactWriteCommand: vi.fn(function(i: unknown) { return i; }),
 }));
 
 import { createRecurring, deleteRecurring, getRecurring, setRecurringHandled, updateRecurring, validateRecurringInput } from '../recurring';
@@ -227,11 +228,15 @@ describe('updateRecurring', () => {
 describe('deleteRecurring', () => {
   beforeEach(() => { mockSend.mockReset(); });
 
-  it('deletes under the caller\'s key and returns 204', async () => {
+  it('moves the item under the caller\'s key to the trash and returns 204', async () => {
+    mockSend.mockResolvedValueOnce({ Item: { PK: 'USER#user-1', SK: 'RECUR#r1', recurringId: 'r1' } });
     mockSend.mockResolvedValueOnce({});
     const res = await deleteRecurring(makeEvent(), 'user-1', { recurringId: 'r1' });
     expect(res.statusCode).toBe(204);
     expect(mockSend.mock.calls[0][0].Key).toEqual({ PK: 'USER#user-1', SK: 'RECUR#r1' });
+    const { TransactItems } = mockSend.mock.calls[1][0];
+    expect(TransactItems[0].Delete.Key).toEqual({ PK: 'USER#user-1', SK: 'RECUR#r1' });
+    expect(TransactItems[1].Put.Item).toMatchObject({ PK: 'USER#user-1', SK: 'TRASH#RECURRING#r1', entityType: 'RECURRING' });
   });
 
   it('is idempotent and scoped to the caller', async () => {

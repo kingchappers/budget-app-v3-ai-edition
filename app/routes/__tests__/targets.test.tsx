@@ -2,7 +2,7 @@ import { beforeEach, describe, it, expect, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MantineProvider } from '@mantine/core';
-import type { Category } from '~/lib/types';
+import type { Category, CategoryTarget } from '~/lib/types';
 
 vi.mock('~/components/layout/DefaultLayout', () => ({
   DefaultLayout: ({ children }: { children: React.ReactNode }) => <>{children}</>,
@@ -16,24 +16,29 @@ const categories: Category[] = [
 ];
 
 const state = vi.hoisted(() => ({
-  targets: [] as unknown[],
+  targets: [] as CategoryTarget[],
   setTarget: vi.fn(),
+  removeTarget: vi.fn(),
+  undoableDelete: vi.fn(),
 }));
 
 vi.mock('~/lib/queries', () => ({
   useCategories: () => ({ data: categories, isLoading: false, error: null, refetch: vi.fn() }),
   useTargets: () => ({ data: state.targets, isLoading: false, error: null, refetch: vi.fn() }),
   useSetTarget: () => ({ mutate: state.setTarget, isPending: false }),
-  useDeleteTarget: () => ({ mutate: vi.fn() }),
+  useDeleteTarget: () => ({ mutateAsync: state.removeTarget }),
 }));
+vi.mock('~/hooks/useUndoableDelete', () => ({ useUndoableDelete: () => state.undoableDelete }));
 
 import Targets from '../targets';
 
 type MutateOptions = { onSuccess?: () => void; onError?: (error: Error) => void };
 
 beforeEach(() => {
-  state.targets = [{ categoryId: 'g', targetAmount: 30000, period: 'MONTHLY' }];
+  state.targets = [{ categoryId: 'g', targetAmount: 30000, period: 'MONTHLY', updatedAt: '' }];
   state.setTarget.mockReset();
+  state.removeTarget.mockReset();
+  state.undoableDelete.mockReset();
 });
 
 function groceriesRow(): HTMLElement {
@@ -102,5 +107,50 @@ describe('Targets page', () => {
       { categoryId: 'g', targetAmount: 35000, period: 'MONTHLY' },
       expect.anything(),
     );
+  });
+});
+
+describe('Removing a target', () => {
+  it('offers Remove target in a menu only when a target is set, not as a bare button', async () => {
+    state.targets = [{ categoryId: 'g', targetAmount: 30000, period: 'MONTHLY', updatedAt: '' }];
+    render(<MantineProvider><Targets /></MantineProvider>);
+
+    expect(screen.queryByRole('button', { name: 'Clear' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Actions for Mortgage target' })).not.toBeInTheDocument();
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Actions for Groceries target' }));
+    expect(await screen.findByRole('menuitem', { name: 'Remove target' })).toBeInTheDocument();
+  });
+
+  it('removes the target with an undoable delete that names it', async () => {
+    state.targets = [{ categoryId: 'g', targetAmount: 30000, period: 'MONTHLY', updatedAt: '' }];
+    render(<MantineProvider><Targets /></MantineProvider>);
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole('button', { name: 'Actions for Groceries target' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Remove target' }));
+
+    expect(state.undoableDelete).toHaveBeenCalledWith(expect.objectContaining({
+      label: '£300.00 target · Groceries',
+      name: 'the Groceries target',
+      ref: { entityType: 'TARGET', id: 'g' },
+    }));
+    await state.undoableDelete.mock.calls[0][0].run();
+    expect(state.removeTarget).toHaveBeenCalledWith('g');
+  });
+
+  it('shows the saved amount in the box, and follows it when it changes', () => {
+    state.targets = [{ categoryId: 'g', targetAmount: 30000, period: 'MONTHLY', updatedAt: '' }];
+    const { rerender } = render(<MantineProvider><Targets /></MantineProvider>);
+    expect(screen.getByLabelText('Target for Groceries')).toHaveValue('300.00');
+
+    state.targets = [];
+    rerender(<MantineProvider><Targets /></MantineProvider>);
+    expect(screen.getByLabelText('Target for Groceries')).toHaveValue('');
+
+    state.targets = [{ categoryId: 'g', targetAmount: 30000, period: 'WEEKLY', updatedAt: '' }];
+    rerender(<MantineProvider><Targets /></MantineProvider>);
+    expect(screen.getByLabelText('Target for Groceries')).toHaveValue('300.00');
   });
 });
