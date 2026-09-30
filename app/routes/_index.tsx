@@ -12,8 +12,11 @@ import { groupItems, bucketKeyFor } from '~/lib/categoryGroups';
 import { buildMonthSummary } from '~/lib/summary';
 import type { CategoryProgress } from '~/lib/summary';
 import { formatPence } from '~/lib/money';
-import { currentYearMonth, shiftMonth } from '~/lib/months';
+import { currentYearMonth, formatMonthLabel, shiftMonth } from '~/lib/months';
+import { useDocumentTitle } from '~/hooks/useDocumentTitle';
 import { useCategories, usePots, useTargets, useTransactions } from '~/lib/queries';
+import { pageTitle } from '~/lib/pageTitle';
+import type { Route } from './+types/_index';
 
 function GroupedProgress({ items }: { items: CategoryProgress[] }) {
   return (
@@ -30,6 +33,7 @@ function GroupedProgress({ items }: { items: CategoryProgress[] }) {
 
 function HomeContent() {
   const [yearMonth, setYearMonth] = useState(currentYearMonth());
+  useDocumentTitle(pageTitle('Home', formatMonthLabel(yearMonth)));
   const categories = useCategories();
   const targets = useTargets();
   const transactions = useTransactions(yearMonth);
@@ -121,6 +125,8 @@ function HomeContent() {
     </Stack>
   );
 }
+
+export const meta: Route.MetaFunction = () => [{ title: pageTitle('Home') }];
 
 export default function Home() {
   return (

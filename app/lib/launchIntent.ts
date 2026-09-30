@@ -1,7 +1,9 @@
+import { readPreferences, writePreferences } from './preferences';
+
 export const ADD_PARAM = 'add';
 export const PENDING_ADD_KEY = 'budget.pendingAdd';
 export const LAUNCH_HANDLED_KEY = 'budget.launchHandled';
-export const OPEN_ON_LAUNCH_KEY = 'budget.openAddOnLaunch';
+export { LEGACY_OPEN_ON_LAUNCH_KEY as OPEN_ON_LAUNCH_KEY } from './preferences';
 
 export interface LocationParts {
   pathname: string;
@@ -74,17 +76,11 @@ export function isStandalone(env: StandaloneEnv): boolean {
 }
 
 export function readOpenOnLaunch(local: Storage | null): boolean {
-  if (local === null) return false;
-  return readItem(local, OPEN_ON_LAUNCH_KEY) === '1';
+  return readPreferences(local).openAddOnLaunch;
 }
 
 export function writeOpenOnLaunch(local: Storage | null, enabled: boolean): void {
-  if (local === null) return;
-  if (enabled) {
-    writeItem(local, OPEN_ON_LAUNCH_KEY, '1');
-    return;
-  }
-  removeItem(local, OPEN_ON_LAUNCH_KEY);
+  writePreferences(local, { ...readPreferences(local), openAddOnLaunch: enabled });
 }
 
 export function consumeLaunchIntent({ session, local, standalone }: LaunchContext): boolean {

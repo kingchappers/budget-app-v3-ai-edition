@@ -9,6 +9,8 @@ import { useCategories, useDeleteRecurring, useRecurring, useSetRecurringHandled
 import { formatDayOfMonth, skippedPeriod } from '~/lib/recurring';
 import { formatSignedPence } from '~/lib/transactionTypes';
 import type { Category, Recurring, Transaction } from '~/lib/types';
+import { pageTitle } from '~/lib/pageTitle';
+import type { Route } from './+types/recurring';
 
 function scheduleText(item: Recurring): string {
   const day = `Monthly on the ${formatDayOfMonth(item.dayOfMonth)}`;
@@ -181,6 +183,8 @@ function RecurringContent() {
     </Stack>
   );
 }
+
+export const meta: Route.MetaFunction = () => [{ title: pageTitle('Recurring') }];
 
 export default function RecurringPage() {
   return (
