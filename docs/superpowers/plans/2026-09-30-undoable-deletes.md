@@ -33,10 +33,10 @@
 
 **Files:**
 - Create: `src/api/trash.ts`, `src/api/__tests__/trash.test.ts`
-- Modify: `src/api/transactions.ts`, `src/api/targets.ts`, `src/api/recurring.ts`, `src/api/accounts.ts`, `src/api/db.ts`, their tests, `api-handler.ts`
+- Modify: `src/api/transactions.ts`, `src/api/targets.ts`, `src/api/recurring.ts`, `src/api/accounts.ts`, `src/api/http.ts`, their tests, `api-handler.ts`
 
 - [ ] Write failing tests in `trash.test.ts` for `validateRestoreInput` (non-object, missing fields, unknown entity type, bad id, bad transaction id, extra field), `moveToTrash` (transaction shape: conditioned `Delete` plus `Put` of `TRASH#TRANSACTION#2026-09#t1` with `entityType`, `originalSk`, `item` without keys, ISO `deletedAt`, `expiresAt` 30 days on; missing item writes nothing; a cancelled transaction is treated as already deleted), `getTrash` (drops expired, newest first, no keys) and `restoreFromTrash` (200 shape, 409 on the original's condition, 404 on a missing or expired record, 400 on bad input).
-- [ ] Implement `src/api/trash.ts` and `trashSk` in `db.ts`.
+- [ ] Implement `src/api/trash.ts` (it owns the `TRASH#` key format) and move `parseJsonObject` into `http.ts` so both it and `recurring.ts` share it.
 - [ ] Update the four delete handlers' tests to expect the transaction shape (mock `GetCommand` and `TransactWriteCommand`), then switch the handlers to `moveToTrash`.
 - [ ] Register the two routes in `api-handler.ts`.
 - [ ] Commit: `feat: move deleted items to a 30-day trash (ST1, PC6, IO-01)`.
