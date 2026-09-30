@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import { ActionIcon, Alert, Button, Group, Loader, Menu, Stack, Text, ThemeIcon, Title } from '@mantine/core';
-import { IconDots, IconPencil, IconPlus, IconTrash } from '@tabler/icons-react';
+import { IconCalendarPlus, IconDots, IconPencil, IconPlus, IconTrash } from '@tabler/icons-react';
 import { DefaultLayout } from '~/components/layout/DefaultLayout';
 import { RecurringForm } from '~/components/recurring/RecurringForm';
 import { CategoryIcon } from '~/components/categories/CategoryIcon';
 import { useUndoableDelete } from '~/hooks/useUndoableDelete';
 import { shiftMonth, todayIso } from '~/lib/months';
 import { useCategories, useDeleteRecurring, useRecurring, useSetRecurringHandled, useTransactions } from '~/lib/queries';
+import { downloadTextFile } from '~/lib/download';
+import { buildBillsCalendar, CALENDAR_FILENAME, isCalendarBill } from '~/lib/ics';
 import { describeSchedule, occurrenceLabel, previousOccurrenceKey, skippedPeriod } from '~/lib/recurring';
 import { transactionLabel } from '~/lib/trash';
 import { formatSignedPence } from '~/lib/transactionTypes';
@@ -100,6 +102,14 @@ function RecurringContent() {
     setHandled.mutate({ recurringId: item.recurringId, period: previousOccurrenceKey(item, skipped) });
   }
 
+  function downloadCalendar(): void {
+    downloadTextFile(
+      CALENDAR_FILENAME,
+      buildBillsCalendar({ bills: recurring.data ?? [], categories: categories.data ?? [] }),
+      'text/calendar;charset=utf-8',
+    );
+  }
+
   function deleteItem(item: Recurring): void {
     const name = recurringLabel(item, categories.data?.find(c => c.categoryId === item.categoryId));
     undoableDelete({
@@ -128,6 +138,15 @@ function RecurringContent() {
         <Title order={3}>Recurring</Title>
         <Button leftSection={<IconPlus size={16} />} onClick={() => setCreating(true)}>New</Button>
       </Group>
+
+      {items.some(isCalendarBill) && (
+        <Stack gap={4} align="flex-start">
+          <Button variant="default" leftSection={<IconCalendarPlus size={16} />} onClick={downloadCalendar}>
+            Add bills to your calendar
+          </Button>
+          <Text size="sm">Adds each bill to your calendar with a reminder. Download again after changing bills.</Text>
+        </Stack>
+      )}
 
       {items.length === 0 && (
         <Text c="dimmed">No recurring items yet. Use Repeat monthly on a transaction, or add one here.</Text>
