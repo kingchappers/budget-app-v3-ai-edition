@@ -54,7 +54,7 @@ The avatar menu loses the "Application" label and the switch; its first item is 
 ## Decisions made without the user
 
 - **Loading state:** the page body shows a loader until Auth0 has finished, rather than the page with empty data. This is the simplest way to stop the "£0.00" flash that ST5 describes.
-- **Expired-session detection:** Auth0's React SDK only sets `error` during start-up; a refresh-token failure mid-visit just clears the user. So "Your session has ended" is also shown when the layout saw a signed-in user who then went away. A full page reload after expiry shows "You're signed out", which is still true and still says the data is safe.
+- **Expired-session detection:** Auth0's React SDK only sets `error` during start-up, and when a stored session can no longer be renewed mid-visit it keeps reporting the user as signed in (found in the browser check: the page showed "Could not load your budget"). So "Your session has ended" is shown in three cases: a start-up error with a session-ended code; `useProtectedApi` getting a session-ended code from `getAccessTokenSilently` (a small `app/lib/session.ts` signal the layout reads); or the layout seeing a signed-in user who then went away. A full page reload after expiry may show "You're signed out", which is still true and still says the data is safe.
 - **N while signed out:** the shortcut does nothing when signed out, because the + button is hidden too.
 - **Storage key:** preferences are stored as one JSON object, with a lazy migration from the old single key rather than a one-off migration step.
 - **Storage failures:** a change that cannot be saved still applies for the current visit, with the error logged; no message is shown because nothing is lost from the budget itself.
@@ -65,6 +65,7 @@ The avatar menu loses the "Application" label and the switch; its first item is 
 ## Testing
 
 - `preferences.test.ts`: defaults, persistence, migration from the legacy key, bad JSON and wrong types, storage that throws on read and on write, hook updates.
+- `session.test.ts` and `useProtectedApi.test.tsx`: session-ended codes are recognised and raised by a failed token renewal.
 - `DefaultLayout.test.tsx`: current-behaviour test first (signed out renders the page and the + button), then: signed-out panel replaces content and hides +; session-ended wording for `login_required`; loader while Auth0 loads; N works when on, does nothing when off or signed out.
 - `settings.test.tsx`: both switches reflect and persist their preference.
 - `Profile.test.tsx`: the Settings item links to `/settings`; the switch and "Application" label are gone.

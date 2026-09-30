@@ -1,10 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MantineProvider } from '@mantine/core';
 import { MemoryRouter } from 'react-router';
 import { PENDING_ADD_KEY } from '~/lib/launchIntent';
 import { DEFAULT_PREFERENCES, writePreferences } from '~/lib/preferences';
+import { clearSessionEnded, markSessionEnded } from '~/lib/session';
 
 const auth = vi.hoisted(() => ({
   isAuthenticated: true,
@@ -39,6 +40,7 @@ function authError(code: string): Error & { error: string } {
 }
 
 beforeEach(() => {
+  clearSessionEnded();
   auth.isAuthenticated = true;
   auth.isLoading = false;
   auth.error = undefined;
@@ -158,6 +160,18 @@ describe('DefaultLayout N shortcut setting', () => {
     await user.hover(screen.getByRole('button', { name: 'Add transaction' }));
     expect(await screen.findByText('Add transaction')).toBeInTheDocument();
     expect(screen.queryByText('Add transaction (N)')).not.toBeInTheDocument();
+  });
+});
+
+describe('DefaultLayout ended session', () => {
+  it('replaces the page when a request finds the session can no longer be renewed', () => {
+    renderLayout(<p>Could not load your budget</p>);
+
+    act(() => markSessionEnded());
+
+    expect(screen.getByRole('heading', { name: 'Your session has ended' })).toBeInTheDocument();
+    expect(screen.queryByText('Could not load your budget')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Add transaction' })).not.toBeInTheDocument();
   });
 });
 

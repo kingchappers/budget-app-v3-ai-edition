@@ -12,7 +12,8 @@ import { LaunchIntent } from './LaunchIntent';
 import { OfflineQueueBanner } from './OfflineQueueBanner';
 import { currentYearMonth } from '~/lib/months';
 import { MoreSheet, MORE_ITEMS } from './MoreSheet';
-import { SignedOutPanel, isSessionEndedError } from './SignedOutPanel';
+import { SignedOutPanel } from './SignedOutPanel';
+import { isSessionEndedError, useSessionEnded } from '~/lib/session';
 import { usePreferences } from '~/lib/preferences';
 
 const NAV_ITEMS = [
@@ -91,10 +92,12 @@ type SessionState = 'loading' | 'signedIn' | 'signedOut' | 'sessionEnded';
 
 function useSessionState(): SessionState {
   const { isAuthenticated, isLoading, error } = useAuth0();
+  const tokenRenewalFailed = useSessionEnded();
   const [hadSession, setHadSession] = useState(false);
   if (isAuthenticated && !hadSession) setHadSession(true);
 
   if (isLoading) return 'loading';
+  if (tokenRenewalFailed) return 'sessionEnded';
   if (isAuthenticated) return 'signedIn';
   if (hadSession || isSessionEndedError(error)) return 'sessionEnded';
   return 'signedOut';

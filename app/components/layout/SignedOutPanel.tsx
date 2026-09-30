@@ -2,14 +2,6 @@ import { Button, Stack, Text, Title } from '@mantine/core';
 import { IconLock } from '@tabler/icons-react';
 import { useAuth0 } from '@auth0/auth0-react';
 
-const SESSION_ENDED_CODES = new Set(['login_required', 'missing_refresh_token', 'invalid_grant']);
-
-export function isSessionEndedError(error: Error | undefined): boolean {
-  if (error === undefined) return false;
-  const code = (error as Error & { error?: unknown }).error;
-  return typeof code === 'string' && SESSION_ENDED_CODES.has(code);
-}
-
 export interface SignedOutPanelProps {
   sessionEnded: boolean;
 }
