@@ -33,7 +33,8 @@ export function QuickEntryTips() {
           </Text>
           <Text size="sm">
             <strong>Recurring:</strong> choose Repeat monthly in a transaction's menu to set one up. When it is
-            due it appears at the top of Home with Add, Edit and Skip. Manage them under Recurring.
+            due it appears at the top of Home with Add, Add with changes and Didn't happen, and it stays there
+            until you deal with it. Manage them under Recurring.
           </Text>
           <Text size="sm">
             <strong>Install:</strong> add the app to your home screen for a full-screen version. On Android,

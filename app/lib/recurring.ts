@@ -1,10 +1,9 @@
 import type { RecurringInput } from './api';
 import { parsePounds } from './money';
-import { addDaysIso, daysBetweenIso, lastDayOfMonth, shiftMonth } from './months';
-import { normaliseNote } from './noteMemory';
+import { addDaysIso, daysBetweenIso, formatMonthName, formatShortDate, lastDayOfMonth, shiftMonth } from './months';
 import type { Category, Recurring, Transaction, TransactionType } from './types';
 
-export type DueStatus = 'upcoming' | 'today' | 'overdue';
+export type DueStatus = 'past' | 'today' | 'upcoming';
 
 export interface DueItem {
   recurring: Recurring;
@@ -12,6 +11,17 @@ export interface DueItem {
   dueDate: string;
   status: DueStatus;
   daysAway: number;
+  likelyMatches: Transaction[];
+}
+
+export interface DueGroup {
+  period: string;
+  items: DueItem[];
+}
+
+export interface GroupedDueItems {
+  current: DueItem[];
+  older: DueGroup[];
 }
 
 export interface ComputeDueInput {
@@ -21,6 +31,10 @@ export interface ComputeDueInput {
   today: string;
 }
 
+export const LOOK_BACK_MONTHS = 3;
+
+const PERIOD_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
+
 function pad(value: number): string {
   return String(value).padStart(2, '0');
 }
@@ -29,22 +43,42 @@ export function dueDateFor(period: string, dayOfMonth: number): string {
   return `${period}-${pad(Math.min(dayOfMonth, lastDayOfMonth(period)))}`;
 }
 
+function inPeriod(transaction: Transaction, period: string): boolean {
+  return transaction.date.slice(0, 7) === period;
+}
+
 export function isHandled(recurring: Recurring, period: string, transactions: Transaction[]): boolean {
   if (recurring.handledPeriod !== null && recurring.handledPeriod >= period) return true;
+  return transactions.some(t => inPeriod(t, period) && t.recurringId === recurring.recurringId);
+}
 
-  const note = normaliseNote(recurring.description);
-  return transactions.some(t =>
-    t.date.slice(0, 7) === period
-    && t.type === recurring.type
-    && t.categoryId === recurring.categoryId
-    && (note === '' || normaliseNote(t.description) === note),
-  );
+function isWithinTenPercent(amount: number, target: number): boolean {
+  return Math.abs(amount - target) * 10 <= target;
+}
+
+function compareCandidates(target: number): (a: Transaction, b: Transaction) => number {
+  return (a, b) => {
+    const byDistance = Math.abs(a.amount - target) - Math.abs(b.amount - target);
+    if (byDistance !== 0) return byDistance;
+    return b.date.localeCompare(a.date);
+  };
+}
+
+export function likelyMatches(recurring: Recurring, period: string, transactions: Transaction[]): Transaction[] {
+  return transactions
+    .filter(t =>
+      inPeriod(t, period)
+      && t.recurringId === undefined
+      && t.type === recurring.type
+      && t.categoryId === recurring.categoryId
+      && isWithinTenPercent(t.amount, recurring.amount))
+    .sort(compareCandidates(recurring.amount));
 }
 
 function statusFor(daysAway: number): DueStatus {
   if (daysAway > 0) return 'upcoming';
   if (daysAway === 0) return 'today';
-  return 'overdue';
+  return 'past';
 }
 
 function compareDue(a: DueItem, b: DueItem): number {
@@ -54,38 +88,90 @@ function compareDue(a: DueItem, b: DueItem): number {
   return a.recurring.recurringId.localeCompare(b.recurring.recurringId);
 }
 
-export function computeDueItems({ recurring, categories, transactions, today }: ComputeDueInput): DueItem[] {
+function firstPeriodFor(template: Recurring, thisMonth: string): string {
+  const earliest = shiftMonth(thisMonth, -LOOK_BACK_MONTHS);
+  const created = template.createdAt.slice(0, 7);
+  if (!PERIOD_PATTERN.test(created)) return earliest;
+  return created > earliest ? created : earliest;
+}
+
+function isVisible(template: Recurring, period: string, dueDate: string, today: string): boolean {
+  if (period < today.slice(0, 7)) return true;
+  return today >= addDaysIso(dueDate, -template.leadDays);
+}
+
+function earliestDue(template: Recurring, transactions: Transaction[], today: string): DueItem | null {
   const thisMonth = today.slice(0, 7);
-  const periods = [thisMonth, shiftMonth(thisMonth, 1)];
+  const lastPeriod = shiftMonth(thisMonth, 1);
+
+  for (let period = firstPeriodFor(template, thisMonth); period <= lastPeriod; period = shiftMonth(period, 1)) {
+    if (isHandled(template, period, transactions)) continue;
+    const dueDate = dueDateFor(period, template.dayOfMonth);
+    if (!isVisible(template, period, dueDate, today)) return null;
+
+    const daysAway = daysBetweenIso(today, dueDate);
+    return {
+      recurring: template,
+      period,
+      dueDate,
+      status: statusFor(daysAway),
+      daysAway,
+      likelyMatches: likelyMatches(template, period, transactions),
+    };
+  }
+  return null;
+}
+
+export function computeDueItems({ recurring, categories, transactions, today }: ComputeDueInput): DueItem[] {
   const knownCategories = new Set(categories.map(c => c.categoryId));
   const items: DueItem[] = [];
 
   for (const template of recurring) {
     if (!knownCategories.has(template.categoryId)) continue;
-
-    for (const period of periods) {
-      const dueDate = dueDateFor(period, template.dayOfMonth);
-      const visibleFrom = addDaysIso(dueDate, -template.leadDays);
-      const visibleUntil = `${period}-${pad(lastDayOfMonth(period))}`;
-      if (today < visibleFrom || today > visibleUntil) continue;
-      if (isHandled(template, period, transactions)) continue;
-
-      const daysAway = daysBetweenIso(today, dueDate);
-      items.push({ recurring: template, period, dueDate, status: statusFor(daysAway), daysAway });
-      break;
-    }
+    const item = earliestDue(template, transactions, today);
+    if (item) items.push(item);
   }
 
   return items.sort(compareDue);
 }
 
-export function dueLabel(item: Pick<DueItem, 'status' | 'daysAway'>): string {
-  if (item.status === 'today') return 'Due today';
+export function groupDueItems(items: DueItem[], today: string): GroupedDueItems {
+  const thisMonth = today.slice(0, 7);
+  const current: DueItem[] = [];
+  const byPeriod = new Map<string, DueItem[]>();
 
-  const days = Math.abs(item.daysAway);
-  const unit = days === 1 ? 'day' : 'days';
-  if (item.status === 'upcoming') return `Due in ${days} ${unit}`;
-  return `${days} ${unit} overdue`;
+  for (const item of items) {
+    if (item.period >= thisMonth) {
+      current.push(item);
+      continue;
+    }
+    byPeriod.set(item.period, [...(byPeriod.get(item.period) ?? []), item]);
+  }
+
+  const older = [...byPeriod.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([period, groupItems]) => ({ period, items: groupItems }));
+  return { current, older };
+}
+
+export function skippedPeriod(recurring: Recurring, transactions: Transaction[], today: string): string | null {
+  const period = recurring.handledPeriod;
+  const thisMonth = today.slice(0, 7);
+  if (period === null || period < thisMonth || period > shiftMonth(thisMonth, 1)) return null;
+  const logged = transactions.some(t => inPeriod(t, period) && t.recurringId === recurring.recurringId);
+  return logged ? null : period;
+}
+
+export function olderGroupHeading(period: string): string {
+  return `From ${formatMonthName(period)}, not logged`;
+}
+
+export function dueLabel(item: Pick<DueItem, 'status' | 'daysAway' | 'dueDate'>): string {
+  if (item.status === 'today') return 'Due today';
+  if (item.status === 'past') return `Due ${formatShortDate(item.dueDate)}`;
+
+  const unit = item.daysAway === 1 ? 'day' : 'days';
+  return `Due in ${item.daysAway} ${unit} · ${formatShortDate(item.dueDate)}`;
 }
 
 export function formatDayOfMonth(day: number): string {

@@ -35,11 +35,12 @@ export interface TransactionSheetProps {
   preset?: { type: TransactionType; categoryId: string } | null;
   template?: Transaction | null;
   templateDate?: string;
+  recurringId?: string;
   onSaved?: (created: Transaction) => void;
   onUndone?: () => void;
 }
 
-export function TransactionSheet({ opened, onClose, yearMonth, editing, preset, template, templateDate, onSaved, onUndone }: TransactionSheetProps) {
+export function TransactionSheet({ opened, onClose, yearMonth, editing, preset, template, templateDate, recurringId, onSaved, onUndone }: TransactionSheetProps) {
   const { data: categories = [], isLoading: categoriesLoading, error: categoriesError } = useCategories();
   const monthTransactions = useSnapshotWhileOpen(useTransactions(currentYearMonth(), opened).data, opened);
   const noteIndex = useNoteHistory(opened);
@@ -47,6 +48,7 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, preset, 
   const saveWithUndo = useSaveWithUndo();
   const amountRef = useRef<HTMLInputElement>(null);
   const createSubmittedRef = useRef(false);
+  const recurringLinkUsedRef = useRef(false);
   const saveAnotherRef = useRef<HTMLButtonElement>(null);
   const chipsRef = useRef<HTMLDivElement>(null);
   const focusChipsAfterRenderRef = useRef(false);
@@ -66,6 +68,7 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, preset, 
   useEffect(() => {
     if (!opened) return;
     createSubmittedRef.current = false;
+    recurringLinkUsedRef.current = false;
     if (editing) {
       setAmount(formatPencePlain(editing.amount));
       setType(editing.type);
@@ -241,7 +244,9 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, preset, 
 
     if (createSubmittedRef.current) return;
     createSubmittedRef.current = true;
-    void saveWithUndo(input, { onUndo: onUndone }).then(created => {
+    const linked = recurringId && !recurringLinkUsedRef.current ? { ...input, recurringId } : input;
+    recurringLinkUsedRef.current = true;
+    void saveWithUndo(linked, { onUndo: onUndone }).then(created => {
       if (created) onSaved?.(created);
     });
     if (mode === 'addAnother') {

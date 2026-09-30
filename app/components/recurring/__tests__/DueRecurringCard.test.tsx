@@ -1,17 +1,19 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { act, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MantineProvider } from '@mantine/core';
 import { Notifications, notifications } from '@mantine/notifications';
 import { MemoryRouter } from 'react-router';
 import type { DueItem } from '~/lib/recurring';
-import type { Recurring } from '~/lib/types';
+import type { Recurring, Transaction } from '~/lib/types';
 
 const mockSave = vi.fn();
 const mockHandled = vi.fn();
 const mockRefetch = vi.fn();
+const mockLink = vi.fn();
 let dueState: { items: DueItem[]; isLoading: boolean; error: Error | null; refetch: () => void };
 
+vi.mock('@auth0/auth0-react', () => ({ useAuth0: () => ({ user: { sub: 'user-1' } }) }));
 vi.mock('~/hooks/useDueRecurring', () => ({ useDueRecurring: () => dueState }));
 vi.mock('~/hooks/useSaveWithUndo', () => ({ useSaveWithUndo: () => mockSave }));
 vi.mock('~/lib/queries', () => ({
@@ -22,18 +24,20 @@ vi.mock('~/lib/queries', () => ({
     ],
   }),
   useSetRecurringHandled: () => ({ mutate: mockHandled }),
+  useLinkTransaction: () => ({ mutate: mockLink }),
 }));
 vi.mock('~/components/transactions/TransactionSheet', () => ({
-  TransactionSheet: ({ opened, template, templateDate, onSaved, onUndone }: {
+  TransactionSheet: ({ opened, template, templateDate, recurringId, onSaved, onUndone }: {
     opened: boolean;
     template?: { description: string; amount: number } | null;
     templateDate?: string;
+    recurringId?: string;
     onSaved?: (created: unknown) => void;
     onUndone?: () => void;
   }) => (opened
     ? (
       <div>
-        <span>{`Sheet ${template?.description} ${template?.amount} on ${templateDate}`}</span>
+        <span>{`Sheet ${template?.description} ${template?.amount} on ${templateDate} for ${recurringId}`}</span>
         <button onClick={() => onSaved?.({})}>simulate saved</button>
         <button onClick={() => onUndone?.()}>simulate undone</button>
       </div>
@@ -52,7 +56,7 @@ function rec(over: Partial<Recurring>): Recurring {
 
 function item(over: Partial<DueItem> = {}, template: Partial<Recurring> = {}): DueItem {
   return {
-    recurring: rec(template), period: '2026-09', dueDate: '2026-09-28', status: 'today', daysAway: 0, ...over,
+    recurring: rec(template), period: '2026-09', dueDate: '2026-09-28', status: 'today', daysAway: 0, likelyMatches: [], ...over,
   };
 }
 
@@ -73,20 +77,27 @@ describe('DueRecurringCard', () => {
     mockSave.mockResolvedValue(null);
     mockHandled.mockReset();
     mockRefetch.mockReset();
+    mockLink.mockReset();
+    window.localStorage.clear();
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 8, 28, 12));
     dueState = { items: [item()], isLoading: false, error: null, refetch: mockRefetch };
   });
 
-  afterEach(() => { notifications.clean(); });
+  afterEach(() => {
+    notifications.clean();
+    vi.useRealTimers();
+  });
 
   it('lists each due item with its status, date and signed amount', () => {
     dueState.items = [
-      item({ status: 'overdue', daysAway: -2, dueDate: '2026-09-26' }, { recurringId: 'a', description: 'Rent', type: 'EXPENSE', categoryId: 'cat-housing', amount: 95000 }),
+      item({ status: 'past', daysAway: -2, dueDate: '2026-09-26' }, { recurringId: 'a', description: 'Rent', type: 'EXPENSE', categoryId: 'cat-housing', amount: 95000 }),
       item({ status: 'upcoming', daysAway: 2, dueDate: '2026-09-30' }, { recurringId: 'b' }),
     ];
     renderCard();
 
     expect(screen.getByText('Rent')).toBeInTheDocument();
-    expect(screen.getByText('2 days overdue · 26 Sep')).toBeInTheDocument();
+    expect(screen.getByText('Due 26 Sep')).toBeInTheDocument();
     expect(screen.getByText('−£950.00')).toBeInTheDocument();
     expect(screen.getByText('Salary')).toBeInTheDocument();
     expect(screen.getByText('Due in 2 days · 30 Sep')).toBeInTheDocument();
@@ -123,46 +134,46 @@ describe('DueRecurringCard', () => {
     await userEvent.setup().click(screen.getByRole('button', { name: 'Add Salary' }));
 
     expect(mockSave).toHaveBeenCalledWith({
-      amount: 240000, type: 'INCOME', categoryId: 'cat-salary', description: 'Salary', date: '2026-09-28',
+      amount: 240000, type: 'INCOME', categoryId: 'cat-salary', description: 'Salary', date: '2026-09-28', recurringId: 'r1',
     });
     expect(mockHandled).not.toHaveBeenCalled();
   });
 
-  it('Skip marks the period handled and its Undo restores the previous marker', async () => {
+  it('Didn\'t happen marks the period handled and its Undo restores the previous marker', async () => {
     const user = userEvent.setup();
     renderCard();
 
     await user.click(screen.getByRole('button', { name: 'More actions for Salary' }));
-    await user.click(await screen.findByRole('menuitem', { name: 'Skip' }));
+    await user.click(await screen.findByRole('menuitem', { name: "Didn't happen" }));
 
     expect(mockHandled).toHaveBeenCalledWith({ recurringId: 'r1', period: '2026-09' });
-    expect(await screen.findByText('Skipped Salary')).toBeInTheDocument();
+    expect(await screen.findByText('Skipped Salary for September')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Undo' }));
 
     expect(mockHandled).toHaveBeenLastCalledWith({ recurringId: 'r1', period: '2026-08' });
   });
 
-  it('Skip\'s Undo can restore an empty marker', async () => {
+  it('Didn\'t happen\'s Undo can restore an empty marker', async () => {
     const user = userEvent.setup();
     dueState.items = [item({}, { handledPeriod: null })];
     renderCard();
 
     await user.click(screen.getByRole('button', { name: 'More actions for Salary' }));
-    await user.click(await screen.findByRole('menuitem', { name: 'Skip' }));
+    await user.click(await screen.findByRole('menuitem', { name: "Didn't happen" }));
     await user.click(await screen.findByRole('button', { name: 'Undo' }));
 
     expect(mockHandled).toHaveBeenLastCalledWith({ recurringId: 'r1', period: null });
   });
 
-  it('Edit opens the add sheet prefilled on the due date, and marks it handled once saved', async () => {
+  it('Add with changes opens the add sheet prefilled on the due date, and marks it handled once saved', async () => {
     const user = userEvent.setup();
     renderCard();
 
     await user.click(screen.getByRole('button', { name: 'More actions for Salary' }));
-    await user.click(await screen.findByRole('menuitem', { name: 'Edit' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Add with changes' }));
 
-    expect(screen.getByText('Sheet Salary 240000 on 2026-09-28')).toBeInTheDocument();
+    expect(screen.getByText('Sheet Salary 240000 on 2026-09-28 for r1')).toBeInTheDocument();
     expect(mockHandled).not.toHaveBeenCalled();
 
     await user.click(screen.getByRole('button', { name: 'simulate saved' }));
@@ -175,7 +186,7 @@ describe('DueRecurringCard', () => {
     renderCard();
 
     await user.click(screen.getByRole('button', { name: 'More actions for Salary' }));
-    await user.click(await screen.findByRole('menuitem', { name: 'Edit' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Add with changes' }));
     await user.click(screen.getByRole('button', { name: 'simulate saved' }));
     await waitFor(() => expect(mockHandled).toHaveBeenCalledWith({ recurringId: 'r1', period: '2026-09' }));
     mockHandled.mockClear();
@@ -191,7 +202,7 @@ describe('DueRecurringCard', () => {
     renderCard();
 
     await user.click(screen.getByRole('button', { name: 'More actions for Salary' }));
-    await user.click(await screen.findByRole('menuitem', { name: 'Edit' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Add with changes' }));
     await user.click(screen.getByRole('button', { name: 'simulate undone' }));
 
     expect(mockHandled).toHaveBeenCalledWith({ recurringId: 'r1', period: null });
@@ -211,5 +222,161 @@ describe('DueRecurringCard', () => {
     await act(async () => { settle(null); });
     await user.click(addButton);
     expect(mockSave).toHaveBeenCalledTimes(2);
+  });
+
+  it('describes past, current and upcoming bills calmly, without danger colour', () => {
+    dueState.items = [
+      item({ status: 'past', daysAway: -25, dueDate: '2026-09-03' }, { recurringId: 'a', description: 'Rent', type: 'EXPENSE', categoryId: 'cat-housing' }),
+      item({}, { recurringId: 'b' }),
+      item({ status: 'upcoming', daysAway: 3, dueDate: '2026-10-01', period: '2026-10' }, { recurringId: 'c', description: 'Phone' }),
+    ];
+    const { container } = renderCard();
+
+    expect(screen.getByText('Due 3 Sep')).toBeInTheDocument();
+    expect(screen.getByText('Due today')).toBeInTheDocument();
+    expect(screen.getByText('Due in 3 days · 1 Oct')).toBeInTheDocument();
+    expect(screen.queryByText(/overdue/i)).not.toBeInTheDocument();
+    expect(container.innerHTML).not.toMatch(/danger/);
+  });
+
+  describe('bills from earlier months', () => {
+    function older(): DueItem[] {
+      return [
+        item({ period: '2026-08', dueDate: '2026-08-01', status: 'past', daysAway: -58 }, { recurringId: 'rent', description: 'Rent', type: 'EXPENSE', categoryId: 'cat-housing', amount: 95000 }),
+        item({ period: '2026-08', dueDate: '2026-08-05', status: 'past', daysAway: -54 }, { recurringId: 'gym', description: 'Gym', type: 'EXPENSE', categoryId: 'cat-housing', amount: 3000 }),
+        item({}, { recurringId: 'salary' }),
+      ];
+    }
+
+    it('groups them under their month, separate from this month\'s bills', () => {
+      dueState.items = older();
+      renderCard();
+
+      const group = screen.getByRole('region', { name: 'From August, not logged' });
+      expect(within(group).getByRole('heading', { name: 'From August, not logged' })).toBeInTheDocument();
+      expect(within(group).getByText('Rent')).toBeInTheDocument();
+      expect(within(group).getByText('Gym')).toBeInTheDocument();
+      expect(within(group).queryByText('Salary')).not.toBeInTheDocument();
+      expect(screen.getByText('Salary')).toBeInTheDocument();
+    });
+
+    it('Add all adds every bill in the group, each linked to its bill', async () => {
+      dueState.items = older();
+      renderCard();
+
+      await userEvent.setup().click(screen.getByRole('button', { name: 'Add all from August' }));
+
+      expect(mockSave).toHaveBeenCalledTimes(2);
+      expect(mockSave).toHaveBeenCalledWith(expect.objectContaining({ recurringId: 'rent', date: '2026-08-01', amount: 95000 }));
+      expect(mockSave).toHaveBeenCalledWith(expect.objectContaining({ recurringId: 'gym', date: '2026-08-05' }));
+    });
+
+    it('Didn\'t happen skips that month for that bill', async () => {
+      const user = userEvent.setup();
+      dueState.items = older();
+      renderCard();
+
+      await user.click(screen.getByRole('button', { name: 'More actions for Gym' }));
+      await user.click(await screen.findByRole('menuitem', { name: "Didn't happen" }));
+
+      expect(mockHandled).toHaveBeenCalledWith({ recurringId: 'gym', period: '2026-08' });
+      expect(await screen.findByText('Skipped Gym for August')).toBeInTheDocument();
+    });
+  });
+
+  describe('likely matches', () => {
+    const typed: Transaction = {
+      transactionId: 'typed-1', yearMonth: '2026-09', amount: 238000, type: 'INCOME', categoryId: 'cat-salary',
+      description: 'pay', date: '2026-09-03', createdAt: '',
+    };
+
+    it('asks whether a hand-typed entry is the same thing', () => {
+      dueState.items = [item({ likelyMatches: [typed] })];
+      renderCard();
+      const prompt = screen.getByRole('group', { name: 'Possible match for Salary' });
+      expect(within(prompt).getByText('Looks like you logged this on 3 Sep. Same thing?')).toBeInTheDocument();
+    });
+
+    it('Yes links that entry to the bill', async () => {
+      dueState.items = [item({ likelyMatches: [typed] })];
+      renderCard();
+
+      await userEvent.setup().click(screen.getByRole('button', { name: "Yes, that's it" }));
+
+      expect(mockLink).toHaveBeenCalledWith({ transaction: typed, recurringId: 'r1' }, expect.anything());
+      expect(mockSave).not.toHaveBeenCalled();
+    });
+
+    it('says so calmly when linking fails', async () => {
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+      mockLink.mockImplementation((_vars: unknown, options: { onError: (error: Error) => void }) => options.onError(new Error('offline')));
+      dueState.items = [item({ likelyMatches: [typed] })];
+      renderCard();
+
+      await userEvent.setup().click(screen.getByRole('button', { name: "Yes, that's it" }));
+
+      expect(await screen.findByText("Couldn't record Salary as logged. Check your connection and try again.")).toBeInTheDocument();
+      vi.mocked(console.error).mockRestore();
+    });
+
+    it('No hides the question, keeps the bill, and remembers the answer', async () => {
+      dueState.items = [item({ likelyMatches: [typed] })];
+      const { unmount } = renderCard();
+
+      await userEvent.setup().click(screen.getByRole('button', { name: 'No' }));
+
+      expect(screen.queryByText(/Looks like you logged this/)).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Add Salary' })).toBeInTheDocument();
+      expect(mockLink).not.toHaveBeenCalled();
+      unmount();
+
+      renderCard();
+      expect(screen.queryByText(/Looks like you logged this/)).not.toBeInTheDocument();
+    });
+
+    it('offers the next candidate after a No', async () => {
+      const second = { ...typed, transactionId: 'typed-2', date: '2026-09-10' };
+      dueState.items = [item({ likelyMatches: [typed, second] })];
+      renderCard();
+
+      await userEvent.setup().click(screen.getByRole('button', { name: 'No' }));
+
+      expect(screen.getByText('Looks like you logged this on 10 Sep. Same thing?')).toBeInTheDocument();
+    });
+  });
+
+  describe('Remind me tomorrow', () => {
+    it('hides the bill until tomorrow', async () => {
+      const user = userEvent.setup();
+      dueState.items = [item(), item({}, { recurringId: 'r2', description: 'Rent', type: 'EXPENSE', categoryId: 'cat-housing' })];
+      const { unmount } = renderCard();
+
+      await user.click(screen.getByRole('button', { name: 'More actions for Salary' }));
+      await user.click(await screen.findByRole('menuitem', { name: 'Remind me tomorrow' }));
+
+      expect(screen.queryByRole('button', { name: 'Add Salary' })).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Add Rent' })).toBeInTheDocument();
+      expect(await screen.findByText('Salary will show again tomorrow')).toBeInTheDocument();
+      expect(mockHandled).not.toHaveBeenCalled();
+      unmount();
+
+      renderCard();
+      expect(screen.queryByRole('button', { name: 'Add Salary' })).not.toBeInTheDocument();
+      cleanup();
+
+      vi.setSystemTime(new Date(2026, 8, 29, 9));
+      renderCard();
+      expect(screen.getByRole('button', { name: 'Add Salary' })).toBeInTheDocument();
+    });
+
+    it('hides the whole card when every bill is snoozed', async () => {
+      const user = userEvent.setup();
+      const { container } = renderCard();
+
+      await user.click(screen.getByRole('button', { name: 'More actions for Salary' }));
+      await user.click(await screen.findByRole('menuitem', { name: 'Remind me tomorrow' }));
+
+      expect(container.querySelector('.mantine-Card-root')).toBeNull();
+    });
   });
 });

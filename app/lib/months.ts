@@ -34,6 +34,11 @@ export function formatMonthLabel(yearMonth: string): string {
   return `${d.toLocaleString('en-GB', { month: 'long' })} ${year}`;
 }
 
+export function formatMonthName(yearMonth: string): string {
+  const [year, month] = yearMonth.split('-').map(Number);
+  return new Date(year, month - 1, 1).toLocaleString('en-GB', { month: 'long' });
+}
+
 const MONTH_ABBREVIATIONS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 export function lastDayOfMonth(yearMonth: string): number {
