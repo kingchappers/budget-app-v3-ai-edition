@@ -30,9 +30,18 @@ function setAsideCell(setAside: number, autoAdded: number): string {
   return autoAdded > 0 ? `${total} (${formatPence(autoAdded)} auto)` : total;
 }
 
-function PotSettingsForm({ pot, category }: { pot: PotSummary; category: Category | undefined }) {
+function initialMonthly(pot: PotSummary, suggested: number | undefined): string {
+  if (suggested !== undefined) return formatPencePlain(suggested);
+  return pot.monthlyAmount !== null ? formatPencePlain(pot.monthlyAmount) : '';
+}
+
+function PotSettingsForm({ pot, category, suggestedMonthly }: {
+  pot: PotSummary;
+  category: Category | undefined;
+  suggestedMonthly?: number;
+}) {
   const save = useSavePot();
-  const [monthly, setMonthly] = useState(pot.monthlyAmount !== null ? formatPencePlain(pot.monthlyAmount) : '');
+  const [monthly, setMonthly] = useState(initialMonthly(pot, suggestedMonthly));
   const [goal, setGoal] = useState(pot.goalAmount !== null ? formatPencePlain(pot.goalAmount) : '');
   const [auto, setAuto] = useState(pot.autoAmountNow > 0);
   const [error, setError] = useState<string | null>(null);
@@ -127,10 +136,12 @@ function PotSettingsForm({ pot, category }: { pot: PotSummary; category: Categor
 export interface PotHistorySheetProps {
   pot: PotSummary | null;
   category: Category | undefined;
+  // A monthly amount to fill in, not yet saved, e.g. from a yearly bill.
+  suggestedMonthly?: number;
   onClose: () => void;
 }
 
-export function PotHistorySheet({ pot, category, onClose }: PotHistorySheetProps) {
+export function PotHistorySheet({ pot, category, suggestedMonthly, onClose }: PotHistorySheetProps) {
   const title = category ? categoryLabel(category) : 'Pot';
   const months = pot ? [...pot.months].reverse() : [];
 
@@ -173,7 +184,7 @@ export function PotHistorySheet({ pot, category, onClose }: PotHistorySheetProps
               </Table>
             </Table.ScrollContainer>
           )}
-          <PotSettingsForm key={pot.categoryId} pot={pot} category={category} />
+          <PotSettingsForm key={pot.categoryId} pot={pot} category={category} suggestedMonthly={suggestedMonthly} />
         </Stack>
       )}
     </ResponsiveSheet>
