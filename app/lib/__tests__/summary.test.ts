@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildMonthSummary, leftToSpendSentence, normaliseTargetToMonth } from '../summary';
+import { buildMonthSummary, leftToSpendSentence, normaliseTargetToMonth, targetedExpenseCategoryIds } from '../summary';
 import type { Category, Transaction, CategoryTarget } from '../types';
 
 const categories: Category[] = [
@@ -268,5 +268,16 @@ describe('leftToSpendSentence', () => {
 
   it('returns null when there are no targets', () => {
     expect(leftToSpendSentence({ spending: [], leftToSpend: 0 }, '2026-09', now)).toBeNull();
+  });
+});
+
+describe('targetedExpenseCategoryIds', () => {
+  it('lists expense categories that have a target, ignoring income and missing categories', () => {
+    const ids = targetedExpenseCategoryIds(categories, [
+      { categoryId: 'cat-food', targetAmount: 100, period: 'MONTHLY', updatedAt: '' },
+      { categoryId: 'cat-salary', targetAmount: 100, period: 'MONTHLY', updatedAt: '' },
+      { categoryId: 'cat-gone', targetAmount: 100, period: 'MONTHLY', updatedAt: '' },
+    ]);
+    expect([...ids]).toEqual(['cat-food']);
   });
 });

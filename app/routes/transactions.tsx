@@ -1,15 +1,17 @@
 import { useState } from 'react';
+import { useSearchParams } from 'react-router';
 import { ActionIcon, Alert, Button, Divider, Group, Loader, Select, Stack, Text, TextInput } from '@mantine/core';
 import { IconSearch, IconX } from '@tabler/icons-react';
 import { DefaultLayout } from '~/components/layout/DefaultLayout';
 import { MonthHeader } from '~/components/budget/MonthHeader';
 import { TransactionRow } from '~/components/transactions/TransactionRow';
 import { useTransactionEditing } from '~/components/transactions/useTransactionEditing';
-import { filterTransactions, type TransactionFilter } from '~/lib/transactions';
+import { filterTransactions, parseTransactionsParams, UNTARGETED_FILTER, type TransactionFilter } from '~/lib/transactions';
 import { categorySelectData } from '~/lib/categoryGroups';
 import { formatPence } from '~/lib/money';
-import { currentYearMonth } from '~/lib/months';
-import { useCategories, useTransactions } from '~/lib/queries';
+import { currentYearMonth, monthPhrase } from '~/lib/months';
+import { targetedExpenseCategoryIds } from '~/lib/summary';
+import { useCategories, useTargets, useTransactions } from '~/lib/queries';
 import type { Transaction, TransactionType } from '~/lib/types';
 
 const TYPE_OPTIONS: { value: TransactionType; label: string }[] = [
@@ -19,10 +21,20 @@ const TYPE_OPTIONS: { value: TransactionType; label: string }[] = [
   { value: 'TAKE_OUT', label: 'Take out' },
 ];
 
+const UNTARGETED_OPTION = { value: UNTARGETED_FILTER, label: 'Other spending (no target)' };
+
+function countLine(count: number, yearMonth: string): string {
+  const noun = count === 1 ? 'transaction' : 'transactions';
+  return `${count} ${noun} ${monthPhrase(yearMonth)}`;
+}
+
 function TransactionsContent() {
-  const [yearMonth, setYearMonth] = useState(currentYearMonth());
-  const [filter, setFilter] = useState<TransactionFilter>({ query: '', categoryId: null, type: null });
+  const [searchParams] = useSearchParams();
+  const [initial] = useState(() => parseTransactionsParams(searchParams));
+  const [yearMonth, setYearMonth] = useState(initial.yearMonth ?? currentYearMonth());
+  const [filter, setFilter] = useState<TransactionFilter>({ query: '', categoryId: initial.categoryId, type: null });
   const categories = useCategories();
+  const targets = useTargets();
   const transactions = useTransactions(yearMonth);
   const { rowActions, sheets } = useTransactionEditing(yearMonth);
 
@@ -42,7 +54,8 @@ function TransactionsContent() {
   if (transactions.isLoading) return <Group justify="center" py="xl"><Loader /></Group>;
 
   const all = transactions.data ?? [];
-  const filtered = filterTransactions(all, categories.data ?? [], filter);
+  const targetedIds = targetedExpenseCategoryIds(categories.data ?? [], targets.data ?? []);
+  const filtered = filterTransactions(all, categories.data ?? [], filter, targetedIds);
   const items = [...filtered].sort((a, b) => (a.date < b.date ? 1 : -1));
   const outgoing = items
     .filter(t => t.type === 'EXPENSE')
@@ -53,7 +66,7 @@ function TransactionsContent() {
     return acc;
   }, {});
 
-  const categoryOptions = categorySelectData(categories.data ?? []);
+  const categoryOptions = [UNTARGETED_OPTION, ...categorySelectData(categories.data ?? [])];
   const isFiltering = filter.query !== '' || filter.categoryId !== null || filter.type !== null;
 
   return (
@@ -95,11 +108,11 @@ function TransactionsContent() {
       </Group>
 
       <Group justify="space-between">
-        <Text c="dimmed">{items.length} transactions</Text>
+        <Text c="dimmed">{countLine(items.length, yearMonth)}</Text>
         <Text fw={600}>{formatPence(outgoing)} spent</Text>
       </Group>
 
-      {items.length === 0 && all.length === 0 && <Text c="dimmed">Nothing logged this month yet.</Text>}
+      {items.length === 0 && all.length === 0 && <Text c="dimmed">Nothing logged {monthPhrase(yearMonth)} yet.</Text>}
       {items.length === 0 && all.length > 0 && isFiltering && <Text c="dimmed">No transactions match your search.</Text>}
 
       {Object.entries(byDate).map(([date, dayItems]) => (

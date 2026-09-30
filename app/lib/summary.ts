@@ -67,6 +67,11 @@ function byOverThenPercent(a: CategoryProgress, b: CategoryProgress): number {
   return b.percent - a.percent;
 }
 
+export function targetedExpenseCategoryIds(categories: Category[], targets: CategoryTarget[]): Set<string> {
+  const expenseIds = new Set(categories.filter(c => c.type === 'EXPENSE').map(c => c.categoryId));
+  return new Set(targets.map(t => t.categoryId).filter(id => expenseIds.has(id)));
+}
+
 export function buildMonthSummary(input: {
   transactions: Transaction[];
   categories: Category[];
