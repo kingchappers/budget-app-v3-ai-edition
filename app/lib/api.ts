@@ -13,6 +13,21 @@ export interface TransactionInput {
   recurringId?: string;
 }
 
+// What a browser hands over when someone subscribes to push, and when they want reminders.
+export interface PushSubscriptionInput {
+  subscription: {
+    endpoint: string;
+    expirationTime?: number | null;
+    keys: { p256dh: string; auth: string };
+  };
+  settings: {
+    hour: number;
+    quietStart: number | null;
+    quietEnd: number | null;
+    timeZone: string;
+  };
+}
+
 export interface RecurringInput {
   type: TransactionType;
   categoryId: string;
@@ -166,6 +181,12 @@ export function createApi(request: Request) {
     getTrash: async (): Promise<TrashEntry[]> => {
       const res = await request('/api/trash') as { items: TrashEntry[] };
       return res.items;
+    },
+    savePushSubscription: async (input: PushSubscriptionInput): Promise<void> => {
+      await request('/api/push/subscriptions', { method: 'POST', body: JSON.stringify(input) });
+    },
+    deletePushSubscription: async (endpoint: string): Promise<void> => {
+      await request('/api/push/subscriptions', { method: 'DELETE', body: JSON.stringify({ endpoint }) });
     },
     restoreFromTrash: async (entityType: TrashEntityType, id: string): Promise<void> => {
       await request('/api/trash/restore', {

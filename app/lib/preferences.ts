@@ -3,17 +3,31 @@ import { useCallback, useSyncExternalStore } from 'react';
 export interface Preferences {
   shortcutN: boolean;
   openAddOnLaunch: boolean;
+  // Bill reminders on this device. Off until the person turns them on and allows notifications.
+  billReminders: boolean;
+  // The hour of the day, 0 to 23, reminders arrive.
+  reminderHour: number;
+  quietHours: boolean;
+  quietStart: number;
+  quietEnd: number;
 }
 
 export const DEFAULT_PREFERENCES: Preferences = {
   shortcutN: true,
   openAddOnLaunch: false,
+  billReminders: false,
+  reminderHour: 8,
+  quietHours: true,
+  quietStart: 22,
+  quietEnd: 7,
 };
+
+const BOOLEAN_KEYS = ['shortcutN', 'openAddOnLaunch', 'billReminders', 'quietHours'] as const;
+const HOUR_KEYS = ['reminderHour', 'quietStart', 'quietEnd'] as const;
 
 export const PREFERENCES_KEY = 'budget.preferences';
 export const LEGACY_OPEN_ON_LAUNCH_KEY = 'budget.openAddOnLaunch';
 
-type PreferenceKey = keyof Preferences;
 type Listener = () => void;
 
 const listeners = new Set<Listener>();
@@ -53,9 +67,13 @@ function parseStored(raw: string | null): Record<string, unknown> {
 
 function fromStored(stored: Record<string, unknown>, legacyOpenOnLaunch: string | null): Preferences {
   const result: Preferences = { ...DEFAULT_PREFERENCES };
-  for (const key of Object.keys(DEFAULT_PREFERENCES) as PreferenceKey[]) {
+  for (const key of BOOLEAN_KEYS) {
     const value = stored[key];
-    if (typeof value === typeof DEFAULT_PREFERENCES[key]) result[key] = value as Preferences[typeof key];
+    if (typeof value === 'boolean') result[key] = value;
+  }
+  for (const key of HOUR_KEYS) {
+    const value = stored[key];
+    if (typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 23) result[key] = value;
   }
   if (typeof stored.openAddOnLaunch !== 'boolean' && legacyOpenOnLaunch === '1') result.openAddOnLaunch = true;
   return result;

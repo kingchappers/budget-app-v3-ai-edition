@@ -8,6 +8,8 @@ vi.mock('~/components/layout/DefaultLayout', () => ({
   DefaultLayout: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
+vi.mock('~/lib/queries', () => ({ useApi: () => ({}) }));
+
 import Settings from '../settings';
 import { DEFAULT_PREFERENCES, readPreferences, writePreferences } from '~/lib/preferences';
 
@@ -58,5 +60,11 @@ describe('Settings page', () => {
     renderSettings();
     expect(screen.getByRole('switch', { name: /^Press N to add a transaction/ })).not.toBeChecked();
     expect(screen.getByRole('switch', { name: /^Open Add sheet when the installed app starts/ })).toBeChecked();
+  });
+
+  it('has a Reminders section with bill reminders off', () => {
+    renderSettings();
+    expect(screen.getByRole('heading', { name: 'Reminders' })).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: /^Remind me about bills/ })).not.toBeChecked();
   });
 });

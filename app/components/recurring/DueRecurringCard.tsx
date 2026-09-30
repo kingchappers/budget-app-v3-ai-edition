@@ -6,6 +6,7 @@ import { useAuth0 } from '@auth0/auth0-react';
 import { Link } from 'react-router';
 import { TOAST_MS, ToastAction } from '~/components/layout/ToastAction';
 import { TransactionSheet } from '~/components/transactions/TransactionSheet';
+import { useDueLink } from '~/hooks/useDueLink';
 import { useDueRecurring } from '~/hooks/useDueRecurring';
 import { useSaveWithUndo } from '~/hooks/useSaveWithUndo';
 import { CategoryIcon } from '~/components/categories/CategoryIcon';
@@ -99,6 +100,9 @@ export function DueRecurringCard() {
 
   const visible = items.filter(item => !isSnoozed(userSub, item.recurring.recurringId, item.period, today));
   const groups = groupDueItems(visible, today);
+
+  // Tapping Add or Skip on a reminder notification lands here.
+  useDueLink(items, !isLoading && !error, { add, skip });
 
   function labelFor(item: DueItem): string {
     const category = categories.find(c => c.categoryId === item.recurring.categoryId);

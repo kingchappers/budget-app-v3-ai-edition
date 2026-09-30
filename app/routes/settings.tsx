@@ -1,5 +1,6 @@
 import { Card, Stack, Switch, Text, Title } from '@mantine/core';
 import { DefaultLayout } from '~/components/layout/DefaultLayout';
+import { BillReminders } from '~/components/settings/BillReminders';
 import { usePreferences } from '~/lib/preferences';
 import { pageTitle } from '~/lib/pageTitle';
 import type { Route } from './+types/settings';
@@ -31,6 +32,8 @@ function SettingsContent() {
           onChange={event => setPreferences({ openAddOnLaunch: event.currentTarget.checked })}
         />
       </Card>
+
+      <BillReminders />
     </Stack>
   );
 }
