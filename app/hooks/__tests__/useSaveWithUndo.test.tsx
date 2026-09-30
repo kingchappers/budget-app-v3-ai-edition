@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { MantineProvider } from '@mantine/core';
 import { Notifications, notifications } from '@mantine/notifications';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { addDaysIso, formatDayLabel, todayIso } from '~/lib/months';
 
 vi.mock('@auth0/auth0-react', () => ({ useAuth0: () => ({ user: { sub: 'user-1' } }) }));
 
@@ -47,7 +48,7 @@ async function clearQueue(): Promise<void> {
   await Promise.all(entries.map(e => dequeue(e.id)));
 }
 
-const input = { amount: 480, type: 'EXPENSE' as const, categoryId: 'cat-dining', description: '', date: '2026-09-20' };
+const input = { amount: 480, type: 'EXPENSE' as const, categoryId: 'cat-dining', description: '', date: todayIso() };
 const created = { transactionId: 't-real', yearMonth: '2026-09' };
 
 describe('useSaveWithUndo', () => {
@@ -152,6 +153,45 @@ describe('useSaveWithUndo', () => {
 
     expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
     expect(mockRemove.mutate).not.toHaveBeenCalled();
+  });
+
+  describe('the date in the message', () => {
+    function renderSaver() {
+      const client = new QueryClient();
+      const wrapper = ({ children }: { children: React.ReactNode }) => (
+        <QueryClientProvider client={client}><MantineProvider><Notifications />{children}</MantineProvider></QueryClientProvider>
+      );
+      return renderHook(() => useSaveWithUndo(), { wrapper });
+    }
+
+    it('leaves the date out for an entry dated today', async () => {
+      mockCreate.mutateAsync.mockResolvedValue({ transactionId: 't1', yearMonth: input.date.slice(0, 7) });
+      const { result } = renderSaver();
+      await act(async () => { await result.current(input); });
+      expect(await screen.findByText('Saved £4.80 · Dining')).toBeInTheDocument();
+    });
+
+    it('says Yesterday for yesterday', async () => {
+      mockCreate.mutateAsync.mockResolvedValue({ transactionId: 't1', yearMonth: '2026-09' });
+      const { result } = renderSaver();
+      await act(async () => { await result.current({ ...input, date: addDaysIso(todayIso(), -1) }); });
+      expect(await screen.findByText('Saved £4.80 · Dining · Yesterday')).toBeInTheDocument();
+    });
+
+    it('names the day for an earlier entry', async () => {
+      const date = addDaysIso(todayIso(), -12);
+      mockCreate.mutateAsync.mockResolvedValue({ transactionId: 't1', yearMonth: date.slice(0, 7) });
+      const { result } = renderSaver();
+      await act(async () => { await result.current({ ...input, date }); });
+      expect(await screen.findByText(`Saved £4.80 · Dining · ${formatDayLabel(date, todayIso())}`)).toBeInTheDocument();
+    });
+
+    it('uses a category name it was given when the list does not have the category yet', async () => {
+      mockCreate.mutateAsync.mockResolvedValue({ transactionId: 't1', yearMonth: input.date.slice(0, 7) });
+      const { result } = renderSaver();
+      await act(async () => { await result.current({ ...input, categoryId: 'cat-new' }, { categoryName: 'Untracked' }); });
+      expect(await screen.findByText('Saved £4.80 · Untracked')).toBeInTheDocument();
+    });
   });
 
   describe('undo from outside the toast', () => {
