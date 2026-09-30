@@ -4,9 +4,11 @@ import { DefaultLayout } from '~/components/layout/DefaultLayout';
 import { AccountRow } from '~/components/accounts/AccountRow';
 import { AccountHistorySheet } from '~/components/accounts/AccountHistorySheet';
 import { UpdateBalanceSheet } from '~/components/accounts/UpdateBalanceSheet';
+import { useUndoableDelete } from '~/hooks/useUndoableDelete';
 import { balanceAsOf, netWorthAsOf, typeOptionsForKind } from '~/lib/accounts';
 import { todayIso } from '~/lib/months';
 import { formatPence } from '~/lib/money';
+import { accountDeleteSummary } from '~/lib/trash';
 import { useAccounts, useCreateAccount, useDeleteAccount } from '~/lib/queries';
 import type { Account, AccountKind, AccountType } from '~/lib/types';
 
@@ -14,13 +16,32 @@ function AccountsContent() {
   const accounts = useAccounts();
   const create = useCreateAccount();
   const remove = useDeleteAccount();
+  const undoableDelete = useUndoableDelete();
 
   const [name, setName] = useState('');
   const [kind, setKind] = useState<AccountKind>('ASSET');
   const [type, setType] = useState<AccountType>('CASH');
   const [pendingDelete, setPendingDelete] = useState<Account | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [openAccount, setOpenAccount] = useState<Account | null>(null);
   const [updatingAccount, setUpdatingAccount] = useState<Account | null>(null);
+
+  function requestDelete(account: Account): void {
+    setPendingDelete(account);
+    setConfirmOpen(true);
+  }
+
+  function confirmDelete(): void {
+    if (!pendingDelete || !confirmOpen) return;
+    const account = pendingDelete;
+    setConfirmOpen(false);
+    undoableDelete({
+      label: accountDeleteSummary(account),
+      name: account.name,
+      ref: { entityType: 'ACCOUNT', id: account.accountId },
+      run: () => remove.mutateAsync(account.accountId),
+    });
+  }
 
   if (accounts.error) {
     return (
@@ -90,7 +111,7 @@ function AccountsContent() {
               key={account.accountId}
               account={account}
               onOpen={() => setOpenAccount(account)}
-              onDelete={() => setPendingDelete(account)}
+              onDelete={() => requestDelete(account)}
               onUpdate={() => setUpdatingAccount(account)}
             />
           ))}
@@ -105,25 +126,32 @@ function AccountsContent() {
               key={account.accountId}
               account={account}
               onOpen={() => setOpenAccount(account)}
-              onDelete={() => setPendingDelete(account)}
+              onDelete={() => requestDelete(account)}
               onUpdate={() => setUpdatingAccount(account)}
             />
           ))}
         </div>
       )}
 
-      <Modal opened={pendingDelete !== null} onClose={() => setPendingDelete(null)} title="Delete account" centered>
-        <Stack>
-          <Text>Delete {pendingDelete?.name}? This can't be undone.</Text>
-          <Group justify="flex-end">
-            <Button variant="default" onClick={() => setPendingDelete(null)}>Cancel</Button>
-            <Button color="danger" onClick={() => {
-              if (!pendingDelete) return;
-              remove.mutate(pendingDelete.accountId);
-              setPendingDelete(null);
-            }}>Delete</Button>
-          </Group>
-        </Stack>
+      <Modal
+        opened={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        onExitTransitionEnd={() => setPendingDelete(null)}
+        title="Delete account"
+        centered
+      >
+        {pendingDelete && (
+          <Stack>
+            <Text>
+              {accountDeleteSummary(pendingDelete)} will move to Recently deleted.
+              {' '}You can restore {pendingDelete.balances.length > 0 ? 'them' : 'it'} from there for 30 days.
+            </Text>
+            <Group justify="flex-end">
+              <Button variant="default" onClick={() => setConfirmOpen(false)}>Cancel</Button>
+              <Button onClick={confirmDelete}>Delete {accountDeleteSummary(pendingDelete)}</Button>
+            </Group>
+          </Stack>
+        )}
       </Modal>
 
       <AccountHistorySheet
