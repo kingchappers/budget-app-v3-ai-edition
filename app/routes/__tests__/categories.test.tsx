@@ -209,7 +209,7 @@ describe('Categories page rename', () => {
     );
   });
 
-  it('saves the new name on blur', async () => {
+  it('does not save when focus moves away, and keeps the field open', async () => {
     const user = userEvent.setup();
     renderPage();
 
@@ -218,11 +218,38 @@ describe('Categories page rename', () => {
     await user.clear(input);
     await user.type(input, 'Tennis');
     await user.tab();
+    await user.click(document.body);
+
+    expect(state.update).not.toHaveBeenCalled();
+    expect(screen.getByRole('textbox', { name: 'Rename Padel' })).toHaveValue('Tennis');
+  });
+
+  it('saves the new name from the Save button', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(screen.getByRole('button', { name: 'Rename Padel' }));
+    const input = screen.getByRole('textbox', { name: 'Rename Padel' });
+    await user.clear(input);
+    await user.type(input, 'Tennis');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
 
     expect(state.update).toHaveBeenCalledWith(
       { categoryId: 'custom-1', name: 'Tennis' },
       expect.objectContaining({ onError: expect.any(Function) }),
     );
+  });
+
+  it('cancels from the Cancel button without saving', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(screen.getByRole('button', { name: 'Rename Padel' }));
+    await user.type(screen.getByRole('textbox', { name: 'Rename Padel' }), 'x');
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    expect(state.update).not.toHaveBeenCalled();
+    expect(screen.getByText('Padel')).toBeInTheDocument();
   });
 
   it('cancels editing on Escape without saving', async () => {

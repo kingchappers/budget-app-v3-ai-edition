@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { ActionIcon, Alert, Button, Group, Stack, Switch, Table, Text, TextInput, UnstyledButton } from '@mantine/core';
+import { RenameField } from '~/components/categories/RenameField';
 import { IconPencil } from '@tabler/icons-react';
 import { SaveStatus, type SaveState } from '~/components/layout/SaveStatus';
 import { ResponsiveSheet } from '~/components/layout/ResponsiveSheet';
@@ -80,17 +81,12 @@ function PotSettingsForm({ pot, category }: { pot: PotSummary; category: Categor
         <Text fw={600}>Settings</Text>
         {category && !category.isDefault && (
           rename.editing ? (
-            <TextInput
-              size="xs"
-              autoFocus
-              aria-label={`Rename ${category.name}`}
-              value={rename.draft}
-              onChange={e => rename.setDraft(e.currentTarget.value)}
-              onBlur={rename.commit}
-              onKeyDown={e => {
-                if (e.key === 'Enter') { e.preventDefault(); rename.commit(); }
-                if (e.key === 'Escape') { e.preventDefault(); rename.cancel(); }
-              }}
+            <RenameField
+              categoryName={category.name}
+              draft={rename.draft}
+              onDraftChange={rename.setDraft}
+              onSave={rename.commit}
+              onCancel={rename.cancel}
             />
           ) : (
             <Group gap={4}>

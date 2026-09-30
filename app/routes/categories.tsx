@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { ActionIcon, Alert, Badge, Button, Card, Group, Loader, Select, Stack, Text, TextInput, Title, UnstyledButton } from '@mantine/core';
+import { RenameField } from '~/components/categories/RenameField';
+import { LoadError } from '~/components/layout/LoadError';
 import { IconPencil } from '@tabler/icons-react';
 import { DefaultLayout } from '~/components/layout/DefaultLayout';
 import { SaveStatus, type SaveState } from '~/components/layout/SaveStatus';
@@ -43,19 +45,7 @@ function CategoryRow({ category, onDelete, onError }: {
   if (editing) {
     return (
       <Group justify="space-between" py={6}>
-        <TextInput
-          size="xs"
-          autoFocus
-          aria-label={`Rename ${category.name}`}
-          value={draft}
-          onChange={e => setDraft(e.currentTarget.value)}
-          onBlur={commit}
-          onKeyDown={e => {
-            if (e.key === 'Enter') { e.preventDefault(); commit(); }
-            if (e.key === 'Escape') { e.preventDefault(); cancel(); }
-          }}
-          style={{ flex: 1 }}
-        />
+        <RenameField categoryName={category.name} draft={draft} onDraftChange={setDraft} onSave={commit} onCancel={cancel} />
       </Group>
     );
   }
@@ -135,9 +125,7 @@ function CategoriesContent() {
 
   if (categories.error) {
     return (
-      <Alert color="danger" title="Could not load categories">
-        <Button onClick={() => categories.refetch()}>Try again</Button>
-      </Alert>
+      <LoadError thing="categories" onRetry={() => categories.refetch()} />
     );
   }
   if (categories.isLoading) return <Group justify="center" py="xl"><Loader /></Group>;
