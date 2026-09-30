@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ActionIcon, Alert, Badge, Button, Card, Group, Loader, Select, Stack, Text, TextInput, Title, UnstyledButton } from '@mantine/core';
 import { IconPencil } from '@tabler/icons-react';
 import { DefaultLayout } from '~/components/layout/DefaultLayout';
+import { SaveStatus, type SaveState } from '~/components/layout/SaveStatus';
 import { ReassignDialog } from '~/components/categories/ReassignDialog';
 import { useInlineCategoryRename } from '~/hooks/useInlineCategoryRename';
 import { useCategories, useCreateCategory, useDeleteCategory, useReassignCategory } from '~/lib/queries';
@@ -85,16 +86,48 @@ function CategoriesContent() {
   const [group, setGroup] = useState<CategoryGroup>('EVERYDAY');
   const [pendingDelete, setPendingDelete] = useState<Category | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [createState, setCreateState] = useState<SaveState>('idle');
 
-  async function confirmDelete(toCategoryId: string) {
+  function addCategory(): void {
+    const trimmed = name.trim();
+    if (trimmed === '') return;
+    setCreateState('saving');
+    createCategory.mutate(
+      type === 'INCOME' ? { name: trimmed, type, icon: 'tag' } : { name: trimmed, type, icon: 'tag', group },
+      {
+        onSuccess: () => {
+          setName('');
+          setCreateState('saved');
+        },
+        onError: (createError: Error) => {
+          console.error(`Failed to create a ${type} category:`, createError);
+          setCreateState('error');
+        },
+      },
+    );
+  }
+
+  async function confirmDelete(toCategoryId: string): Promise<void> {
     if (!pendingDelete) return;
+    const deleting = pendingDelete;
+    const targetName = categories.data?.find(c => c.categoryId === toCategoryId)?.name ?? 'the chosen category';
+
     try {
-      await reassign.mutateAsync({ categoryId: pendingDelete.categoryId, toCategoryId });
-      await deleteCategory.mutateAsync(pendingDelete.categoryId);
+      await reassign.mutateAsync({ categoryId: deleting.categoryId, toCategoryId });
+    } catch (reassignError) {
       setPendingDelete(null);
-    } catch {
-      setError('Could not delete the category. Nothing was changed.');
+      console.error(`Failed to move transactions from category ${deleting.categoryId} to ${toCategoryId}:`, reassignError);
+      setError(`Couldn't move the transactions to ${targetName}, so ${deleting.name} wasn't deleted. Some transactions may already have moved. Try again.`);
+      return;
+    }
+
+    try {
+      await deleteCategory.mutateAsync(deleting.categoryId);
       setPendingDelete(null);
+    } catch (deleteError) {
+      setPendingDelete(null);
+      console.error(`Failed to delete category ${deleting.categoryId} after moving its transactions:`, deleteError);
+      setError(`Transactions moved to ${targetName}; the category wasn't deleted. Try again.`);
     }
   }
 
@@ -117,7 +150,7 @@ function CategoriesContent() {
       <Card withBorder>
         <Group align="flex-end">
           <TextInput label="New category" placeholder="e.g. Padel" style={{ flex: 1, minWidth: 160 }}
-            value={name} onChange={e => setName(e.currentTarget.value)} />
+            value={name} onChange={e => { setName(e.currentTarget.value); setCreateState('idle'); }} />
           <Select label="Type" data={TYPES} value={type}
             onChange={v => {
               const next = v as CategoryType;
@@ -130,19 +163,11 @@ function CategoriesContent() {
           <Select label="Group" data={groupsForType(type)} value={type === 'INCOME' ? null : group}
             onChange={v => { if (v) setGroup(v as CategoryGroup); }}
             disabled={type === 'INCOME'} allowDeselect={false} />
-          <Button
-            disabled={name.trim() === ''}
-            loading={createCategory.isPending}
-            onClick={() => {
-              createCategory.mutate(type === 'INCOME'
-                ? { name: name.trim(), type, icon: 'tag' }
-                : { name: name.trim(), type, icon: 'tag', group });
-              setName('');
-            }}
-          >
+          <Button disabled={name.trim() === ''} loading={createState === 'saving'} onClick={addCategory}>
             Add
           </Button>
         </Group>
+        <SaveStatus state={createState} onRetry={addCategory} />
       </Card>
 
       {groupCategories(all).map(bucket => (
