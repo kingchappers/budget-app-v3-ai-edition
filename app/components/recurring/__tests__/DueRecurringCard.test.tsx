@@ -398,6 +398,7 @@ describe('DueRecurringCard', () => {
     });
 
     it('says so calmly when linking fails', async () => {
+      const showSpy = vi.spyOn(notifications, 'show');
       vi.spyOn(console, 'error').mockImplementation(() => {});
       mockLink.mockImplementation((_vars: unknown, options: { onError: (error: Error) => void }) => options.onError(new Error('offline')));
       dueState.items = [item({ likelyMatches: [typed] })];
@@ -406,6 +407,9 @@ describe('DueRecurringCard', () => {
       await userEvent.setup().click(screen.getByRole('button', { name: "Yes, that's it" }));
 
       expect(await screen.findByText("Couldn't record Salary as logged. Check your connection and try again.")).toBeInTheDocument();
+      // An error stays until it is closed, whatever time the person chose for other messages.
+      const failure = showSpy.mock.calls.find(call => String(call[0].message).startsWith("Couldn't record Salary"));
+      expect(failure?.[0].autoClose).toBe(false);
       vi.mocked(console.error).mockRestore();
     });
 

@@ -5,7 +5,7 @@ import { notifications } from '@mantine/notifications';
 import { IconBellPause, IconDots, IconPencil, IconPlayerSkipForward } from '@tabler/icons-react';
 import { useAuth0 } from '@auth0/auth0-react';
 import { Link } from 'react-router';
-import { TOAST_MS, ToastAction } from '~/components/layout/ToastAction';
+import { ToastAction } from '~/components/layout/ToastAction';
 import { TransactionSheet } from '~/components/transactions/TransactionSheet';
 import { useDueLink } from '~/hooks/useDueLink';
 import { useDueRecurring } from '~/hooks/useDueRecurring';
@@ -51,8 +51,8 @@ interface DueRowProps {
 function DueRow({ item, label, icon, match, onAdd, onEdit, onSkip, onSnooze, onConfirmMatch, onRejectMatch }: DueRowProps) {
   return (
     <Stack gap={4} py={4}>
-      <Group justify="space-between" wrap="nowrap">
-        <Group gap="sm" wrap="nowrap" style={{ minWidth: 0 }}>
+      <Group justify="space-between" wrap="wrap">
+        <Group gap="sm" wrap="nowrap" style={{ minWidth: 0, flex: '1 1 10rem' }}>
           <ThemeIcon variant="light" color="primary" radius="xl" size={32}>
             <CategoryIcon icon={icon} />
           </ThemeIcon>
@@ -61,12 +61,12 @@ function DueRow({ item, label, icon, match, onAdd, onEdit, onSkip, onSnooze, onC
             <Text size="sm">{dueLabel(item)}</Text>
           </div>
         </Group>
-        <Group gap="xs" wrap="nowrap" style={{ flexShrink: 0 }}>
+        <Group gap="xs" wrap="nowrap">
           <Text fw={500} style={{ whiteSpace: 'nowrap' }}>{formatSignedPence(item.recurring.type, item.recurring.amount)}</Text>
-          <Button size="compact-sm" aria-label={`Add ${label}`} onClick={() => onAdd(item)}>Add</Button>
+          <Button size="compact-sm" mih={44} aria-label={`Add ${label}`} onClick={() => onAdd(item)}>Add</Button>
           <Menu position="bottom-end">
             <Menu.Target>
-              <ActionIcon variant="subtle" aria-label={`More actions for ${label}`}><IconDots size={16} /></ActionIcon>
+              <ActionIcon variant="subtle" size={44} aria-label={`More actions for ${label}`}><IconDots size={16} /></ActionIcon>
             </Menu.Target>
             <Menu.Dropdown>
               <Menu.Item leftSection={<IconPencil size={14} />} onClick={() => onEdit(item)}>Add with changes</Menu.Item>
@@ -191,7 +191,7 @@ export function DueRecurringCard() {
   function snooze(item: DueItem): void {
     snoozeUntilTomorrow(userSub, item.recurring.recurringId, item.period, today);
     setPrefsVersion(version => version + 1);
-    notifications.show({ autoClose: TOAST_MS, message: `${labelFor(item)} will show again tomorrow` });
+    notifications.show({ autoClose: undoAutoClose(undoDuration), message: `${labelFor(item)} will show again tomorrow` });
   }
 
   function confirmMatch(item: DueItem, match: Transaction): void {
@@ -199,7 +199,7 @@ export function DueRecurringCard() {
       onError: (linkError) => {
         console.error('Failed to link a transaction to its recurring bill:', linkError);
         notifications.show({
-          autoClose: TOAST_MS,
+          autoClose: false,
           message: `Couldn't record ${labelFor(item)} as logged. Check your connection and try again.`,
         });
       },
@@ -239,7 +239,7 @@ export function DueRecurringCard() {
       <Card withBorder>
         <Group justify="space-between" mb="xs">
           <Title order={2} size="h5">Due</Title>
-          <Anchor component={Link} to="/plan?tab=recurring" size="sm" style={{ display: 'inline-flex', alignItems: 'center', minHeight: 24 }}>Manage</Anchor>
+          <Anchor component={Link} to="/plan?tab=recurring" size="sm" style={{ display: 'inline-flex', alignItems: 'center', minHeight: 44 }}>Manage</Anchor>
         </Group>
         {groups.current.map(renderRow)}
         {groups.older.length > 0 && (
@@ -251,7 +251,9 @@ export function DueRecurringCard() {
               aria-expanded={showOlder}
               aria-controls="due-older"
               onClick={() => setShowOlder(open => !open)}
-              style={{ minHeight: 44 }}
+              h="auto"
+              mih={44}
+              styles={{ label: { whiteSpace: 'normal', textAlign: 'center' } }}
             >
               {showOlder ? 'Hide earlier bills' : `Earlier bills (${groups.older.reduce((n, g) => n + g.items.length, 0)}), when you are ready`}
             </Button>

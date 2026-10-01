@@ -123,27 +123,35 @@ function InsightsContent() {
         <SegmentedControl
           fullWidth
           mt={4}
+          // Four options do not fit side by side at the larger text sizes.
+          orientation={preferences.textSize === 'standard' ? 'horizontal' : 'vertical'}
           value={String(months)}
           onChange={value => setMonths(Number(value))}
           data={SPAN_OPTIONS}
         />
       </Input.Wrapper>
-      <Group justify="space-between" wrap="nowrap">
+      <Text fw={600} ta="center">{periodLabel(current[0], current[1])}</Text>
+      <Group gap="xs" wrap="wrap" grow>
         <Button
           variant="subtle"
           leftSection={<IconChevronLeft size={18} />}
           aria-label={`Earlier: ${earlierLabel}`}
           onClick={() => setAnchor(earlierAnchor)}
+          h="auto"
+          mih={44}
+          styles={{ label: { whiteSpace: 'normal' } }}
         >
           {earlierLabel}
         </Button>
-        <Text fw={600} ta="center">{periodLabel(current[0], current[1])}</Text>
         <Button
           variant="subtle"
           rightSection={<IconChevronRight size={18} />}
           aria-label={`Later: ${laterLabel}`}
           disabled={!canGoNewer(anchor)}
           onClick={() => setAnchor(laterAnchor)}
+          h="auto"
+          mih={44}
+          styles={{ label: { whiteSpace: 'normal' } }}
         >
           {laterLabel}
         </Button>

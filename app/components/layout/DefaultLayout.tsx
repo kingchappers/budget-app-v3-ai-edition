@@ -177,6 +177,8 @@ function LayoutShell({ children }: { children: React.ReactNode }) {
   }]] : []);
 
   return (
+    <>
+    <a className="skip-link" href="#main">Skip to main content</a>
     <AppShell
       padding="md"
       header={{ height: 60 }}
@@ -184,8 +186,8 @@ function LayoutShell({ children }: { children: React.ReactNode }) {
     >
       <AppShell.Header>
         <Flex h="100%" px="md" justify="space-between" align="center">
-          <Text fw={700}>Budget</Text>
-          <Group gap="sm">
+          <Text fw={700} className="app-wordmark">Budget</Text>
+          <Group gap="xs" wrap="nowrap">
             {signedIn && (
               <Tooltip label={shortcutN ? 'Add transaction (N)' : 'Add transaction'} events={{ hover: true, focus: true, touch: false }}>
                 <Button visibleFrom="sm" leftSection={<IconPlus size={18} />} onClick={openAdd}>Add transaction</Button>
@@ -203,7 +205,7 @@ function LayoutShell({ children }: { children: React.ReactNode }) {
       </AppShell.Navbar>
 
       {/* Clears the phone tab bar, which is fixed to the bottom of the screen. */}
-      <AppShell.Main style={{ paddingBottom: 'calc(var(--tab-bar-height) + var(--mantine-spacing-xl))' }}>
+      <AppShell.Main id="main" tabIndex={-1} style={{ outline: 'none', paddingBottom: 'calc(var(--tab-bar-height) + var(--mantine-spacing-xl))' }}>
         <OfflineQueueBanner />
         <MainContent session={session}>{children}</MainContent>
       </AppShell.Main>
@@ -211,6 +213,7 @@ function LayoutShell({ children }: { children: React.ReactNode }) {
       <LaunchIntent onOpenAdd={openAdd} />
       <BottomTabs signedIn={signedIn} onAdd={openAdd} />
     </AppShell>
+    </>
   );
 }
 

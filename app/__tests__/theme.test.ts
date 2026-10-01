@@ -58,3 +58,17 @@ describe('motion', () => {
     expect(mergedTheme.respectReducedMotion).toBe(true);
   });
 });
+
+describe('error text contrast', () => {
+  const resolved = cssVariablesResolver(mergedTheme);
+
+  it('reaches 4.5:1 on white in light mode', () => {
+    expect(contrastRatio(resolved.light?.['--mantine-color-error'] as string, '#ffffff')).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it('reaches 4.5:1 on the dark page and on a dark card', () => {
+    const error = resolved.dark?.['--mantine-color-error'] as string;
+    expect(contrastRatio(error, '#242424')).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio(error, '#2e2e2e')).toBeGreaterThanOrEqual(4.5);
+  });
+});

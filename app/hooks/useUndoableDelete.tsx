@@ -1,5 +1,5 @@
 import { notifications } from '@mantine/notifications';
-import { TOAST_MS, ToastAction } from '~/components/layout/ToastAction';
+import { ToastAction } from '~/components/layout/ToastAction';
 import { ApiError } from '~/lib/apiError';
 import { usePreferences } from '~/lib/preferences';
 import { useRestoreFromTrash } from '~/lib/queries';
@@ -32,7 +32,7 @@ export function useUndoableDelete(): (del: UndoableDelete) => void {
 
   function undo(del: UndoableDelete): void {
     restore.mutateAsync(del.ref).then(
-      () => showMessage(`Restored ${del.label}`, TOAST_MS),
+      () => showMessage(`Restored ${del.label}`, undoAutoClose(undoDuration)),
       (error: unknown) => {
         console.error('Restore after undo failed', { entityType: del.ref.entityType, error });
         showMessage(restoreFailureMessage(error, del.name), false);

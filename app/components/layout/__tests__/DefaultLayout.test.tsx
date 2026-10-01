@@ -100,6 +100,14 @@ describe('DefaultLayout add shortcut', () => {
     expect(screen.getByRole('navigation', { name: 'Primary' }).style.height).toBe('var(--tab-bar-height)');
   });
 
+  it('starts with a skip link to the main content', () => {
+    renderLayout();
+    const skip = screen.getByRole('link', { name: 'Skip to main content' });
+    expect(skip).toHaveAttribute('href', '#main');
+    expect(document.getElementById('main')).not.toBeNull();
+    expect(skip.compareDocumentPosition(screen.getByRole('main')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it('shows the quick entry tips button in the header', async () => {
     renderLayout();
     await userEvent.setup().click(screen.getByRole('button', { name: 'Quick entry tips' }));

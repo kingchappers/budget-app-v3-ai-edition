@@ -88,3 +88,55 @@ html[data-text-size='largest'] .tab-label {
   transition-duration: 0.01ms !important;
   scroll-behavior: auto !important;
 }
+
+/* Skip link: the first stop for keyboard and screen reader users, out of sight until it has focus. */
+.skip-link {
+  position: absolute;
+  left: 8px;
+  top: -64px;
+  z-index: 1000;
+  padding: 12px 16px;
+  border-radius: var(--mantine-radius-sm);
+  background: var(--mantine-color-body);
+  color: var(--mantine-color-text);
+  border: 2px solid var(--mantine-color-primary-6);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.skip-link:focus {
+  top: 8px;
+}
+
+/* A phone header cannot hold the name and four controls at the larger text sizes. The name is
+   the one that goes; every control stays. */
+@media (max-width: 30em) {
+  html[data-text-size='large'] .app-wordmark,
+  html[data-text-size='largest'] .app-wordmark {
+    display: none;
+  }
+}
+
+/* The plan summary floats above the tab bar; at larger text it would cover the fields being edited. */
+html[data-text-size='large'] .plan-footer,
+html[data-text-size='largest'] .plan-footer {
+  position: static !important;
+}
+
+/* Segmented controls share one row. Tighter labels keep the last option from being cut off
+   at the larger text sizes and on narrow screens. */
+.mantine-SegmentedControl-label {
+  padding-inline: 6px;
+}
+
+/* While a sheet is open the toast would sit over its bottom buttons, so it moves to the top. */
+body:has([role='dialog']) .mantine-Notifications-root[data-position='bottom-center'] {
+  top: calc(env(safe-area-inset-top, 0px) + 12px);
+  bottom: auto;
+}
+
+/* Error text is the one message that must be read, so it is not the smallest text on the page.
+   Mantine sets the size inline per field, hence !important. */
+.mantine-InputWrapper-error {
+  font-size: 0.875rem !important;
+}

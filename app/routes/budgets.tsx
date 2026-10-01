@@ -136,6 +136,7 @@ function PlanFooter({ targets }: { targets: CategoryTarget[] }) {
       p="sm"
       role="status"
       data-testid="plan-footer"
+      className="plan-footer"
       // Sits just above the phone tab bar.
       style={{ position: 'sticky', bottom: 'calc(var(--tab-bar-height) + 12px)', zIndex: 50 }}
     >
