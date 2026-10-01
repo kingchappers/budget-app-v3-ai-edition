@@ -136,7 +136,7 @@ export function RecurringContent() {
   return (
     <Stack>
       <Group justify="space-between">
-        <Title order={1} size="h3">Recurring</Title>
+        <Title order={2} size="h4">Recurring</Title>
         <Button leftSection={<IconPlus size={16} />} onClick={() => setCreating(true)}>New</Button>
       </Group>
 

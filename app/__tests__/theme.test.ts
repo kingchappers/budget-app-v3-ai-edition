@@ -19,6 +19,11 @@ describe('dark mode dimmed text contrast', () => {
     expect(contrastRatio(dimmed as string, MANTINE_DEFAULT_DARK_BODY)).toBeGreaterThanOrEqual(4.5);
   });
 
+  it('also reaches 4.5:1 on a card, which sits lighter than the page (#2e2e2e)', () => {
+    const dimmed = cssVariablesResolver(mergedTheme).dark?.['--mantine-color-dimmed'];
+    expect(contrastRatio(dimmed as string, '#2e2e2e')).toBeGreaterThanOrEqual(4.5);
+  });
+
   it('does not regress light mode dimmed text contrast', () => {
     const gray6 = mergedTheme.colors.gray[6];
 

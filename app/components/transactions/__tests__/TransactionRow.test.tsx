@@ -253,3 +253,20 @@ describe('TransactionRow tap to edit', () => {
     expect(screen.queryByRole('button', { name: 'Edit Weekly Shop' })).not.toBeInTheDocument();
   });
 });
+
+describe('TransactionRow layout', () => {
+  it('lets the amount and actions drop below the name when they do not fit beside it', () => {
+    render(
+      <MantineProvider>
+        <TransactionRow
+          transaction={{ transactionId: 't1', yearMonth: '2026-10', amount: 1000, type: 'EXPENSE', categoryId: 'c', description: 'Lunch', date: '2026-10-01', createdAt: '' }}
+          categoryName="Eating out"
+          categoryIcon="tag"
+          onEdit={() => {}}
+        />
+      </MantineProvider>,
+    );
+    const row = screen.getByRole('button', { name: 'Edit Lunch' }).parentElement as HTMLElement;
+    expect(row.style.getPropertyValue('--group-wrap')).toBe('wrap');
+  });
+});

@@ -70,7 +70,7 @@ beforeEach(() => {
 describe('Pots page', () => {
   it('groups pots under Saving for known costs and Saving & Investment in group order', () => {
     renderPage();
-    const headings = screen.getAllByRole('heading', { level: 2 }).map(h => h.textContent);
+    const headings = screen.getAllByRole('heading', { level: 3 }).map(h => h.textContent);
     expect(headings).toEqual(['Saving for known costs', 'Saving & Investment']);
   });
 
@@ -160,8 +160,11 @@ describe('Pots page', () => {
 });
 
 describe('Accessibility', () => {
-  it('has one h1 and no skipped heading levels', () => {
+  it('has no skipped heading levels under the Plan page\'s h1', () => {
     renderPage();
+    const planHeading = document.createElement('h1');
+    planHeading.textContent = 'Plan';
+    document.body.prepend(planHeading);
     expectSoundHeadings(document.body);
   });
 

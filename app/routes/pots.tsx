@@ -46,13 +46,13 @@ export function PotsContent() {
 
   return (
     <Stack>
-      <Title order={1} size="h3">Pots</Title>
+      <Title order={2} size="h4">Pots</Title>
       {rows.length === 0 && (
         <Text c="dimmed">No pots yet. Add a category with the Pot type on the Categories page.</Text>
       )}
       {groupItems(rows, row => bucketKeyFor(row.category), row => row.category.name).map(bucket => (
         <div key={bucket.key}>
-          <Title order={2} size="h5" mt="md" mb="xs">{bucket.label}</Title>
+          <Title order={3} size="h5" mt="md" mb="xs">{bucket.label}</Title>
           {bucket.items.map(({ pot, category }) => (
             <PotRow
               key={pot.categoryId}
