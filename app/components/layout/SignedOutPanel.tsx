@@ -1,6 +1,7 @@
 import { Button, Stack, Text, Title } from '@mantine/core';
 import { IconLock } from '@tabler/icons-react';
 import { useAuth0 } from '@auth0/auth0-react';
+import { SESSION_LIFETIME_TEXT } from '~/lib/sessionLifetime';
 
 export interface SignedOutPanelProps {
   sessionEnded: boolean;
@@ -20,9 +21,10 @@ export function SignedOutPanel({ sessionEnded }: SignedOutPanelProps) {
   return (
     <Stack align="center" gap="md" py={48} maw={420} mx="auto" ta="center">
       <IconLock size={40} stroke={1.5} aria-hidden="true" />
-      <Title order={2}>{sessionEnded ? 'Your session has ended' : "You're signed out"}</Title>
+      <Title order={1} size="h2">{sessionEnded ? 'Your session has ended' : "You're signed out"}</Title>
       <Text>Your data is safe. Sign in to see it.</Text>
       <Button size="lg" onClick={() => void signIn()}>Sign in</Button>
+      <Text size="sm">{SESSION_LIFETIME_TEXT}</Text>
     </Stack>
   );
 }

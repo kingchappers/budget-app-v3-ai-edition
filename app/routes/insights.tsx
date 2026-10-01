@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ActionIcon, Alert, Button, Group, Loader, SegmentedControl, Stack, Text, Title } from '@mantine/core';
+import { ActionIcon, Alert, Button, Group, Input, Loader, SegmentedControl, Stack, Text, Title } from '@mantine/core';
 import { IconChevronLeft, IconChevronRight } from '@tabler/icons-react';
 import { DefaultLayout } from '~/components/layout/DefaultLayout';
 import { ResponsiveSheet } from '~/components/layout/ResponsiveSheet';
@@ -22,9 +22,9 @@ import type { Route } from './+types/insights';
 
 const SPAN_OPTIONS = [
   { label: 'This month', value: '1' },
-  { label: '3M', value: '3' },
-  { label: '6M', value: '6' },
-  { label: '12M', value: '12' },
+  { label: '3 months', value: '3' },
+  { label: '6 months', value: '6' },
+  { label: '12 months', value: '12' },
 ];
 
 function periodLabel(from: string, to: string): string {
@@ -68,12 +68,16 @@ function InsightsContent() {
 
   return (
     <Stack>
-      <Title order={3}>Insights</Title>
-      <SegmentedControl
-        value={String(months)}
-        onChange={value => setMonths(Number(value))}
-        data={SPAN_OPTIONS}
-      />
+      <Title order={1} size="h3">Insights</Title>
+      <Input.Wrapper label="Show">
+        <SegmentedControl
+          fullWidth
+          mt={4}
+          value={String(months)}
+          onChange={value => setMonths(Number(value))}
+          data={SPAN_OPTIONS}
+        />
+      </Input.Wrapper>
       <Group justify="space-between">
         <ActionIcon variant="subtle" aria-label="Earlier" onClick={() => setAnchor(shiftMonth(anchor, -months))}>
           <IconChevronLeft size={20} />
@@ -88,22 +92,22 @@ function InsightsContent() {
       </Group>
       <SummaryRow current={currentTotals} previous={previousTotals} />
 
-      <Title order={5} mt="md">Spending by group</Title>
+      <Title order={2} size="h5" mt="md">Spending by group</Title>
       <GroupBreakdownChart rows={breakdown} onSelectGroup={setOpenGroup} />
 
-      <Title order={5} mt="md">Monthly trend</Title>
+      <Title order={2} size="h5" mt="md">Monthly trend</Title>
       <MonthlyTrendChart rows={trend} />
 
-      <Title order={5} mt="md">Biggest movers</Title>
+      <Title order={2} size="h5" mt="md">Biggest movers</Title>
       <BiggestMoversList up={movers.up} down={movers.down} />
 
-      <Title order={5} mt="md">Targets</Title>
+      <Title order={2} size="h5" mt="md">Targets</Title>
       <TargetAdherence rows={adherence} />
 
-      <Title order={5} mt="md">Pots</Title>
+      <Title order={2} size="h5" mt="md">Pots</Title>
       <PotsTrend pots={pots.data ?? []} categories={categories.data ?? []} current={current} />
 
-      <Title order={5} mt="md">Net worth</Title>
+      <Title order={2} size="h5" mt="md">Net worth</Title>
       <NetWorth accounts={accounts.data ?? []} months={monthsInPeriod(current)} />
 
       <ResponsiveSheet opened={openGroup !== null} onClose={() => setOpenGroup(null)} title={openGroupLabel}>

@@ -207,7 +207,7 @@ export function DueRecurringCard() {
     card = (
       <Card withBorder>
         <Group justify="space-between" mb="xs">
-          <Title order={5}>Due</Title>
+          <Title order={2} size="h5">Due</Title>
           <Anchor component={Link} to="/recurring" size="sm">Manage</Anchor>
         </Group>
         {groups.current.map(renderRow)}
@@ -215,7 +215,7 @@ export function DueRecurringCard() {
           <section key={group.period} aria-label={olderGroupHeading(group.period)}>
             {(index > 0 || groups.current.length > 0) && <Divider my="xs" />}
             <Group justify="space-between" wrap="nowrap" mb={4}>
-              <Title order={6}>{olderGroupHeading(group.period)}</Title>
+              <Title order={3} size="h6">{olderGroupHeading(group.period)}</Title>
               <Button
                 size="compact-sm"
                 variant="light"

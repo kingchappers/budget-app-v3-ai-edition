@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ActionIcon, Alert, Button, Card, Group, Loader, Menu, SegmentedControl, Stack, Text, TextInput, Title } from '@mantine/core';
+import { ActionIcon, Alert, Button, Card, Group, Input, Loader, Menu, SegmentedControl, Stack, Text, TextInput, Title } from '@mantine/core';
 import { IconDots, IconTrash } from '@tabler/icons-react';
 import { DefaultLayout } from '~/components/layout/DefaultLayout';
 import { SaveStatus, type SaveState } from '~/components/layout/SaveStatus';
@@ -99,11 +99,15 @@ function TargetRow({ category, amountPence, period }: {
           value={value} onChange={e => changeValue(e.currentTarget.value)} error={error}
           aria-label={`Target for ${category.name}`}
         />
-        <SegmentedControl
-          value={selectedPeriod}
-          onChange={v => changePeriod(v as TargetPeriod)}
-          data={[{ label: '/mo', value: 'MONTHLY' }, { label: '/wk', value: 'WEEKLY' }]}
-        />
+        <Input.Wrapper label="Repeats">
+          <SegmentedControl
+            mt={4}
+            aria-label={`How often the ${category.name} target repeats`}
+            value={selectedPeriod}
+            onChange={v => changePeriod(v as TargetPeriod)}
+            data={[{ label: 'per month', value: 'MONTHLY' }, { label: 'per week', value: 'WEEKLY' }]}
+          />
+        </Input.Wrapper>
         <Button onClick={save} loading={saveState === 'saving'}>Save</Button>
       </Group>
       <Group justify="flex-end" mt={4} mih={24}>
@@ -134,12 +138,12 @@ function TargetsContent() {
 
   return (
     <Stack>
-      <Title order={3}>Targets</Title>
+      <Title order={1} size="h3">Targets</Title>
       <Text c="dimmed" size="sm">Income and pots have no monthly target here. Set a pot's goal and plan on the Pots page.</Text>
 
       {groupCategories(eligible).map(bucket => (
         <div key={bucket.key}>
-          <Title order={5} mt="md" mb="xs">{bucket.label}</Title>
+          <Title order={2} size="h5" mt="md" mb="xs">{bucket.label}</Title>
           {bucket.items.map(c => {
             const t = targetFor(c.categoryId);
             return <TargetRow key={c.categoryId} category={c}

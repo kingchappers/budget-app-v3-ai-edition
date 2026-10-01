@@ -82,7 +82,7 @@ function AccountsContent() {
 
   return (
     <Stack>
-      <Title order={3}>Accounts</Title>
+      <Title order={1} size="h3">Accounts</Title>
 
       <SimpleGrid cols={{ base: 1, sm: 3 }}>
         <Text>Assets: {formatPence(totalAssets)}</Text>
@@ -119,7 +119,7 @@ function AccountsContent() {
 
       {assets.length > 0 && (
         <div>
-          <Title order={5} mt="md" mb="xs">Assets</Title>
+          <Title order={2} size="h5" mt="md" mb="xs">Assets</Title>
           {assets.map(account => (
             <AccountRow
               key={account.accountId}
@@ -134,7 +134,7 @@ function AccountsContent() {
 
       {liabilities.length > 0 && (
         <div>
-          <Title order={5} mt="md" mb="xs">Liabilities</Title>
+          <Title order={2} size="h5" mt="md" mb="xs">Liabilities</Title>
           {liabilities.map(account => (
             <AccountRow
               key={account.accountId}

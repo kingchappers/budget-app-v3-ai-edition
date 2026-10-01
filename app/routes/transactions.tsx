@@ -77,7 +77,7 @@ function TransactionsContent() {
 
   return (
     <Stack>
-      <MonthHeader yearMonth={yearMonth} onChange={setYearMonth} />
+      <MonthHeader yearMonth={yearMonth} onChange={setYearMonth} pageTitle="Transactions" />
 
       <TextInput
         placeholder="Search transactions"
