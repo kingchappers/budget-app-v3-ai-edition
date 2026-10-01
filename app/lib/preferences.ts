@@ -60,6 +60,8 @@ export interface Preferences {
   launchOfferAnswered: boolean;
   // Shows how much is left in the category on the Saved message. Off unless asked for.
   leftAfterSave: boolean;
+  // The day of the month pay arrives, 1 to 28, or null when not set. Home then shows the bills due before it.
+  payDay: number | null;
 }
 
 export const DEFAULT_PREFERENCES: Preferences = {
@@ -87,6 +89,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   tourDismissals: 0,
   launchOfferAnswered: false,
   leftAfterSave: false,
+  payDay: null,
 };
 
 const BOOLEAN_KEYS = ['shortcutN', 'openAddOnLaunch', 'billReminders', 'quietHours', 'quickAddTipDismissed', 'reduceMotion', 'showMilestones', 'launchOfferAnswered', 'leftAfterSave'] as const;
@@ -201,6 +204,8 @@ function fromStored(stored: Record<string, unknown>, legacyOpenOnLaunch: string 
   }
   const step = stored.tourStep;
   if (typeof step === 'number' && Number.isInteger(step)) result.tourStep = Math.min(Math.max(step, 0), TOUR_SCREENS);
+  const payDay = stored.payDay;
+  if (typeof payDay === 'number' && Number.isInteger(payDay) && payDay >= 1 && payDay <= 28) result.payDay = payDay;
   const dismissals = stored.tourDismissals;
   if (typeof dismissals === 'number' && Number.isInteger(dismissals)) result.tourDismissals = Math.min(Math.max(dismissals, 0), 9);
   if (typeof stored.openAddOnLaunch !== 'boolean' && legacyOpenOnLaunch === '1') result.openAddOnLaunch = true;

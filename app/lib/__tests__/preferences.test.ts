@@ -276,3 +276,20 @@ describe('tour dismissals and one-off offers', () => {
     expect(prefs.readPreferences(window.localStorage)).toMatchObject({ launchOfferAnswered: true, leftAfterSave: true });
   });
 });
+
+describe('pay day', () => {
+  it('is not set to begin with', () => {
+    expect(prefs.DEFAULT_PREFERENCES.payDay).toBeNull();
+  });
+
+  it('keeps a whole day from 1 to 28, and repairs the rest to not set', () => {
+    for (const value of [1, 15, 28]) {
+      window.localStorage.setItem(prefs.PREFERENCES_KEY, JSON.stringify({ payDay: value }));
+      expect(prefs.readPreferences(window.localStorage).payDay).toBe(value);
+    }
+    for (const value of [0, 29, 31, 12.5, '15', null, -3]) {
+      window.localStorage.setItem(prefs.PREFERENCES_KEY, JSON.stringify({ payDay: value }));
+      expect(prefs.readPreferences(window.localStorage).payDay).toBeNull();
+    }
+  });
+});

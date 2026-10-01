@@ -98,6 +98,17 @@ describe('Settings page', () => {
     expect(readPreferences(window.localStorage).leftAfterSave).toBe(true);
   });
 
+  it('starts with no pay day, and saves one when chosen', async () => {
+    renderSettings();
+    const field = screen.getByRole('textbox', { name: 'Pay day' });
+    expect(field).toHaveValue('');
+
+    await userEvent.setup().click(field);
+    await userEvent.setup().click(await screen.findByRole('option', { name: '25th' }));
+
+    expect(readPreferences(window.localStorage).payDay).toBe(25);
+  });
+
   it('says what milestones are and what they are not', () => {
     renderSettings();
     expect(screen.getByText(/no streaks, sounds or animations/i)).toBeInTheDocument();
@@ -122,10 +133,10 @@ describe('Settings page', () => {
   });
 
   describe('grouping', () => {
-    it('groups the controls under Signing in, Display, Messages, Keyboard and launch, Reminders and Manage, in that order', () => {
+    it('groups the controls under Signing in, Display, Messages, Money, Keyboard and launch, Reminders and Manage, in that order', () => {
       renderSettings();
       const headings = screen.getAllByRole('heading', { level: 2 }).map(heading => heading.textContent);
-      expect(headings).toEqual(['Signing in', 'Display', 'Messages', 'Keyboard and launch', 'Reminders', 'Manage']);
+      expect(headings).toEqual(['Signing in', 'Display', 'Messages', 'Money', 'Keyboard and launch', 'Reminders', 'Manage']);
     });
 
     it('keeps to a handful of controls, each with a line of plain help', () => {

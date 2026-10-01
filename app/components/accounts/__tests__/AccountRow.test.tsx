@@ -76,4 +76,14 @@ describe('AccountRow', () => {
     expect(open).toHaveAccessibleName(/Cash/);
     expect(open).not.toHaveAttribute('aria-label');
   });
+
+  it('shows how a debt has moved since the last balance, in plain words', () => {
+    renderRow(account({ kind: 'LIABILITY', type: 'CREDIT_CARD', balances: [{ date: '2026-08-10', pence: 32000 }, { date: '2026-09-10', pence: 27000 }] }));
+    expect(screen.getByText('£50.00 lower than on 10 Aug')).toBeInTheDocument();
+  });
+
+  it('does not add a movement line to an asset', () => {
+    renderRow(account({ balances: [{ date: '2026-08-10', pence: 32000 }, { date: '2026-09-10', pence: 27000 }] }));
+    expect(screen.queryByText(/lower than on|higher than on/)).not.toBeInTheDocument();
+  });
 });

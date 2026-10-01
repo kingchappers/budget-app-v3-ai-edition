@@ -1,4 +1,5 @@
-import { daysBetweenIso, lastDayOfMonth } from './months';
+import { formatPence } from './money';
+import { daysBetweenIso, formatShortDate, lastDayOfMonth } from './months';
 import type { Account, AccountKind, AccountType, BalanceEntry } from './types';
 
 export function balanceAsOf(entries: BalanceEntry[], date: string): number {
@@ -20,6 +21,23 @@ export function updatedAgo(entries: BalanceEntry[], today: string): string {
   if (days === 0) return 'Updated today';
   if (days === 1) return 'Updated yesterday';
   return `Updated ${days} days ago`;
+}
+
+// Accounts with no balance entered. They count as £0, so the net worth total is not complete without them.
+export function accountsWithoutBalance(accounts: Account[]): Account[] {
+  return accounts.filter(account => account.balances.length === 0);
+}
+
+// How the latest balance compares with the one before it, in plain words, e.g. "£50.00 lower than on 10 Sep".
+// Said without judgement: for a debt, lower is progress, but the words are the same for every account.
+export function balanceChangeNote(entries: BalanceEntry[], today: string): string | null {
+  const sorted = entries.filter(entry => entry.date <= today).sort((a, b) => a.date.localeCompare(b.date));
+  if (sorted.length < 2) return null;
+  const latest = sorted[sorted.length - 1];
+  const before = sorted[sorted.length - 2];
+  const difference = latest.pence - before.pence;
+  if (difference === 0) return `Same as on ${formatShortDate(before.date)}`;
+  return `${formatPence(Math.abs(difference))} ${difference < 0 ? 'lower' : 'higher'} than on ${formatShortDate(before.date)}`;
 }
 
 export function netWorthAsOf(accounts: Account[], date: string): number {

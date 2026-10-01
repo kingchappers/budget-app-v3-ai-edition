@@ -25,6 +25,7 @@ const data = vi.hoisted(() => ({
   txCalls: [] as [string, boolean | undefined][],
   // Transactions in the last 12 months: any entry means the person has used the app before.
   history: [{}] as unknown[],
+  recurring: [] as unknown[],
 }));
 vi.mock('~/lib/queries', () => ({
   useCategories: () => ({ data: data.categories, isLoading: false, error: null, refetch: vi.fn() }),
@@ -38,6 +39,7 @@ vi.mock('~/lib/queries', () => ({
     return { data: data.byMonth[month] ?? data.transactions, isLoading: false, error: null, refetch: vi.fn() };
   },
   useTransactionsRange: () => ({ isSuccess: true, data: data.history }),
+  useRecurring: () => ({ data: data.recurring, isLoading: false, error: null }),
   useDeleteTransaction: () => ({ mutate: vi.fn(), mutateAsync: vi.fn() }),
   useRestoreFromTrash: () => ({ mutateAsync: vi.fn() }),
 }));
@@ -79,6 +81,7 @@ describe('Home', () => {
     data.potsCalls = [];
     data.byMonth = {};
     data.txCalls = [];
+    data.recurring = [];
     window.localStorage.clear();
   });
 
@@ -422,5 +425,52 @@ describe('Accessibility', () => {
   it('has no unlabelled controls, empty buttons or empty headings', async () => {
     renderHome();
     await expectNoViolations(document.body);
+  });
+});
+
+describe('Home money ahead', () => {
+  const rent = { recurringId: 'rent', type: 'EXPENSE', categoryId: 'g', amount: 85000, description: 'Rent', dayOfMonth: 20, frequency: 'MONTHLY', anchorDate: null, leadDays: 3, handledPeriod: null, createdAt: '', updatedAt: '' };
+
+  beforeEach(() => {
+    data.categories = [groceries];
+    data.targets = [];
+    data.pots = [];
+    data.transactions = [];
+    data.recurring = [rent];
+    data.byMonth = {};
+    window.localStorage.clear();
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 8, 10, 12));
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it('stays out of the way until a pay day is set', () => {
+    renderHome();
+    expect(screen.queryByText(/Next pay day/)).not.toBeInTheDocument();
+  });
+
+  it('says when pay day is and what bills fall due before it, as plain facts', () => {
+    window.localStorage.setItem('budget.preferences', JSON.stringify({ payDay: 25 }));
+    renderHome();
+    expect(screen.getByText('Next pay day: Fri 25 Sep, in 15 days.')).toBeInTheDocument();
+    expect(screen.getByText('Bills due before then: £850.00 (1 bill).')).toBeInTheDocument();
+  });
+
+  it('says so when nothing is due before pay day', () => {
+    window.localStorage.setItem('budget.preferences', JSON.stringify({ payDay: 15 }));
+    renderHome();
+    expect(screen.getByText('No bills are due before then.')).toBeInTheDocument();
+  });
+
+  it('is not shown on another month', () => {
+    window.localStorage.setItem('budget.preferences', JSON.stringify({ payDay: 25 }));
+    renderHome('/?month=2026-08');
+    expect(screen.queryByText(/Next pay day/)).not.toBeInTheDocument();
+  });
+
+  it('puts income beside the headline, and says when none has arrived', () => {
+    renderHome();
+    expect(screen.getByText('No income recorded yet this month.')).toBeInTheDocument();
+    expect(screen.getByText(/^Income /)).toBeInTheDocument();
   });
 });

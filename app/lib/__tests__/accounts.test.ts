@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { accountTypeLabel, balanceAsOf, monthEndIso, netWorthAsOf, typeOptionsForKind, updatedAgo } from '../accounts';
+import { accountsWithoutBalance, accountTypeLabel, balanceAsOf, balanceChangeNote, monthEndIso, netWorthAsOf, typeOptionsForKind, updatedAgo } from '../accounts';
 import type { Account, BalanceEntry } from '../types';
 
 function account(overrides: Partial<Account> = {}): Account {
@@ -88,5 +88,32 @@ describe('updatedAgo', () => {
   it('says so when there is nothing entered yet', () => {
     expect(updatedAgo([], '2026-09-28')).toBe('Not updated yet');
     expect(updatedAgo(entries('2026-12-01'), '2026-09-28')).toBe('Not updated yet');
+  });
+});
+
+describe('accountsWithoutBalance', () => {
+  it('lists only the accounts that have no balance entered', () => {
+    const empty = account({ accountId: 'empty' });
+    const filled = account({ accountId: 'filled', balances: [{ date: '2026-09-01', pence: 100 }] });
+    expect(accountsWithoutBalance([empty, filled])).toEqual([empty]);
+  });
+});
+
+describe('balanceChangeNote', () => {
+  const today = '2026-09-28';
+
+  it('says nothing with fewer than two balances', () => {
+    expect(balanceChangeNote([], today)).toBeNull();
+    expect(balanceChangeNote([{ date: '2026-09-01', pence: 5000 }], today)).toBeNull();
+  });
+
+  it('says how the latest balance compares with the one before, without judging it', () => {
+    expect(balanceChangeNote([{ date: '2026-08-10', pence: 32000 }, { date: '2026-09-10', pence: 27000 }], today)).toBe('£50.00 lower than on 10 Aug');
+    expect(balanceChangeNote([{ date: '2026-08-10', pence: 27000 }, { date: '2026-09-10', pence: 32000 }], today)).toBe('£50.00 higher than on 10 Aug');
+    expect(balanceChangeNote([{ date: '2026-08-10', pence: 27000 }, { date: '2026-09-10', pence: 27000 }], today)).toBe('Same as on 10 Aug');
+  });
+
+  it('ignores balances dated in the future and works out of order', () => {
+    expect(balanceChangeNote([{ date: '2026-10-10', pence: 1 }, { date: '2026-09-10', pence: 27000 }, { date: '2026-08-10', pence: 32000 }], today)).toBe('£50.00 lower than on 10 Aug');
   });
 });

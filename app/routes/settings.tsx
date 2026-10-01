@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router';
-import { Button, Card, Input, Radio, SegmentedControl, Stack, Switch, Text, Title, useMantineColorScheme } from '@mantine/core';
+import { Button, Card, Input, Radio, SegmentedControl, Select, Stack, Switch, Text, Title, useMantineColorScheme } from '@mantine/core';
 import { IconChevronRight } from '@tabler/icons-react';
 import { DefaultLayout } from '~/components/layout/DefaultLayout';
 import { BillReminders } from '~/components/settings/BillReminders';
@@ -9,6 +9,7 @@ import { TEXT_SIZE_OPTIONS } from '~/lib/textSize';
 import { UNDO_DURATION_OPTIONS } from '~/lib/undoDuration';
 import { SESSION_LIFETIME_TEXT } from '~/lib/sessionLifetime';
 import { pageTitle } from '~/lib/pageTitle';
+import { formatDayOfMonth } from '~/lib/recurring';
 import type { Route } from './+types/settings';
 
 // Places that used to sit in the More menu. One way to each of them, from here.
@@ -18,6 +19,8 @@ const MANAGE_LINKS = [
   { to: '/deleted', label: 'Recently deleted', hint: 'Bring back something you removed.' },
   { to: '/catch-up', label: 'Catch up', hint: 'Add what you remember from the last few weeks.' },
 ];
+
+const PAY_DAY_OPTIONS = Array.from({ length: 28 }, (_, index) => ({ value: String(index + 1), label: formatDayOfMonth(index + 1) }));
 
 const APPEARANCE_OPTIONS = [
   { value: 'auto', label: 'Match my device' },
@@ -103,6 +106,19 @@ function SettingsContent() {
           description={'Adds a line to the Saved message, such as "£395.50 left in Groceries this month." Only for spending in a category with a monthly budget. Off unless you turn it on.'}
           checked={preferences.leftAfterSave}
           onChange={event => setPreferences({ leftAfterSave: event.currentTarget.checked })}
+        />
+      </Card>
+
+      <Card withBorder>
+        <Title order={2} size="h4" mb="sm">Money</Title>
+        <Select
+          label="Pay day"
+          description="The day of the month your pay arrives. Home then shows the bills due before your next one. Nothing else changes."
+          placeholder="Not set"
+          clearable
+          data={PAY_DAY_OPTIONS}
+          value={preferences.payDay === null ? null : String(preferences.payDay)}
+          onChange={value => setPreferences({ payDay: value === null ? null : Number(value) })}
         />
       </Card>
 
