@@ -284,6 +284,20 @@ describe('DueRecurringCard', () => {
     expect(container.innerHTML).not.toMatch(/danger/);
   });
 
+  describe('reminders', () => {
+    it('points to reminders under the first due bill, until they are on', () => {
+      dueState.items = [item({})];
+      const { unmount } = renderCard();
+      expect(screen.getByRole('link', { name: 'Get a reminder before bills are due' })).toHaveAttribute('href', '/settings');
+      unmount();
+
+      window.localStorage.setItem('budget.preferences', JSON.stringify({ billReminders: true }));
+      renderCard();
+      expect(screen.queryByRole('link', { name: 'Get a reminder before bills are due' })).not.toBeInTheDocument();
+      window.localStorage.clear();
+    });
+  });
+
   describe('bills from earlier months', () => {
     function older(): DueItem[] {
       return [

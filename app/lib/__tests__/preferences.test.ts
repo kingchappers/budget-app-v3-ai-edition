@@ -252,3 +252,27 @@ describe('usePreferences', () => {
     expect(prefs.readPreferences(window.localStorage).reduceMotion).toBe(true);
   });
 });
+
+describe('tour dismissals and one-off offers', () => {
+  it('starts with no dismissals, no answered offer, and no after-save line', () => {
+    expect(prefs.DEFAULT_PREFERENCES).toMatchObject({ tourDismissals: 0, launchOfferAnswered: false, leftAfterSave: false });
+  });
+
+  it('keeps a whole number of dismissals between 0 and 9, and repairs the rest', () => {
+    window.localStorage.setItem(prefs.PREFERENCES_KEY, JSON.stringify({ tourDismissals: 1 }));
+    expect(prefs.readPreferences(window.localStorage).tourDismissals).toBe(1);
+    window.localStorage.setItem(prefs.PREFERENCES_KEY, JSON.stringify({ tourDismissals: 99 }));
+    expect(prefs.readPreferences(window.localStorage).tourDismissals).toBe(9);
+    window.localStorage.setItem(prefs.PREFERENCES_KEY, JSON.stringify({ tourDismissals: -2 }));
+    expect(prefs.readPreferences(window.localStorage).tourDismissals).toBe(0);
+    window.localStorage.setItem(prefs.PREFERENCES_KEY, JSON.stringify({ tourDismissals: 'many' }));
+    expect(prefs.readPreferences(window.localStorage).tourDismissals).toBe(0);
+  });
+
+  it('only accepts true or false for the offer and the after-save line', () => {
+    window.localStorage.setItem(prefs.PREFERENCES_KEY, JSON.stringify({ launchOfferAnswered: 'yes', leftAfterSave: 1 }));
+    expect(prefs.readPreferences(window.localStorage)).toMatchObject({ launchOfferAnswered: false, leftAfterSave: false });
+    window.localStorage.setItem(prefs.PREFERENCES_KEY, JSON.stringify({ launchOfferAnswered: true, leftAfterSave: true }));
+    expect(prefs.readPreferences(window.localStorage)).toMatchObject({ launchOfferAnswered: true, leftAfterSave: true });
+  });
+});

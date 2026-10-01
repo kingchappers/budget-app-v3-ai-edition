@@ -4,13 +4,14 @@ import { notifications } from '@mantine/notifications';
 import { ToastAction } from '~/components/layout/ToastAction';
 import { ApiError } from '~/lib/apiError';
 import type { TransactionInput } from '~/lib/api';
+import { leftAfterSaveNote } from '~/lib/afterSave';
 import { formatPence } from '~/lib/money';
 import { formatDayLabel, todayIso } from '~/lib/months';
 import { enqueue } from '~/lib/offlineQueue';
 import { clearPendingEntry, discardQueuedEntry, setPendingEntry } from '~/lib/pendingEntries';
 import { usePreferences } from '~/lib/preferences';
 import { undoAutoClose } from '~/lib/undoDuration';
-import { useCategories, useCreateTransaction, useDeleteTransaction } from '~/lib/queries';
+import { getCachedBudgets, getCachedMonth, useCategories, useCreateTransaction, useDeleteTransaction } from '~/lib/queries';
 import type { Transaction } from '~/lib/types';
 
 // Module-level so that saves made from different components (the Add sheet,
@@ -39,7 +40,19 @@ export function useSaveWithUndo(): (input: TransactionInput, options?: SaveOptio
   const remove = useDeleteTransaction();
   const qc = useQueryClient();
   const userSub = useAuth0().user?.sub ?? '';
-  const [{ undoDuration }] = usePreferences();
+  const [{ undoDuration, leftAfterSave }] = usePreferences();
+
+  // What is left in the category's budget, if the person asked for that line on the Saved message.
+  function savedText(input: TransactionInput, description: string): string {
+    if (!leftAfterSave) return `Saved ${description}`;
+    const note = leftAfterSaveNote(
+      input,
+      categories,
+      getCachedBudgets(qc),
+      getCachedMonth(qc, input.date.slice(0, 7)),
+    );
+    return note ? `Saved ${description}. ${note}` : `Saved ${description}`;
+  }
 
   // "£3.50 · Coffee", with the day added when the entry is not for today: "£3.50 · Coffee · Mon 22 Sep".
   function describeInput(input: TransactionInput, categoryName?: string): string {
@@ -108,7 +121,7 @@ export function useSaveWithUndo(): (input: TransactionInput, options?: SaveOptio
 
     const outcome: Promise<Transaction | null> = create.mutateAsync(withId).then(
       created => {
-        if (!undone) relabelSaveToast(toastId, `Saved ${description}`, undo);
+        if (!undone) relabelSaveToast(toastId, savedText(withId, description), undo);
         return created;
       },
       async (error: unknown) => {

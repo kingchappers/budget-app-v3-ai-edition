@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  checkLumpSumRange, dayParts, daysInRange, entriesPerDay, newestCreatedAt, recentDays, shouldWelcomeBack, untrackedNote,
+  checkLumpSumRange, dayParts, daysInRange, entriesPerDay, gapDays, lumpSumPresets, newestCreatedAt, recentDays, shouldWelcomeBack, untrackedNote,
 } from '../catchUp';
 import type { Transaction } from '../types';
 
@@ -113,5 +113,45 @@ describe('dayParts', () => {
   it('gives the weekday, day and month for a tile', () => {
     expect(dayParts('2026-09-28')).toEqual({ weekday: 'Mon', day: 28, month: 'Sep' });
     expect(dayParts('2026-01-01')).toEqual({ weekday: 'Thu', day: 1, month: 'Jan' });
+  });
+});
+
+describe('lumpSumPresets', () => {
+  it('offers the last 7 days and last month', () => {
+    expect(lumpSumPresets('2026-09-28', null)).toEqual([
+      { label: 'Last 7 days', start: '2026-09-22', end: '2026-09-28' },
+      { label: 'Last month', start: '2026-08-01', end: '2026-08-31' },
+    ]);
+  });
+
+  it('adds "Since my last entry" when the last entry was more than a day ago', () => {
+    const presets = lumpSumPresets('2026-09-28', '2026-09-20');
+    expect(presets.map(preset => preset.label)).toEqual(['Last 7 days', 'Since my last entry', 'Last month']);
+    expect(presets[1]).toEqual({ label: 'Since my last entry', start: '2026-09-21', end: '2026-09-28' });
+  });
+
+  it('does not offer it when the last entry was yesterday or today', () => {
+    expect(lumpSumPresets('2026-09-28', '2026-09-27').map(preset => preset.label)).not.toContain('Since my last entry');
+  });
+
+  it('gets last month right across a year end', () => {
+    expect(lumpSumPresets('2026-01-10', null).at(-1)).toEqual({ label: 'Last month', start: '2025-12-01', end: '2025-12-31' });
+  });
+});
+
+describe('gapDays', () => {
+  it('runs from the day after the last entry to yesterday', () => {
+    expect(gapDays('2026-09-25', '2026-09-28')).toEqual(['2026-09-26', '2026-09-27']);
+  });
+
+  it('is empty when the last entry was yesterday or today', () => {
+    expect(gapDays('2026-09-27', '2026-09-28')).toEqual([]);
+    expect(gapDays('2026-09-28', '2026-09-28')).toEqual([]);
+  });
+
+  it('stops at a month, however long the gap', () => {
+    const days = gapDays('2025-01-01', '2026-09-28');
+    expect(days).toHaveLength(30);
+    expect(days.at(-1)).toBe('2026-09-27');
   });
 });

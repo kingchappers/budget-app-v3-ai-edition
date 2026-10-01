@@ -97,6 +97,13 @@ function SettingsContent() {
             ))}
           </Stack>
         </Radio.Group>
+        <Switch
+          mt="md"
+          label="Show what is left after saving"
+          description={'Adds a line to the Saved message, such as "£395.50 left in Groceries this month." Only for spending in a category with a monthly budget. Off unless you turn it on.'}
+          checked={preferences.leftAfterSave}
+          onChange={event => setPreferences({ leftAfterSave: event.currentTarget.checked })}
+        />
       </Card>
 
       <Card withBorder>

@@ -1,4 +1,4 @@
-import { addDaysIso, daysBetweenIso, formatShortDate } from './months';
+import { addDaysIso, daysBetweenIso, formatShortDate, shiftMonth } from './months';
 import type { Transaction } from './types';
 
 export const CATCH_UP_DAYS = 31;
@@ -80,4 +80,32 @@ export function dayParts(iso: string): DayParts {
     day,
     month: formatShortDate(iso).split(' ')[1],
   };
+}
+
+export const FIRST_VISIBLE_DAYS = 7;
+
+export interface LumpSumPreset {
+  label: string;
+  start: string;
+  end: string;
+}
+
+// Ready-made stretches for the lump sum, so nobody has to type dates after a bad few weeks.
+export function lumpSumPresets(today: string, newestEntryDate: string | null): LumpSumPreset[] {
+  const presets: LumpSumPreset[] = [{ label: 'Last 7 days', start: addDaysIso(today, -6), end: today }];
+  if (newestEntryDate !== null && daysBetweenIso(newestEntryDate, today) > 1) {
+    presets.push({ label: 'Since my last entry', start: addDaysIso(newestEntryDate, 1), end: today });
+  }
+  const lastMonth = shiftMonth(today.slice(0, 7), -1);
+  const firstOfThisMonth = `${today.slice(0, 7)}-01`;
+  presets.push({ label: 'Last month', start: `${lastMonth}-01`, end: addDaysIso(firstOfThisMonth, -1) });
+  return presets;
+}
+
+// The quiet days between the last entry and today, up to a month, for "start fresh from today".
+export function gapDays(newestCreatedDate: string, today: string): string[] {
+  const yesterday = addDaysIso(today, -1);
+  const from = addDaysIso(newestCreatedDate, 1);
+  const earliest = addDaysIso(today, -(CATCH_UP_DAYS - 1));
+  return daysInRange(from < earliest ? earliest : from, yesterday);
 }
