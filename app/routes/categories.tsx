@@ -1,3 +1,4 @@
+import { TermHelp } from '~/components/layout/TermHelp';
 import { useState } from 'react';
 import { ActionIcon, Alert, Badge, Button, Card, Group, Loader, Select, Stack, Text, TextInput, Title, UnstyledButton } from '@mantine/core';
 import { IconPencil } from '@tabler/icons-react';
@@ -165,6 +166,7 @@ function CategoriesContent() {
           <Select label="Group" data={groupsForType(type)} value={type === 'INCOME' ? null : group}
             onChange={v => { if (v) setGroup(v as CategoryGroup); }}
             disabled={type === 'INCOME'} allowDeselect={false} />
+          <TermHelp terms={['groupBills', 'groupKnownCosts', 'groupEveryday', 'groupSaving']} />
           <Button disabled={name.trim() === ''} loading={createState === 'saving'} onClick={addCategory}>
             Add
           </Button>

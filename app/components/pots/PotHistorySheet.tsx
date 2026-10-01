@@ -1,3 +1,4 @@
+import { TermHelp } from '~/components/layout/TermHelp';
 import { useState } from 'react';
 import { ActionIcon, Alert, Button, Group, Stack, Switch, Table, Text, TextInput, UnstyledButton } from '@mantine/core';
 import { IconPencil } from '@tabler/icons-react';
@@ -103,17 +104,27 @@ function PotSettingsForm({ pot, category }: { pot: PotSummary; category: Categor
             </Group>
           )
         )}
-        <TextInput label="Monthly amount" placeholder="0.00" inputMode="decimal" value={monthly}
-          onChange={e => { setMonthly(e.currentTarget.value); setSaveState('idle'); }} />
-        <TextInput label="Goal" placeholder="0.00" inputMode="decimal" value={goal}
-          onChange={e => { setGoal(e.currentTarget.value); setSaveState('idle'); }} />
-        <Switch
-          label="Auto-contribute"
-          description={hasMonthly ? 'Adds the monthly amount every month, from this month.' : 'Set a monthly amount first.'}
-          checked={auto && hasMonthly}
-          disabled={!hasMonthly}
-          onChange={e => { setAuto(e.currentTarget.checked); setSaveState('idle'); }}
-        />
+        <Group align="flex-end" wrap="nowrap" gap={0}>
+          <TextInput label="Monthly amount" placeholder="0.00" inputMode="decimal" value={monthly} style={{ flex: 1 }}
+            onChange={e => { setMonthly(e.currentTarget.value); setSaveState('idle'); }} />
+          <TermHelp terms={['monthlyAmount']} />
+        </Group>
+        <Group align="flex-end" wrap="nowrap" gap={0}>
+          <TextInput label="Goal" placeholder="0.00" inputMode="decimal" value={goal} style={{ flex: 1 }}
+            onChange={e => { setGoal(e.currentTarget.value); setSaveState('idle'); }} />
+          <TermHelp terms={['potGoal']} />
+        </Group>
+        <Group wrap="nowrap" gap={0}>
+          <Switch
+            label="Auto-contribute"
+            description={hasMonthly ? 'Adds the monthly amount every month, from this month.' : 'Set a monthly amount first.'}
+            checked={auto && hasMonthly}
+            disabled={!hasMonthly}
+            onChange={e => { setAuto(e.currentTarget.checked); setSaveState('idle'); }}
+            style={{ flex: 1 }}
+          />
+          <TermHelp terms={['autoContribute']} />
+        </Group>
         {error && <Alert color="danger" role="alert">{error}</Alert>}
         <Group justify="flex-end">
           <SaveStatus state={saveState} onRetry={send} />

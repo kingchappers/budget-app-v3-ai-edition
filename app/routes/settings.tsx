@@ -1,7 +1,8 @@
-import { Link } from 'react-router';
-import { Card, Input, Radio, SegmentedControl, Stack, Switch, Text, Title, useMantineColorScheme } from '@mantine/core';
+import { Link, useNavigate } from 'react-router';
+import { Button, Card, Input, Radio, SegmentedControl, Stack, Switch, Text, Title, useMantineColorScheme } from '@mantine/core';
 import { IconChevronRight } from '@tabler/icons-react';
 import { DefaultLayout } from '~/components/layout/DefaultLayout';
+import { TOUR_PARAM } from '~/components/layout/GuidedTour';
 import { usePreferences, type TextSize, type UndoDuration } from '~/lib/preferences';
 import { TEXT_SIZE_OPTIONS } from '~/lib/textSize';
 import { UNDO_DURATION_OPTIONS } from '~/lib/undoDuration';
@@ -25,6 +26,12 @@ const APPEARANCE_OPTIONS = [
 function SettingsContent() {
   const [preferences, setPreferences] = usePreferences();
   const { colorScheme, setColorScheme } = useMantineColorScheme();
+  const navigate = useNavigate();
+
+  function replayTour(): void {
+    setPreferences({ tourStep: 0 });
+    navigate(`/?${TOUR_PARAM}=1`);
+  }
 
   return (
     <Stack maw={640}>
@@ -110,6 +117,9 @@ function SettingsContent() {
             </Link>
           ))}
         </Stack>
+        <Text fw={500} mt="md">Guided tour</Text>
+        <Text size="sm" mb="xs">Three short screens on targets, pots and recurring bills.</Text>
+        <Button variant="default" onClick={replayTour}>Take the tour again</Button>
       </Card>
     </Stack>
   );

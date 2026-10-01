@@ -9,6 +9,7 @@ vi.mock('~/components/layout/DefaultLayout', () => ({
 }));
 vi.mock('~/components/budget/WelcomeBackCard', () => ({ WelcomeBackCard: () => null }));
 vi.mock('~/components/layout/WhatsChanged', () => ({ WhatsChanged: () => null }));
+vi.mock('~/components/layout/GuidedTour', () => ({ GuidedTour: () => null }));
 vi.mock('~/components/recurring/DueRecurringCard', () => ({ DueRecurringCard: () => <div>Due card</div> }));
 vi.mock('~/hooks/useOfflineQueue', () => ({ useOfflineQueue: () => ({ pendingMap: {}, flushNow: vi.fn(), discard: vi.fn() }) }));
 vi.mock('~/components/transactions/TransactionSheet', () => ({

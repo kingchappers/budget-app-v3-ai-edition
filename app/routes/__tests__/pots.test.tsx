@@ -62,10 +62,10 @@ beforeEach(() => {
 });
 
 describe('Pots page', () => {
-  it('groups pots under Sinking Funds and Saving & Investment in group order', () => {
+  it('groups pots under Saving for known costs and Saving & Investment in group order', () => {
     renderPage();
     const headings = screen.getAllByRole('heading', { level: 5 }).map(h => h.textContent);
-    expect(headings).toEqual(['Sinking Funds', 'Saving & Investment']);
+    expect(headings).toEqual(['Saving for known costs', 'Saving & Investment']);
   });
 
   it('shows the emoji label, balance and this month for a pot', () => {

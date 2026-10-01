@@ -29,7 +29,7 @@ afterEach(() => {
 
 describe('readPreferences', () => {
   it('returns the defaults when nothing is saved', () => {
-    expect(prefs.readPreferences(window.localStorage)).toEqual({ ...prefs.DEFAULT_PREFERENCES, shortcutN: true, openAddOnLaunch: false });
+    expect(prefs.readPreferences(window.localStorage)).toEqual(prefs.DEFAULT_PREFERENCES);
   });
 
   it('returns the defaults when storage is unavailable', () => {
@@ -77,6 +77,20 @@ describe('readPreferences', () => {
 
     window.localStorage.setItem(prefs.PREFERENCES_KEY, JSON.stringify({ shortcutN: 'no', openAddOnLaunch: true, extra: 1 }));
     expect(prefs.readPreferences(window.localStorage)).toEqual({ ...prefs.DEFAULT_PREFERENCES, shortcutN: true, openAddOnLaunch: true });
+  });
+
+  it('keeps the guided tour step within range and ignores a bad one', () => {
+    window.localStorage.setItem(prefs.PREFERENCES_KEY, JSON.stringify({ tourStep: 99 }));
+    expect(prefs.readPreferences(window.localStorage).tourStep).toBe(prefs.TOUR_SCREENS);
+
+    window.localStorage.setItem(prefs.PREFERENCES_KEY, JSON.stringify({ tourStep: -4 }));
+    expect(prefs.readPreferences(window.localStorage).tourStep).toBe(0);
+
+    window.localStorage.setItem(prefs.PREFERENCES_KEY, JSON.stringify({ tourStep: 1.5 }));
+    expect(prefs.readPreferences(window.localStorage).tourStep).toBe(0);
+
+    window.localStorage.setItem(prefs.PREFERENCES_KEY, JSON.stringify({ tourStep: 2 }));
+    expect(prefs.readPreferences(window.localStorage).tourStep).toBe(2);
   });
 
   it('survives storage that throws', () => {

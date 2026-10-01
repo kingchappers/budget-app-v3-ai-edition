@@ -12,6 +12,9 @@ export type TextSize = 'standard' | 'large' | 'largest';
 // How long a message with an Undo button stays on screen.
 export type UndoDuration = 'until-closed' | '30s' | '10s';
 
+// How many guided setup screens exist. A tourStep of TOUR_SCREENS means finished or skipped.
+export const TOUR_SCREENS = 3;
+
 export interface Preferences {
   textSize: TextSize;
   undoDuration: UndoDuration;
@@ -28,6 +31,8 @@ export interface Preferences {
   welcomeBackHiddenUntil: string;
   // "What's changed" notes the user has dismissed, by release key.
   seenReleases: string[];
+  // The next guided setup screen to show, 0 to TOUR_SCREENS.
+  tourStep: number;
 }
 
 export const DEFAULT_PREFERENCES: Preferences = {
@@ -42,6 +47,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   nothingToLog: {},
   welcomeBackHiddenUntil: '',
   seenReleases: [],
+  tourStep: 0,
 };
 
 const BOOLEAN_KEYS = ['shortcutN', 'openAddOnLaunch', 'quickAddTipDismissed'] as const;
@@ -60,7 +66,6 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 export const PREFERENCES_KEY = 'budget.preferences';
 export const LEGACY_OPEN_ON_LAUNCH_KEY = 'budget.openAddOnLaunch';
 
-type PreferenceKey = keyof Preferences;
 type Listener = () => void;
 
 const listeners = new Set<Listener>();
@@ -137,6 +142,8 @@ function fromStored(stored: Record<string, unknown>, legacyOpenOnLaunch: string 
   if (typeof stored.welcomeBackHiddenUntil === 'string' && (stored.welcomeBackHiddenUntil === '' || ISO_DATE.test(stored.welcomeBackHiddenUntil))) {
     result.welcomeBackHiddenUntil = stored.welcomeBackHiddenUntil;
   }
+  const step = stored.tourStep;
+  if (typeof step === 'number' && Number.isInteger(step)) result.tourStep = Math.min(Math.max(step, 0), TOUR_SCREENS);
   if (typeof stored.openAddOnLaunch !== 'boolean' && legacyOpenOnLaunch === '1') result.openAddOnLaunch = true;
   return result;
 }
