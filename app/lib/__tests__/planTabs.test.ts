@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { isPlanTab, planPath } from '../planTabs';
+import { isPlanTab, normalisePlanTab, planPath } from '../planTabs';
 
 describe('isPlanTab', () => {
   it('accepts the three tabs and nothing else', () => {
-    expect(['targets', 'pots', 'recurring'].every(isPlanTab)).toBe(true);
+    expect(['budgets', 'pots', 'recurring'].every(isPlanTab)).toBe(true);
+    expect(isPlanTab('targets')).toBe(false);
     expect(isPlanTab('settings')).toBe(false);
     expect(isPlanTab('')).toBe(false);
     expect(isPlanTab(null)).toBe(false);
@@ -12,7 +13,7 @@ describe('isPlanTab', () => {
 
 describe('planPath', () => {
   it('leads to the matching tab', () => {
-    expect(planPath('targets')).toBe('/plan?tab=targets');
+    expect(planPath('budgets')).toBe('/plan?tab=budgets');
     expect(planPath('recurring', '')).toBe('/plan?tab=recurring');
   });
 
@@ -21,6 +22,19 @@ describe('planPath', () => {
   });
 
   it('does not let an old tab parameter override the destination', () => {
-    expect(planPath('pots', '?tab=targets&pot=a')).toBe('/plan?tab=pots&pot=a');
+    expect(planPath('pots', '?tab=budgets&pot=a')).toBe('/plan?tab=pots&pot=a');
+  });
+});
+
+describe('normalisePlanTab', () => {
+  it('lets an old link to the targets tab land on budgets', () => {
+    expect(normalisePlanTab('targets')).toBe('budgets');
+  });
+
+  it('keeps the current tabs and rejects anything else', () => {
+    expect(normalisePlanTab('budgets')).toBe('budgets');
+    expect(normalisePlanTab('pots')).toBe('pots');
+    expect(normalisePlanTab('nonsense')).toBeNull();
+    expect(normalisePlanTab(null)).toBeNull();
   });
 });

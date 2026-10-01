@@ -32,7 +32,7 @@ vi.mock('~/lib/queries', () => ({
 }));
 vi.mock('~/hooks/useUndoableDelete', () => ({ useUndoableDelete: () => state.undoableDelete }));
 
-import Targets from '../targets';
+import Budgets from '../budgets';
 import { expectReadable } from '~/test-utils/readableText';
 
 type MutateOptions = { onSuccess?: () => void; onError?: (error: Error) => void };
@@ -46,24 +46,24 @@ beforeEach(() => {
 });
 
 function groceriesRow(): HTMLElement {
-  return screen.getByLabelText('Target for Groceries').closest('.mantine-Card-root') as HTMLElement;
+  return screen.getByLabelText('Budget for Groceries').closest('.mantine-Card-root') as HTMLElement;
 }
 
 function renderPage() {
-  render(<MantineProvider><Targets /></MantineProvider>);
+  render(<MantineProvider><Budgets /></MantineProvider>);
   return userEvent.setup();
 }
 
-describe('Targets page', () => {
+describe('Budgets page', () => {
   it('has one section per group in order and no Income section', () => {
-    render(<MantineProvider><Targets /></MantineProvider>);
+    render(<MantineProvider><Budgets /></MantineProvider>);
     const headings = screen.getAllByRole('heading', { level: 5 }).map(h => h.textContent);
     expect(screen.queryByText('😌 Emergency fund')).not.toBeInTheDocument();
     expect(headings).toEqual(['Bills', 'Everyday Spending']);
   });
 
   it('shows the emoji before the category name', () => {
-    render(<MantineProvider><Targets /></MantineProvider>);
+    render(<MantineProvider><Budgets /></MantineProvider>);
     expect(screen.getByText('🛒 Groceries')).toBeInTheDocument();
   });
 
@@ -77,8 +77,8 @@ describe('Targets page', () => {
 
   it('marks a row as not saved yet after the amount changes', async () => {
     const user = renderPage();
-    await user.clear(screen.getByLabelText('Target for Groceries'));
-    await user.type(screen.getByLabelText('Target for Groceries'), '350');
+    await user.clear(screen.getByLabelText('Budget for Groceries'));
+    await user.type(screen.getByLabelText('Budget for Groceries'), '350');
     expect(within(groceriesRow()).getByText('Not saved yet')).toBeInTheDocument();
   });
 
@@ -99,12 +99,12 @@ describe('Targets page', () => {
   it('shows the failure inline, keeps the typed value, and Retry sends it again', async () => {
     state.setTarget.mockImplementation((_vars: unknown, options: MutateOptions) => options.onError?.(new Error('boom')));
     const user = renderPage();
-    await user.clear(screen.getByLabelText('Target for Groceries'));
-    await user.type(screen.getByLabelText('Target for Groceries'), '350');
+    await user.clear(screen.getByLabelText('Budget for Groceries'));
+    await user.type(screen.getByLabelText('Budget for Groceries'), '350');
     await user.click(within(groceriesRow()).getByRole('button', { name: 'Save' }));
 
     expect(within(groceriesRow()).getByRole('status')).toHaveTextContent("Couldn't save.");
-    expect(screen.getByLabelText('Target for Groceries')).toHaveValue('350');
+    expect(screen.getByLabelText('Budget for Groceries')).toHaveValue('350');
 
     await user.click(within(groceriesRow()).getByRole('button', { name: 'Retry' }));
     expect(state.setTarget).toHaveBeenCalledTimes(2);
@@ -116,29 +116,29 @@ describe('Targets page', () => {
 });
 
 describe('Removing a target', () => {
-  it('offers Remove target in a menu only when a target is set, not as a bare button', async () => {
+  it('offers Remove budget in a menu only when a target is set, not as a bare button', async () => {
     state.targets = [{ categoryId: 'g', targetAmount: 30000, period: 'MONTHLY', updatedAt: '' }];
-    render(<MantineProvider><Targets /></MantineProvider>);
+    render(<MantineProvider><Budgets /></MantineProvider>);
 
     expect(screen.queryByRole('button', { name: 'Clear' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Actions for Mortgage target' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Actions for Mortgage budget' })).not.toBeInTheDocument();
 
     const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: 'Actions for Groceries target' }));
-    expect(await screen.findByRole('menuitem', { name: 'Remove target' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Actions for Groceries budget' }));
+    expect(await screen.findByRole('menuitem', { name: 'Remove budget' })).toBeInTheDocument();
   });
 
-  it('removes the target with an undoable delete that names it', async () => {
+  it('removes the budget with an undoable delete that names it', async () => {
     state.targets = [{ categoryId: 'g', targetAmount: 30000, period: 'MONTHLY', updatedAt: '' }];
-    render(<MantineProvider><Targets /></MantineProvider>);
+    render(<MantineProvider><Budgets /></MantineProvider>);
     const user = userEvent.setup();
 
-    await user.click(screen.getByRole('button', { name: 'Actions for Groceries target' }));
-    await user.click(await screen.findByRole('menuitem', { name: 'Remove target' }));
+    await user.click(screen.getByRole('button', { name: 'Actions for Groceries budget' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Remove budget' }));
 
     expect(state.undoableDelete).toHaveBeenCalledWith(expect.objectContaining({
-      label: '£300.00 target · Groceries',
-      name: 'the Groceries target',
+      label: '£300.00 budget · Groceries',
+      name: 'the Groceries budget',
       ref: { entityType: 'TARGET', id: 'g' },
     }));
     await state.undoableDelete.mock.calls[0][0].run();
@@ -147,20 +147,20 @@ describe('Removing a target', () => {
 
   it('shows the saved amount in the box, and follows it when it changes', () => {
     state.targets = [{ categoryId: 'g', targetAmount: 30000, period: 'MONTHLY', updatedAt: '' }];
-    const { rerender } = render(<MantineProvider><Targets /></MantineProvider>);
-    expect(screen.getByLabelText('Target for Groceries')).toHaveValue('300.00');
+    const { rerender } = render(<MantineProvider><Budgets /></MantineProvider>);
+    expect(screen.getByLabelText('Budget for Groceries')).toHaveValue('300.00');
 
     state.targets = [];
-    rerender(<MantineProvider><Targets /></MantineProvider>);
-    expect(screen.getByLabelText('Target for Groceries')).toHaveValue('');
+    rerender(<MantineProvider><Budgets /></MantineProvider>);
+    expect(screen.getByLabelText('Budget for Groceries')).toHaveValue('');
 
     state.targets = [{ categoryId: 'g', targetAmount: 30000, period: 'WEEKLY', updatedAt: '' }];
-    rerender(<MantineProvider><Targets /></MantineProvider>);
-    expect(screen.getByLabelText('Target for Groceries')).toHaveValue('300.00');
+    rerender(<MantineProvider><Budgets /></MantineProvider>);
+    expect(screen.getByLabelText('Budget for Groceries')).toHaveValue('300.00');
   });
 });
 
-describe('Targets plan footer', () => {
+describe('Budgets plan footer', () => {
   it('shows what is planned on its own when there is no income yet', () => {
     renderPage();
     expect(screen.getByTestId('plan-footer')).toHaveTextContent('Planned £300.00');

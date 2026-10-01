@@ -2,18 +2,18 @@ import { useSearchParams } from 'react-router';
 import { Stack, Tabs, Title } from '@mantine/core';
 import { DefaultLayout } from '~/components/layout/DefaultLayout';
 import { useDocumentTitle } from '~/hooks/useDocumentTitle';
-import { isPlanTab, PLAN_TABS, type PlanTab } from '~/lib/planTabs';
+import { isPlanTab, normalisePlanTab, PLAN_TABS, type PlanTab } from '~/lib/planTabs';
 import { pageTitle } from '~/lib/pageTitle';
 import { PotsContent } from './pots';
 import { RecurringContent } from './recurring';
-import { TargetsContent } from './targets';
+import { BudgetsContent } from './budgets';
 import type { Route } from './+types/plan';
 
 function PlanContent() {
   const [params, setParams] = useSearchParams();
   const requested = params.get('tab');
-  const tab: PlanTab = isPlanTab(requested) ? requested : 'targets';
-  const label = PLAN_TABS.find(item => item.value === tab)?.label ?? 'Targets';
+  const tab: PlanTab = normalisePlanTab(requested) ?? 'budgets';
+  const label = PLAN_TABS.find(item => item.value === tab)?.label ?? 'Budgets';
   useDocumentTitle(pageTitle('Plan', label));
 
   return (
@@ -30,7 +30,7 @@ function PlanContent() {
             <Tabs.Tab key={item.value} value={item.value} style={{ minHeight: 44 }}>{item.label}</Tabs.Tab>
           ))}
         </Tabs.List>
-        <Tabs.Panel value="targets" pt="md"><TargetsContent /></Tabs.Panel>
+        <Tabs.Panel value="budgets" pt="md"><BudgetsContent /></Tabs.Panel>
         <Tabs.Panel value="pots" pt="md"><PotsContent /></Tabs.Panel>
         <Tabs.Panel value="recurring" pt="md"><RecurringContent /></Tabs.Panel>
       </Tabs>

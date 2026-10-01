@@ -11,10 +11,11 @@ import { targetLabel } from '~/lib/trash';
 import { useCategories, useDeleteTarget, useSetTarget, useTargets, useTransactions } from '~/lib/queries';
 import { describePlan, planTargets } from '~/lib/targetPlan';
 import { currentYearMonth, shiftMonth } from '~/lib/months';
+import { NAMES } from '~/lib/glossary';
 import { TermHelp } from '~/components/layout/TermHelp';
 import type { Category, CategoryTarget, TargetPeriod } from '~/lib/types';
 import { pageTitle } from '~/lib/pageTitle';
-import type { Route } from './+types/targets';
+import type { Route } from './+types/budgets';
 import { redirect } from 'react-router';
 import { planPath } from '~/lib/planTabs';
 
@@ -48,7 +49,7 @@ function TargetRow({ category, amountPence, period }: {
   function remove(targetAmount: number): void {
     undoableDelete({
       label: targetLabel(targetAmount, category.name),
-      name: `the ${category.name} target`,
+      name: `the ${category.name} budget`,
       ref: { entityType: 'TARGET', id: category.categoryId },
       run: () => removeTarget.mutateAsync(category.categoryId),
     });
@@ -66,7 +67,7 @@ function TargetRow({ category, amountPence, period }: {
       {
         onSuccess: () => setSaveState('saved'),
         onError: (saveError: Error) => {
-          console.error(`Failed to save the target for category ${category.categoryId}:`, saveError);
+          console.error(`Failed to save the budget for category ${category.categoryId}:`, saveError);
           setSaveState('error');
         },
       },
@@ -90,19 +91,19 @@ function TargetRow({ category, amountPence, period }: {
         {amountPence !== null && (
           <Menu position="bottom-end">
             <Menu.Target>
-              <ActionIcon variant="subtle" aria-label={`Actions for ${category.name} target`}><IconDots size={16} /></ActionIcon>
+              <ActionIcon variant="subtle" aria-label={`Actions for ${category.name} budget`}><IconDots size={16} /></ActionIcon>
             </Menu.Target>
             <Menu.Dropdown>
-              <Menu.Item leftSection={<IconTrash size={14} />} onClick={() => remove(amountPence)}>Remove target</Menu.Item>
+              <Menu.Item leftSection={<IconTrash size={14} />} onClick={() => remove(amountPence)}>Remove budget</Menu.Item>
             </Menu.Dropdown>
           </Menu>
         )}
       </Group>
       <Group align="flex-end">
         <TextInput
-          label="Target" placeholder="0.00" inputMode="decimal" style={{ flex: 1, minWidth: 100 }}
+          label="Budget" placeholder="0.00" inputMode="decimal" style={{ flex: 1, minWidth: 100 }}
           value={value} onChange={e => changeValue(e.currentTarget.value)} error={error}
-          aria-label={`Target for ${category.name}`}
+          aria-label={`Budget for ${category.name}`}
         />
         <SegmentedControl
           value={selectedPeriod}
@@ -138,13 +139,13 @@ function PlanFooter({ targets }: { targets: CategoryTarget[] }) {
   );
 }
 
-export function TargetsContent() {
+export function BudgetsContent() {
   const categories = useCategories();
   const targets = useTargets();
 
   if (categories.error || targets.error) {
     return (
-      <Alert color="danger" title="Could not load targets">
+      <Alert color="danger" title="Could not load budgets">
         <Button onClick={() => { categories.refetch(); targets.refetch(); }}>Try again</Button>
       </Alert>
     );
@@ -159,10 +160,10 @@ export function TargetsContent() {
   return (
     <Stack>
       <Group gap={0}>
-        <Title order={3}>Targets</Title>
+        <Title order={3}>{NAMES.budgets}</Title>
         <TermHelp terms={['target']} />
       </Group>
-      <Text c="dimmed" size="sm">Income and pots have no monthly target here. Set a pot's goal and plan on the Pots page.</Text>
+      <Text c="dimmed" size="sm">{NAMES.budgetsAreOptional} Income and pots have no monthly budget here. Set a pot goal and plan on the Pots page.</Text>
 
       {groupCategories(eligible).map(bucket => (
         <div key={bucket.key}>
@@ -181,15 +182,15 @@ export function TargetsContent() {
 
 // This page now lives under Plan. The old address still works and leads there.
 export function clientLoader({ request }: Route.ClientLoaderArgs) {
-  throw redirect(planPath('targets', new URL(request.url).search));
+  throw redirect(planPath('budgets', new URL(request.url).search));
 }
 
-export const meta: Route.MetaFunction = () => [{ title: pageTitle('Targets') }];
+export const meta: Route.MetaFunction = () => [{ title: pageTitle(NAMES.budgets) }];
 
-export default function Targets() {
+export default function Budgets() {
   return (
     <DefaultLayout>
-      <TargetsContent />
+      <BudgetsContent />
     </DefaultLayout>
   );
 }
