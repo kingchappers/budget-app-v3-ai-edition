@@ -9,7 +9,7 @@ import { useDocumentTitle } from '~/hooks/useDocumentTitle';
 import { useNothingToLog } from '~/hooks/useNothingToLog';
 import { useSaveWithUndo } from '~/hooks/useSaveWithUndo';
 import {
-  checkLumpSumRange, daysInRange, dayParts, entriesPerDay, recentDays, UNTRACKED_CATEGORY_NAME, untrackedNote,
+  checkLumpSumRange, daysInRange, dayParts, entriesPerDay, FIRST_VISIBLE_DAYS, lumpSumPresets, recentDays, UNTRACKED_CATEGORY_NAME, untrackedNote,
 } from '~/lib/catchUp';
 import { parsePounds } from '~/lib/money';
 import { currentYearMonth, formatDayLabel, shiftMonth, todayIso } from '~/lib/months';
@@ -62,11 +62,12 @@ function DayTile({ day, today, count, nothing, onOpen }: DayTileProps) {
 interface LumpSumProps {
   categories: Category[];
   today: string;
+  newestEntryDate: string | null;
   onSaved: (created: Transaction) => void;
   onCovered: (days: string[]) => void;
 }
 
-function LumpSumCard({ categories, today, onSaved, onCovered }: LumpSumProps) {
+function LumpSumCard({ categories, today, newestEntryDate, onSaved, onCovered }: LumpSumProps) {
   const createCategory = useCreateCategory();
   const saveWithUndo = useSaveWithUndo();
   const [amount, setAmount] = useState('');
@@ -84,7 +85,10 @@ function LumpSumCard({ categories, today, onSaved, onCovered }: LumpSumProps) {
 
   async function submit(): Promise<void> {
     const parsed = parsePounds(amount);
-    const range = checkLumpSumRange(start, end, today);
+    // A first day after the last day is the same stretch typed the other way round.
+    const [first, last] = start !== '' && end !== '' && start > end ? [end, start] : [start, end];
+    if (first !== start) { setStart(first); setEnd(last); }
+    const range = checkLumpSumRange(first, last, today);
     const next: typeof errors = {};
     if (!parsed.ok) next.amount = parsed.message;
     if (!range.ok) next[range.field] = range.message;
@@ -95,12 +99,12 @@ function LumpSumCard({ categories, today, onSaved, onCovered }: LumpSumProps) {
     try {
       const categoryId = await untrackedCategoryId();
       const created = await saveWithUndo(
-        { amount: parsed.pence, type: 'EXPENSE', categoryId, description: untrackedNote(start, end), date: end },
+        { amount: parsed.pence, type: 'EXPENSE', categoryId, description: untrackedNote(first, last), date: last },
         { categoryName: UNTRACKED_CATEGORY_NAME },
       );
       if (created) {
         onSaved(created);
-        onCovered(daysInRange(start, end));
+        onCovered(daysInRange(first, last));
       }
       setAmount('');
       setStart('');
@@ -130,6 +134,19 @@ function LumpSumCard({ categories, today, onSaved, onCovered }: LumpSumProps) {
             onChange={event => setAmount(event.currentTarget.value)}
             error={errors.amount}
           />
+          <Group gap="xs" role="group" aria-label="Quick ranges">
+            {lumpSumPresets(today, newestEntryDate).map(preset => (
+              <Button
+                key={preset.label}
+                variant="light"
+                size="compact-sm"
+                mih={44}
+                onClick={() => { setStart(preset.start); setEnd(preset.end); }}
+              >
+                {preset.label}
+              </Button>
+            ))}
+          </Group>
           <Group grow align="flex-start">
             <DateInput
               label="From"
@@ -167,6 +184,7 @@ function CatchUpContent() {
   const range = useTransactionsRange(shiftMonth(current, -2), current);
   const days = useMemo(() => recentDays(today), [today]);
   const [openDay, setOpenDay] = useState<string | null>(null);
+  const [showEarlier, setShowEarlier] = useState(false);
   const [editing, setEditing] = useState<Transaction | null>(null);
   // Newest first, added during this visit.
   const [justAdded, setJustAdded] = useState<Transaction[]>([]);
@@ -184,7 +202,8 @@ function CatchUpContent() {
 
   const transactions = range.data ?? [];
   const counts = entriesPerDay(transactions, days);
-  const covered = days.filter(day => (counts.get(day) ?? 0) > 0 || nothing.days.has(day)).length;
+  const shownDays = showEarlier ? days : days.slice(0, FIRST_VISIBLE_DAYS);
+  const newestEntryDate = transactions.reduce<string | null>((newest, t) => (newest === null || t.date > newest ? t.date : newest), null);
   const latest = new Map(transactions.map(t => [t.transactionId, t]));
   const added = [...justAdded]
     .map(t => latest.get(t.transactionId) ?? t)
@@ -202,26 +221,32 @@ function CatchUpContent() {
     <Stack>
       <Title order={1} size="h3">Catch up</Title>
       <Text size="sm">
-        Add what you remember for any of the last {days.length} days. Mark a day “Nothing to log” inside it if there was nothing.
+        Add what you remember, or skip it and start from today. Mark a day “Nothing to log” inside it if there was nothing.
         There is no need to do them all.
       </Text>
       {today.slice(8, 10) === '01' && (
         <Text size="sm">It is the 1st of the month, a fresh start. Last month's gaps are still here if you want them.</Text>
       )}
-      <Text fw={600}>{covered} of {days.length} days covered</Text>
-
-      <Group gap="xs" role="group" aria-label="Last 31 days">
-        {days.map(day => (
-          <DayTile key={day} day={day} today={today} count={counts.get(day) ?? 0} nothing={nothing.days.has(day)} onOpen={setOpenDay} />
-        ))}
+      <Group>
+        <Button onClick={() => setOpenDay(today)}>Add something from today</Button>
       </Group>
 
       <LumpSumCard
         categories={categories.data ?? []}
         today={today}
+        newestEntryDate={newestEntryDate}
         onSaved={remember}
         onCovered={nothing.mark}
       />
+
+      <Group gap="xs" role="group" aria-label={showEarlier ? 'Last 31 days' : 'Last 7 days'}>
+        {shownDays.map(day => (
+          <DayTile key={day} day={day} today={today} count={counts.get(day) ?? 0} nothing={nothing.days.has(day)} onOpen={setOpenDay} />
+        ))}
+      </Group>
+      <Button variant="subtle" aria-expanded={showEarlier} onClick={() => setShowEarlier(open => !open)} style={{ alignSelf: 'flex-start' }}>
+        {showEarlier ? 'Show fewer days' : 'Show earlier days'}
+      </Button>
 
       {added.length > 0 && (
         <Stack gap="xs">

@@ -104,15 +104,35 @@ async function fillLumpSum(user: ReturnType<typeof userEvent.setup>, amount: str
 }
 
 describe('Catch up day strip', () => {
-  it('shows the last 31 days, today first, each with a readable label', () => {
+  it('starts with the last 7 days, today first, each with a readable label', () => {
     renderPage();
-    const strip = screen.getByRole('group', { name: 'Last 31 days' });
+    const strip = screen.getByRole('group', { name: 'Last 7 days' });
     const tiles = within(strip).getAllByRole('button');
-    expect(tiles).toHaveLength(31);
+    expect(tiles).toHaveLength(7);
     expect(tiles[0]).toHaveAccessibleName('Today, no entries');
     expect(tiles[1]).toHaveAccessibleName('Yesterday, no entries');
     expect(tiles[2]).toHaveAccessibleName('Sat 26 Sep, no entries');
+    expect(tiles[6]).toHaveAccessibleName('Tue 22 Sep, no entries');
+  });
+
+  it('shows the full 31 days on request, and folds back', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(screen.getByRole('button', { name: 'Show earlier days' }));
+    const tiles = within(screen.getByRole('group', { name: 'Last 31 days' })).getAllByRole('button');
+    expect(tiles).toHaveLength(31);
     expect(tiles[30]).toHaveAccessibleName('Sat 29 Aug, no entries');
+
+    await user.click(screen.getByRole('button', { name: 'Show fewer days' }));
+    expect(screen.getByRole('group', { name: 'Last 7 days' })).toBeInTheDocument();
+  });
+
+  it('offers the lowest-effort way back first: add something from today', async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await user.click(screen.getByRole('button', { name: 'Add something from today' }));
+    expect(screen.getByText('Adding on 2026-09-28')).toBeInTheDocument();
   });
 
   it('marks the days that have entries and counts them', () => {
@@ -123,16 +143,11 @@ describe('Catch up day strip', () => {
     expect(tile('Today, no entries')).toBeInTheDocument();
   });
 
-  it('ignores entries older than the strip', () => {
-    state.transactions = [entry('2026-07-01')];
-    renderPage();
-    expect(screen.getByText('0 of 31 days covered')).toBeInTheDocument();
-  });
-
-  it('counts days with entries as covered, as progress rather than a backlog', () => {
+  it('never turns the gaps into a score', () => {
     state.transactions = [entry('2026-09-25'), entry('2026-09-27')];
     renderPage();
-    expect(screen.getByText('2 of 31 days covered')).toBeInTheDocument();
+    expect(screen.queryByText(/days covered/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/ of 31/)).not.toBeInTheDocument();
   });
 
   it('loads enough months to cover 31 days, even across a month start', () => {
@@ -177,7 +192,6 @@ describe('Nothing to log', () => {
     await user.click(screen.getByRole('button', { name: 'toggle nothing to log' }));
 
     expect(tile('Fri 25 Sep, nothing to log')).toBeInTheDocument();
-    expect(screen.getByText('1 of 31 days covered')).toBeInTheDocument();
     expect(screen.getByText('marked empty')).toBeInTheDocument();
   });
 
@@ -216,7 +230,6 @@ describe('Nothing to log', () => {
     state.transactions = [entry('2026-09-25')];
     renderPage();
     expect(tile('Fri 25 Sep, 1 entry')).toBeInTheDocument();
-    expect(screen.getByText('1 of 31 days covered')).toBeInTheDocument();
   });
 });
 
@@ -254,8 +267,8 @@ describe('Add a lump sum as Untracked', () => {
     renderPage();
 
     await fillLumpSum(user, '120', '2026-09-10', '2026-09-14');
+    await user.click(screen.getByRole('button', { name: 'Show earlier days' }));
 
-    expect(screen.getByText('5 of 31 days covered')).toBeInTheDocument();
     expect(tile('Sat 12 Sep, nothing to log')).toBeInTheDocument();
   });
 
@@ -265,8 +278,44 @@ describe('Add a lump sum as Untracked', () => {
     renderPage();
 
     await fillLumpSum(user, '120', '2026-09-10', '2026-09-14');
+    await user.click(screen.getByRole('button', { name: 'Show earlier days' }));
 
-    expect(screen.getByText('0 of 31 days covered')).toBeInTheDocument();
+    expect(tile('Sat 12 Sep, no entries')).toBeInTheDocument();
+  });
+
+  it('fills both dates from a quick range', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(screen.getByRole('button', { name: 'Last 7 days' }));
+
+    expect(screen.getByLabelText('From')).toHaveValue('2026-09-22');
+    expect(screen.getByLabelText('To')).toHaveValue('2026-09-28');
+  });
+
+  it('offers "Since my last entry" only when there has been a gap', async () => {
+    state.transactions = [entry('2026-09-27')];
+    const { unmount } = renderPage();
+    expect(screen.queryByRole('button', { name: 'Since my last entry' })).not.toBeInTheDocument();
+    unmount();
+
+    state.transactions = [entry('2026-09-20')];
+    renderPage();
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Since my last entry' }));
+    expect(screen.getByLabelText('From')).toHaveValue('2026-09-21');
+    expect(screen.getByLabelText('To')).toHaveValue('2026-09-28');
+  });
+
+  it('takes a start after the end as the same stretch the other way round, and saves it', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await fillLumpSum(user, '50', '2026-09-15', '2026-09-14');
+
+    expect(state.save).toHaveBeenCalledWith(
+      expect.objectContaining({ date: '2026-09-15', description: 'Untracked spending 14 Sep–15 Sep' }),
+      expect.anything(),
+    );
   });
 
   it('clears the form after saving', async () => {
@@ -282,7 +331,6 @@ describe('Add a lump sum as Untracked', () => {
     ['no start day', '50', '', '2026-09-14', /first day/i],
     ['no end day', '50', '2026-09-10', '', /last day/i],
     ['an end in the future', '50', '2026-09-10', '2026-09-29', /future/i],
-    ['a start after the end', '50', '2026-09-15', '2026-09-14', /on or before/i],
   ])('says what to fix for %s, and saves nothing', async (_name, amount, from, to, message) => {
     const user = userEvent.setup();
     renderPage();

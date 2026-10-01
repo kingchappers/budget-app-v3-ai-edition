@@ -19,6 +19,15 @@ export const queryKeys = {
   trash: ['trash'] as const,
 };
 
+// What is already loaded, for text that should not wait on a request.
+export function getCachedBudgets(qc: QueryClient): CategoryTarget[] {
+  return qc.getQueryData<CategoryTarget[]>(queryKeys.targets) ?? [];
+}
+
+export function getCachedMonth(qc: QueryClient, yearMonth: string): Transaction[] {
+  return qc.getQueryData<Transaction[]>(queryKeys.transactions(yearMonth)) ?? [];
+}
+
 export function useApi() {
   const { request } = useProtectedApi();
   return useMemo(() => createApi(request), [request]);

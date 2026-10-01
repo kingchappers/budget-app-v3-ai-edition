@@ -5,6 +5,7 @@ import { LoadError } from '~/components/layout/LoadError';
 import { DefaultLayout } from '~/components/layout/DefaultLayout';
 import { RELEASE_NOTES } from '~/lib/glossary';
 import { WelcomeBackCard } from '~/components/budget/WelcomeBackCard';
+import { LaunchOffer } from '~/components/layout/LaunchOffer';
 import { WhatsChanged } from '~/components/layout/WhatsChanged';
 import { GuidedTour } from '~/components/layout/GuidedTour';
 import { MonthHeader } from '~/components/budget/MonthHeader';
@@ -157,6 +158,8 @@ function HomeContent() {
       <Button component={Link} to="/plan?tab=recurring" variant="subtle" style={{ alignSelf: 'flex-start' }}>
         Manage recurring
       </Button>
+
+      <LaunchOffer entryCount={history.data?.length ?? 0} />
 
       {sheets}
     </Stack>

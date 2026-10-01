@@ -87,6 +87,17 @@ describe('Settings page', () => {
     expect(readPreferences(window.localStorage).showMilestones).toBe(true);
   });
 
+  it('keeps the after-save line off until it is switched on', async () => {
+    renderSettings();
+    const toggle = screen.getByRole('switch', { name: /^Show what is left after saving/ });
+    expect(toggle).not.toBeChecked();
+
+    await userEvent.setup().click(toggle);
+
+    expect(toggle).toBeChecked();
+    expect(readPreferences(window.localStorage).leftAfterSave).toBe(true);
+  });
+
   it('says what milestones are and what they are not', () => {
     renderSettings();
     expect(screen.getByText(/no streaks, sounds or animations/i)).toBeInTheDocument();

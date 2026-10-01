@@ -54,6 +54,12 @@ export interface Preferences {
   seenReleases: string[];
   // The next guided setup screen to show, 0 to TOUR_SCREENS.
   tourStep: number;
+  // How many times the tour was closed without choosing Skip or Done. The second close counts as skipping.
+  tourDismissals: number;
+  // The one-time offer to open Add as soon as the app starts has been shown and answered.
+  launchOfferAnswered: boolean;
+  // Shows how much is left in the category on the Saved message. Off unless asked for.
+  leftAfterSave: boolean;
 }
 
 export const DEFAULT_PREFERENCES: Preferences = {
@@ -78,9 +84,12 @@ export const DEFAULT_PREFERENCES: Preferences = {
   welcomeBackHiddenUntil: '',
   seenReleases: [],
   tourStep: 0,
+  tourDismissals: 0,
+  launchOfferAnswered: false,
+  leftAfterSave: false,
 };
 
-const BOOLEAN_KEYS = ['shortcutN', 'openAddOnLaunch', 'billReminders', 'quietHours', 'quickAddTipDismissed', 'reduceMotion', 'showMilestones'] as const;
+const BOOLEAN_KEYS = ['shortcutN', 'openAddOnLaunch', 'billReminders', 'quietHours', 'quickAddTipDismissed', 'reduceMotion', 'showMilestones', 'launchOfferAnswered', 'leftAfterSave'] as const;
 const HOUR_KEYS = ['reminderHour', 'quietStart', 'quietEnd'] as const;
 const KEEP_SHEET_OPEN_VALUES: readonly KeepSheetOpen[] = ['ask', 'yes', 'no'];
 const ENTRY_MODES: readonly EntryMode[] = ['form', 'quick'];
@@ -192,6 +201,8 @@ function fromStored(stored: Record<string, unknown>, legacyOpenOnLaunch: string 
   }
   const step = stored.tourStep;
   if (typeof step === 'number' && Number.isInteger(step)) result.tourStep = Math.min(Math.max(step, 0), TOUR_SCREENS);
+  const dismissals = stored.tourDismissals;
+  if (typeof dismissals === 'number' && Number.isInteger(dismissals)) result.tourDismissals = Math.min(Math.max(dismissals, 0), 9);
   if (typeof stored.openAddOnLaunch !== 'boolean' && legacyOpenOnLaunch === '1') result.openAddOnLaunch = true;
   return result;
 }

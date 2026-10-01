@@ -155,6 +155,38 @@ describe('useSaveWithUndo', () => {
     expect(mockRemove.mutate).not.toHaveBeenCalled();
   });
 
+  describe('what is left after saving (Settings, off by default)', () => {
+    const budget = [{ categoryId: 'cat-dining', targetAmount: 10000, period: 'MONTHLY', updatedAt: '' }];
+    const earlier = [{ transactionId: 'old', yearMonth: input.date.slice(0, 7), amount: 3000, type: 'EXPENSE', categoryId: 'cat-dining', description: '', date: input.date, createdAt: '' }];
+
+    function renderSaver(preferences: object) {
+      window.localStorage.setItem('budget.preferences', JSON.stringify(preferences));
+      const client = new QueryClient();
+      client.setQueryData(queryKeys.targets, budget);
+      client.setQueryData(queryKeys.transactions(input.date.slice(0, 7)), earlier);
+      const wrapper = ({ children }: { children: React.ReactNode }) => (
+        <QueryClientProvider client={client}><MantineProvider><Notifications />{children}</MantineProvider></QueryClientProvider>
+      );
+      return renderHook(() => useSaveWithUndo(), { wrapper });
+    }
+
+    afterEach(() => window.localStorage.clear());
+
+    it('says nothing extra by default', async () => {
+      mockCreate.mutateAsync.mockResolvedValue({ transactionId: 't1', yearMonth: input.date.slice(0, 7) });
+      const { result } = renderSaver({});
+      await act(async () => { await result.current(input); });
+      expect(await screen.findByText('Saved £4.80 · Dining')).toBeInTheDocument();
+    });
+
+    it('adds what is left in the category when switched on', async () => {
+      mockCreate.mutateAsync.mockResolvedValue({ transactionId: 't1', yearMonth: input.date.slice(0, 7) });
+      const { result } = renderSaver({ leftAfterSave: true });
+      await act(async () => { await result.current(input); });
+      expect(await screen.findByText('Saved £4.80 · Dining. £65.20 left in Dining this month.')).toBeInTheDocument();
+    });
+  });
+
   describe('the date in the message', () => {
     function renderSaver() {
       const client = new QueryClient();

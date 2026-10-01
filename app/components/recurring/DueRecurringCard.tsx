@@ -114,7 +114,7 @@ export function DueRecurringCard() {
   const { items, isLoading, error, refetch } = useDueRecurring();
   const { data: categories = [] } = useCategories();
   const userSub = useAuth0().user?.sub ?? '';
-  const [{ undoDuration }] = usePreferences();
+  const [{ undoDuration, billReminders }] = usePreferences();
   const saveWithUndo = useSaveWithUndo();
   const setHandled = useSetRecurringHandled();
   const link = useLinkTransaction();
@@ -273,6 +273,11 @@ export function DueRecurringCard() {
               </section>
             ))}
           </div>
+        )}
+        {!billReminders && (
+          <Anchor component={Link} to="/settings" size="sm" style={{ display: 'inline-flex', alignItems: 'center', minHeight: 44 }}>
+            Get a reminder before bills are due
+          </Anchor>
         )}
       </Card>
     );
