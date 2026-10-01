@@ -19,7 +19,7 @@ function SyncStatus({ label, saving, pending, pendingError, onRetry }: {
     return (
       <Group gap={6} mt={2}>
         <IconClock size={12} color="var(--mantine-color-warning-6)" aria-hidden />
-        <Text size="xs">Not synced. Tap to retry.</Text>
+        <Text size="sm">Not synced. Tap to retry.</Text>
         {onRetry && (
           <Button size="compact-sm" variant="light" aria-label={`Retry syncing ${label}`} onClick={onRetry}>Retry</Button>
         )}
@@ -30,7 +30,7 @@ function SyncStatus({ label, saving, pending, pendingError, onRetry }: {
     return (
       <Group gap={4} mt={2}>
         <IconClock size={12} color="var(--mantine-color-dimmed)" aria-hidden />
-        <Text size="xs" c="dimmed">Waiting to sync</Text>
+        <Text size="sm">Waiting to sync</Text>
       </Group>
     );
   }
@@ -38,7 +38,7 @@ function SyncStatus({ label, saving, pending, pendingError, onRetry }: {
     return (
       <Group gap={4} mt={2}>
         <Loader size={10} aria-hidden />
-        <Text size="xs" c="dimmed">Saving</Text>
+        <Text size="sm">Saving</Text>
       </Group>
     );
   }
@@ -76,7 +76,7 @@ export function TransactionRow({
       </ThemeIcon>
       <div style={{ minWidth: 0 }}>
         <Text truncate>{label}</Text>
-        <Text size="xs" c="dimmed">{categoryName} · {formatDayLabel(transaction.date, todayIso())}</Text>
+        <Text size="sm">{categoryName} · {formatDayLabel(transaction.date, todayIso())}</Text>
         <SyncStatus label={label} saving={saving} pending={pending} pendingError={pendingError} onRetry={onRetry} />
       </div>
     </Group>

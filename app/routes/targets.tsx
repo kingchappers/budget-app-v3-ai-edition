@@ -109,7 +109,7 @@ function TargetRow({ category, amountPence, period }: {
         <Button onClick={save} loading={saveState === 'saving'}>Save</Button>
       </Group>
       <Group justify="flex-end" mt={4} mih={24}>
-        {unsaved && <Text size="sm" c="dimmed">Not saved yet</Text>}
+        {unsaved && <Text size="sm">Not saved yet</Text>}
         <SaveStatus state={saveState} onRetry={save} />
       </Group>
     </Card>

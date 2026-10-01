@@ -1,7 +1,6 @@
 import { useAuth0 } from "@auth0/auth0-react";
 import { Box, Avatar, Menu, UnstyledButton } from '@mantine/core';
-import { IconLogout, IconSettings, IconUser } from '@tabler/icons-react';
-import { Link } from 'react-router';
+import { IconLogout, IconUser } from '@tabler/icons-react';
 
 function initialsFor(name?: string, email?: string): string {
   const source = name?.trim() || email?.trim() || '';
@@ -53,10 +52,15 @@ export const Profile = () => {
                     width header that overflows past the toggle and title.
                     Full detail is still one tap away via the dropdown. */}
                 <Box visibleFrom="sm" style={{ textAlign: 'center' }}>
-                  <div className="profile-name" style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--mantine-color-text)', marginBottom: '0.1rem' }}>
+                  <div className="profile-name" style={{ fontSize: '0.875rem', fontWeight: '600', color: 'var(--mantine-color-text)', marginBottom: '0.1rem' }}>
                     {user.name}
                   </div>
-                  <div className="profile-email" style={{ fontSize: '0.6rem', color: 'var(--mantine-color-dimmed)' }}>
+                  {/* The email is long and unbroken, so it is cut with an ellipsis rather than shrunk. */}
+                  <div
+                    className="profile-email"
+                    title={user.email}
+                    style={{ fontSize: '0.875rem', color: 'var(--mantine-color-text)', maxWidth: '16rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                  >
                     {user.email}
                   </div>
                 </Box>
@@ -66,10 +70,6 @@ export const Profile = () => {
 
           <Menu.Dropdown>
             <Menu.Label hiddenFrom="sm">{user.email}</Menu.Label>
-            <Menu.Item component={Link} to="/settings" leftSection={<IconSettings size={14} />}>
-              Settings
-            </Menu.Item>
-            <Menu.Divider />
             <Menu.Item onClick={() => logout({ logoutParams: { returnTo: window.location.origin } })} component="button" leftSection={<IconLogout size={14} />}>
               Logout
             </Menu.Item>

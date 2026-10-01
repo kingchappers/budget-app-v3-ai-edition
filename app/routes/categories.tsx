@@ -34,7 +34,7 @@ function CategoryRow({ category, onDelete, onError }: {
       <Group justify="space-between" py={6}>
         <Group gap="xs">
           <Text>{categoryLabel(category)}</Text>
-          <Badge size="xs" variant="light">default</Badge>
+          <Badge size="lg" variant="light">default</Badge>
         </Group>
       </Group>
     );

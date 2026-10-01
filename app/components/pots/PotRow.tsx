@@ -24,17 +24,17 @@ export function PotRow({ pot, category, onSetAside, onOpen }: PotRowProps) {
     <Stack gap={4}>
       <Group gap="xs" wrap="wrap">
         <Text fw={500}>{name}</Text>
-        {pot.autoAmountNow > 0 && <Badge size="xs" variant="light">Auto {formatPence(pot.autoAmountNow)}/mo</Badge>}
-        {pot.balance < 0 && <Badge size="xs" variant="light" color="danger">Below zero</Badge>}
+        {pot.autoAmountNow > 0 && <Badge size="lg" variant="light">Auto {formatPence(pot.autoAmountNow)}/mo</Badge>}
+        {pot.balance < 0 && <Badge size="lg" variant="light" color="danger">Below zero</Badge>}
       </Group>
       <Text fw={700} size="lg" c={pot.balance < 0 ? 'danger' : undefined}>{formatBalance(pot.balance)}</Text>
       {pot.goalAmount !== null && (
         <>
           <Progress value={percent ?? 0} aria-label={`${category.name} goal progress`} />
-          <Text size="xs" c="dimmed">{formatPence(Math.max(0, pot.balance))} of {formatPence(pot.goalAmount)}</Text>
+          <Text size="sm">{formatPence(Math.max(0, pot.balance))} of {formatPence(pot.goalAmount)}</Text>
         </>
       )}
-      {activity && <Text size="xs" c="dimmed">{activity}</Text>}
+      {activity && <Text size="sm">{activity}</Text>}
     </Stack>
   );
 

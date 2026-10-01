@@ -46,6 +46,7 @@ vi.mock('~/components/transactions/TransactionSheet', () => ({
 }));
 
 import { DueRecurringCard } from '../DueRecurringCard';
+import { expectReadable } from '~/test-utils/readableText';
 
 function rec(over: Partial<Recurring>): Recurring {
   return {
@@ -86,6 +87,7 @@ describe('DueRecurringCard', () => {
 
   afterEach(() => {
     notifications.clean();
+    window.localStorage.removeItem('budget.preferences');
     vi.useRealTimers();
   });
 
@@ -98,6 +100,7 @@ describe('DueRecurringCard', () => {
 
     expect(screen.getByText('Rent')).toBeInTheDocument();
     expect(screen.getByText('Due 26 Sep')).toBeInTheDocument();
+    expectReadable(screen.getByText('Due 26 Sep'));
     expect(screen.getByText('−£950.00')).toBeInTheDocument();
     expect(screen.getByText('Salary')).toBeInTheDocument();
     expect(screen.getByText('Due in 2 days · 30 Sep')).toBeInTheDocument();
@@ -137,6 +140,24 @@ describe('DueRecurringCard', () => {
       amount: 240000, type: 'INCOME', categoryId: 'cat-salary', description: 'Salary', date: '2026-09-28', recurringId: 'r1',
     });
     expect(mockHandled).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [undefined, false],
+    ['30s', 30000],
+    ['10s', 10000],
+  ])('keeps the skipped message on screen for the chosen time (%s)', async (undoDuration, expected) => {
+    if (undoDuration) window.localStorage.setItem('budget.preferences', JSON.stringify({ undoDuration }));
+    const show = vi.spyOn(notifications, 'show');
+    show.mockClear();
+    const user = userEvent.setup();
+    renderCard();
+
+    await user.click(screen.getByRole('button', { name: 'More actions for Salary' }));
+    await user.click(await screen.findByRole('menuitem', { name: "Didn't happen" }));
+
+    const skipped = show.mock.calls.map(call => call[0]).find(options => String(options.id).startsWith('skipped-'));
+    expect(skipped?.autoClose).toBe(expected);
   });
 
   it('Didn\'t happen marks the period handled and its Undo restores the previous marker', async () => {

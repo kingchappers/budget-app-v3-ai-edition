@@ -31,6 +31,7 @@ vi.mock('~/lib/queries', () => ({
 vi.mock('~/hooks/useUndoableDelete', () => ({ useUndoableDelete: () => state.undoableDelete }));
 
 import Targets from '../targets';
+import { expectReadable } from '~/test-utils/readableText';
 
 type MutateOptions = { onSuccess?: () => void; onError?: (error: Error) => void };
 
@@ -68,6 +69,7 @@ describe('Targets page', () => {
     expect(within(groceriesRow()).queryByText('Not saved yet')).not.toBeInTheDocument();
     await user.click(within(groceriesRow()).getByText('/wk'));
     expect(within(groceriesRow()).getByText('Not saved yet')).toBeInTheDocument();
+    expectReadable(within(groceriesRow()).getByText('Not saved yet'));
   });
 
   it('marks a row as not saved yet after the amount changes', async () => {

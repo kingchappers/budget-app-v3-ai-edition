@@ -7,7 +7,14 @@ export type KeepSheetOpen = 'ask' | 'yes' | 'no';
 // How the Add sheet opens: the form, or the one-line "type it" box.
 export type EntryMode = 'form' | 'quick';
 
+// Root font size, so every rem-based size follows: 100%, 112.5% and 125%.
+export type TextSize = 'standard' | 'large' | 'largest';
+// How long a message with an Undo button stays on screen.
+export type UndoDuration = 'until-closed' | '30s' | '10s';
+
 export interface Preferences {
+  textSize: TextSize;
+  undoDuration: UndoDuration;
   shortcutN: boolean;
   openAddOnLaunch: boolean;
   // Category chips the user chose to keep first, in the order they chose them.
@@ -24,6 +31,8 @@ export interface Preferences {
 }
 
 export const DEFAULT_PREFERENCES: Preferences = {
+  textSize: 'standard',
+  undoDuration: 'until-closed',
   shortcutN: true,
   openAddOnLaunch: false,
   pinnedCategoryIds: [],
@@ -38,6 +47,8 @@ export const DEFAULT_PREFERENCES: Preferences = {
 const BOOLEAN_KEYS = ['shortcutN', 'openAddOnLaunch', 'quickAddTipDismissed'] as const;
 const KEEP_SHEET_OPEN_VALUES: readonly KeepSheetOpen[] = ['ask', 'yes', 'no'];
 const ENTRY_MODES: readonly EntryMode[] = ['form', 'quick'];
+const TEXT_SIZES: readonly TextSize[] = ['standard', 'large', 'largest'];
+const UNDO_DURATIONS: readonly UndoDuration[] = ['until-closed', '30s', '10s'];
 const MAX_CATEGORY_ID_LENGTH = 64;
 const MAX_USER_KEY_LENGTH = 128;
 const MAX_NOTHING_TO_LOG_USERS = 20;
@@ -118,6 +129,8 @@ function fromStored(stored: Record<string, unknown>, legacyOpenOnLaunch: string 
   }
   result.pinnedCategoryIds = pinnedFrom(stored.pinnedCategoryIds);
   if (KEEP_SHEET_OPEN_VALUES.includes(stored.keepSheetOpen as KeepSheetOpen)) result.keepSheetOpen = stored.keepSheetOpen as KeepSheetOpen;
+  if (TEXT_SIZES.includes(stored.textSize as TextSize)) result.textSize = stored.textSize as TextSize;
+  if (UNDO_DURATIONS.includes(stored.undoDuration as UndoDuration)) result.undoDuration = stored.undoDuration as UndoDuration;
   if (ENTRY_MODES.includes(stored.entryMode as EntryMode)) result.entryMode = stored.entryMode as EntryMode;
   result.nothingToLog = nothingToLogFrom(stored.nothingToLog);
   result.seenReleases = releasesFrom(stored.seenReleases);

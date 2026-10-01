@@ -1,8 +1,10 @@
 import { Link } from 'react-router';
-import { Card, Stack, Switch, Text, Title } from '@mantine/core';
+import { Card, Input, Radio, SegmentedControl, Stack, Switch, Text, Title, useMantineColorScheme } from '@mantine/core';
 import { IconChevronRight } from '@tabler/icons-react';
 import { DefaultLayout } from '~/components/layout/DefaultLayout';
-import { usePreferences } from '~/lib/preferences';
+import { usePreferences, type TextSize, type UndoDuration } from '~/lib/preferences';
+import { TEXT_SIZE_OPTIONS } from '~/lib/textSize';
+import { UNDO_DURATION_OPTIONS } from '~/lib/undoDuration';
 import { pageTitle } from '~/lib/pageTitle';
 import type { Route } from './+types/settings';
 
@@ -14,13 +16,79 @@ const MANAGE_LINKS = [
   { to: '/catch-up', label: 'Catch up', hint: 'Add what you remember from the last few weeks.' },
 ];
 
+const APPEARANCE_OPTIONS = [
+  { value: 'auto', label: 'Match my device' },
+  { value: 'light', label: 'Light' },
+  { value: 'dark', label: 'Dark' },
+];
+
 function SettingsContent() {
   const [preferences, setPreferences] = usePreferences();
+  const { colorScheme, setColorScheme } = useMantineColorScheme();
 
   return (
     <Stack maw={640}>
       <Title order={3}>Settings</Title>
       <Text size="sm" c="dimmed">Settings are saved on this device.</Text>
+
+      <Card withBorder>
+        <Title order={4} mb="sm">Display</Title>
+        <Stack gap="md">
+          <Input.Wrapper label="Text size" description="Makes text bigger everywhere. It changes straight away.">
+            <SegmentedControl
+              fullWidth
+              mt={4}
+              aria-label="Text size"
+              value={preferences.textSize}
+              onChange={value => setPreferences({ textSize: value as TextSize })}
+              data={TEXT_SIZE_OPTIONS}
+            />
+          </Input.Wrapper>
+          <Input.Wrapper label="Appearance" description="Light, dark, or whichever your device is set to.">
+            <SegmentedControl
+              fullWidth
+              mt={4}
+              aria-label="Appearance"
+              value={colorScheme}
+              onChange={value => setColorScheme(value as 'auto' | 'light' | 'dark')}
+              data={APPEARANCE_OPTIONS}
+            />
+          </Input.Wrapper>
+        </Stack>
+      </Card>
+
+      <Card withBorder>
+        <Title order={4} mb="sm">Messages</Title>
+        <Radio.Group
+          label="How long messages with an Undo button stay"
+          description="Saved, deleted and skipped messages. Errors always stay until you close them."
+          value={preferences.undoDuration}
+          onChange={value => setPreferences({ undoDuration: value as UndoDuration })}
+        >
+          <Stack gap="xs" mt="xs">
+            {UNDO_DURATION_OPTIONS.map(option => (
+              <Radio key={option.value} value={option.value} label={option.label} />
+            ))}
+          </Stack>
+        </Radio.Group>
+      </Card>
+
+      <Card withBorder>
+        <Title order={4} mb="sm">Keyboard and launch</Title>
+        <Switch
+          label="Press N to add a transaction"
+          description="Turn this off if it opens the Add sheet when you don't mean it to, for example while using dictation."
+          checked={preferences.shortcutN}
+          onChange={event => setPreferences({ shortcutN: event.currentTarget.checked })}
+        />
+        <Switch
+          mt="md"
+          label="Open Add sheet when the installed app starts"
+          description="Only applies when the app is installed on this device."
+          checked={preferences.openAddOnLaunch}
+          onChange={event => setPreferences({ openAddOnLaunch: event.currentTarget.checked })}
+        />
+      </Card>
 
       <Card withBorder>
         <Title order={4} mb="sm">Manage</Title>
@@ -42,26 +110,6 @@ function SettingsContent() {
             </Link>
           ))}
         </Stack>
-      </Card>
-
-      <Card withBorder>
-        <Title order={4} mb="sm">Keyboard shortcut</Title>
-        <Switch
-          label="Press N to add a transaction"
-          description="Turn this off if it opens the Add sheet when you don't mean it to, for example while using dictation."
-          checked={preferences.shortcutN}
-          onChange={event => setPreferences({ shortcutN: event.currentTarget.checked })}
-        />
-      </Card>
-
-      <Card withBorder>
-        <Title order={4} mb="sm">Installed app</Title>
-        <Switch
-          label="Open Add sheet when the installed app starts"
-          description="Only applies when the app is installed on this device."
-          checked={preferences.openAddOnLaunch}
-          onChange={event => setPreferences({ openAddOnLaunch: event.currentTarget.checked })}
-        />
       </Card>
     </Stack>
   );
