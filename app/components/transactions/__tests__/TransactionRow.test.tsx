@@ -4,6 +4,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MantineProvider, TextInput } from '@mantine/core';
 import { TransactionRow } from '../TransactionRow';
+import { todayIso, yesterdayIso } from '~/lib/months';
 import { ResponsiveSheet } from '~/components/layout/ResponsiveSheet';
 import type { Transaction } from '~/lib/types';
 
@@ -21,27 +22,6 @@ function renderRow(props: Partial<React.ComponentProps<typeof TransactionRow>> =
 }
 
 describe('TransactionRow menu', () => {
-  it('offers Duplicate and reports the transaction', async () => {
-    const user = userEvent.setup();
-    const onDuplicate = vi.fn();
-    renderRow({ onEdit: vi.fn(), onDuplicate });
-
-    await user.click(screen.getByRole('button', { name: 'Actions for Weekly Shop' }));
-    await user.click(await screen.findByRole('menuitem', { name: 'Duplicate' }));
-
-    expect(onDuplicate).toHaveBeenCalledWith(transaction);
-  });
-
-  it('omits Duplicate when no handler is given', async () => {
-    const user = userEvent.setup();
-    renderRow({ onEdit: vi.fn() });
-
-    await user.click(screen.getByRole('button', { name: 'Actions for Weekly Shop' }));
-    await screen.findByRole('menuitem', { name: 'Edit' });
-
-    expect(screen.queryByRole('menuitem', { name: 'Duplicate' })).not.toBeInTheDocument();
-  });
-
   it('offers Repeat monthly and reports the transaction', async () => {
     const user = userEvent.setup();
     const onRepeat = vi.fn();
@@ -63,9 +43,58 @@ describe('TransactionRow menu', () => {
     expect(screen.queryByRole('menuitem', { name: 'Repeat monthly' })).not.toBeInTheDocument();
   });
 
-  it('shows the menu when Duplicate is the only action', async () => {
+  it('has no menu when Duplicate is the only action, because Duplicate is not in the menu', () => {
     renderRow({ onDuplicate: vi.fn() });
-    expect(screen.getByRole('button', { name: 'Actions for Weekly Shop' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Actions for Weekly Shop' })).not.toBeInTheDocument();
+  });
+});
+
+describe('TransactionRow Duplicate', () => {
+  it('is a visible, labelled button, not tucked in the menu, and reports the transaction', async () => {
+    const onDuplicate = vi.fn();
+    renderRow({ onEdit: vi.fn(), onDuplicate });
+
+    const button = screen.getByRole('button', { name: 'Duplicate Weekly Shop' });
+    expect(button).toBeVisible();
+    expect(button).toHaveTextContent('Duplicate');
+    await userEvent.setup().click(button);
+
+    expect(onDuplicate).toHaveBeenCalledWith(transaction);
+  });
+
+  it('is not repeated inside the menu', async () => {
+    renderRow({ onEdit: vi.fn(), onDuplicate: vi.fn() });
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Actions for Weekly Shop' }));
+    await screen.findByRole('menuitem', { name: 'Edit' });
+    expect(screen.queryByRole('menuitem', { name: 'Duplicate' })).not.toBeInTheDocument();
+  });
+
+  it('is absent when no handler is given', () => {
+    renderRow({ onEdit: vi.fn() });
+    expect(screen.queryByRole('button', { name: /^Duplicate/ })).not.toBeInTheDocument();
+  });
+
+  it('is absent while the row is still waiting to sync', () => {
+    renderRow({ onDuplicate: vi.fn(), onDiscard: vi.fn(), pending: true });
+    expect(screen.queryByRole('button', { name: /^Duplicate/ })).not.toBeInTheDocument();
+  });
+});
+
+describe('TransactionRow date', () => {
+  it('says Today and Yesterday, and otherwise a readable day, never an ISO date', () => {
+    renderRow({ transaction: { ...transaction, date: todayIso() } });
+    expect(screen.getByText('Groceries · Today')).toBeInTheDocument();
+  });
+
+  it('says Yesterday for yesterday', () => {
+    renderRow({ transaction: { ...transaction, date: yesterdayIso() } });
+    expect(screen.getByText('Groceries · Yesterday')).toBeInTheDocument();
+  });
+
+  it('gives an older date as weekday, day and month', () => {
+    renderRow({ transaction: { ...transaction, date: '2020-09-10' } });
+    expect(screen.getByText('Groceries · Thu 10 Sep 2020')).toBeInTheDocument();
+    expect(screen.queryByText(/2020-09-10/)).not.toBeInTheDocument();
   });
 });
 

@@ -47,10 +47,10 @@ function txn(over: Record<string, unknown>) {
   };
 }
 
-function renderHome() {
+function renderHome(url: string = '/') {
   return render(
     <MantineProvider>
-      <MemoryRouter>
+      <MemoryRouter initialEntries={[url]}>
         <Home />
       </MemoryRouter>
     </MantineProvider>,
@@ -289,5 +289,33 @@ describe('Home page title', () => {
     await userEvent.setup().click(screen.getByRole('button', { name: 'Previous month' }));
 
     expect(document.title).toBe(`Home – ${formatMonthLabel(shiftMonth(currentYearMonth(), -1))} – Budget`);
+  });
+});
+
+describe('Home month in the URL', () => {
+  beforeEach(() => {
+    data.categories = [];
+    data.targets = [];
+    data.pots = [];
+    data.transactions = [];
+    data.potsCalls = [];
+    window.localStorage.clear();
+  });
+
+  it('opens on the month named in the link', () => {
+    renderHome('/?month=2026-08');
+    expect(screen.getByRole('heading', { name: 'August 2026' })).toBeInTheDocument();
+  });
+
+  it('offers a way back to this month, and takes it', () => {
+    renderHome('/?month=2026-08');
+    fireEvent.click(screen.getByRole('button', { name: 'Back to this month' }));
+    expect(screen.getByRole('heading', { name: formatMonthLabel(thisMonth) })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Back to this month' })).not.toBeInTheDocument();
+  });
+
+  it('has no way-back button on the current month', () => {
+    renderHome();
+    expect(screen.queryByRole('button', { name: 'Back to this month' })).not.toBeInTheDocument();
   });
 });

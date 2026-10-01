@@ -15,6 +15,7 @@ import { MoreSheet, MORE_ITEMS } from './MoreSheet';
 import { SignedOutPanel } from './SignedOutPanel';
 import { isSessionEndedError, useSessionEnded } from '~/lib/session';
 import { usePreferences } from '~/lib/preferences';
+import { useNavTarget } from '~/hooks/useNavTarget';
 
 const NAV_ITEMS = [
   { to: '/', label: 'Home', Icon: IconHome },
@@ -34,6 +35,7 @@ function isMoreActive(pathname: string): boolean {
 function BottomTabs() {
   const { pathname } = useLocation();
   const [moreOpen, setMoreOpen] = useState(false);
+  const navTarget = useNavTarget();
   const moreActive = isMoreActive(pathname);
   return (
     <>
@@ -49,7 +51,7 @@ function BottomTabs() {
           {NAV_ITEMS.map(({ to, label, Icon }) => {
             const active = isNavItemActive(pathname, to);
             return (
-              <RouterNavLink key={to} to={to} style={{ textDecoration: 'none' }} aria-label={label}>
+              <RouterNavLink key={to} to={navTarget(to)} style={{ textDecoration: 'none' }} aria-label={label}>
                 <Group gap={2} justify="center" style={{ flexDirection: 'column' }}>
                   <Icon size={22} stroke={active ? 2.4 : 1.6} />
                   <Text size="xs" fw={active ? 700 : 400}>{label}</Text>
@@ -72,13 +74,14 @@ function BottomTabs() {
 
 function SidebarNav() {
   const { pathname } = useLocation();
+  const navTarget = useNavTarget();
   return (
     <>
       {[...NAV_ITEMS, ...MORE_ITEMS].map(({ to, label, Icon }) => (
         <NavLink
           key={to}
           component={RouterNavLink}
-          to={to}
+          to={navTarget(to)}
           label={label}
           active={isNavItemActive(pathname, to)}
           leftSection={<Icon size={16} stroke={1.5} />}
