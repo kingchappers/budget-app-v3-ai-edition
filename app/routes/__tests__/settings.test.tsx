@@ -9,7 +9,9 @@ vi.mock('~/components/layout/DefaultLayout', () => ({
 }));
 
 import Settings from '../settings';
+import { SESSION_LIFETIME_TEXT } from '~/lib/sessionLifetime';
 import { DEFAULT_PREFERENCES, readPreferences, writePreferences } from '~/lib/preferences';
+import { expectNoViolations, expectSoundHeadings } from '~/test-utils/accessibility';
 
 function renderSettings() {
   return render(
@@ -58,5 +60,23 @@ describe('Settings page', () => {
     renderSettings();
     expect(screen.getByRole('switch', { name: /^Press N to add a transaction/ })).not.toBeChecked();
     expect(screen.getByRole('switch', { name: /^Open Add sheet when the installed app starts/ })).toBeChecked();
+  });
+});
+
+describe('Accessibility', () => {
+  it('has one h1 and no skipped heading levels', () => {
+    renderSettings();
+    expectSoundHeadings(document.body);
+  });
+
+  it('has no unlabelled controls, empty buttons or empty headings', async () => {
+    renderSettings();
+    await expectNoViolations(document.body);
+  });
+
+  it('says how long you stay signed in, from the shared wording', () => {
+    renderSettings();
+    expect(screen.getByRole('heading', { name: 'Signing in' })).toBeInTheDocument();
+    expect(screen.getByText(SESSION_LIFETIME_TEXT)).toBeInTheDocument();
   });
 });

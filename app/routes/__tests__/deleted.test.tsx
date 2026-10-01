@@ -28,6 +28,7 @@ vi.mock('~/lib/queries', () => ({
 
 import Deleted from '../deleted';
 import { ApiError } from '~/lib/apiError';
+import { expectNoViolations, expectSoundHeadings } from '~/test-utils/accessibility';
 
 function entry(over: Partial<TrashEntry>): TrashEntry {
   return {
@@ -75,7 +76,7 @@ describe('Recently deleted page', () => {
     ];
     renderPage();
 
-    const headings = screen.getAllByRole('heading', { level: 5 }).map(h => h.textContent);
+    const headings = screen.getAllByRole('heading', { level: 2 }).map(h => h.textContent);
     expect(headings).toEqual(['Transactions', 'Targets', 'Accounts']);
     expect(screen.getByText('£3.50 · Coffee')).toBeInTheDocument();
     expect(screen.getByText('£300.00 target · Groceries')).toBeInTheDocument();
@@ -120,5 +121,17 @@ describe('Recently deleted page', () => {
     renderPage();
     await userEvent.setup().click(screen.getByRole('button', { name: 'Try again' }));
     expect(state.trash.refetch).toHaveBeenCalled();
+  });
+});
+
+describe('Accessibility', () => {
+  it('has one h1 and no skipped heading levels', () => {
+    renderPage();
+    expectSoundHeadings(document.body);
+  });
+
+  it('has no unlabelled controls, empty buttons or empty headings', async () => {
+    renderPage();
+    await expectNoViolations(document.body);
   });
 });

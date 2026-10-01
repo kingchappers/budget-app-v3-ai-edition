@@ -23,6 +23,7 @@ vi.mock('~/lib/queries', () => ({
 vi.mock('~/hooks/useUndoableDelete', () => ({ useUndoableDelete: () => state.undoableDelete }));
 
 import Accounts from '../accounts';
+import { expectNoViolations, expectSoundHeadings } from '~/test-utils/accessibility';
 
 function account(overrides: Partial<Account> = {}): Account {
   return { accountId: 'acc-1', name: 'Lloyds', kind: 'ASSET', type: 'CASH', balances: [{ date: '2026-09-01', pence: 250000 }], createdAt: '', ...overrides };
@@ -128,7 +129,7 @@ describe('Accounts page', () => {
   it('opens the history sheet when a row is tapped, and the update sheet from its own button', async () => {
     state.accounts = [account()];
     const user = renderPageAsUser();
-    await user.click(screen.getByRole('button', { name: 'Open Lloyds history' }));
+    await user.click(screen.getByRole('button', { name: /Open Lloyds history/ }));
     expect(await screen.findByRole('dialog', { name: 'Lloyds' })).toBeInTheDocument();
     await user.keyboard('{Escape}');
     expect(screen.queryByRole('dialog', { name: 'Lloyds' })).not.toBeInTheDocument();
@@ -158,5 +159,17 @@ describe('Accounts page', () => {
 
     expect(screen.getByLabelText('Name')).toHaveValue('');
     expect(screen.getByRole('status')).toHaveTextContent('Saved');
+  });
+});
+
+describe('Accessibility', () => {
+  it('has one h1 and no skipped heading levels', () => {
+    renderPage();
+    expectSoundHeadings(document.body);
+  });
+
+  it('has no unlabelled controls, empty buttons or empty headings', async () => {
+    renderPage();
+    await expectNoViolations(document.body);
   });
 });

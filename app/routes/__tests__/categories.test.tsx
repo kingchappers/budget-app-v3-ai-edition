@@ -24,6 +24,7 @@ vi.mock('~/lib/queries', () => ({
 }));
 
 import Categories from '../categories';
+import { expectNoViolations, expectSoundHeadings } from '~/test-utils/accessibility';
 
 function cat(categoryId: string, name: string, type: Category['type'], group?: Category['group'], icon = 'tag'): Category {
   return { categoryId, name, type, group, icon, isDefault: true, createdAt: '' };
@@ -49,7 +50,7 @@ beforeEach(() => {
 describe('Categories page', () => {
   it('lists sections by group with Income and Other last', () => {
     renderPage();
-    const headings = screen.getAllByRole('heading', { level: 5 }).map(h => h.textContent);
+    const headings = screen.getAllByRole('heading', { level: 2 }).map(h => h.textContent);
     expect(headings).toEqual(['Bills', 'Everyday Spending', 'Income', 'Other']);
   });
 
@@ -287,5 +288,17 @@ describe('Categories page rename', () => {
     await user.type(input, 'Tennis{Enter}');
 
     expect(await screen.findByText(/could not rename the category/i)).toBeInTheDocument();
+  });
+});
+
+describe('Accessibility', () => {
+  it('has one h1 and no skipped heading levels', () => {
+    renderPage();
+    expectSoundHeadings(document.body);
+  });
+
+  it('has no unlabelled controls, empty buttons or empty headings', async () => {
+    renderPage();
+    await expectNoViolations(document.body);
   });
 });

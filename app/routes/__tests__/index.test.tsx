@@ -32,6 +32,7 @@ vi.mock('~/lib/queries', () => ({
 
 import Home from '../_index';
 import { currentYearMonth, formatMonthLabel, monthName, shiftMonth } from '~/lib/months';
+import { expectNoViolations, expectSoundHeadings } from '~/test-utils/accessibility';
 
 const thisMonth = currentYearMonth();
 const lastMonth = shiftMonth(thisMonth, -1);
@@ -70,7 +71,7 @@ describe('Home', () => {
   it('shows the Due card above the month header', () => {
     renderHome();
     const card = screen.getByText('Due card');
-    const header = screen.getByRole('heading', { level: 3 });
+    const header = screen.getByRole('heading', { level: 2, name: formatMonthLabel(currentYearMonth()) });
     expect(card.compareDocumentPosition(header) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
@@ -289,5 +290,17 @@ describe('Home page title', () => {
     await userEvent.setup().click(screen.getByRole('button', { name: 'Previous month' }));
 
     expect(document.title).toBe(`Home – ${formatMonthLabel(shiftMonth(currentYearMonth(), -1))} – Budget`);
+  });
+});
+
+describe('Accessibility', () => {
+  it('has one h1 and no skipped heading levels', () => {
+    renderHome();
+    expectSoundHeadings(document.body);
+  });
+
+  it('has no unlabelled controls, empty buttons or empty headings', async () => {
+    renderHome();
+    await expectNoViolations(document.body);
   });
 });

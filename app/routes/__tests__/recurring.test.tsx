@@ -41,6 +41,7 @@ vi.mock('~/lib/queries', () => ({
 vi.mock('~/hooks/useUndoableDelete', () => ({ useUndoableDelete: () => mockUndoableDelete }));
 
 import RecurringPage from '../recurring';
+import { expectNoViolations, expectSoundHeadings } from '~/test-utils/accessibility';
 
 function renderPage() {
   return render(
@@ -205,5 +206,23 @@ describe('Recurring page', () => {
     renderPage();
     await userEvent.setup().click(within(screen.getByRole('alert')).getByRole('button', { name: /try again/i }));
     expect(mockRefetch).toHaveBeenCalled();
+  });
+});
+
+describe('Accessibility', () => {
+  it('has one h1 and no skipped heading levels', () => {
+    mockQuery = { data: [rec({})], isLoading: false, error: null };
+    mockCategories = categories;
+    mockMonthTransactions = {};
+    renderPage();
+    expectSoundHeadings(document.body);
+  });
+
+  it('has no unlabelled controls, empty buttons or empty headings', async () => {
+    mockQuery = { data: [rec({})], isLoading: false, error: null };
+    mockCategories = categories;
+    mockMonthTransactions = {};
+    renderPage();
+    await expectNoViolations(document.body);
   });
 });

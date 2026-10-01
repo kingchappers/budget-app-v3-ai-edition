@@ -27,6 +27,7 @@ vi.mock('~/lib/queries', () => ({
 }));
 
 import Insights from '../insights';
+import { expectNoViolations, expectSoundHeadings } from '~/test-utils/accessibility';
 
 function renderPage() {
   return render(<MantineProvider><Insights /></MantineProvider>);
@@ -79,7 +80,7 @@ describe('Insights page', () => {
     const user = userEvent.setup();
     renderPage();
     await user.click(screen.getByRole('button', { name: 'Earlier' }));
-    await user.click(screen.getByRole('radio', { name: '12M' }));
+    await user.click(screen.getByRole('radio', { name: '12 months' }));
     await user.click(screen.getByRole('button', { name: 'Later' }));
     expect(data.rangeCalls.at(-1)).toEqual(['2024-10', '2026-09']);
     expect(screen.getByRole('button', { name: 'Later' })).toBeDisabled();
@@ -126,5 +127,25 @@ describe('Insights page title', () => {
     await user.click(screen.getByRole('radio', { name: 'This month' }));
 
     expect(document.title).toBe('Insights – September 2026 – Budget');
+  });
+});
+
+describe('Accessibility', () => {
+  it('has one h1 and no skipped heading levels', () => {
+    renderPage();
+    expectSoundHeadings(document.body);
+  });
+
+  it('has no unlabelled controls, empty buttons or empty headings', async () => {
+    renderPage();
+    await expectNoViolations(document.body);
+  });
+
+  it('labels the span switch "Show" and writes the spans out', () => {
+    renderPage();
+    expect(screen.getByText('Show')).toBeInTheDocument();
+    expect(screen.getAllByRole('radio').map(radio => radio.getAttribute('value'))).toEqual(['1', '3', '6', '12']);
+    for (const label of ['3 months', '6 months', '12 months']) expect(screen.getByRole('radio', { name: label })).toBeInTheDocument();
+    expect(screen.queryByText('3M')).not.toBeInTheDocument();
   });
 });

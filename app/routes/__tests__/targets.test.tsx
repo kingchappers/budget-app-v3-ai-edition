@@ -31,6 +31,7 @@ vi.mock('~/lib/queries', () => ({
 vi.mock('~/hooks/useUndoableDelete', () => ({ useUndoableDelete: () => state.undoableDelete }));
 
 import Targets from '../targets';
+import { expectNoViolations, expectSoundHeadings } from '~/test-utils/accessibility';
 
 type MutateOptions = { onSuccess?: () => void; onError?: (error: Error) => void };
 
@@ -53,7 +54,7 @@ function renderPage() {
 describe('Targets page', () => {
   it('has one section per group in order and no Income section', () => {
     render(<MantineProvider><Targets /></MantineProvider>);
-    const headings = screen.getAllByRole('heading', { level: 5 }).map(h => h.textContent);
+    const headings = screen.getAllByRole('heading', { level: 2 }).map(h => h.textContent);
     expect(screen.queryByText('😌 Emergency fund')).not.toBeInTheDocument();
     expect(headings).toEqual(['Bills', 'Everyday Spending']);
   });
@@ -66,7 +67,7 @@ describe('Targets page', () => {
   it('marks a row as not saved yet after the period changes', async () => {
     const user = renderPage();
     expect(within(groceriesRow()).queryByText('Not saved yet')).not.toBeInTheDocument();
-    await user.click(within(groceriesRow()).getByText('/wk'));
+    await user.click(within(groceriesRow()).getByText('per week'));
     expect(within(groceriesRow()).getByText('Not saved yet')).toBeInTheDocument();
   });
 
@@ -80,7 +81,7 @@ describe('Targets page', () => {
   it('shows Saved once the server confirms', async () => {
     state.setTarget.mockImplementation((_vars: unknown, options: MutateOptions) => options.onSuccess?.());
     const user = renderPage();
-    await user.click(within(groceriesRow()).getByText('/wk'));
+    await user.click(within(groceriesRow()).getByText('per week'));
     await user.click(within(groceriesRow()).getByRole('button', { name: 'Save' }));
 
     expect(state.setTarget).toHaveBeenCalledWith(
@@ -152,5 +153,26 @@ describe('Removing a target', () => {
     state.targets = [{ categoryId: 'g', targetAmount: 30000, period: 'WEEKLY', updatedAt: '' }];
     rerender(<MantineProvider><Targets /></MantineProvider>);
     expect(screen.getByLabelText('Target for Groceries')).toHaveValue('300.00');
+  });
+});
+
+describe('Accessibility', () => {
+  it('has one h1 and no skipped heading levels', () => {
+    renderPage();
+    expectSoundHeadings(document.body);
+  });
+
+  it('has no unlabelled controls, empty buttons or empty headings', async () => {
+    renderPage();
+    await expectNoViolations(document.body);
+  });
+
+  it('labels the period switch and writes per month and per week out', () => {
+    renderPage();
+    expect(screen.getAllByText('Repeats').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('per month').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('per week').length).toBeGreaterThan(0);
+    expect(screen.queryByText('/mo')).not.toBeInTheDocument();
+    expect(screen.queryByText('/wk')).not.toBeInTheDocument();
   });
 });

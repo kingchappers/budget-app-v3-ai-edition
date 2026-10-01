@@ -32,7 +32,7 @@ describe('AccountRow', () => {
 
   it('opens the account when the row is tapped', async () => {
     const { onOpen } = renderRow();
-    await userEvent.setup().click(screen.getByRole('button', { name: 'Open Lloyds history' }));
+    await userEvent.setup().click(screen.getByRole('button', { name: /Open Lloyds history/ }));
     expect(onOpen).toHaveBeenCalled();
   });
 
@@ -51,5 +51,13 @@ describe('AccountRow', () => {
     await userEvent.setup().click(screen.getByRole('button', { name: 'Update Lloyds' }));
     expect(onUpdate).toHaveBeenCalled();
     expect(onOpen).not.toHaveBeenCalled();
+  });
+
+  it('exposes the account type and a way to open its history in the button, rather than replacing them', () => {
+    renderRow();
+    const open = screen.getByRole('button', { name: /Open Lloyds history/ });
+    expect(open).toHaveAccessibleName(/Lloyds/);
+    expect(open).toHaveAccessibleName(/Cash/);
+    expect(open).not.toHaveAttribute('aria-label');
   });
 });

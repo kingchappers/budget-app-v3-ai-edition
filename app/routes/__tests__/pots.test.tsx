@@ -33,6 +33,7 @@ vi.mock('~/lib/queries', () => ({
 }));
 
 import Pots from '../pots';
+import { expectNoViolations, expectSoundHeadings } from '~/test-utils/accessibility';
 
 function cat(categoryId: string, name: string, group: Category['group'], icon = 'tag'): Category {
   return { categoryId, name, type: 'POT', group, icon, isDefault: true, createdAt: '' };
@@ -64,7 +65,7 @@ beforeEach(() => {
 describe('Pots page', () => {
   it('groups pots under Sinking Funds and Saving & Investment in group order', () => {
     renderPage();
-    const headings = screen.getAllByRole('heading', { level: 5 }).map(h => h.textContent);
+    const headings = screen.getAllByRole('heading', { level: 2 }).map(h => h.textContent);
     expect(headings).toEqual(['Sinking Funds', 'Saving & Investment']);
   });
 
@@ -96,8 +97,18 @@ describe('Pots page', () => {
 
   it('opens the history sheet for the tapped pot', async () => {
     renderPage();
-    await userEvent.setup().click(screen.getByRole('button', { name: 'Open Holidays history' }));
+    await userEvent.setup().click(screen.getByRole('button', { name: /Open Holidays history/ }));
     expect(screen.getByText('History: cat-holidays')).toBeInTheDocument();
+  });
+
+  it('exposes the balance, the below-zero warning and the progress inside the history button', () => {
+    state.pots = [pot('cat-holidays', { balance: -3000, goalAmount: 100000, autoAmountNow: 5000 }), pot('cat-emergency-fund')];
+    renderPage();
+    const open = screen.getByRole('button', { name: /Open Holidays history/ });
+    expect(open).toHaveAccessibleName(/−£30\.00/);
+    expect(open).toHaveAccessibleName(/Below zero/);
+    expect(open).toHaveAccessibleName(/of £1,000\.00/);
+    expect(open).not.toHaveAttribute('aria-label');
   });
 
   it('shows an empty state when there are no pots', () => {
@@ -112,5 +123,17 @@ describe('Pots page', () => {
     renderPage();
     expect(screen.getByText('Could not load pots')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
+  });
+});
+
+describe('Accessibility', () => {
+  it('has one h1 and no skipped heading levels', () => {
+    renderPage();
+    expectSoundHeadings(document.body);
+  });
+
+  it('has no unlabelled controls, empty buttons or empty headings', async () => {
+    renderPage();
+    await expectNoViolations(document.body);
   });
 });
