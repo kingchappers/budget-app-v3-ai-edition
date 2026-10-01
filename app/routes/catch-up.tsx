@@ -117,7 +117,7 @@ function LumpSumCard({ categories, today, onSaved, onCovered }: LumpSumProps) {
     <Card withBorder>
       <form onSubmit={event => { event.preventDefault(); void submit(); }}>
         <Stack gap="sm">
-          <Title order={5}>Add a lump sum as Untracked</Title>
+          <Title order={2} size="h5">Add a lump sum as Untracked</Title>
           <Text size="sm">
             If the details are gone, add what you think you spent over a stretch of days as one entry. Those days then count as covered.
           </Text>
@@ -200,7 +200,7 @@ function CatchUpContent() {
 
   return (
     <Stack>
-      <Title order={3}>Catch up</Title>
+      <Title order={1} size="h3">Catch up</Title>
       <Text size="sm">
         Add what you remember for any of the last {days.length} days. Mark a day “Nothing to log” inside it if there was nothing.
         There is no need to do them all.
@@ -225,7 +225,7 @@ function CatchUpContent() {
 
       {added.length > 0 && (
         <Stack gap="xs">
-          <Title order={5}>Just added</Title>
+          <Title order={2} size="h5">Just added</Title>
           {added.map(t => (
             <Group key={t.transactionId} justify="space-between" wrap="nowrap">
               <div style={{ minWidth: 0 }}>

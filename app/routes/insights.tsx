@@ -1,7 +1,7 @@
 import { TermHelp } from '~/components/layout/TermHelp';
 import { useState } from 'react';
 import { useSelectedMonth } from '~/hooks/useSelectedMonth';
-import { Button, Group, Loader, SegmentedControl, Stack, Text, Title } from '@mantine/core';
+import { Button, Group, Input, Loader, SegmentedControl, Stack, Text, Title } from '@mantine/core';
 import { LoadError } from '~/components/layout/LoadError';
 import { IconChevronLeft, IconChevronRight } from '@tabler/icons-react';
 import { DefaultLayout } from '~/components/layout/DefaultLayout';
@@ -34,9 +34,9 @@ import type { Route } from './+types/insights';
 
 const SPAN_OPTIONS = [
   { label: 'This month', value: '1' },
-  { label: '3M', value: '3' },
-  { label: '6M', value: '6' },
-  { label: '12M', value: '12' },
+  { label: '3 months', value: '3' },
+  { label: '6 months', value: '6' },
+  { label: '12 months', value: '12' },
 ];
 
 function periodLabel(from: string, to: string): string {
@@ -118,12 +118,16 @@ function InsightsContent() {
 
   return (
     <Stack>
-      <Title order={3}>Insights</Title>
-      <SegmentedControl
-        value={String(months)}
-        onChange={value => setMonths(Number(value))}
-        data={SPAN_OPTIONS}
-      />
+      <Title order={1} size="h3">Insights</Title>
+      <Input.Wrapper label="Show">
+        <SegmentedControl
+          fullWidth
+          mt={4}
+          value={String(months)}
+          onChange={value => setMonths(Number(value))}
+          data={SPAN_OPTIONS}
+        />
+      </Input.Wrapper>
       <Group justify="space-between" wrap="nowrap">
         <Button
           variant="subtle"

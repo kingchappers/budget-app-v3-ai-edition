@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ActionIcon, Button, Card, Group, Loader, Menu, Paper, SegmentedControl, Stack, Text, TextInput, Title } from '@mantine/core';
+import { ActionIcon, Button, Card, Group, Input, Loader, Menu, Paper, SegmentedControl, Stack, Text, TextInput, Title } from '@mantine/core';
 import { IconDots, IconTrash } from '@tabler/icons-react';
 import { LoadError } from '~/components/layout/LoadError';
 import { DefaultLayout } from '~/components/layout/DefaultLayout';
@@ -106,11 +106,15 @@ function TargetRow({ category, amountPence, period }: {
           value={value} onChange={e => changeValue(e.currentTarget.value)} error={error}
           aria-label={`Budget for ${category.name}`}
         />
-        <SegmentedControl
-          value={selectedPeriod}
-          onChange={v => changePeriod(v as TargetPeriod)}
-          data={[{ label: '/mo', value: 'MONTHLY' }, { label: '/wk', value: 'WEEKLY' }]}
-        />
+        <Input.Wrapper label="Repeats">
+          <SegmentedControl
+            mt={4}
+            aria-label={`How often the ${category.name} budget repeats`}
+            value={selectedPeriod}
+            onChange={v => changePeriod(v as TargetPeriod)}
+            data={[{ label: 'per month', value: 'MONTHLY' }, { label: 'per week', value: 'WEEKLY' }]}
+          />
+        </Input.Wrapper>
         <Button onClick={save} loading={saveState === 'saving'}>Save</Button>
       </Group>
       <Group justify="flex-end" mt={4} mih={24}>
@@ -159,14 +163,14 @@ export function BudgetsContent() {
   return (
     <Stack>
       <Group gap={0}>
-        <Title order={3}>{NAMES.budgets}</Title>
+        <Title order={2} size="h4">{NAMES.budgets}</Title>
         <TermHelp terms={['target']} />
       </Group>
       <Text c="dimmed" size="sm">{NAMES.budgetsAreOptional} Income and pots have no monthly budget here. Set a pot goal and plan on the Pots page.</Text>
 
       {groupCategories(eligible).map(bucket => (
         <div key={bucket.key}>
-          <Title order={5} mt="md" mb="xs">{bucket.label}</Title>
+          <Title order={3} size="h5" mt="md" mb="xs">{bucket.label}</Title>
           {bucket.items.map(c => {
             const t = targetFor(c.categoryId);
             return <TargetRow key={c.categoryId} category={c}

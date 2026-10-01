@@ -103,14 +103,14 @@ function HomeContent() {
       <WhatsChanged releaseKey="names-2026-10">{RELEASE_NOTES.names}</WhatsChanged>
       <WelcomeBackCard />
       <DueRecurringCard />
-      <MonthHeader yearMonth={yearMonth} onChange={setYearMonth} />
+      <MonthHeader yearMonth={yearMonth} onChange={setYearMonth} pageTitle="Home" />
       <HomeSummary summary={summary} yearMonth={yearMonth} />
 
       {!hasTargets && <TargetsOptionalCard />}
 
       {hasTargets && (
         <div>
-          <Title order={5} mb="xs">Spending vs budget</Title>
+          <Title order={2} size="h5" mb="xs">Spending vs budget</Title>
           <GroupedProgress items={summary.spending} yearMonth={yearMonth} />
           {summary.spentUnbudgeted > 0 && <OtherSpendingRow amount={summary.spentUnbudgeted} yearMonth={yearMonth} />}
         </div>
@@ -128,7 +128,7 @@ function HomeContent() {
       </Group>
 
       <div>
-        <Title order={5} mb="xs">Recent</Title>
+        <Title order={2} size="h5" mb="xs">Recent</Title>
         {summary.recent.length === 0
           ? <Text c="dimmed" size="sm">Nothing logged {phrase}.</Text>
           : summary.recent.map(t => (

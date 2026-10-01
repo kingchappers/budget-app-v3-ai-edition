@@ -5,7 +5,7 @@ export function InsightsHeadline({ sentences }: { sentences: string[] }) {
   if (sentences.length === 0) return null;
   return (
     <Stack gap="xs">
-      <Title order={5}>What stood out</Title>
+      <Title order={2} size="h5">What stood out</Title>
       <List spacing="xs" listStyleType="none" aria-label="What stood out">
         {sentences.map(sentence => <List.Item key={sentence}>{sentence}</List.Item>)}
       </List>

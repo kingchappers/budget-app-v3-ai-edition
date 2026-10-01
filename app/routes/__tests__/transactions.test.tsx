@@ -74,6 +74,7 @@ vi.mock('~/hooks/useOfflineQueue', () => ({
 }));
 
 import Transactions from '../transactions';
+import { expectNoViolations, expectSoundHeadings } from '~/test-utils/accessibility';
 
 // The app runs under StrictMode (React Router's default client entry). In dev it
 // re-runs state updaters during render, which is what exposed reading the event
@@ -161,7 +162,7 @@ describe('Transactions route search', () => {
     renderRoute();
     await user.type(screen.getByLabelText('Search transactions'), 'coffee');
 
-    const headings = screen.getAllByRole('heading', { level: 5 }).map(h => h.textContent);
+    const headings = screen.getAllByRole('heading', { level: 2 }).map(h => h.textContent);
     expect(headings).toEqual(['September 2026', 'June 2026']);
     expect(screen.getByText('3 transactions found')).toBeInTheDocument();
     const order = screen.getAllByText(/^Coffee /).map(node => node.textContent);
@@ -325,5 +326,17 @@ describe('Transactions page title', () => {
     await userEvent.setup().click(screen.getByRole('button', { name: 'Next month' }));
 
     expect(document.title).toBe(`Transactions – ${formatMonthLabel(shiftMonth(currentYearMonth(), 1))} – Budget`);
+  });
+});
+
+describe('Accessibility', () => {
+  it('has one h1 and no skipped heading levels', () => {
+    renderRoute();
+    expectSoundHeadings(document.body);
+  });
+
+  it('has no unlabelled controls, empty buttons or empty headings', async () => {
+    renderRoute();
+    await expectNoViolations(document.body);
   });
 });

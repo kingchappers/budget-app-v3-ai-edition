@@ -1,16 +1,18 @@
-import { ActionIcon, Button, Group, Stack, Title } from '@mantine/core';
+import { ActionIcon, Button, Group, Stack, Title, VisuallyHidden } from '@mantine/core';
 import { IconChevronLeft, IconChevronRight } from '@tabler/icons-react';
 import { currentYearMonth, formatMonthLabel, shiftMonth } from '~/lib/months';
 
-export function MonthHeader({ yearMonth, onChange }: { yearMonth: string; onChange: (ym: string) => void }) {
+// `pageTitle` is the page's own name for screen readers, since the month is only part of what the page is about.
+export function MonthHeader({ yearMonth, onChange, pageTitle }: { yearMonth: string; onChange: (ym: string) => void; pageTitle: string }) {
   const isCurrent = yearMonth === currentYearMonth();
   return (
     <Stack gap={4} mb="md" align="stretch">
+      <VisuallyHidden><Title order={1}>{pageTitle}</Title></VisuallyHidden>
       <Group justify="space-between">
         <ActionIcon variant="subtle" aria-label="Previous month" onClick={() => onChange(shiftMonth(yearMonth, -1))}>
           <IconChevronLeft size={20} />
         </ActionIcon>
-        <Title order={3}>{formatMonthLabel(yearMonth)}</Title>
+        <Title order={2} size="h3">{formatMonthLabel(yearMonth)}</Title>
         <ActionIcon variant="subtle" aria-label="Next month" onClick={() => onChange(shiftMonth(yearMonth, 1))}>
           <IconChevronRight size={20} />
         </ActionIcon>

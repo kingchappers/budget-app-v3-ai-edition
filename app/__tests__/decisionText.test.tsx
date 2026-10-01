@@ -101,7 +101,7 @@ describe('budget', () => {
       />,
     );
     expectReadable(screen.getByText(/spent of/));
-    expectReadable(screen.getByText(/\/wk/));
+    expectReadable(screen.getByText(/a week/));
   });
 });
 

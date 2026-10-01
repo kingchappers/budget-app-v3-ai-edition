@@ -89,7 +89,7 @@ function TransactionsContent() {
     <Stack>
       {searching
         ? <Text size="sm">Searching the last 2 years. Clear the search to go back to {formatMonthLabel(yearMonth)}.</Text>
-        : <MonthHeader yearMonth={yearMonth} onChange={setYearMonth} />}
+        : <MonthHeader yearMonth={yearMonth} onChange={setYearMonth} pageTitle="Transactions" />}
 
       <TextInput
         placeholder="Search transactions"
@@ -136,7 +136,7 @@ function TransactionsContent() {
       {searching
         ? byMonth.map(([month, monthItems]) => (
           <div key={month}>
-            <Title order={5} mt="md" mb="xs">{formatMonthLabel(month)}</Title>
+            <Title order={2} size="h5" mt="md" mb="xs">{formatMonthLabel(month)}</Title>
             {monthItems.map(t => (
               <TransactionRow
                 key={t.transactionId}

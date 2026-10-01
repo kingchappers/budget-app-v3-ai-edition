@@ -33,7 +33,7 @@ describe('AccountRow', () => {
 
   it('opens the account when the row is tapped', async () => {
     const { onOpen } = renderRow();
-    await userEvent.setup().click(screen.getByRole('button', { name: 'Open Lloyds history' }));
+    await userEvent.setup().click(screen.getByRole('button', { name: /Open Lloyds history/ }));
     expect(onOpen).toHaveBeenCalled();
   });
 
@@ -67,5 +67,13 @@ describe('AccountRow', () => {
   it('says so when no balance has been entered', () => {
     renderRow(account({ balances: [] }));
     expect(screen.getByText('Not updated yet')).toBeInTheDocument();
+  });
+
+  it('exposes the account type and a way to open its history in the button, rather than replacing them', () => {
+    renderRow();
+    const open = screen.getByRole('button', { name: /Open Lloyds history/ });
+    expect(open).toHaveAccessibleName(/Lloyds/);
+    expect(open).toHaveAccessibleName(/Cash/);
+    expect(open).not.toHaveAttribute('aria-label');
   });
 });

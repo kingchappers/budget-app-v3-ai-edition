@@ -18,7 +18,7 @@ function PlanContent() {
 
   return (
     <Stack>
-      <Title order={3}>Plan</Title>
+      <Title order={1} size="h3">Plan</Title>
       <Tabs
         value={tab}
         // Moving between tabs drops anything meant for the tab you left.

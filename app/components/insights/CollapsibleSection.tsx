@@ -18,7 +18,7 @@ export function CollapsibleSection({ id, title, children }: { id: InsightsSectio
 
   return (
     <section>
-      <Title order={5} mt="md">
+      <Title order={2} size="h5" mt="md">
         <UnstyledButton
           onClick={toggle}
           aria-expanded={open}

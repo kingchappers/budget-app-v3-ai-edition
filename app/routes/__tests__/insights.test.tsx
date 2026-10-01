@@ -29,6 +29,7 @@ vi.mock('~/lib/queries', () => ({
 }));
 
 import Insights from '../insights';
+import { expectNoViolations, expectSoundHeadings } from '~/test-utils/accessibility';
 
 function renderPage(url: string = '/insights') {
   return render(<MantineProvider><MemoryRouter initialEntries={[url]}><Insights /></MemoryRouter></MantineProvider>);
@@ -87,7 +88,7 @@ describe('Insights page', () => {
     const user = userEvent.setup();
     renderPage();
     await user.click(screen.getByRole('button', { name: /^Earlier:/ }));
-    await user.click(screen.getByRole('radio', { name: '12M' }));
+    await user.click(screen.getByRole('radio', { name: '12 months' }));
     await user.click(screen.getByRole('button', { name: /^Later:/ }));
     expect(data.rangeCalls.at(-1)).toEqual(['2024-10', '2026-09']);
     expect(screen.getByRole('button', { name: /^Later:/ })).toBeDisabled();
@@ -160,7 +161,7 @@ describe('Insights page paging labels', () => {
 
   it('follows the span length', async () => {
     const user = renderInsightsUser();
-    await user.click(screen.getByRole('radio', { name: '3M' }));
+    await user.click(screen.getByRole('radio', { name: '3 months' }));
     expect(screen.getByRole('button', { name: 'Earlier: Apr–Jun 2026' })).toBeInTheDocument();
   });
 });
@@ -274,7 +275,7 @@ describe('Insights page comparisons', () => {
     data.targets = [{ categoryId: 'cat-groceries', targetAmount: 100000, period: 'MONTHLY', updatedAt: '' }];
     data.transactions = [...entries('2026-07', 20, 100), ...entries('2026-08', 2, 99999), ...entries('2026-09', 15, 100)];
     const user = renderInsightsUser();
-    await user.click(screen.getByRole('radio', { name: '3M' }));
+    await user.click(screen.getByRole('radio', { name: '3 months' }));
 
     // Only July counts: August is barely logged and September is not finished.
     expect(screen.getByText('Groceries: within target in 1 of 1 month')).toBeInTheDocument();
@@ -300,5 +301,25 @@ describe('Insights milestones', () => {
     const user = renderInsightsUser();
     await user.click(screen.getByRole('button', { name: 'Milestones' }));
     expect(screen.getByText('Holidays: goal reached.')).toBeInTheDocument();
+  });
+});
+
+describe('Accessibility', () => {
+  it('has one h1 and no skipped heading levels', () => {
+    renderPage();
+    expectSoundHeadings(document.body);
+  });
+
+  it('has no unlabelled controls, empty buttons or empty headings', async () => {
+    renderPage();
+    await expectNoViolations(document.body);
+  });
+
+  it('labels the span switch "Show" and writes the spans out', () => {
+    renderPage();
+    expect(screen.getByText('Show')).toBeInTheDocument();
+    expect(screen.getAllByRole('radio').map(radio => radio.getAttribute('value'))).toEqual(['1', '3', '6', '12']);
+    for (const label of ['3 months', '6 months', '12 months']) expect(screen.getByRole('radio', { name: label })).toBeInTheDocument();
+    expect(screen.queryByText('3M')).not.toBeInTheDocument();
   });
 });

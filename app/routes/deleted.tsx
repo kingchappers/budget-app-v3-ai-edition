@@ -64,7 +64,7 @@ function DeletedContent() {
 
   const intro = (
     <>
-      <Title order={3}>Recently deleted</Title>
+      <Title order={1} size="h3">Recently deleted</Title>
       <Text c="dimmed" size="sm">Deleted items are kept for 30 days, then removed for good.</Text>
     </>
   );
@@ -90,7 +90,7 @@ function DeletedContent() {
       {groups.length === 0 && <Text c="dimmed">Nothing deleted in the last 30 days.</Text>}
       {groups.map(group => (
         <div key={group.entityType}>
-          <Title order={5} mt="md" mb="xs">{group.label}</Title>
+          <Title order={2} size="h5" mt="md" mb="xs">{group.label}</Title>
           {group.entries.map(entry => {
             const label = trashEntryLabel(entry, categories.data ?? []);
             return (

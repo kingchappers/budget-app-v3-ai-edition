@@ -23,7 +23,7 @@ export function HomePots({ pots, categories }: { pots: PotSummary[]; categories:
 
   return (
     <div>
-      <Title order={5} mb="xs">Pots</Title>
+      <Title order={2} size="h5" mb="xs">Pots</Title>
       {rows.map(({ pot, category }) => {
         const percent = goalPercent(pot.balance, pot.goalAmount);
         return (

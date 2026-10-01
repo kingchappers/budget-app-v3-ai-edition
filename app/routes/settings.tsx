@@ -6,6 +6,7 @@ import { TOUR_PARAM } from '~/components/layout/GuidedTour';
 import { usePreferences, type TextSize, type UndoDuration } from '~/lib/preferences';
 import { TEXT_SIZE_OPTIONS } from '~/lib/textSize';
 import { UNDO_DURATION_OPTIONS } from '~/lib/undoDuration';
+import { SESSION_LIFETIME_TEXT } from '~/lib/sessionLifetime';
 import { pageTitle } from '~/lib/pageTitle';
 import type { Route } from './+types/settings';
 
@@ -35,11 +36,16 @@ function SettingsContent() {
 
   return (
     <Stack maw={640}>
-      <Title order={3}>Settings</Title>
+      <Title order={1} size="h3">Settings</Title>
       <Text size="sm" c="dimmed">Settings are saved on this device.</Text>
 
       <Card withBorder>
-        <Title order={4} mb="sm">Display</Title>
+        <Title order={2} size="h4" mb="sm">Signing in</Title>
+        <Text size="sm">{SESSION_LIFETIME_TEXT}</Text>
+      </Card>
+
+      <Card withBorder>
+        <Title order={2} size="h4" mb="sm">Display</Title>
         <Stack gap="md">
           <Input.Wrapper label="Text size" description="Makes text bigger everywhere. It changes straight away.">
             <SegmentedControl
@@ -77,7 +83,7 @@ function SettingsContent() {
       </Card>
 
       <Card withBorder>
-        <Title order={4} mb="sm">Messages</Title>
+        <Title order={2} size="h4" mb="sm">Messages</Title>
         <Radio.Group
           label="How long messages with an Undo button stay"
           description="Saved, deleted and skipped messages. Errors always stay until you close them."
@@ -93,7 +99,7 @@ function SettingsContent() {
       </Card>
 
       <Card withBorder>
-        <Title order={4} mb="sm">Keyboard and launch</Title>
+        <Title order={2} size="h4" mb="sm">Keyboard and launch</Title>
         <Switch
           label="Press N to add a transaction"
           description="Turn this off if it opens the Add sheet when you don't mean it to, for example while using dictation."
@@ -110,7 +116,7 @@ function SettingsContent() {
       </Card>
 
       <Card withBorder>
-        <Title order={4} mb="sm">Manage</Title>
+        <Title order={2} size="h4" mb="sm">Manage</Title>
         <Stack gap={0}>
           {MANAGE_LINKS.map(({ to, label, hint }) => (
             <Link

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
-import { Button, Group, NumberInput, SegmentedControl, Select, Stack, Text, TextInput } from '@mantine/core';
+import { Button, Group, Input, NumberInput, SegmentedControl, Select, Stack, Text, TextInput } from '@mantine/core';
 import { DateInput } from '@mantine/dates';
 import { ResponsiveSheet } from '~/components/layout/ResponsiveSheet';
 import { categorySelectData } from '~/lib/categoryGroups';
@@ -180,12 +180,15 @@ export function RecurringForm({ opened, onClose, editing, draft }: RecurringForm
     <ResponsiveSheet opened={opened} onClose={onClose} title={editing ? 'Edit recurring item' : 'New recurring item'}>
       <form onSubmit={e => { e.preventDefault(); void handleSubmit(); }}>
         <Stack>
-          <SegmentedControl
-            fullWidth
-            value={type}
-            onChange={value => { setType(value as TransactionType); setCategoryId(null); }}
-            data={TYPE_OPTIONS}
-          />
+          <Input.Wrapper label="Type">
+            <SegmentedControl
+              fullWidth
+              mt={4}
+              value={type}
+              onChange={value => { setType(value as TransactionType); setCategoryId(null); }}
+              data={TYPE_OPTIONS}
+            />
+          </Input.Wrapper>
           <TextInput
             label="Amount"
             placeholder="0.00"

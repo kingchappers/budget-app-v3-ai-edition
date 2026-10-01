@@ -10,7 +10,7 @@ export function WhatsChanged({ releaseKey, children }: { releaseKey: string; chi
 
   return (
     <Card withBorder aria-label="What's changed" component="section">
-      <Title order={5} mb="xs">What's changed</Title>
+      <Title order={2} size="h5" mb="xs">What's changed</Title>
       <Text size="sm" component="div">{children}</Text>
       <Group mt="sm" justify="flex-end">
         <Button

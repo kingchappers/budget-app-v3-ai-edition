@@ -1,4 +1,4 @@
-import { Badge, Button, Card, Group, Progress, Stack, Text, UnstyledButton } from '@mantine/core';
+import { Badge, Button, Card, Group, Progress, Stack, Text, UnstyledButton, VisuallyHidden } from '@mantine/core';
 import { GLOSSARY } from '~/lib/glossary';
 import { categoryLabel } from '~/lib/categoryIcons';
 import { formatPence } from '~/lib/money';
@@ -25,7 +25,7 @@ export function PotRow({ pot, category, onSetAside, onOpen }: PotRowProps) {
     <Stack gap={4}>
       <Group gap="xs" wrap="wrap">
         <Text fw={500}>{name}</Text>
-        {pot.autoAmountNow > 0 && <Badge size="lg" variant="light">Auto {formatPence(pot.autoAmountNow)}/mo</Badge>}
+        {pot.autoAmountNow > 0 && <Badge size="lg" variant="light">Auto {formatPence(pot.autoAmountNow)} a month</Badge>}
         {pot.balance < 0 && <Badge size="lg" variant="light" color="attention">Below zero</Badge>}
       </Group>
       <Text fw={700} size="lg" c={pot.balance < 0 ? 'attention' : undefined}>{formatBalance(pot.balance)}</Text>
@@ -43,7 +43,13 @@ export function PotRow({ pot, category, onSetAside, onOpen }: PotRowProps) {
     <Card withBorder mb="xs">
       <Group justify="space-between" wrap="nowrap" align="flex-start">
         {onOpen
-          ? <UnstyledButton onClick={onOpen} style={{ flex: 1, minWidth: 0 }} aria-label={`Open ${category.name} history`}>{details}</UnstyledButton>
+          ? (
+            // No aria-label: it would replace the balance, badges and progress inside. The hidden text adds to them instead.
+            <UnstyledButton onClick={onOpen} style={{ flex: 1, minWidth: 0 }}>
+              {details}
+              <VisuallyHidden>Open {category.name} history</VisuallyHidden>
+            </UnstyledButton>
+          )
           : <div style={{ flex: 1, minWidth: 0 }}>{details}</div>}
         <Button size="compact-sm" variant="light" onClick={onSetAside} aria-label={`Add to ${category.name} pot`}>
           {GLOSSARY.setAside.term}

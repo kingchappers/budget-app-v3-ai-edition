@@ -136,7 +136,7 @@ function CategoriesContent() {
 
   return (
     <Stack>
-      <Title order={3}>Categories</Title>
+      <Title order={1} size="h3">Categories</Title>
       {error && <Alert color="danger" onClose={() => setError(null)} withCloseButton>{error}</Alert>}
 
       <Card withBorder>
@@ -165,7 +165,7 @@ function CategoriesContent() {
 
       {groupCategories(all).map(bucket => (
         <div key={bucket.key}>
-          <Title order={5} mt="md" mb="xs">{bucket.label}</Title>
+          <Title order={2} size="h5" mt="md" mb="xs">{bucket.label}</Title>
           {bucket.items.map(c => (
             <CategoryRow key={c.categoryId} category={c} onDelete={setPendingDelete} onError={setError} />
           ))}

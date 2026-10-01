@@ -51,7 +51,7 @@ export function CategoryProgressRow({ progress, to, pace = null }: CategoryProgr
       <Text size="sm">
         {week
           ? `${formatPence(week.spent)} of ${formatPence(week.target)} this week · about ${formatPence(target)} a month`
-          : `${formatPence(spent)} spent of ${formatPence(target)}${period === 'WEEKLY' ? ` · ${formatPence(rawTarget)}/wk` : ''}`}
+          : `${formatPence(spent)} spent of ${formatPence(target)}${period === 'WEEKLY' ? ` · ${formatPence(rawTarget)} a week` : ''}`}
       </Text>
     </Stack>
   );

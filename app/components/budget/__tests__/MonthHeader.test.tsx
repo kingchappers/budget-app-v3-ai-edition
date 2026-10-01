@@ -7,7 +7,7 @@ import { currentYearMonth, formatMonthLabel, shiftMonth } from '~/lib/months';
 
 function renderHeader(yearMonth: string) {
   const onChange = vi.fn();
-  render(<MantineProvider><MonthHeader yearMonth={yearMonth} onChange={onChange} /></MantineProvider>);
+  render(<MantineProvider><MonthHeader yearMonth={yearMonth} onChange={onChange} pageTitle="Budget" /></MantineProvider>);
   return { onChange, user: userEvent.setup() };
 }
 

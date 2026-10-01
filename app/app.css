@@ -35,6 +35,17 @@ html[data-text-size='largest'] {
   font-size: 125%;
 }
 
+/* Touch screens: small icon buttons and compact buttons get a 44px target. The icon inside stays
+   its size; only the area that can be tapped grows. */
+@media (pointer: coarse) {
+  .mantine-ActionIcon-root,
+  .mantine-Button-root[data-size^='compact'] {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
+/* Narrow screens: lift bottom-centre toasts above the tab bar. */
 @media (max-width: 47.99em) {
   :root {
     --tab-bar-height: calc(68px + env(safe-area-inset-bottom, 0px));
