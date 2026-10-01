@@ -1,7 +1,9 @@
 import { notifications } from '@mantine/notifications';
 import { TOAST_MS, ToastAction } from '~/components/layout/ToastAction';
 import { ApiError } from '~/lib/apiError';
+import { usePreferences } from '~/lib/preferences';
 import { useRestoreFromTrash } from '~/lib/queries';
+import { undoAutoClose } from '~/lib/undoDuration';
 import type { TrashRef } from '~/lib/trash';
 
 export interface UndoableDelete {
@@ -26,6 +28,7 @@ function showMessage(message: string, autoClose: number | false): void {
 
 export function useUndoableDelete(): (del: UndoableDelete) => void {
   const restore = useRestoreFromTrash();
+  const [{ undoDuration }] = usePreferences();
 
   function undo(del: UndoableDelete): void {
     restore.mutateAsync(del.ref).then(
@@ -52,7 +55,9 @@ export function useUndoableDelete(): (del: UndoableDelete) => void {
 
     notifications.show({
       id: toastId,
-      autoClose: TOAST_MS,
+      autoClose: undoAutoClose(undoDuration),
+      withCloseButton: true,
+      closeButtonProps: { 'aria-label': 'Close notification' },
       message: (
         <ToastAction
           text={`Deleted ${del.label}`}

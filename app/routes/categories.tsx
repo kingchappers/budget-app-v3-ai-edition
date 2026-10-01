@@ -1,5 +1,9 @@
+import { GLOSSARY, NAMES } from '~/lib/glossary';
+import { TermHelp } from '~/components/layout/TermHelp';
 import { useState } from 'react';
 import { ActionIcon, Alert, Badge, Button, Card, Group, Loader, Select, Stack, Text, TextInput, Title, UnstyledButton } from '@mantine/core';
+import { RenameField } from '~/components/categories/RenameField';
+import { LoadError } from '~/components/layout/LoadError';
 import { IconPencil } from '@tabler/icons-react';
 import { DefaultLayout } from '~/components/layout/DefaultLayout';
 import { SaveStatus, type SaveState } from '~/components/layout/SaveStatus';
@@ -13,9 +17,9 @@ import { pageTitle } from '~/lib/pageTitle';
 import type { Route } from './+types/categories';
 
 const TYPES: { value: CategoryType; label: string }[] = [
-  { value: 'EXPENSE', label: 'Spending' },
-  { value: 'INCOME', label: 'Income' },
-  { value: 'POT', label: 'Pot' },
+  { value: 'EXPENSE', label: NAMES.categoryTypeSpending },
+  { value: 'INCOME', label: GLOSSARY.income.term },
+  { value: 'POT', label: GLOSSARY.pot.term },
 ];
 
 function CategoryRow({ category, onDelete, onError }: {
@@ -34,7 +38,7 @@ function CategoryRow({ category, onDelete, onError }: {
       <Group justify="space-between" py={6}>
         <Group gap="xs">
           <Text>{categoryLabel(category)}</Text>
-          <Badge size="xs" variant="light">default</Badge>
+          <Badge size="lg" variant="light">default</Badge>
         </Group>
       </Group>
     );
@@ -43,19 +47,7 @@ function CategoryRow({ category, onDelete, onError }: {
   if (editing) {
     return (
       <Group justify="space-between" py={6}>
-        <TextInput
-          size="xs"
-          autoFocus
-          aria-label={`Rename ${category.name}`}
-          value={draft}
-          onChange={e => setDraft(e.currentTarget.value)}
-          onBlur={commit}
-          onKeyDown={e => {
-            if (e.key === 'Enter') { e.preventDefault(); commit(); }
-            if (e.key === 'Escape') { e.preventDefault(); cancel(); }
-          }}
-          style={{ flex: 1 }}
-        />
+        <RenameField categoryName={category.name} draft={draft} onDraftChange={setDraft} onSave={commit} onCancel={cancel} />
       </Group>
     );
   }
@@ -135,9 +127,7 @@ function CategoriesContent() {
 
   if (categories.error) {
     return (
-      <Alert color="danger" title="Could not load categories">
-        <Button onClick={() => categories.refetch()}>Try again</Button>
-      </Alert>
+      <LoadError thing="categories" onRetry={() => categories.refetch()} />
     );
   }
   if (categories.isLoading) return <Group justify="center" py="xl"><Loader /></Group>;
@@ -146,7 +136,7 @@ function CategoriesContent() {
 
   return (
     <Stack>
-      <Title order={3}>Categories</Title>
+      <Title order={1} size="h3">Categories</Title>
       {error && <Alert color="danger" onClose={() => setError(null)} withCloseButton>{error}</Alert>}
 
       <Card withBorder>
@@ -165,6 +155,7 @@ function CategoriesContent() {
           <Select label="Group" data={groupsForType(type)} value={type === 'INCOME' ? null : group}
             onChange={v => { if (v) setGroup(v as CategoryGroup); }}
             disabled={type === 'INCOME'} allowDeselect={false} />
+          <TermHelp terms={['groupBills', 'groupKnownCosts', 'groupEveryday', 'groupSaving']} />
           <Button disabled={name.trim() === ''} loading={createState === 'saving'} onClick={addCategory}>
             Add
           </Button>
@@ -174,7 +165,7 @@ function CategoriesContent() {
 
       {groupCategories(all).map(bucket => (
         <div key={bucket.key}>
-          <Title order={5} mt="md" mb="xs">{bucket.label}</Title>
+          <Title order={2} size="h5" mt="md" mb="xs">{bucket.label}</Title>
           {bucket.items.map(c => (
             <CategoryRow key={c.categoryId} category={c} onDelete={setPendingDelete} onError={setError} />
           ))}

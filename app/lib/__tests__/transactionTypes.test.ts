@@ -2,12 +2,12 @@ import { describe, it, expect } from 'vitest';
 import { categoryTypesFor, formatSignedPence, TYPE_OPTIONS } from '../transactionTypes';
 
 describe('TYPE_OPTIONS', () => {
-  it('offers Spend, Income, Set aside and Take out in that order', () => {
+  it('offers Spend, Income, Add to pot and Take from pot in that order', () => {
     expect(TYPE_OPTIONS.map(option => [option.label, option.value])).toEqual([
       ['Spend', 'EXPENSE'],
       ['Income', 'INCOME'],
-      ['Set aside', 'SET_ASIDE'],
-      ['Take out', 'TAKE_OUT'],
+      ['Add to pot', 'SET_ASIDE'],
+      ['Take from pot', 'TAKE_OUT'],
     ]);
   });
 });

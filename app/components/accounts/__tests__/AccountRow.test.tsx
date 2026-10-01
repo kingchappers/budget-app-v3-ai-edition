@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MantineProvider } from '@mantine/core';
 import { AccountRow } from '../AccountRow';
+import { addDaysIso, todayIso } from '~/lib/months';
 import type { Account } from '~/lib/types';
 
 function account(overrides: Partial<Account> = {}): Account {
@@ -32,7 +33,7 @@ describe('AccountRow', () => {
 
   it('opens the account when the row is tapped', async () => {
     const { onOpen } = renderRow();
-    await userEvent.setup().click(screen.getByRole('button', { name: 'Open Lloyds history' }));
+    await userEvent.setup().click(screen.getByRole('button', { name: /Open Lloyds history/ }));
     expect(onOpen).toHaveBeenCalled();
   });
 
@@ -51,5 +52,28 @@ describe('AccountRow', () => {
     await userEvent.setup().click(screen.getByRole('button', { name: 'Update Lloyds' }));
     expect(onUpdate).toHaveBeenCalled();
     expect(onOpen).not.toHaveBeenCalled();
+  });
+
+  it('says how long ago the balance was entered', () => {
+    renderRow(account({ balances: [{ date: addDaysIso(todayIso(), -23), pence: 250000 }] }));
+    expect(screen.getByText('Updated 23 days ago')).toBeInTheDocument();
+  });
+
+  it('says Updated today for a balance entered today', () => {
+    renderRow(account({ balances: [{ date: todayIso(), pence: 250000 }] }));
+    expect(screen.getByText('Updated today')).toBeInTheDocument();
+  });
+
+  it('says so when no balance has been entered', () => {
+    renderRow(account({ balances: [] }));
+    expect(screen.getByText('Not updated yet')).toBeInTheDocument();
+  });
+
+  it('exposes the account type and a way to open its history in the button, rather than replacing them', () => {
+    renderRow();
+    const open = screen.getByRole('button', { name: /Open Lloyds history/ });
+    expect(open).toHaveAccessibleName(/Lloyds/);
+    expect(open).toHaveAccessibleName(/Cash/);
+    expect(open).not.toHaveAttribute('aria-label');
   });
 });

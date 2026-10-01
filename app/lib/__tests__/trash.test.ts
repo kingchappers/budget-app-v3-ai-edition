@@ -45,9 +45,9 @@ describe('trashEntryLabel', () => {
     expect(trashEntryLabel(entry({ item: { ...txn } }), categories)).toBe('£3.50 · Coffee');
   });
 
-  it('describes a target with its category', () => {
+  it('describes a budget with its category', () => {
     const target = entry({ entityType: 'TARGET', id: 'cat-food', item: { categoryId: 'cat-food', targetAmount: 30000, period: 'MONTHLY' } });
-    expect(trashEntryLabel(target, categories)).toBe('£300.00 target · Groceries');
+    expect(trashEntryLabel(target, categories)).toBe('£300.00 budget · Groceries');
   });
 
   it('describes a recurring item', () => {

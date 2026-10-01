@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MantineProvider } from '@mantine/core';
@@ -7,6 +7,9 @@ import { MemoryRouter } from 'react-router';
 vi.mock('~/components/layout/DefaultLayout', () => ({
   DefaultLayout: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
+vi.mock('~/components/budget/WelcomeBackCard', () => ({ WelcomeBackCard: () => null }));
+vi.mock('~/components/layout/WhatsChanged', () => ({ WhatsChanged: () => null }));
+vi.mock('~/components/layout/GuidedTour', () => ({ GuidedTour: () => null }));
 vi.mock('~/components/recurring/DueRecurringCard', () => ({ DueRecurringCard: () => <div>Due card</div> }));
 vi.mock('~/hooks/useOfflineQueue', () => ({ useOfflineQueue: () => ({ pendingMap: {}, flushNow: vi.fn(), discard: vi.fn() }) }));
 vi.mock('~/components/transactions/TransactionSheet', () => ({
@@ -17,6 +20,9 @@ vi.mock('~/components/recurring/RecurringForm', () => ({ RecurringForm: () => nu
 const data = vi.hoisted(() => ({
   categories: [] as unknown[], targets: [] as unknown[], pots: [] as unknown[], transactions: [] as unknown[],
   potsCalls: [] as [string, boolean | undefined][],
+  // When set for a month, that month's transactions come from here instead of `transactions`.
+  byMonth: {} as Record<string, unknown[]>,
+  txCalls: [] as [string, boolean | undefined][],
 }));
 vi.mock('~/lib/queries', () => ({
   useCategories: () => ({ data: data.categories, isLoading: false, error: null, refetch: vi.fn() }),
@@ -25,13 +31,17 @@ vi.mock('~/lib/queries', () => ({
     data.potsCalls.push([asOf, enabled]);
     return { data: data.pots, isLoading: false, error: null };
   },
-  useTransactions: () => ({ data: data.transactions, isLoading: false, error: null, refetch: vi.fn() }),
+  useTransactions: (month: string, enabled?: boolean) => {
+    data.txCalls.push([month, enabled]);
+    return { data: data.byMonth[month] ?? data.transactions, isLoading: false, error: null, refetch: vi.fn() };
+  },
   useDeleteTransaction: () => ({ mutate: vi.fn(), mutateAsync: vi.fn() }),
   useRestoreFromTrash: () => ({ mutateAsync: vi.fn() }),
 }));
 
 import Home from '../_index';
 import { currentYearMonth, formatMonthLabel, monthName, shiftMonth } from '~/lib/months';
+import { expectNoViolations, expectSoundHeadings } from '~/test-utils/accessibility';
 
 const thisMonth = currentYearMonth();
 const lastMonth = shiftMonth(thisMonth, -1);
@@ -47,10 +57,10 @@ function txn(over: Record<string, unknown>) {
   };
 }
 
-function renderHome() {
+function renderHome(url: string = '/') {
   return render(
     <MantineProvider>
-      <MemoryRouter>
+      <MemoryRouter initialEntries={[url]}>
         <Home />
       </MemoryRouter>
     </MantineProvider>,
@@ -64,19 +74,21 @@ describe('Home', () => {
     data.pots = [];
     data.transactions = [];
     data.potsCalls = [];
+    data.byMonth = {};
+    data.txCalls = [];
     window.localStorage.clear();
   });
 
   it('shows the Due card above the month header', () => {
     renderHome();
     const card = screen.getByText('Due card');
-    const header = screen.getByRole('heading', { level: 3 });
+    const header = screen.getByRole('heading', { level: 2, name: formatMonthLabel(currentYearMonth()) });
     expect(card.compareDocumentPosition(header) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it('always links to the Recurring page', () => {
     renderHome();
-    expect(screen.getByRole('link', { name: 'Manage recurring' })).toHaveAttribute('href', '/recurring');
+    expect(screen.getByRole('link', { name: 'Manage recurring' })).toHaveAttribute('href', '/plan?tab=recurring');
   });
 
   it('shows group sub-headings inside the spending section, in group order', () => {
@@ -105,7 +117,7 @@ describe('Home', () => {
     renderHome();
     expect(screen.getByRole('heading', { name: 'Pots' })).toBeInTheDocument();
     expect(screen.getByText('£120.00')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'See all pots' })).toHaveAttribute('href', '/pots');
+    expect(screen.getByRole('link', { name: 'See all pots' })).toHaveAttribute('href', '/plan?tab=pots');
   });
 
   it('does not show a Pots section when there are no pots', () => {
@@ -145,7 +157,7 @@ describe('Home', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Next month' }));
       expect(lastCall()[1]).toBe(false);
       expect(screen.queryByRole('heading', { name: 'Pots' })).not.toBeInTheDocument();
-      expect(screen.queryByText('Could not load pots.')).not.toBeInTheDocument();
+      expect(screen.queryByText("We couldn't load your pots. Nothing has been lost.")).not.toBeInTheDocument();
     });
   });
 });
@@ -204,9 +216,9 @@ describe('Home left to spend', () => {
       .toHaveAttribute('href', `/transactions?month=${thisMonth}&category=g`);
   });
 
-  it('links spending without a target to the filtered list', () => {
+  it('links spending without a budget to the filtered list', () => {
     renderHome();
-    const link = screen.getByRole('link', { name: /Other spending \(no target\)/ });
+    const link = screen.getByRole('link', { name: /Other spending \(no budget\)/ });
     expect(link).toHaveTextContent('£30.00');
     expect(link).toHaveAttribute('href', `/transactions?month=${thisMonth}&spending=untargeted`);
   });
@@ -250,24 +262,24 @@ describe('Home without targets', () => {
     renderHome();
     expect(screen.getByText('Spent this month').parentElement).toHaveTextContent('£45.00');
     expect(screen.queryByText(/left to spend|over so far/)).not.toBeInTheDocument();
-    expect(screen.queryByText('Other spending (no target)')).not.toBeInTheDocument();
+    expect(screen.queryByText('Other spending (no budget)')).not.toBeInTheDocument();
   });
 
-  it('explains that targets are optional', () => {
+  it('explains that budgets are optional', () => {
     renderHome();
-    expect(screen.getByText("Targets are optional. Set one to see what's left in a category.")).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Set targets' })).toHaveAttribute('href', '/targets');
+    expect(screen.getByText("Budgets are optional. Set one to see what's left in a category.")).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Set budgets' })).toHaveAttribute('href', '/plan?tab=budgets');
   });
 
-  it('hides the targets card for good after "Just tracking for now"', async () => {
+  it('hides the budgets card for good after "Just tracking for now"', async () => {
     const user = userEvent.setup();
     const { unmount } = renderHome();
     await user.click(screen.getByRole('button', { name: 'Just tracking for now' }));
-    expect(screen.queryByText(/Targets are optional/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Budgets are optional/)).not.toBeInTheDocument();
 
     unmount();
     renderHome();
-    expect(screen.queryByText(/Targets are optional/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Budgets are optional/)).not.toBeInTheDocument();
     expect(screen.getByText('Spent this month')).toBeInTheDocument();
   });
 
@@ -275,7 +287,7 @@ describe('Home without targets', () => {
     const getItem = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('blocked'); });
     const error = vi.spyOn(console, 'error').mockImplementation(() => {});
     renderHome();
-    expect(screen.getByText(/Targets are optional/)).toBeInTheDocument();
+    expect(screen.getByText(/Budgets are optional/)).toBeInTheDocument();
     getItem.mockRestore();
     error.mockRestore();
   });
@@ -289,5 +301,116 @@ describe('Home page title', () => {
     await userEvent.setup().click(screen.getByRole('button', { name: 'Previous month' }));
 
     expect(document.title).toBe(`Home – ${formatMonthLabel(shiftMonth(currentYearMonth(), -1))} – Budget`);
+  });
+});
+
+describe('Home pace and weekly targets', () => {
+  const weeklyGroceries = [{ categoryId: 'g', targetAmount: 2000, period: 'WEEKLY', updatedAt: '' }];
+  const monthlyGroceries = [{ categoryId: 'g', targetAmount: 25000, period: 'MONTHLY', updatedAt: '' }];
+
+  function pretendItIs(year: number, monthIndex: number, day: number): void {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(year, monthIndex, day, 12));
+  }
+
+  beforeEach(() => {
+    data.categories = [groceries];
+    data.pots = [];
+    data.potsCalls = [];
+    data.transactions = [];
+    data.byMonth = {};
+    data.txCalls = [];
+    window.localStorage.clear();
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it('marks how far through the month it is on each row', () => {
+    pretendItIs(2026, 9, 14); // 14 October: day 14 of 31
+    data.targets = monthlyGroceries;
+    data.transactions = [txn({ yearMonth: '2026-10', date: '2026-10-05', amount: 5000 })];
+    renderHome();
+    expect(screen.getByTestId('pace-marker')).toHaveStyle({ left: '45%' });
+  });
+
+  it('shows no pace marker for a past month', () => {
+    pretendItIs(2026, 9, 14);
+    data.targets = monthlyGroceries;
+    renderHome();
+    fireEvent.click(screen.getByRole('button', { name: 'Previous month' }));
+    expect(screen.queryByTestId('pace-marker')).not.toBeInTheDocument();
+  });
+
+  it('measures a weekly target against this week, counting days from last month', () => {
+    pretendItIs(2026, 9, 1); // Thursday 1 October: the week began Monday 28 September
+    data.targets = weeklyGroceries;
+    data.byMonth = {
+      '2026-10': [txn({ transactionId: 'a', yearMonth: '2026-10', date: '2026-10-01', amount: 300 })],
+      '2026-09': [
+        txn({ transactionId: 'b', yearMonth: '2026-09', date: '2026-09-29', amount: 900 }),
+        txn({ transactionId: 'c', yearMonth: '2026-09', date: '2026-09-10', amount: 4000 }), // earlier in September: not this week
+      ],
+    };
+    renderHome();
+    expect(screen.getByText('£8.00 left this week')).toBeInTheDocument();
+    expect(screen.getByText(/£12\.00 of £20\.00 this week/)).toBeInTheDocument();
+  });
+
+  it('only asks for last month when a weekly target\'s week began in it', () => {
+    pretendItIs(2026, 9, 14); // 14 October: the week began 12 October, inside the month
+    data.targets = weeklyGroceries;
+    renderHome();
+    expect(data.txCalls.filter(([, enabled]) => enabled !== false).map(([month]) => month)).not.toContain('2026-09');
+
+    data.txCalls = [];
+    vi.setSystemTime(new Date(2026, 9, 1, 12));
+    renderHome();
+    expect(data.txCalls.some(([month, enabled]) => month === '2026-09' && enabled === true)).toBe(true);
+  });
+
+  it('does not ask for last month when there is no weekly target', () => {
+    pretendItIs(2026, 9, 1);
+    data.targets = monthlyGroceries;
+    renderHome();
+    expect(data.txCalls.every(([month, enabled]) => month !== '2026-09' || enabled === false)).toBe(true);
+  });
+});
+
+describe('Home month in the URL', () => {
+  beforeEach(() => {
+    data.categories = [];
+    data.targets = [];
+    data.pots = [];
+    data.transactions = [];
+    data.potsCalls = [];
+    window.localStorage.clear();
+  });
+
+  it('opens on the month named in the link', () => {
+    renderHome('/?month=2026-08');
+    expect(screen.getByRole('heading', { name: 'August 2026' })).toBeInTheDocument();
+  });
+
+  it('offers a way back to this month, and takes it', () => {
+    renderHome('/?month=2026-08');
+    fireEvent.click(screen.getByRole('button', { name: 'Back to this month' }));
+    expect(screen.getByRole('heading', { name: formatMonthLabel(thisMonth) })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Back to this month' })).not.toBeInTheDocument();
+  });
+
+  it('has no way-back button on the current month', () => {
+    renderHome();
+    expect(screen.queryByRole('button', { name: 'Back to this month' })).not.toBeInTheDocument();
+  });
+});
+
+describe('Accessibility', () => {
+  it('has one h1 and no skipped heading levels', () => {
+    renderHome();
+    expectSoundHeadings(document.body);
+  });
+
+  it('has no unlabelled controls, empty buttons or empty headings', async () => {
+    renderHome();
+    await expectNoViolations(document.body);
   });
 });

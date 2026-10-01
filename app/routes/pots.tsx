@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router';
-import { Alert, Button, Group, Loader, Stack, Text, Title } from '@mantine/core';
+import { Group, Loader, Stack, Text, Title } from '@mantine/core';
+import { LoadError } from '~/components/layout/LoadError';
 import { DefaultLayout } from '~/components/layout/DefaultLayout';
 import { PotHistorySheet } from '~/components/pots/PotHistorySheet';
 import { PotRow } from '~/components/pots/PotRow';
@@ -11,8 +12,10 @@ import { useCategories, usePots } from '~/lib/queries';
 import type { Category, PotSummary } from '~/lib/types';
 import { pageTitle } from '~/lib/pageTitle';
 import type { Route } from './+types/pots';
+import { redirect } from 'react-router';
+import { planPath } from '~/lib/planTabs';
 
-function PotsContent() {
+export function PotsContent() {
   const asOf = currentYearMonth();
   const categories = useCategories();
   const pots = usePots(asOf);
@@ -31,9 +34,7 @@ function PotsContent() {
 
   if (categories.error || pots.error) {
     return (
-      <Alert color="danger" title="Could not load pots">
-        <Button onClick={() => { categories.refetch(); pots.refetch(); }}>Try again</Button>
-      </Alert>
+      <LoadError thing="pots" onRetry={() => { categories.refetch(); pots.refetch(); }} />
     );
   }
   if (categories.isLoading || pots.isLoading) return <Group justify="center" py="xl"><Loader /></Group>;
@@ -45,13 +46,13 @@ function PotsContent() {
 
   return (
     <Stack>
-      <Title order={3}>Pots</Title>
+      <Title order={1} size="h3">Pots</Title>
       {rows.length === 0 && (
         <Text c="dimmed">No pots yet. Add a category with the Pot type on the Categories page.</Text>
       )}
       {groupItems(rows, row => bucketKeyFor(row.category), row => row.category.name).map(bucket => (
         <div key={bucket.key}>
-          <Title order={5} mt="md" mb="xs">{bucket.label}</Title>
+          <Title order={2} size="h5" mt="md" mb="xs">{bucket.label}</Title>
           {bucket.items.map(({ pot, category }) => (
             <PotRow
               key={pot.categoryId}
@@ -75,11 +76,22 @@ function PotsContent() {
         suggestedMonthly={suggestedMonthly}
         onClose={() => {
           setOpenId(null);
-          if (params.has('pot')) setParams({}, { replace: true });
+          if (params.has('pot') || params.has('monthly')) {
+            // Only what opened the pot goes; the Plan page's own ?tab=pots stays.
+            const next = new URLSearchParams(params);
+            next.delete('pot');
+            next.delete('monthly');
+            setParams(next, { replace: true });
+          }
         }}
       />
     </Stack>
   );
+}
+
+// This page now lives under Plan. The old address still works and leads there.
+export function clientLoader({ request }: Route.ClientLoaderArgs) {
+  throw redirect(planPath('pots', new URL(request.url).search));
 }
 
 export const meta: Route.MetaFunction = () => [{ title: pageTitle('Pots') }];

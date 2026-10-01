@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   currentYearMonth, shiftMonth, formatMonthLabel, todayIso, yesterdayIso, dateChoiceFor,
   lastDayOfMonth, addDaysIso, daysBetweenIso, formatShortDate, monthName, monthPhrase, daysLeftInMonth, formatMonthName,
+  formatDayLabel, isYearMonth, startOfWeekIso,
 } from '../months';
 
 describe('currentYearMonth', () => {
@@ -148,5 +149,58 @@ describe('daysLeftInMonth', () => {
 
   it('is 1 on the last day', () => {
     expect(daysLeftInMonth(new Date(2026, 1, 28))).toBe(1);
+  });
+});
+
+describe('startOfWeekIso', () => {
+  it('returns the Monday of the week for any day in it', () => {
+    expect(startOfWeekIso('2026-09-28')).toBe('2026-09-28'); // Monday
+    expect(startOfWeekIso('2026-09-30')).toBe('2026-09-28'); // Wednesday
+    expect(startOfWeekIso('2026-10-04')).toBe('2026-09-28'); // Sunday
+  });
+
+  it('can reach back into the previous month and year', () => {
+    expect(startOfWeekIso('2026-10-01')).toBe('2026-09-28');
+    expect(startOfWeekIso('2027-01-01')).toBe('2026-12-28');
+  });
+});
+
+describe('formatDayLabel', () => {
+  const today = '2026-09-30'; // a Wednesday
+
+  it('says Today and Yesterday', () => {
+    expect(formatDayLabel('2026-09-30', today)).toBe('Today');
+    expect(formatDayLabel('2026-09-29', today)).toBe('Yesterday');
+  });
+
+  it('gives the weekday, day and month for anything else this year', () => {
+    expect(formatDayLabel('2026-09-28', today)).toBe('Mon 28 Sep');
+    expect(formatDayLabel('2026-01-05', today)).toBe('Mon 5 Jan');
+  });
+
+  it('adds the year when it is not this year', () => {
+    expect(formatDayLabel('2025-12-31', today)).toBe('Wed 31 Dec 2025');
+    expect(formatDayLabel('2027-02-01', today)).toBe('Mon 1 Feb 2027');
+  });
+
+  it('treats the day before New Year as Yesterday across the year boundary', () => {
+    expect(formatDayLabel('2025-12-31', '2026-01-01')).toBe('Yesterday');
+  });
+
+  it('labels a future date by its weekday and date, not as Today', () => {
+    expect(formatDayLabel('2026-10-01', today)).toBe('Thu 1 Oct');
+  });
+});
+
+describe('isYearMonth', () => {
+  it('accepts a real year and month', () => {
+    expect(isYearMonth('2026-09')).toBe(true);
+    expect(isYearMonth('2026-12')).toBe(true);
+  });
+
+  it('rejects anything else', () => {
+    for (const bad of ['2026-13', '2026-00', '2026-9', '26-09', 'nonsense', '', '2026-09-01']) {
+      expect(isYearMonth(bad)).toBe(false);
+    }
   });
 });

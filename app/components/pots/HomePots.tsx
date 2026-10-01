@@ -23,25 +23,25 @@ export function HomePots({ pots, categories }: { pots: PotSummary[]; categories:
 
   return (
     <div>
-      <Title order={5} mb="xs">Pots</Title>
+      <Title order={2} size="h5" mb="xs">Pots</Title>
       {rows.map(({ pot, category }) => {
         const percent = goalPercent(pot.balance, pot.goalAmount);
         return (
           <Stack key={pot.categoryId} gap={4} mb="sm">
             <Group justify="space-between" wrap="nowrap">
               <Text fw={500}>{categoryLabel(category)}</Text>
-              <Text fw={600} c={pot.balance < 0 ? 'danger' : undefined}>{formatBalance(pot.balance)}</Text>
+              <Text fw={600} c={pot.balance < 0 ? 'attention' : undefined}>{formatBalance(pot.balance)}</Text>
             </Group>
             {pot.goalAmount !== null && (
               <>
                 <Progress value={percent ?? 0} aria-label={`${category.name} goal progress`} />
-                <Text size="xs" c="dimmed">{formatPence(Math.max(0, pot.balance))} of {formatPence(pot.goalAmount)}</Text>
+                <Text size="sm">{formatPence(Math.max(0, pot.balance))} of {formatPence(pot.goalAmount)}</Text>
               </>
             )}
           </Stack>
         );
       })}
-      <Anchor component={Link} to="/pots" size="sm">See all pots</Anchor>
+      <Anchor component={Link} to="/plan?tab=pots" size="sm">See all pots</Anchor>
     </div>
   );
 }

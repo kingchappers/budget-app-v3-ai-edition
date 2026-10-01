@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MantineProvider } from '@mantine/core';
-import { MemoryRouter } from 'react-router';
+import { MemoryRouter, useLocation } from 'react-router';
 import type { Category, PotSummary } from '~/lib/types';
 
 const state = vi.hoisted(() => ({
@@ -19,8 +19,8 @@ vi.mock('~/components/transactions/TransactionSheet', () => ({
     (opened ? <div>Add sheet: {preset?.type} {preset?.categoryId}</div> : null),
 }));
 vi.mock('~/components/pots/PotHistorySheet', () => ({
-  PotHistorySheet: ({ pot, suggestedMonthly }: { pot: { categoryId: string } | null; suggestedMonthly?: number }) =>
-    (pot ? <div>History: {pot.categoryId} {suggestedMonthly ?? 'no suggestion'}</div> : null),
+  PotHistorySheet: ({ pot, suggestedMonthly, onClose }: { pot: { categoryId: string } | null; suggestedMonthly?: number; onClose: () => void }) =>
+    (pot ? <div>History: {pot.categoryId} {suggestedMonthly ?? 'no suggestion'}<button onClick={onClose}>close pot</button></div> : null),
 }));
 vi.mock('~/lib/queries', () => ({
   useSavePot: () => ({ mutate: vi.fn(), isPending: false }),
@@ -34,6 +34,7 @@ vi.mock('~/lib/queries', () => ({
 }));
 
 import Pots from '../pots';
+import { expectNoViolations, expectSoundHeadings } from '~/test-utils/accessibility';
 
 function cat(categoryId: string, name: string, group: Category['group'], icon = 'tag'): Category {
   return { categoryId, name, type: 'POT', group, icon, isDefault: true, createdAt: '' };
@@ -46,8 +47,12 @@ function pot(categoryId: string, overrides: Partial<PotSummary> = {}): PotSummar
   };
 }
 
+function CurrentSearch() {
+  return <output data-testid="search">{useLocation().search}</output>;
+}
+
 function renderPage(url = '/pots') {
-  return render(<MantineProvider><MemoryRouter initialEntries={[url]}><Pots /></MemoryRouter></MantineProvider>);
+  return render(<MantineProvider><MemoryRouter initialEntries={[url]}><Pots /><CurrentSearch /></MemoryRouter></MantineProvider>);
 }
 
 beforeEach(() => {
@@ -63,23 +68,23 @@ beforeEach(() => {
 });
 
 describe('Pots page', () => {
-  it('groups pots under Sinking Funds and Saving & Investment in group order', () => {
+  it('groups pots under Saving for known costs and Saving & Investment in group order', () => {
     renderPage();
-    const headings = screen.getAllByRole('heading', { level: 5 }).map(h => h.textContent);
-    expect(headings).toEqual(['Sinking Funds', 'Saving & Investment']);
+    const headings = screen.getAllByRole('heading', { level: 2 }).map(h => h.textContent);
+    expect(headings).toEqual(['Saving for known costs', 'Saving & Investment']);
   });
 
   it('shows the emoji label, balance and this month for a pot', () => {
     renderPage();
     expect(screen.getByText('✈️ Holidays')).toBeInTheDocument();
     expect(screen.getByText('£250.00')).toBeInTheDocument();
-    expect(screen.getByText('+£50.00 set aside · −£10.00 spent')).toBeInTheDocument();
+    expect(screen.getByText('+£50.00 added to pot · −£10.00 spent')).toBeInTheDocument();
   });
 
   it('shows goal progress and the auto-contribute badge', () => {
     renderPage();
     expect(screen.getByText('£800.00 of £3,000.00')).toBeInTheDocument();
-    expect(screen.getByText('Auto £50.00/mo')).toBeInTheDocument();
+    expect(screen.getByText('Auto £50.00 a month')).toBeInTheDocument();
   });
 
   it('flags a balance below zero', () => {
@@ -89,16 +94,26 @@ describe('Pots page', () => {
     expect(screen.getByText('−£30.00')).toBeInTheDocument();
   });
 
-  it('opens the Add sheet on Set aside with the pot preselected', async () => {
+  it('opens the Add sheet on Add to pot with the pot preselected', async () => {
     renderPage();
-    await userEvent.setup().click(screen.getByRole('button', { name: 'Set aside to Holidays' }));
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Add to Holidays pot' }));
     expect(screen.getByText('Add sheet: SET_ASIDE cat-holidays')).toBeInTheDocument();
   });
 
   it('opens the history sheet for the tapped pot', async () => {
     renderPage();
-    await userEvent.setup().click(screen.getByRole('button', { name: 'Open Holidays history' }));
+    await userEvent.setup().click(screen.getByRole('button', { name: /Open Holidays history/ }));
     expect(screen.getByText('History: cat-holidays no suggestion')).toBeInTheDocument();
+  });
+
+  it('exposes the balance, the below-zero warning and the progress inside the history button', () => {
+    state.pots = [pot('cat-holidays', { balance: -3000, goalAmount: 100000, autoAmountNow: 5000 }), pot('cat-emergency-fund')];
+    renderPage();
+    const open = screen.getByRole('button', { name: /Open Holidays history/ });
+    expect(open).toHaveAccessibleName(/−£30\.00/);
+    expect(open).toHaveAccessibleName(/Below zero/);
+    expect(open).toHaveAccessibleName(/of £1,000\.00/);
+    expect(open).not.toHaveAttribute('aria-label');
   });
 
   it('shows an empty state when there are no pots', () => {
@@ -111,7 +126,7 @@ describe('Pots page', () => {
   it('shows an error with a retry when the pots fail to load', () => {
     state.potsError = true;
     renderPage();
-    expect(screen.getByText('Could not load pots')).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent("We couldn't load your pots");
     expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
   });
 
@@ -131,9 +146,27 @@ describe('Pots page', () => {
       expect(screen.getByText('History: holidays no suggestion')).toBeInTheDocument();
     });
 
+    it('keeps the Plan tab in the address when the pot is closed, and drops only what opened it', async () => {
+      renderPage('/plan?tab=pots&pot=holidays&monthly=3000');
+      await userEvent.setup().click(screen.getByRole('button', { name: 'close pot' }));
+      expect(screen.getByTestId('search').textContent).toBe('?tab=pots');
+    });
+
     it('opens nothing for a pot that does not exist', () => {
       renderPage('/pots?pot=gone&monthly=3000');
       expect(screen.queryByText(/History:/)).not.toBeInTheDocument();
     });
+  });
+});
+
+describe('Accessibility', () => {
+  it('has one h1 and no skipped heading levels', () => {
+    renderPage();
+    expectSoundHeadings(document.body);
+  });
+
+  it('has no unlabelled controls, empty buttons or empty headings', async () => {
+    renderPage();
+    await expectNoViolations(document.body);
   });
 });

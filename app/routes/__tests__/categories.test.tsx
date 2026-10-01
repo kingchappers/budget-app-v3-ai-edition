@@ -24,6 +24,7 @@ vi.mock('~/lib/queries', () => ({
 }));
 
 import Categories from '../categories';
+import { expectNoViolations, expectSoundHeadings } from '~/test-utils/accessibility';
 
 function cat(categoryId: string, name: string, type: Category['type'], group?: Category['group'], icon = 'tag'): Category {
   return { categoryId, name, type, group, icon, isDefault: true, createdAt: '' };
@@ -49,7 +50,7 @@ beforeEach(() => {
 describe('Categories page', () => {
   it('lists sections by group with Income and Other last', () => {
     renderPage();
-    const headings = screen.getAllByRole('heading', { level: 5 }).map(h => h.textContent);
+    const headings = screen.getAllByRole('heading', { level: 2 }).map(h => h.textContent);
     expect(headings).toEqual(['Bills', 'Everyday Spending', 'Income', 'Other']);
   });
 
@@ -78,12 +79,12 @@ describe('Categories page', () => {
     expect(state.create).toHaveBeenCalledWith({ name: 'Bonus', type: 'INCOME', icon: 'tag' }, expect.anything());
   });
 
-  it('switches Group to Sinking Funds when the type is Pot', async () => {
+  it('switches Group to Saving for known costs when the type is Pot', async () => {
     const user = userEvent.setup();
     renderPage();
     await user.click(screen.getByLabelText('Type', { selector: 'input' }));
     await user.click(await screen.findByRole('option', { name: 'Pot', hidden: true }));
-    expect(screen.getByLabelText('Group', { selector: 'input' })).toHaveValue('Sinking Funds');
+    expect(screen.getByLabelText('Group', { selector: 'input' })).toHaveValue('Saving for known costs');
   });
 
   it('does not offer Saving & Investment when the type is Spending', async () => {
@@ -92,15 +93,15 @@ describe('Categories page', () => {
     await user.click(screen.getByLabelText('Group', { selector: 'input' }));
     expect(await screen.findByRole('option', { name: 'Bills', hidden: true })).toBeInTheDocument();
     expect(screen.queryByRole('option', { name: 'Saving & Investment', hidden: true })).not.toBeInTheDocument();
-    expect(screen.queryByRole('option', { name: 'Sinking Funds', hidden: true })).not.toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'Saving for known costs', hidden: true })).not.toBeInTheDocument();
   });
 
-  it('offers Sinking Funds and Saving & Investment for a Pot and sends the chosen group', async () => {
+  it('offers Saving for known costs and Saving & Investment for a Pot and sends the chosen group', async () => {
     const user = userEvent.setup();
     renderPage();
     await user.click(screen.getByLabelText('Type', { selector: 'input' }));
     await user.click(await screen.findByRole('option', { name: 'Pot', hidden: true }));
-    expect(screen.getByLabelText('Group', { selector: 'input' })).toHaveValue('Sinking Funds');
+    expect(screen.getByLabelText('Group', { selector: 'input' })).toHaveValue('Saving for known costs');
 
     await user.type(screen.getByLabelText('New category'), 'Boiler');
     await user.click(screen.getByRole('button', { name: 'Add' }));
@@ -209,7 +210,7 @@ describe('Categories page rename', () => {
     );
   });
 
-  it('saves the new name on blur', async () => {
+  it('does not save when focus moves away, and keeps the field open', async () => {
     const user = userEvent.setup();
     renderPage();
 
@@ -218,11 +219,38 @@ describe('Categories page rename', () => {
     await user.clear(input);
     await user.type(input, 'Tennis');
     await user.tab();
+    await user.click(document.body);
+
+    expect(state.update).not.toHaveBeenCalled();
+    expect(screen.getByRole('textbox', { name: 'Rename Padel' })).toHaveValue('Tennis');
+  });
+
+  it('saves the new name from the Save button', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(screen.getByRole('button', { name: 'Rename Padel' }));
+    const input = screen.getByRole('textbox', { name: 'Rename Padel' });
+    await user.clear(input);
+    await user.type(input, 'Tennis');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
 
     expect(state.update).toHaveBeenCalledWith(
       { categoryId: 'custom-1', name: 'Tennis' },
       expect.objectContaining({ onError: expect.any(Function) }),
     );
+  });
+
+  it('cancels from the Cancel button without saving', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(screen.getByRole('button', { name: 'Rename Padel' }));
+    await user.type(screen.getByRole('textbox', { name: 'Rename Padel' }), 'x');
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    expect(state.update).not.toHaveBeenCalled();
+    expect(screen.getByText('Padel')).toBeInTheDocument();
   });
 
   it('cancels editing on Escape without saving', async () => {
@@ -287,5 +315,17 @@ describe('Categories page rename', () => {
     await user.type(input, 'Tennis{Enter}');
 
     expect(await screen.findByText(/could not rename the category/i)).toBeInTheDocument();
+  });
+});
+
+describe('Accessibility', () => {
+  it('has one h1 and no skipped heading levels', () => {
+    renderPage();
+    expectSoundHeadings(document.body);
+  });
+
+  it('has no unlabelled controls, empty buttons or empty headings', async () => {
+    renderPage();
+    await expectNoViolations(document.body);
   });
 });

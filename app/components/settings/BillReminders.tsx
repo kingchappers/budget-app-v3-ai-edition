@@ -66,7 +66,7 @@ export function BillReminders() {
 
   return (
     <Card withBorder>
-      <Title order={4} mb="sm">Reminders</Title>
+      <Title order={2} size="h4" mb="sm">Reminders</Title>
       <Stack gap="md">
         <Switch
           label="Remind me about bills"

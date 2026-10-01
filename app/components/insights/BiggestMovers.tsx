@@ -2,29 +2,41 @@ import { Group, SimpleGrid, Stack, Text } from '@mantine/core';
 import { formatPence } from '~/lib/money';
 import type { Mover } from '~/lib/insights';
 
-function MoverRow({ mover, sign }: { mover: Mover; sign: '+' | '−' }) {
+// Words carry the meaning; colour only backs them up.
+function MoverRow({ mover, direction }: { mover: Mover; direction: 'more' | 'less' }) {
   return (
     <Group justify="space-between">
       <Text>{mover.name}</Text>
-      <Text c={sign === '+' ? 'red' : 'teal'}>{sign}{formatPence(Math.abs(mover.deltaPence))}</Text>
+      <Text c={direction === 'more' ? 'attention' : 'success'}>{formatPence(Math.abs(mover.deltaPence))} {direction}</Text>
     </Group>
   );
 }
 
-export function BiggestMoversList({ up, down }: { up: Mover[]; down: Mover[] }) {
+export interface BiggestMoversListProps {
+  up: Mover[];
+  down: Mover[];
+  // What the change is measured against, in words, e.g. "1–15 Aug". Empty when there is no fair comparison.
+  comparedWith?: string;
+}
+
+export function BiggestMoversList({ up, down, comparedWith }: BiggestMoversListProps) {
+  if (comparedWith === '') {
+    return <Text c="dimmed" size="sm">Not compared, because the months needed were only partly tracked.</Text>;
+  }
   if (up.length === 0 && down.length === 0) {
     return <Text c="dimmed" size="sm">Nothing to show for this period.</Text>;
   }
+  const against = comparedWith ? ` compared with ${comparedWith}` : '';
 
   return (
     <SimpleGrid cols={{ base: 1, sm: 2 }}>
       <Stack gap="xs">
-        <Text fw={600}>Up</Text>
-        {up.map(mover => <MoverRow key={mover.categoryId} mover={mover} sign="+" />)}
+        <Text fw={600}>{`Spending up${against}`}</Text>
+        {up.map(mover => <MoverRow key={mover.categoryId} mover={mover} direction="more" />)}
       </Stack>
       <Stack gap="xs">
-        <Text fw={600}>Down</Text>
-        {down.map(mover => <MoverRow key={mover.categoryId} mover={mover} sign="−" />)}
+        <Text fw={600}>{`Spending down${against}`}</Text>
+        {down.map(mover => <MoverRow key={mover.categoryId} mover={mover} direction="less" />)}
       </Stack>
     </SimpleGrid>
   );

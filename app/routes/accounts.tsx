@@ -1,5 +1,7 @@
+import { TermHelp } from '~/components/layout/TermHelp';
 import { useState } from 'react';
-import { Alert, Button, Group, Loader, Modal, Select, SimpleGrid, Stack, Text, TextInput, Title } from '@mantine/core';
+import { Button, Group, Loader, Modal, Select, SimpleGrid, Stack, Text, TextInput, Title } from '@mantine/core';
+import { LoadError } from '~/components/layout/LoadError';
 import { DefaultLayout } from '~/components/layout/DefaultLayout';
 import { SaveStatus, type SaveState } from '~/components/layout/SaveStatus';
 import { AccountRow } from '~/components/accounts/AccountRow';
@@ -65,9 +67,7 @@ function AccountsContent() {
 
   if (accounts.error) {
     return (
-      <Alert color="danger" title="Could not load accounts">
-        <Button onClick={() => accounts.refetch()}>Try again</Button>
-      </Alert>
+      <LoadError thing="accounts" onRetry={() => accounts.refetch()} />
     );
   }
   if (accounts.isLoading) return <Group justify="center" py="xl"><Loader /></Group>;
@@ -82,7 +82,7 @@ function AccountsContent() {
 
   return (
     <Stack>
-      <Title order={3}>Accounts</Title>
+      <Title order={1} size="h3">Accounts</Title>
 
       <SimpleGrid cols={{ base: 1, sm: 3 }}>
         <Text>Assets: {formatPence(totalAssets)}</Text>
@@ -90,6 +90,7 @@ function AccountsContent() {
         <Group gap={4}>
           <Text fw={700}>Net worth:</Text>
           <Text fw={700}>{formatPence(netWorth)}</Text>
+          <TermHelp terms={['netWorth']} />
         </Group>
       </SimpleGrid>
 
@@ -107,8 +108,10 @@ function AccountsContent() {
           }}
           allowDeselect={false}
         />
+        <TermHelp terms={['accountKind']} />
         <Select label="Type" data={typeOptionsForKind(kind)} value={type}
           onChange={v => { if (v) setType(v as AccountType); }} allowDeselect={false} />
+        <TermHelp terms={['accountType']} />
         <Button disabled={name.trim() === ''} loading={createState === 'saving'} onClick={addAccount}>
           Add
         </Button>
@@ -119,7 +122,7 @@ function AccountsContent() {
 
       {assets.length > 0 && (
         <div>
-          <Title order={5} mt="md" mb="xs">Assets</Title>
+          <Title order={2} size="h5" mt="md" mb="xs">Assets</Title>
           {assets.map(account => (
             <AccountRow
               key={account.accountId}
@@ -134,7 +137,7 @@ function AccountsContent() {
 
       {liabilities.length > 0 && (
         <div>
-          <Title order={5} mt="md" mb="xs">Liabilities</Title>
+          <Title order={2} size="h5" mt="md" mb="xs">Liabilities</Title>
           {liabilities.map(account => (
             <AccountRow
               key={account.accountId}

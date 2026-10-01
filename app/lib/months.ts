@@ -2,6 +2,12 @@ function pad(n: number): string {
   return String(n).padStart(2, '0');
 }
 
+const YEAR_MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
+
+export function isYearMonth(value: string): boolean {
+  return YEAR_MONTH_PATTERN.test(value);
+}
+
 export function currentYearMonth(now: Date = new Date()): string {
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}`;
 }
@@ -51,6 +57,13 @@ export function addDaysIso(iso: string, delta: number): string {
   return todayIso(new Date(year, month - 1, day + delta));
 }
 
+// The Monday of the week containing `iso` (weeks run Monday to Sunday).
+export function startOfWeekIso(iso: string): string {
+  const [year, month, day] = iso.split('-').map(Number);
+  const daysSinceMonday = (new Date(year, month - 1, day).getDay() + 6) % 7;
+  return addDaysIso(iso, -daysSinceMonday);
+}
+
 export function daysBetweenIso(from: string, to: string): number {
   const [fromYear, fromMonth, fromDay] = from.split('-').map(Number);
   const [toYear, toMonth, toDay] = to.split('-').map(Number);
@@ -76,4 +89,18 @@ export function monthPhrase(yearMonth: string, now: Date = new Date()): string {
 
 export function daysLeftInMonth(now: Date = new Date()): number {
   return lastDayOfMonth(currentYearMonth(now)) - now.getDate() + 1;
+}
+
+const WEEKDAY_ABBREVIATIONS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+// The friendliest label for a date: Today, Yesterday, then "Mon 28 Sep", with
+// the year added only when it isn't the current one. Dates are ISO
+// (YYYY-MM-DD) internally; this is only for reading.
+export function formatDayLabel(iso: string, today: string): string {
+  if (iso === today) return 'Today';
+  if (iso === addDaysIso(today, -1)) return 'Yesterday';
+  const [year, month, day] = iso.split('-').map(Number);
+  const weekday = WEEKDAY_ABBREVIATIONS[new Date(year, month - 1, day).getDay()];
+  const label = `${weekday} ${day} ${MONTH_ABBREVIATIONS[month - 1]}`;
+  return year === Number(today.slice(0, 4)) ? label : `${label} ${year}`;
 }

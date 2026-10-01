@@ -1,9 +1,13 @@
 import { LineChart } from '@mantine/charts';
 import { Group, Stack, Text } from '@mantine/core';
+import { CHART_COLORS } from '~/lib/chartColors';
 import type { Period } from '~/lib/insights';
+import { potSummary } from '~/lib/insightsText';
+import { NAMES } from '~/lib/glossary';
 import { formatMonthLabel } from '~/lib/months';
 import { formatPence } from '~/lib/money';
 import type { Category, PotSummary } from '~/lib/types';
+import { ChartData } from './ChartData';
 
 interface PotWithMonthsInSpan {
   pot: PotSummary;
@@ -28,20 +32,27 @@ export function PotsTrend({ pots, categories, current }: { pots: PotSummary[]; c
   return (
     <Stack gap="md">
       <Group gap={4}>
-        <Text fw={600}>Total reserved:</Text>
+        <Text fw={600}>{NAMES.totalInPots}:</Text>
         <Text fw={600}>{formatPence(totalReserved)}</Text>
       </Group>
       {withHistory.map(({ pot, name, monthsInSpan }) => (
         <div key={pot.categoryId}>
           <Text size="sm" fw={500} mb={4}>{name}</Text>
-          <LineChart
-            h={120}
-            data={monthsInSpan.map(month => ({ month: formatMonthLabel(month.yearMonth), Balance: month.closing }))}
-            dataKey="month"
-            series={[{ name: 'Balance', color: 'teal.6' }]}
-            valueFormatter={formatPence}
-            withDots={false}
-          />
+          <ChartData
+            summary={potSummary(name, monthsInSpan)}
+            caption={`${name} balance by month`}
+            columns={['Month', 'Balance at end of month']}
+            rows={monthsInSpan.map(month => [formatMonthLabel(month.yearMonth), formatPence(month.closing)])}
+          >
+            <LineChart
+              h={120}
+              data={monthsInSpan.map(month => ({ month: formatMonthLabel(month.yearMonth), Balance: month.closing }))}
+              dataKey="month"
+              series={[{ name: 'Balance', color: CHART_COLORS.info }]}
+              valueFormatter={formatPence}
+              withDots
+            />
+          </ChartData>
         </div>
       ))}
     </Stack>

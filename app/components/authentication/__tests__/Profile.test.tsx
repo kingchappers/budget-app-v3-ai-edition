@@ -36,17 +36,51 @@ beforeEach(() => {
 });
 
 describe('Profile menu', () => {
-  it('links to the Settings page', async () => {
+  it('leaves Settings to the header, so there is one way to it', async () => {
     await openMenu();
-    expect(await screen.findByRole('menuitem', { name: 'Settings' })).toHaveAttribute('href', '/settings');
+    await screen.findByRole('menuitem', { name: 'Logout' });
+    expect(screen.queryByRole('menuitem', { name: 'Settings' })).not.toBeInTheDocument();
   });
 
   it('no longer holds settings or an unclear label itself', async () => {
     await openMenu();
-    await screen.findByRole('menuitem', { name: 'Settings' });
+    await screen.findByRole('menuitem', { name: 'Logout' });
     expect(screen.queryByRole('switch')).not.toBeInTheDocument();
     expect(screen.queryByText('Application')).not.toBeInTheDocument();
     expect(screen.queryByRole('menuitem', { name: 'Profile' })).not.toBeInTheDocument();
+  });
+});
+
+describe('Profile header text', () => {
+  function renderProfile() {
+    return render(
+      <MantineProvider env="test">
+        <MemoryRouter>
+          <Profile />
+        </MemoryRouter>
+      </MantineProvider>,
+    );
+  }
+
+  it('shows the email at 14px or more, in the normal text colour rather than dimmed', () => {
+    renderProfile();
+    const email = screen.getByText('sam@example.com');
+    expect(email.style.fontSize).toBe('0.875rem');
+    expect(email.style.color).toBe('var(--mantine-color-text)');
+  });
+
+  it('shows the name at 14px or more', () => {
+    renderProfile();
+    expect(screen.getByText('Sam Tester').style.fontSize).toBe('0.875rem');
+  });
+
+  it('cuts a very long email with an ellipsis, keeping all of it in the tooltip', () => {
+    const long = `${'a'.repeat(60)}@example.com`;
+    mockAuthedUser({ email: long });
+    renderProfile();
+    const email = screen.getByText(long);
+    expect(email).toHaveAttribute('title', long);
+    expect(email.style.textOverflow).toBe('ellipsis');
   });
 });
 

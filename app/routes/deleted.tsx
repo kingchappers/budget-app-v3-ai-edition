@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Alert, Button, Group, Loader, Stack, Text, Title } from '@mantine/core';
+import { Button, Group, Loader, Stack, Text, Title } from '@mantine/core';
+import { LoadError } from '~/components/layout/LoadError';
 import { notifications } from '@mantine/notifications';
 import { DefaultLayout } from '~/components/layout/DefaultLayout';
 import { TOAST_MS } from '~/components/layout/ToastAction';
@@ -34,7 +35,7 @@ function DeletedRow({ label, deletedAt, restoring, onRestore }: DeletedRowProps)
     <Group justify="space-between" wrap="nowrap" py={4}>
       <div style={{ minWidth: 0 }}>
         <Text truncate>{label}</Text>
-        <Text size="xs" c="dimmed">Deleted {deletedAtFormat.format(new Date(deletedAt))}</Text>
+        <Text size="sm">Deleted {deletedAtFormat.format(new Date(deletedAt))}</Text>
       </div>
       <Button variant="light" size="compact-sm" loading={restoring} onClick={onRestore} aria-label={`Restore ${label}`}>
         Restore
@@ -63,7 +64,7 @@ function DeletedContent() {
 
   const intro = (
     <>
-      <Title order={3}>Recently deleted</Title>
+      <Title order={1} size="h3">Recently deleted</Title>
       <Text c="dimmed" size="sm">Deleted items are kept for 30 days, then removed for good.</Text>
     </>
   );
@@ -72,9 +73,7 @@ function DeletedContent() {
     return (
       <Stack>
         {intro}
-        <Alert color="danger" title="Could not load recently deleted items">
-          <Button onClick={() => trash.refetch()}>Try again</Button>
-        </Alert>
+        <LoadError thing="recently deleted items" onRetry={() => trash.refetch()} />
       </Stack>
     );
   }
@@ -91,7 +90,7 @@ function DeletedContent() {
       {groups.length === 0 && <Text c="dimmed">Nothing deleted in the last 30 days.</Text>}
       {groups.map(group => (
         <div key={group.entityType}>
-          <Title order={5} mt="md" mb="xs">{group.label}</Title>
+          <Title order={2} size="h5" mt="md" mb="xs">{group.label}</Title>
           {group.entries.map(entry => {
             const label = trashEntryLabel(entry, categories.data ?? []);
             return (

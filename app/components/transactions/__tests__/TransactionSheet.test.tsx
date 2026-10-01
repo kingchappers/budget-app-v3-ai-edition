@@ -4,7 +4,8 @@ import userEvent from '@testing-library/user-event';
 import { MantineProvider } from '@mantine/core';
 import { Notifications, notifications } from '@mantine/notifications';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { todayIso, yesterdayIso } from '~/lib/months';
+import { addDaysIso, formatDayLabel, todayIso, yesterdayIso } from '~/lib/months';
+import { PREFERENCES_KEY } from '~/lib/preferences';
 import type { Transaction } from '~/lib/types';
 import { ApiError } from '~/lib/apiError';
 import { EMPTY_DRAFT, clearTransactionDraft, saveTransactionDraft } from '~/lib/transactionDraft';
@@ -12,8 +13,9 @@ import { EMPTY_DRAFT, clearTransactionDraft, saveTransactionDraft } from '~/lib/
 const mockCreate = vi.fn();
 const mockUpdate = vi.fn();
 const mockRemove = vi.fn();
-const mockUseTransactions = vi.hoisted(() => vi.fn());
-let mockTransactions: Transaction[] = [];
+const mockUseRange = vi.hoisted(() => vi.fn());
+// undefined means "still loading".
+let mockTransactions: Transaction[] | undefined = [];
 let mockPotCategories: unknown[] = [];
 let mockCategoriesLoaded = true;
 
@@ -30,7 +32,7 @@ vi.mock('~/lib/queries', async (importOriginal) => {
       ] : [],
       isLoading: false,
     }),
-    useTransactions: mockUseTransactions,
+    useTransactionsRange: mockUseRange,
     useCreateTransaction: () => ({ mutateAsync: mockCreate, isPending: false }),
     useUpdateTransaction: () => ({ mutateAsync: mockUpdate, isPending: false }),
     useDeleteTransaction: () => ({ mutate: mockRemove }),
@@ -38,6 +40,8 @@ vi.mock('~/lib/queries', async (importOriginal) => {
 });
 
 import { TransactionSheet, type TransactionSheetProps } from '../TransactionSheet';
+
+type User = ReturnType<typeof userEvent.setup>;
 
 function renderSheet(props: Partial<TransactionSheetProps> = {}) {
   const onClose = vi.fn();
@@ -65,6 +69,43 @@ function chipNames(): (string | undefined)[] {
   return within(group).getAllByRole('radio').map(r => (r as HTMLInputElement).labels?.[0]?.textContent ?? undefined);
 }
 
+// By default a Save closes the sheet and the tip is out of the way; tests that
+// care about the first-time question or the tip say so.
+function seedPreferences(patch: Record<string, unknown> = {}): void {
+  localStorage.setItem(PREFERENCES_KEY, JSON.stringify({ keepSheetOpen: 'no', quickAddTipDismissed: true, ...patch }));
+}
+
+function storedPreferences(): Record<string, unknown> {
+  return JSON.parse(localStorage.getItem(PREFERENCES_KEY) ?? '{}') as Record<string, unknown>;
+}
+
+// The type, date and note are values in one line ("Spend · Today · No note");
+// tapping a value opens its control.
+async function pickType(user: User, label: string): Promise<void> {
+  await user.click(screen.getByRole('button', { name: /^type:/i }));
+  await user.click(screen.getByRole('radio', { name: label }));
+}
+
+async function pickDate(user: User, label: string): Promise<void> {
+  await user.click(screen.getByRole('button', { name: /^date:/i }));
+  await user.click(screen.getByRole('radio', { name: label }));
+}
+
+async function openNote(user: User): Promise<HTMLElement> {
+  await user.click(screen.getByRole('button', { name: /^note:/i }));
+  return screen.getByLabelText('Note (optional)');
+}
+
+function noteInput(): HTMLElement {
+  return screen.getByLabelText('Note (optional)');
+}
+
+async function fillAndSave(user: User, amount = '4.80', category = 'Dining'): Promise<void> {
+  await user.type(screen.getByLabelText(/amount/i), amount);
+  await user.click(screen.getByRole('radio', { name: category }));
+  await user.click(screen.getByRole('button', { name: /^save$/i }));
+}
+
 const editing: Transaction = {
   transactionId: 't1', yearMonth: '2026-07', amount: 480, type: 'EXPENSE', categoryId: 'cat-dining',
   description: 'Lunch', date: '2026-07-03', createdAt: '',
@@ -86,21 +127,25 @@ describe('TransactionSheet', () => {
     mockTransactions = [];
     mockPotCategories = [];
     mockCategoriesLoaded = true;
-    mockUseTransactions.mockReset();
-    mockUseTransactions.mockImplementation(() => ({ data: mockTransactions }));
+    mockUseRange.mockReset();
+    mockUseRange.mockImplementation(() => ({ data: mockTransactions }));
     clearTransactionDraft();
+    seedPreferences();
   });
 
-  afterEach(() => { notifications.clean(); });
+  afterEach(() => {
+    cleanup();
+    notifications.clean();
+    localStorage.removeItem(PREFERENCES_KEY);
+  });
 
-  it('only enables the ranking query while the sheet is open', () => {
+  it('only loads recent history while the sheet is open', () => {
     const { setProps } = renderSheet({ opened: false });
-    const currentMonth = mockUseTransactions.mock.calls[0][0];
-    expect(mockUseTransactions.mock.calls.every(([, enabled]) => enabled === false)).toBe(true);
+    expect(mockUseRange.mock.calls.every(([, , enabled]) => enabled === false)).toBe(true);
 
-    mockUseTransactions.mockClear();
+    mockUseRange.mockClear();
     setProps({ opened: true });
-    expect(mockUseTransactions).toHaveBeenCalledWith(currentMonth, true);
+    expect(mockUseRange.mock.calls.some(([, , enabled]) => enabled === true)).toBe(true);
   });
 
   it('shows a validation message for an invalid amount', async () => {
@@ -133,9 +178,7 @@ describe('TransactionSheet', () => {
   it('submits a valid transaction as integer pence', async () => {
     const user = userEvent.setup();
     renderSheet();
-    await user.type(screen.getByLabelText(/amount/i), '4.80');
-    await user.click(screen.getByRole('radio', { name: 'Dining' }));
-    await user.click(screen.getByRole('button', { name: /^save$/i }));
+    await fillAndSave(user);
     expect(mockCreate).toHaveBeenCalledWith(
       expect.objectContaining({ amount: 480, type: 'EXPENSE', categoryId: 'cat-dining' }),
     );
@@ -151,11 +194,43 @@ describe('TransactionSheet', () => {
     expect(chipNames()).toEqual(['Groceries', 'Dining']);
   });
 
+  it('puts pinned categories first, ahead of more-used ones', () => {
+    seedPreferences({ pinnedCategoryIds: ['cat-dining'] });
+    mockTransactions = [
+      { ...editing, transactionId: 'a', categoryId: 'cat-food' },
+      { ...editing, transactionId: 'b', categoryId: 'cat-food' },
+    ];
+    renderSheet();
+    expect(chipNames()).toEqual(['Dining', 'Groceries']);
+  });
+
   it('only offers categories that match the chosen type', async () => {
     const user = userEvent.setup();
     renderSheet();
-    await user.click(screen.getByRole('radio', { name: 'Income' }));
+    await pickType(user, 'Income');
     expect(chipNames()).toEqual(['Salary']);
+  });
+
+  it('shows the type, date and note as one line of values', () => {
+    renderSheet();
+    expect(screen.getByRole('button', { name: 'Type: Spend' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Date: Today' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Note: No note' })).toBeInTheDocument();
+    expect(screen.queryByRole('radio', { name: 'Yesterday' })).not.toBeInTheDocument();
+  });
+
+  it('keeps the category and says so when the type no longer fits it', async () => {
+    const user = userEvent.setup();
+    renderSheet();
+    await user.click(screen.getByRole('radio', { name: 'Dining' }));
+
+    await pickType(user, 'Income');
+    expect(screen.getByText("Dining isn't an income category. Choose another.")).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'Salary' })).not.toBeChecked();
+
+    await pickType(user, 'Spend');
+    expect(screen.queryByText(/isn't an income category/i)).not.toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'Dining' })).toBeChecked();
   });
 
   it('defaults the date to today and lets you pick yesterday', async () => {
@@ -163,7 +238,8 @@ describe('TransactionSheet', () => {
     renderSheet();
     await user.type(screen.getByLabelText(/amount/i), '4.80');
     await user.click(screen.getByRole('radio', { name: 'Dining' }));
-    await user.click(screen.getByRole('radio', { name: 'Yesterday' }));
+    await pickDate(user, 'Yesterday');
+    expect(screen.getByRole('button', { name: 'Date: Yesterday' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /^save$/i }));
     expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({ date: yesterdayIso() }));
   });
@@ -171,26 +247,32 @@ describe('TransactionSheet', () => {
   it('saves with today\'s date when no date is chosen', async () => {
     const user = userEvent.setup();
     renderSheet();
-    await user.type(screen.getByLabelText(/amount/i), '4.80');
-    await user.click(screen.getByRole('radio', { name: 'Dining' }));
-    await user.click(screen.getByRole('button', { name: /^save$/i }));
+    await fillAndSave(user);
     expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({ date: todayIso() }));
   });
 
   it('hides the note until asked for', async () => {
     const user = userEvent.setup();
     renderSheet();
-    expect(screen.queryByLabelText(/note/i)).not.toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: /add note/i }));
-    expect(screen.getByLabelText(/note/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText('Note (optional)')).not.toBeInTheDocument();
+    await openNote(user);
+    expect(noteInput()).toBeInTheDocument();
+  });
+
+  it('shows the note in the line once one has been typed', async () => {
+    const user = userEvent.setup();
+    renderSheet();
+    await user.type(await openNote(user), 'Coffee');
+    expect(screen.getByRole('button', { name: 'Note: Coffee' })).toBeInTheDocument();
   });
 
   it('shows every field when editing', () => {
     renderSheet({ editing });
-    expect(screen.getByLabelText(/note/i)).toHaveValue('Lunch');
+    expect(noteInput()).toHaveValue('Lunch');
     expect(screen.getByLabelText(/^date/i)).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /add note/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^note:/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('radio', { name: 'Yesterday' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Type it instead' })).not.toBeInTheDocument();
   });
 
   it('prefills from a template, dated today', async () => {
@@ -199,8 +281,8 @@ describe('TransactionSheet', () => {
 
     expect(screen.getByLabelText(/amount/i)).toHaveValue('4.80');
     expect(screen.getByRole('radio', { name: 'Dining' })).toBeChecked();
-    expect(screen.getByLabelText(/note/i)).toHaveValue('Lunch');
-    expect(screen.getByRole('radio', { name: 'Today' })).toBeChecked();
+    expect(noteInput()).toHaveValue('Lunch');
+    expect(screen.getByRole('button', { name: 'Date: Today' })).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: /^save$/i }));
 
@@ -211,8 +293,8 @@ describe('TransactionSheet', () => {
 
   it('keeps the note collapsed for a template with no note', () => {
     renderSheet({ template: { ...editing, description: '' } });
-    expect(screen.queryByLabelText(/note/i)).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /add note/i })).toBeInTheDocument();
+    expect(screen.queryByLabelText('Note (optional)')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Note: No note' })).toBeInTheDocument();
   });
 
   it('prefers the transaction being edited over a template', () => {
@@ -224,9 +306,7 @@ describe('TransactionSheet', () => {
     const user = userEvent.setup();
     mockCreate.mockReturnValue(new Promise(() => {}));
     const { onClose } = renderSheet();
-    await user.type(screen.getByLabelText(/amount/i), '4.80');
-    await user.click(screen.getByRole('radio', { name: 'Dining' }));
-    await user.click(screen.getByRole('button', { name: /^save$/i }));
+    await fillAndSave(user);
     expect(onClose).toHaveBeenCalled();
   });
 
@@ -243,72 +323,122 @@ describe('TransactionSheet', () => {
     expect(mockCreate).toHaveBeenCalledTimes(1);
   });
 
-  it('accepts the next entry after Save & add another', async () => {
-    const user = userEvent.setup();
-    renderSheet();
-    await user.type(screen.getByLabelText(/amount/i), '4.80');
-    await user.click(screen.getByRole('radio', { name: 'Dining' }));
-    await user.click(screen.getByRole('button', { name: /save & add another/i }));
+  describe('after saving', () => {
+    it('asks the first time whether to keep the sheet open, without closing it', async () => {
+      seedPreferences({ keepSheetOpen: 'ask' });
+      const user = userEvent.setup();
+      const { onClose } = renderSheet();
+      await fillAndSave(user);
 
-    await user.type(screen.getByLabelText(/amount/i), '2.00');
-    await user.click(screen.getByRole('radio', { name: 'Groceries' }));
-    await user.click(screen.getByRole('button', { name: /save & add another/i }));
+      expect(await screen.findByText('Keep this open for the next entry?')).toBeInTheDocument();
+      expect(mockCreate).toHaveBeenCalledTimes(1);
+      expect(onClose).not.toHaveBeenCalled();
+    });
 
-    expect(mockCreate).toHaveBeenCalledTimes(2);
-  });
+    it('closes and remembers the answer when told no', async () => {
+      seedPreferences({ keepSheetOpen: 'ask' });
+      const user = userEvent.setup();
+      const { onClose } = renderSheet();
+      await fillAndSave(user);
 
-  it('keeps the sheet open on Save & add another, clearing amount, note and category', async () => {
-    const user = userEvent.setup();
-    const { onClose } = renderSheet();
-    await user.click(screen.getByRole('radio', { name: 'Income' }));
-    await user.click(screen.getByRole('radio', { name: 'Yesterday' }));
-    await user.type(screen.getByLabelText(/amount/i), '10');
-    await user.click(screen.getByRole('radio', { name: 'Salary' }));
-    await user.click(screen.getByRole('button', { name: /add note/i }));
-    await user.type(screen.getByLabelText(/note/i), 'March');
+      await user.click(await screen.findByRole('button', { name: 'No, just close' }));
 
-    await user.click(screen.getByRole('button', { name: /save & add another/i }));
+      expect(onClose).toHaveBeenCalled();
+      expect(storedPreferences().keepSheetOpen).toBe('no');
+    });
 
-    expect(mockCreate).toHaveBeenCalledTimes(1);
-    expect(onClose).not.toHaveBeenCalled();
-    expect(screen.getByLabelText(/amount/i)).toHaveValue('');
-    expect(screen.getByLabelText(/amount/i)).toHaveFocus();
-    expect(screen.getByRole('radio', { name: 'Salary' })).not.toBeChecked();
-    expect(screen.queryByLabelText(/note/i)).not.toBeInTheDocument();
-    expect(screen.getByRole('radio', { name: 'Income' })).toBeChecked();
-    expect(screen.getByRole('radio', { name: 'Yesterday' })).toBeChecked();
-  });
+    it('stays open, empty and ready for the next entry when told yes', async () => {
+      seedPreferences({ keepSheetOpen: 'ask' });
+      const user = userEvent.setup();
+      const { onClose } = renderSheet();
+      await pickType(user, 'Income');
+      await pickDate(user, 'Yesterday');
+      await user.type(screen.getByLabelText(/amount/i), '10');
+      await user.click(screen.getByRole('radio', { name: 'Salary' }));
+      await user.type(await openNote(user), 'March');
+      await user.click(screen.getByRole('button', { name: /^save$/i }));
 
-  it('clears the quick add line and its error on Save & add another', async () => {
-    const user = userEvent.setup();
-    renderSheet();
-    await user.type(screen.getByLabelText('Quick add'), 'coffee{Enter}');
-    expect(screen.getByText("Couldn't find an amount")).toBeInTheDocument();
-    await user.type(screen.getByLabelText(/amount/i), '4.80');
-    await user.click(screen.getByRole('radio', { name: 'Dining' }));
+      await user.click(await screen.findByRole('button', { name: 'Yes, keep it open' }));
 
-    await user.click(screen.getByRole('button', { name: /save & add another/i }));
+      expect(onClose).not.toHaveBeenCalled();
+      expect(storedPreferences().keepSheetOpen).toBe('yes');
+      expect(screen.getByLabelText(/amount/i)).toHaveValue('');
+      expect(screen.getByLabelText(/amount/i)).toHaveFocus();
+      expect(screen.getByRole('radio', { name: 'Salary' })).not.toBeChecked();
+      expect(screen.queryByLabelText('Note (optional)')).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Type: Income' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Date: Yesterday' })).toBeInTheDocument();
+    });
 
-    expect(mockCreate).toHaveBeenCalledTimes(1);
-    expect(screen.getByLabelText('Quick add')).toHaveValue('');
-    expect(screen.queryByText("Couldn't find an amount")).not.toBeInTheDocument();
-  });
+    it('does not ask again once answered', async () => {
+      seedPreferences({ keepSheetOpen: 'yes' });
+      const user = userEvent.setup();
+      const { onClose } = renderSheet();
+      await fillAndSave(user);
 
-  it('runs Save & add another when Enter is pressed while adding', async () => {
-    const user = userEvent.setup();
-    const { onClose } = renderSheet();
-    await user.click(screen.getByRole('radio', { name: 'Dining' }));
-    await user.type(screen.getByLabelText(/amount/i), '4.80{Enter}');
-    expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({ amount: 480, categoryId: 'cat-dining' }));
-    expect(onClose).not.toHaveBeenCalled();
+      expect(screen.queryByText('Keep this open for the next entry?')).not.toBeInTheDocument();
+      expect(onClose).not.toHaveBeenCalled();
+      expect(screen.getByLabelText(/amount/i)).toHaveValue('');
+    });
+
+    it('accepts the next entry after keeping the sheet open', async () => {
+      seedPreferences({ keepSheetOpen: 'yes' });
+      const user = userEvent.setup();
+      renderSheet();
+      await fillAndSave(user);
+      await fillAndSave(user, '2.00', 'Groceries');
+
+      expect(mockCreate).toHaveBeenCalledTimes(2);
+    });
+
+    it('saves and stays open when Enter is pressed and the preference is to keep it open', async () => {
+      seedPreferences({ keepSheetOpen: 'yes' });
+      const user = userEvent.setup();
+      const { onClose } = renderSheet();
+      await user.click(screen.getByRole('radio', { name: 'Dining' }));
+      await user.type(screen.getByLabelText(/amount/i), '4.80{Enter}');
+
+      expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({ amount: 480, categoryId: 'cat-dining' }));
+      expect(onClose).not.toHaveBeenCalled();
+    });
+
+    it('offers Undo last save inside the sheet, and undoing removes the transaction', async () => {
+      seedPreferences({ keepSheetOpen: 'yes' });
+      const user = userEvent.setup();
+      renderSheet();
+      await fillAndSave(user);
+
+      await user.click(await screen.findByRole('button', { name: /undo last save/i }));
+
+      await waitFor(() => expect(mockRemove).toHaveBeenCalledWith({ transactionId: 't-real', yearMonth: '2026-07' }));
+      await waitFor(() => expect(screen.queryByRole('button', { name: /undo last save/i })).not.toBeInTheDocument());
+    });
+
+    it('names what was saved on the in-sheet Undo', async () => {
+      seedPreferences({ keepSheetOpen: 'yes' });
+      const user = userEvent.setup();
+      renderSheet();
+      await fillAndSave(user);
+
+      expect(await screen.findByRole('button', { name: 'Undo last save (£4.80 · Dining)' })).toBeInTheDocument();
+    });
+
+    it('offers Undo on the keep-open question too', async () => {
+      seedPreferences({ keepSheetOpen: 'ask' });
+      const user = userEvent.setup();
+      renderSheet();
+      await fillAndSave(user);
+
+      await user.click(await screen.findByRole('button', { name: /undo last save/i }));
+
+      await waitFor(() => expect(mockRemove).toHaveBeenCalledWith({ transactionId: 't-real', yearMonth: '2026-07' }));
+    });
   });
 
   it('offers Undo that deletes the created transaction', async () => {
     const user = userEvent.setup();
     renderSheet();
-    await user.type(screen.getByLabelText(/amount/i), '4.80');
-    await user.click(screen.getByRole('radio', { name: 'Dining' }));
-    await user.click(screen.getByRole('button', { name: /^save$/i }));
+    await fillAndSave(user);
 
     expect(await screen.findByText(/saved £4\.80 · dining/i)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Undo' }));
@@ -320,9 +450,7 @@ describe('TransactionSheet', () => {
     const user = userEvent.setup();
     const onUndone = vi.fn();
     renderSheet({ onUndone });
-    await user.type(screen.getByLabelText(/amount/i), '4.80');
-    await user.click(screen.getByRole('radio', { name: 'Dining' }));
-    await user.click(screen.getByRole('button', { name: /^save$/i }));
+    await fillAndSave(user);
 
     expect(await screen.findByText(/saved £4\.80 · dining/i)).toBeInTheDocument();
     expect(onUndone).not.toHaveBeenCalled();
@@ -337,9 +465,7 @@ describe('TransactionSheet', () => {
     const pending = deferred<{ transactionId: string; yearMonth: string }>();
     mockCreate.mockReturnValue(pending.promise);
     renderSheet();
-    await user.type(screen.getByLabelText(/amount/i), '4.80');
-    await user.click(screen.getByRole('radio', { name: 'Dining' }));
-    await user.click(screen.getByRole('button', { name: /^save$/i }));
+    await fillAndSave(user);
 
     await user.click(await screen.findByRole('button', { name: 'Undo' }));
     expect(mockRemove).not.toHaveBeenCalled();
@@ -352,9 +478,7 @@ describe('TransactionSheet', () => {
     const user = userEvent.setup();
     mockCreate.mockRejectedValueOnce(new ApiError(400, 'Bad Request'));
     renderSheet();
-    await user.type(screen.getByLabelText(/amount/i), '4.80');
-    await user.click(screen.getByRole('radio', { name: 'Dining' }));
-    await user.click(screen.getByRole('button', { name: /^save$/i }));
+    await fillAndSave(user);
 
     await user.click(await screen.findByRole('button', { name: 'Retry' }));
 
@@ -368,9 +492,7 @@ describe('TransactionSheet', () => {
     const pending = deferred<never>();
     mockCreate.mockReturnValue(pending.promise.then(() => { throw new ApiError(400, 'Bad Request'); }));
     renderSheet();
-    await user.type(screen.getByLabelText(/amount/i), '4.80');
-    await user.click(screen.getByRole('radio', { name: 'Dining' }));
-    await user.click(screen.getByRole('button', { name: /^save$/i }));
+    await fillAndSave(user);
     await user.click(await screen.findByRole('button', { name: 'Undo' }));
 
     pending.resolve(undefined as never);
@@ -388,7 +510,7 @@ describe('TransactionSheet', () => {
     await user.click(screen.getByRole('button', { name: /^save$/i }));
     expect(await screen.findByText(/could not save/i)).toBeInTheDocument();
     expect(onClose).not.toHaveBeenCalled();
-    expect(screen.queryByRole('button', { name: /save & add another/i })).not.toBeInTheDocument();
+    expect(screen.queryByText('Keep this open for the next entry?')).not.toBeInTheDocument();
   });
 
   it('closes after a successful edit', async () => {
@@ -397,6 +519,16 @@ describe('TransactionSheet', () => {
     const { onClose } = renderSheet({ editing });
     await user.click(screen.getByRole('button', { name: /^save$/i }));
     await waitFor(() => expect(onClose).toHaveBeenCalled());
+  });
+
+  it('never asks whether to keep the sheet open after an edit', async () => {
+    seedPreferences({ keepSheetOpen: 'ask' });
+    const user = userEvent.setup();
+    mockUpdate.mockResolvedValue({});
+    const { onClose } = renderSheet({ editing });
+    await user.click(screen.getByRole('button', { name: /^save$/i }));
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    expect(screen.queryByText('Keep this open for the next entry?')).not.toBeInTheDocument();
   });
 
   it('renders as a centred modal on wide screens', () => {
@@ -417,360 +549,423 @@ describe('TransactionSheet', () => {
     expect(document.querySelector('.mantine-Modal-root')).toBeNull();
   });
 
-  it('selects the remembered category when a known note is fully typed', async () => {
-    const user = userEvent.setup();
-    mockTransactions = [pastTxn({ description: 'Starbucks', categoryId: 'cat-dining' })];
-    renderSheet();
+  describe('category suggestions from the note', () => {
+    it('offers the remembered category as a chip when a known note is fully typed', async () => {
+      const user = userEvent.setup();
+      mockTransactions = [pastTxn({ description: 'Starbucks', categoryId: 'cat-dining' })];
+      renderSheet();
 
-    await user.click(screen.getByRole('button', { name: /add note/i }));
-    await user.type(screen.getByLabelText(/note/i), 'starbucks');
+      await user.type(await openNote(user), 'starbucks');
 
-    expect(screen.getByRole('radio', { name: 'Dining' })).toBeChecked();
-    expect(screen.getByText("Suggested from your earlier 'starbucks'")).toBeInTheDocument();
+      expect(screen.getByText("You used Dining for ‘starbucks’ before.")).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Use Dining?' })).toBeInTheDocument();
+    });
+
+    it('never applies the suggestion until it is tapped', async () => {
+      const user = userEvent.setup();
+      mockTransactions = [pastTxn({ description: 'Starbucks', categoryId: 'cat-dining' })];
+      renderSheet();
+
+      await user.type(await openNote(user), 'starbucks');
+      expect(screen.getByRole('radio', { name: 'Dining' })).not.toBeChecked();
+
+      await user.click(screen.getByRole('button', { name: 'Use Dining?' }));
+
+      expect(screen.getByRole('radio', { name: 'Dining' })).toBeChecked();
+      expect(screen.queryByRole('button', { name: 'Use Dining?' })).not.toBeInTheDocument();
+    });
+
+    it('announces the suggestion as a status message', async () => {
+      const user = userEvent.setup();
+      mockTransactions = [pastTxn({ description: 'Starbucks', categoryId: 'cat-dining' })];
+      renderSheet();
+
+      await user.type(await openNote(user), 'starbucks');
+
+      expect(screen.getByText("You used Dining for ‘starbucks’ before.").closest('[role="status"]')).not.toBeNull();
+    });
+
+    it('does not suggest a category for a partial note', async () => {
+      const user = userEvent.setup();
+      mockTransactions = [pastTxn({ description: 'Starbucks', categoryId: 'cat-dining' })];
+      renderSheet();
+
+      await user.type(await openNote(user), 'starb');
+
+      expect(screen.queryByRole('button', { name: 'Use Dining?' })).not.toBeInTheDocument();
+      expect(screen.getByRole('radio', { name: 'Dining' })).not.toBeChecked();
+    });
+
+    it('never overwrites a category the user picked', async () => {
+      const user = userEvent.setup();
+      mockTransactions = [
+        pastTxn({ transactionId: 'a', description: 'Starbucks', categoryId: 'cat-dining' }),
+        pastTxn({ transactionId: 'b', description: 'Tesco', categoryId: 'cat-food' }),
+      ];
+      renderSheet();
+
+      await user.click(screen.getByRole('radio', { name: 'Groceries' }));
+      await user.type(await openNote(user), 'starbucks');
+
+      expect(screen.getByRole('radio', { name: 'Groceries' })).toBeChecked();
+      expect(screen.getByRole('radio', { name: 'Dining' })).not.toBeChecked();
+    });
+
+    it('offers the suggestion once history loads after the note was typed', async () => {
+      const user = userEvent.setup();
+      mockTransactions = undefined;
+      const { setProps } = renderSheet();
+
+      await user.type(await openNote(user), 'starbucks');
+      expect(screen.queryByRole('button', { name: 'Use Dining?' })).not.toBeInTheDocument();
+
+      mockTransactions = [pastTxn({ description: 'Starbucks', categoryId: 'cat-dining' })];
+      setProps({});
+
+      expect(await screen.findByRole('button', { name: 'Use Dining?' })).toBeInTheDocument();
+      expect(screen.getByRole('radio', { name: 'Dining' })).not.toBeChecked();
+    });
+
+    it('offers the suggestion once categories load after the history', async () => {
+      const user = userEvent.setup();
+      mockCategoriesLoaded = false;
+      mockTransactions = undefined;
+      const { setProps } = renderSheet();
+
+      await user.type(await openNote(user), 'starbucks');
+
+      mockTransactions = [pastTxn({ description: 'Starbucks', categoryId: 'cat-dining' })];
+      setProps({});
+
+      mockCategoriesLoaded = true;
+      setProps({});
+
+      expect(await screen.findByRole('button', { name: 'Use Dining?' })).toBeInTheDocument();
+    });
+
+    it('does not change a category the user picked when the history arrives late', async () => {
+      const user = userEvent.setup();
+      mockTransactions = undefined;
+      const { setProps } = renderSheet();
+
+      await user.click(screen.getByRole('radio', { name: 'Groceries' }));
+      await user.type(await openNote(user), 'starbucks');
+
+      mockTransactions = [pastTxn({ description: 'Starbucks', categoryId: 'cat-dining' })];
+      setProps({});
+
+      expect(screen.getByRole('radio', { name: 'Groceries' })).toBeChecked();
+      expect(screen.getByRole('radio', { name: 'Dining' })).not.toBeChecked();
+    });
+
+    it('does not change an edited transaction when the history arrives late', async () => {
+      mockTransactions = undefined;
+      const { setProps } = renderSheet({ editing });
+      expect(screen.getByRole('radio', { name: 'Dining' })).toBeChecked();
+
+      mockTransactions = [pastTxn({ description: 'Lunch', categoryId: 'cat-food' })];
+      setProps({});
+
+      expect(screen.getByRole('radio', { name: 'Dining' })).toBeChecked();
+      expect(screen.getByRole('radio', { name: 'Groceries' })).not.toBeChecked();
+    });
+
+    it('suggests nothing when the history arrives but there is no note', () => {
+      mockTransactions = undefined;
+      const { setProps } = renderSheet();
+
+      mockTransactions = [pastTxn({ description: 'Starbucks', categoryId: 'cat-dining' })];
+      setProps({});
+
+      expect(screen.queryByText(/you used/i)).not.toBeInTheDocument();
+      expect(screen.getByRole('radio', { name: 'Dining' })).not.toBeChecked();
+      expect(screen.getByRole('radio', { name: 'Groceries' })).not.toBeChecked();
+    });
+
+    it('withdraws the suggestion when the note stops matching', async () => {
+      const user = userEvent.setup();
+      mockTransactions = [pastTxn({ description: 'Starbucks', categoryId: 'cat-dining' })];
+      renderSheet();
+
+      await user.type(await openNote(user), 'starbucks');
+      expect(screen.getByRole('button', { name: 'Use Dining?' })).toBeInTheDocument();
+
+      await user.type(noteInput(), 'x');
+
+      expect(screen.queryByRole('button', { name: 'Use Dining?' })).not.toBeInTheDocument();
+      expect(screen.queryByText(/you used/i)).not.toBeInTheDocument();
+    });
+
+    it('drops the suggestion once the user picks a category', async () => {
+      const user = userEvent.setup();
+      mockTransactions = [pastTxn({ description: 'Starbucks', categoryId: 'cat-dining' })];
+      renderSheet();
+
+      await user.type(await openNote(user), 'starbucks');
+      await user.click(screen.getByRole('radio', { name: 'Groceries' }));
+
+      expect(screen.queryByText(/you used/i)).not.toBeInTheDocument();
+      expect(screen.getByRole('radio', { name: 'Groceries' })).toBeChecked();
+    });
+
+    it('suggests again for the new type when the type changes', async () => {
+      const user = userEvent.setup();
+      mockTransactions = [
+        pastTxn({ transactionId: 'a', description: 'Refund', categoryId: 'cat-dining' }),
+        pastTxn({ transactionId: 'b', description: 'Refund', categoryId: 'cat-salary', type: 'INCOME', date: '2026-07-02' }),
+      ];
+      renderSheet();
+
+      await user.type(await openNote(user), 'refund');
+      expect(screen.getByRole('button', { name: 'Use Dining?' })).toBeInTheDocument();
+
+      await pickType(user, 'Income');
+      expect(screen.getByRole('button', { name: 'Use Salary?' })).toBeInTheDocument();
+
+      await pickType(user, 'Spend');
+      expect(screen.getByRole('button', { name: 'Use Dining?' })).toBeInTheDocument();
+    });
+
+    it('suggests nothing on a type change when the note has no match there', async () => {
+      const user = userEvent.setup();
+      mockTransactions = [pastTxn({ description: 'Starbucks', categoryId: 'cat-dining' })];
+      renderSheet();
+
+      await user.type(await openNote(user), 'starbucks');
+      await pickType(user, 'Income');
+
+      expect(screen.getByRole('radio', { name: 'Salary' })).not.toBeChecked();
+      expect(screen.queryByText(/you used/i)).not.toBeInTheDocument();
+    });
+
+    it('never suggests a category while editing', async () => {
+      const user = userEvent.setup();
+      mockTransactions = [pastTxn({ description: 'Starbucks', categoryId: 'cat-dining' })];
+      renderSheet({ editing: { ...editing, categoryId: 'cat-food', description: 'Lunch' } });
+
+      const note = noteInput();
+      await user.clear(note);
+      await user.type(note, 'starbucks');
+
+      expect(screen.getByRole('radio', { name: 'Groceries' })).toBeChecked();
+      expect(screen.queryByText(/you used/i)).not.toBeInTheDocument();
+    });
+
+    it('keeps a duplicated category when the note is changed', async () => {
+      const user = userEvent.setup();
+      mockTransactions = [pastTxn({ description: 'Starbucks', categoryId: 'cat-dining' })];
+      renderSheet({ template: { ...editing, categoryId: 'cat-food', description: 'Tesco' } });
+
+      const note = noteInput();
+      await user.clear(note);
+      await user.type(note, 'starbucks');
+
+      expect(screen.getByRole('radio', { name: 'Groceries' })).toBeChecked();
+    });
   });
 
-  it('announces the remembered category suggestion as a status message', async () => {
-    const user = userEvent.setup();
-    mockTransactions = [pastTxn({ description: 'Starbucks', categoryId: 'cat-dining' })];
-    renderSheet();
-
-    await user.click(screen.getByRole('button', { name: /add note/i }));
-    await user.type(screen.getByLabelText(/note/i), 'starbucks');
-
-    expect(screen.getByText("Suggested from your earlier 'starbucks'")).toHaveAttribute('role', 'status');
-  });
-
-  it('does not select a category for a partial note', async () => {
-    const user = userEvent.setup();
-    mockTransactions = [pastTxn({ description: 'Starbucks', categoryId: 'cat-dining' })];
-    renderSheet();
-
-    await user.click(screen.getByRole('button', { name: /add note/i }));
-    await user.type(screen.getByLabelText(/note/i), 'starb');
-
-    expect(screen.getByRole('radio', { name: 'Dining' })).not.toBeChecked();
-    expect(screen.queryByText(/suggested from your earlier/i)).not.toBeInTheDocument();
-  });
-
-  it('never overwrites a category the user picked', async () => {
-    const user = userEvent.setup();
-    mockTransactions = [
-      pastTxn({ transactionId: 'a', description: 'Starbucks', categoryId: 'cat-dining' }),
-      pastTxn({ transactionId: 'b', description: 'Tesco', categoryId: 'cat-food' }),
-    ];
-    renderSheet();
-
-    await user.click(screen.getByRole('radio', { name: 'Groceries' }));
-    await user.click(screen.getByRole('button', { name: /add note/i }));
-    await user.type(screen.getByLabelText(/note/i), 'starbucks');
-
-    expect(screen.getByRole('radio', { name: 'Groceries' })).toBeChecked();
-    expect(screen.getByRole('radio', { name: 'Dining' })).not.toBeChecked();
-  });
-
-  it('recalls the category once the note history loads after the note was typed', async () => {
-    const user = userEvent.setup();
-    const { setProps } = renderSheet();
-
-    await user.click(screen.getByRole('button', { name: /add note/i }));
-    await user.type(screen.getByLabelText(/note/i), 'starbucks');
-    expect(screen.getByRole('radio', { name: 'Dining' })).not.toBeChecked();
-
-    mockTransactions = [pastTxn({ description: 'Starbucks', categoryId: 'cat-dining' })];
-    setProps({});
-
-    await waitFor(() => expect(screen.getByRole('radio', { name: 'Dining' })).toBeChecked());
-    expect(screen.getByText("Suggested from your earlier 'starbucks'")).toBeInTheDocument();
-  });
-
-  it('recalls the category once categories load after the note history', async () => {
-    const user = userEvent.setup();
-    mockCategoriesLoaded = false;
-    const { setProps } = renderSheet();
-
-    await user.click(screen.getByRole('button', { name: /add note/i }));
-    await user.type(screen.getByLabelText(/note/i), 'starbucks');
-
-    mockTransactions = [pastTxn({ description: 'Starbucks', categoryId: 'cat-dining' })];
-    setProps({});
-
-    mockCategoriesLoaded = true;
-    setProps({});
-
-    await waitFor(() => expect(screen.getByRole('radio', { name: 'Dining' })).toBeChecked());
-    expect(screen.getByText("Suggested from your earlier 'starbucks'")).toBeInTheDocument();
-  });
-
-  it('does not overwrite a category the user picked when the history arrives late', async () => {
-    const user = userEvent.setup();
-    const { setProps } = renderSheet();
-
-    await user.click(screen.getByRole('radio', { name: 'Groceries' }));
-    await user.click(screen.getByRole('button', { name: /add note/i }));
-    await user.type(screen.getByLabelText(/note/i), 'starbucks');
-
-    mockTransactions = [pastTxn({ description: 'Starbucks', categoryId: 'cat-dining' })];
-    setProps({});
-
-    expect(screen.getByRole('radio', { name: 'Groceries' })).toBeChecked();
-    expect(screen.getByRole('radio', { name: 'Dining' })).not.toBeChecked();
-  });
-
-  it('does not change an edited transaction when the history arrives late', async () => {
-    const { setProps } = renderSheet({ editing });
-    expect(screen.getByRole('radio', { name: 'Dining' })).toBeChecked();
-
-    mockTransactions = [pastTxn({ description: 'Lunch', categoryId: 'cat-food' })];
-    setProps({});
-
-    expect(screen.getByRole('radio', { name: 'Dining' })).toBeChecked();
-    expect(screen.getByRole('radio', { name: 'Groceries' })).not.toBeChecked();
-  });
-
-  it('recalls nothing when the history arrives but there is no note', async () => {
-    const { setProps } = renderSheet();
-
-    mockTransactions = [pastTxn({ description: 'Starbucks', categoryId: 'cat-dining' })];
-    setProps({});
-
-    expect(screen.getByRole('radio', { name: 'Dining' })).not.toBeChecked();
-    expect(screen.getByRole('radio', { name: 'Groceries' })).not.toBeChecked();
-  });
-
-  it('clears a remembered category when the note stops matching', async () => {
-    const user = userEvent.setup();
-    mockTransactions = [pastTxn({ description: 'Starbucks', categoryId: 'cat-dining' })];
-    renderSheet();
-
-    await user.click(screen.getByRole('button', { name: /add note/i }));
-    await user.type(screen.getByLabelText(/note/i), 'starbucks');
-    expect(screen.getByRole('radio', { name: 'Dining' })).toBeChecked();
-
-    await user.type(screen.getByLabelText(/note/i), 'x');
-
-    expect(screen.getByRole('radio', { name: 'Dining' })).not.toBeChecked();
-    expect(screen.queryByText(/suggested from your earlier/i)).not.toBeInTheDocument();
-  });
-
-  it('drops the hint once the user picks a category', async () => {
-    const user = userEvent.setup();
-    mockTransactions = [pastTxn({ description: 'Starbucks', categoryId: 'cat-dining' })];
-    renderSheet();
-
-    await user.click(screen.getByRole('button', { name: /add note/i }));
-    await user.type(screen.getByLabelText(/note/i), 'starbucks');
-    await user.click(screen.getByRole('radio', { name: 'Groceries' }));
-
-    expect(screen.queryByText(/suggested from your earlier/i)).not.toBeInTheDocument();
-    expect(screen.getByRole('radio', { name: 'Groceries' })).toBeChecked();
-  });
-
-  it('re-runs the lookup when the type changes', async () => {
-    const user = userEvent.setup();
-    mockTransactions = [
-      pastTxn({ transactionId: 'a', description: 'Refund', categoryId: 'cat-dining' }),
-      pastTxn({ transactionId: 'b', description: 'Refund', categoryId: 'cat-salary', type: 'INCOME', date: '2026-07-02' }),
-    ];
-    renderSheet();
-
-    await user.click(screen.getByRole('button', { name: /add note/i }));
-    await user.type(screen.getByLabelText(/note/i), 'refund');
-    expect(screen.getByRole('radio', { name: 'Dining' })).toBeChecked();
-
-    await user.click(screen.getByRole('radio', { name: 'Income' }));
-    expect(screen.getByRole('radio', { name: 'Salary' })).toBeChecked();
-
-    await user.click(screen.getByRole('radio', { name: 'Spend' }));
-    expect(screen.getByRole('radio', { name: 'Dining' })).toBeChecked();
-  });
-
-  it('clears the category on a type change when the note has no match there', async () => {
-    const user = userEvent.setup();
-    mockTransactions = [pastTxn({ description: 'Starbucks', categoryId: 'cat-dining' })];
-    renderSheet();
-
-    await user.click(screen.getByRole('button', { name: /add note/i }));
-    await user.type(screen.getByLabelText(/note/i), 'starbucks');
-    await user.click(screen.getByRole('radio', { name: 'Income' }));
-
-    expect(screen.getByRole('radio', { name: 'Salary' })).not.toBeChecked();
-    expect(screen.queryByText(/suggested from your earlier/i)).not.toBeInTheDocument();
-  });
-
-  it('never recalls a category while editing', async () => {
-    const user = userEvent.setup();
-    mockTransactions = [pastTxn({ description: 'Starbucks', categoryId: 'cat-dining' })];
-    renderSheet({ editing: { ...editing, categoryId: 'cat-food', description: 'Lunch' } });
-
-    const note = screen.getByLabelText(/note/i);
-    await user.clear(note);
-    await user.type(note, 'starbucks');
-
-    expect(screen.getByRole('radio', { name: 'Groceries' })).toBeChecked();
-    expect(screen.queryByText(/suggested from your earlier/i)).not.toBeInTheDocument();
-  });
-
-  it('keeps a duplicated category when the note is changed', async () => {
-    const user = userEvent.setup();
-    mockTransactions = [pastTxn({ description: 'Starbucks', categoryId: 'cat-dining' })];
-    renderSheet({ template: { ...editing, categoryId: 'cat-food', description: 'Tesco' } });
-
-    const note = screen.getByLabelText(/note/i);
-    await user.clear(note);
-    await user.type(note, 'starbucks');
-
-    expect(screen.getByRole('radio', { name: 'Groceries' })).toBeChecked();
-  });
-
-  it('fills the form from the quick add line without saving', async () => {
-    const user = userEvent.setup();
-    renderSheet();
-
-    await user.type(screen.getByLabelText('Quick add'), 'coffee 3.50{Enter}');
-
-    expect(screen.getByLabelText(/amount/i)).toHaveValue('3.50');
-    expect(screen.getByLabelText(/note/i)).toHaveValue('coffee');
-    expect(screen.getByLabelText('Quick add')).toHaveValue('');
-    expect(mockCreate).not.toHaveBeenCalled();
-    expect(screen.queryByText(/enter a valid amount/i)).not.toBeInTheDocument();
-  });
-
-  it('recalls the category and switches to income for a + line', async () => {
-    const user = userEvent.setup();
-    mockTransactions = [pastTxn({ description: 'salary', categoryId: 'cat-salary', type: 'INCOME' })];
-    renderSheet();
-
-    await user.type(screen.getByLabelText('Quick add'), '+2400 salary{Enter}');
-
-    expect(screen.getByRole('radio', { name: 'Income' })).toBeChecked();
-    expect(screen.getByRole('radio', { name: 'Salary' })).toBeChecked();
-    expect(screen.getByLabelText(/amount/i)).toHaveValue('2400.00');
-    expect(screen.getByText("Suggested from your earlier 'salary'")).toBeInTheDocument();
-    expect(mockCreate).not.toHaveBeenCalled();
-  });
-
-  it('focuses Save & add another when a category was recalled', async () => {
-    const user = userEvent.setup();
-    mockTransactions = [pastTxn({ description: 'coffee', categoryId: 'cat-dining' })];
-    renderSheet();
-
-    await user.type(screen.getByLabelText('Quick add'), 'coffee 3.50{Enter}');
-
-    expect(screen.getByRole('button', { name: /save & add another/i })).toHaveFocus();
-  });
-
-  it('focuses the category chips when no category was recalled', async () => {
-    const user = userEvent.setup();
-    renderSheet();
-
-    await user.type(screen.getByLabelText('Quick add'), 'flat white 3.50{Enter}');
-
-    const group = screen.getByRole('radiogroup', { name: 'Category' });
-    expect(within(group).getAllByRole('radio')[0]).toHaveFocus();
-  });
-
-  it('focuses the first chip of the new type when the line flips the type', async () => {
-    const user = userEvent.setup();
-    renderSheet();
-
-    await user.type(screen.getByLabelText('Quick add'), '+2400 bonus{Enter}');
-
-    const group = screen.getByRole('radiogroup', { name: 'Category' });
-    expect(screen.getByRole('radio', { name: 'Income' })).toBeChecked();
-    expect(within(group).getAllByRole('radio')[0]).toHaveFocus();
-  });
-
-  it('shows the parser message and keeps the text when the line is invalid', async () => {
-    const user = userEvent.setup();
-    renderSheet();
-
-    await user.type(screen.getByLabelText('Quick add'), 'coffee{Enter}');
-
-    expect(await screen.findByText("Couldn't find an amount")).toBeInTheDocument();
-    expect(screen.getByLabelText('Quick add')).toHaveValue('coffee');
-    expect(screen.getByLabelText(/amount/i)).toHaveValue('');
-  });
-
-  it('clears the parser message on the next keystroke', async () => {
-    const user = userEvent.setup();
-    renderSheet();
-
-    await user.type(screen.getByLabelText('Quick add'), 'coffee{Enter}');
-    await screen.findByText("Couldn't find an amount");
-    await user.type(screen.getByLabelText('Quick add'), ' 3');
-
-    expect(screen.queryByText("Couldn't find an amount")).not.toBeInTheDocument();
-  });
-
-  it('sets the type from the line even if another type was selected', async () => {
-    const user = userEvent.setup();
-    renderSheet();
-
-    await user.click(screen.getByRole('radio', { name: 'Income' }));
-    await user.type(screen.getByLabelText('Quick add'), 'coffee 3.50{Enter}');
-
-    expect(screen.getByRole('radio', { name: 'Spend' })).toBeChecked();
-  });
-
-  it('keeps the chosen date when filling from the line', async () => {
-    const user = userEvent.setup();
-    renderSheet();
-
-    await user.click(screen.getByRole('radio', { name: 'Yesterday' }));
-    await user.type(screen.getByLabelText('Quick add'), 'coffee 3.50{Enter}');
-
-    expect(screen.getByRole('radio', { name: 'Yesterday' })).toBeChecked();
-  });
-
-  it('replaces a category the user had already picked', async () => {
-    const user = userEvent.setup();
-    mockTransactions = [pastTxn({ description: 'coffee', categoryId: 'cat-dining' })];
-    renderSheet();
-
-    await user.click(screen.getByRole('radio', { name: 'Groceries' }));
-    await user.type(screen.getByLabelText('Quick add'), 'coffee 3.50{Enter}');
-
-    expect(screen.getByRole('radio', { name: 'Dining' })).toBeChecked();
-  });
-
-  it('does not show the quick add line when editing', () => {
-    renderSheet({ editing });
-    expect(screen.queryByLabelText('Quick add')).not.toBeInTheDocument();
-  });
-
-  it('shows an example under the quick add field, even beside an error', async () => {
-    const user = userEvent.setup();
-    renderSheet();
-    const example = 'e.g. coffee 3.50 · 3.50 coffee · +2400 salary (income)';
-
-    expect(screen.getByText(example)).toBeInTheDocument();
-
-    await user.type(screen.getByLabelText('Quick add'), 'coffee{Enter}');
-    expect(await screen.findByText("Couldn't find an amount")).toBeInTheDocument();
-    expect(screen.getByText(example)).toBeInTheDocument();
+  describe('typing it instead', () => {
+    async function startTyping(user: User): Promise<void> {
+      await user.click(screen.getByRole('button', { name: 'Type it instead' }));
+    }
+
+    it('fills the form from the line without saving', async () => {
+      const user = userEvent.setup();
+      renderSheet();
+
+      await startTyping(user);
+      await user.type(screen.getByLabelText('Quick add'), 'coffee 3.50{Enter}');
+
+      expect(screen.getByLabelText(/amount/i)).toHaveValue('3.50');
+      expect(screen.getByRole('button', { name: 'Note: coffee' })).toBeInTheDocument();
+      expect(screen.queryByLabelText('Quick add')).not.toBeInTheDocument();
+      expect(mockCreate).not.toHaveBeenCalled();
+    });
+
+    it('recalls the category and switches to income for a + line, and says where it came from', async () => {
+      const user = userEvent.setup();
+      mockTransactions = [pastTxn({ description: 'salary', categoryId: 'cat-salary', type: 'INCOME' })];
+      renderSheet();
+
+      await startTyping(user);
+      await user.type(screen.getByLabelText('Quick add'), '+2400 salary{Enter}');
+
+      expect(screen.getByRole('button', { name: 'Type: Income' })).toBeInTheDocument();
+      expect(screen.getByRole('radio', { name: 'Salary' })).toBeChecked();
+      expect(screen.getByLabelText(/amount/i)).toHaveValue('2400.00');
+      expect(screen.getByText('Category filled in from your earlier ‘salary’.')).toBeInTheDocument();
+      expect(mockCreate).not.toHaveBeenCalled();
+    });
+
+    it('drops the "filled in" message once the category is changed', async () => {
+      const user = userEvent.setup();
+      mockTransactions = [pastTxn({ description: 'coffee', categoryId: 'cat-dining' })];
+      renderSheet();
+
+      await startTyping(user);
+      await user.type(screen.getByLabelText('Quick add'), 'coffee 3.50{Enter}');
+      expect(screen.getByText(/category filled in from your earlier/i)).toBeInTheDocument();
+
+      await user.click(screen.getByRole('radio', { name: 'Groceries' }));
+
+      expect(screen.queryByText(/category filled in from your earlier/i)).not.toBeInTheDocument();
+    });
+
+    it('moves focus to Save, whether or not a category was recalled', async () => {
+      const user = userEvent.setup();
+      mockTransactions = [pastTxn({ description: 'coffee', categoryId: 'cat-dining' })];
+      renderSheet();
+
+      await startTyping(user);
+      await user.type(screen.getByLabelText('Quick add'), 'coffee 3.50{Enter}');
+      expect(screen.getByRole('button', { name: /^save$/i })).toHaveFocus();
+    });
+
+    it('moves focus to Save when no category was recalled', async () => {
+      const user = userEvent.setup();
+      renderSheet();
+
+      await startTyping(user);
+      await user.type(screen.getByLabelText('Quick add'), 'flat white 3.50{Enter}');
+
+      expect(screen.getByRole('button', { name: /^save$/i })).toHaveFocus();
+      expect(screen.getByRole('radiogroup', { name: 'Category' })).toBeInTheDocument();
+    });
+
+    it('shows the parser message and keeps the text when the line is invalid', async () => {
+      const user = userEvent.setup();
+      renderSheet();
+
+      await startTyping(user);
+      await user.type(screen.getByLabelText('Quick add'), 'coffee{Enter}');
+
+      expect(await screen.findByText("Couldn't find an amount")).toBeInTheDocument();
+      expect(screen.getByLabelText('Quick add')).toHaveValue('coffee');
+    });
+
+    it('clears the parser message on the next keystroke', async () => {
+      const user = userEvent.setup();
+      renderSheet();
+
+      await startTyping(user);
+      await user.type(screen.getByLabelText('Quick add'), 'coffee{Enter}');
+      await screen.findByText("Couldn't find an amount");
+      await user.type(screen.getByLabelText('Quick add'), ' 3');
+
+      expect(screen.queryByText("Couldn't find an amount")).not.toBeInTheDocument();
+    });
+
+    it('sets the type from the line even if another type was selected', async () => {
+      const user = userEvent.setup();
+      renderSheet();
+
+      await pickType(user, 'Income');
+      await startTyping(user);
+      await user.type(screen.getByLabelText('Quick add'), 'coffee 3.50{Enter}');
+
+      expect(screen.getByRole('button', { name: 'Type: Spend' })).toBeInTheDocument();
+    });
+
+    it('keeps the chosen date when filling from the line', async () => {
+      const user = userEvent.setup();
+      renderSheet();
+
+      await pickDate(user, 'Yesterday');
+      await startTyping(user);
+      await user.type(screen.getByLabelText('Quick add'), 'coffee 3.50{Enter}');
+
+      expect(screen.getByRole('button', { name: 'Date: Yesterday' })).toBeInTheDocument();
+    });
+
+    it('replaces a category the user had already picked when the line has a remembered one', async () => {
+      const user = userEvent.setup();
+      mockTransactions = [pastTxn({ description: 'coffee', categoryId: 'cat-dining' })];
+      renderSheet();
+
+      await user.click(screen.getByRole('radio', { name: 'Groceries' }));
+      await startTyping(user);
+      await user.type(screen.getByLabelText('Quick add'), 'coffee 3.50{Enter}');
+
+      expect(screen.getByRole('radio', { name: 'Dining' })).toBeChecked();
+    });
+
+    it('does not show the quick add line when editing', () => {
+      renderSheet({ editing });
+      expect(screen.queryByLabelText('Quick add')).not.toBeInTheDocument();
+    });
+
+    it('shows an example under the quick add field, even beside an error', async () => {
+      const user = userEvent.setup();
+      renderSheet();
+      const example = 'e.g. coffee 3.50 · 3.50 coffee · +2400 salary (income)';
+
+      await startTyping(user);
+      expect(screen.getByText(example)).toBeInTheDocument();
+
+      await user.type(screen.getByLabelText('Quick add'), 'coffee{Enter}');
+      expect(await screen.findByText("Couldn't find an amount")).toBeInTheDocument();
+      expect(screen.getByText(example)).toBeInTheDocument();
+    });
+
+    it('remembers the mode for next time, and goes back with Use the form instead', async () => {
+      const user = userEvent.setup();
+      renderSheet();
+
+      await startTyping(user);
+      expect(storedPreferences().entryMode).toBe('quick');
+
+      await user.click(screen.getByRole('button', { name: 'Use the form instead' }));
+      expect(storedPreferences().entryMode).toBe('form');
+      expect(screen.getByLabelText(/amount/i)).toBeInTheDocument();
+    });
+
+    it('opens in the remembered mode', () => {
+      seedPreferences({ entryMode: 'quick' });
+      renderSheet();
+      expect(screen.getByLabelText('Quick add')).toBeInTheDocument();
+      expect(screen.queryByLabelText(/amount/i)).not.toBeInTheDocument();
+    });
+
+    it('offers Fill in the form rather than Save while typing a line', () => {
+      seedPreferences({ entryMode: 'quick' });
+      renderSheet();
+      expect(screen.getByRole('button', { name: 'Fill in the form' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /^save$/i })).not.toBeInTheDocument();
+    });
+
+    it('shows the tip in quick add until it is dismissed, then never again', async () => {
+      seedPreferences({ quickAddTipDismissed: false, entryMode: 'quick' });
+      const user = userEvent.setup();
+      renderSheet();
+
+      expect(screen.getByRole('note')).toHaveTextContent('Tip: type +2400 salary for income.');
+      await user.click(screen.getByRole('button', { name: 'Got it' }));
+
+      expect(screen.queryByRole('note')).not.toBeInTheDocument();
+      expect(storedPreferences().quickAddTipDismissed).toBe(true);
+    });
   });
 
   it('uses the template date instead of today when one is given', async () => {
     const user = userEvent.setup();
     renderSheet({ template: editing, templateDate: '2099-01-15' });
 
-    expect(screen.getByRole('radio', { name: 'Other…' })).toBeChecked();
+    expect(screen.getByRole('button', { name: /^date:/i })).not.toHaveAccessibleName('Date: Today');
     await user.click(screen.getByRole('button', { name: /^save$/i }));
 
     expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({ date: '2099-01-15' }));
   });
 
   it('links the first save to the recurring bill it came from, and only that one', async () => {
+    seedPreferences({ keepSheetOpen: 'yes' });
     const user = userEvent.setup();
     const recurringId = '3f2b8c1e-9a4d-4e7f-b1c2-0d9e8f7a6b5c';
     renderSheet({ template: editing, templateDate: '2099-01-15', recurringId });
 
-    await user.click(screen.getByRole('button', { name: /save & add another/i }));
+    await user.click(screen.getByRole('button', { name: /^save$/i }));
     expect(mockCreate).toHaveBeenLastCalledWith(expect.objectContaining({ recurringId }));
 
-    await user.type(screen.getByLabelText(/amount/i), '2.00');
-    await user.click(screen.getByRole('radio', { name: 'Dining' }));
-    await user.click(screen.getByRole('button', { name: /save & add another/i }));
+    await fillAndSave(user, '2.00', 'Dining');
     await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(2));
     expect(mockCreate.mock.calls[1][0]).not.toHaveProperty('recurringId');
   });
@@ -782,9 +977,9 @@ describe('TransactionSheet', () => {
     expect(mockCreate.mock.calls[0][0]).not.toHaveProperty('recurringId');
   });
 
-  it('selects Today when the template date is today', () => {
+  it('labels the date Today when the template date is today', () => {
     renderSheet({ template: editing, templateDate: todayIso() });
-    expect(screen.getByRole('radio', { name: 'Today' })).toBeChecked();
+    expect(screen.getByRole('button', { name: 'Date: Today' })).toBeInTheDocument();
   });
 
   it('reports the created transaction through onSaved after a successful create', async () => {
@@ -815,7 +1010,7 @@ describe('TransactionSheet', () => {
     it('opens on the preset type and category', () => {
       mockPotCategories = [holidays];
       renderSheet({ preset: { type: 'SET_ASIDE', categoryId: 'cat-holidays' } });
-      expect(screen.getByRole('radio', { name: 'Set aside' })).toBeChecked();
+      expect(screen.getByRole('button', { name: 'Type: Add to pot' })).toBeInTheDocument();
       expect(screen.getByRole('radio', { name: 'Holidays' })).toBeChecked();
     });
 
@@ -826,31 +1021,36 @@ describe('TransactionSheet', () => {
       expect(screen.getByRole('radio', { name: 'Dining' })).toBeChecked();
     });
 
-    it('offers only pots for Set aside and Take out, and both kinds for Spend', async () => {
+    it('offers only pots for Add to pot and Take from pot, and both kinds for Spend', async () => {
       mockPotCategories = [holidays];
       const user = userEvent.setup();
       renderSheet();
       expect(chipNames()).toEqual(expect.arrayContaining(['Dining', 'Holidays']));
-      await user.click(screen.getByRole('radio', { name: 'Set aside' }));
+      await pickType(user, 'Add to pot');
       expect(chipNames()).toEqual(['Holidays']);
-      await user.click(screen.getByRole('radio', { name: 'Take out' }));
+      await pickType(user, 'Take from pot');
       expect(chipNames()).toEqual(['Holidays']);
     });
 
-    it('clears an expense category when switching to Set aside and refuses to save', async () => {
+    it('keeps an expense category when switching to Add to pot, says it does not fit, and refuses to save', async () => {
       mockPotCategories = [holidays];
       const user = userEvent.setup();
       renderSheet();
       await user.click(screen.getByRole('radio', { name: 'Dining' }));
-      await user.click(screen.getByRole('radio', { name: 'Set aside' }));
+      await pickType(user, 'Add to pot');
+
+      expect(screen.getByText("Dining isn't a pot. Choose another.")).toBeInTheDocument();
       const group = screen.getByRole('radiogroup', { name: 'Category' });
       within(group).getAllByRole('radio').forEach(r => expect(r).not.toBeChecked());
+
       await user.type(screen.getByLabelText(/amount/i), '4.80');
       await user.click(screen.getByRole('button', { name: /^save$/i }));
-      expect(await screen.findByText(/choose a category/i)).toBeInTheDocument();
+
+      expect(await screen.findByText("Dining isn't a pot. Choose another.")).toBeInTheDocument();
       expect(mockCreate).not.toHaveBeenCalled();
     });
   });
+
   describe('field errors', () => {
     it('shows the category error on the category field and focuses a chip', async () => {
       const user = userEvent.setup();
@@ -897,11 +1097,11 @@ describe('TransactionSheet', () => {
       renderSheet();
       await user.type(screen.getByLabelText(/amount/i), '4.80');
       await user.click(screen.getByRole('radio', { name: 'Dining' }));
-      await user.click(screen.getByRole('radio', { name: 'Other…' }));
-      await user.clear(screen.getByLabelText(/^date/i));
+      await pickDate(user, 'Other…');
+      await user.clear(screen.getByLabelText('Date'));
       await user.click(screen.getByRole('button', { name: /^save$/i }));
 
-      const date = screen.getByLabelText(/^date/i);
+      const date = screen.getByLabelText('Date');
       expect(date).toHaveAttribute('aria-invalid', 'true');
       expect(date).toHaveAccessibleDescription('Enter a date, for example 27/09/2026');
       expect(date).toHaveFocus();
@@ -928,30 +1128,29 @@ describe('TransactionSheet', () => {
       expect(screen.getByLabelText(/amount/i)).not.toHaveAttribute('aria-invalid', 'true');
     });
   });
+
   describe('drafts', () => {
-    async function typeDraft(user: ReturnType<typeof userEvent.setup>): Promise<void> {
-      await user.type(screen.getByLabelText(/quick add/i), 'cof');
+    async function typeDraft(user: User): Promise<void> {
       await user.type(screen.getByLabelText(/amount/i), '9.99');
       await user.click(screen.getByRole('radio', { name: 'Groceries' }));
-      await user.click(screen.getByRole('radio', { name: 'Yesterday' }));
-      await user.click(screen.getByRole('button', { name: /add note/i }));
-      await user.type(screen.getByLabelText(/note/i), 'Market');
+      await pickDate(user, 'Yesterday');
+      await user.type(await openNote(user), 'Market');
     }
 
     function expectDraftRestored(): void {
-      expect(screen.getByLabelText(/quick add/i)).toHaveValue('cof');
       expect(screen.getByLabelText(/amount/i)).toHaveValue('9.99');
       expect(screen.getByRole('radio', { name: 'Groceries' })).toBeChecked();
-      expect(screen.getByRole('radio', { name: 'Yesterday' })).toBeChecked();
-      expect(screen.getByLabelText(/note/i)).toHaveValue('Market');
+      expect(screen.getByRole('button', { name: 'Date: Yesterday' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Note: Market' })).toBeInTheDocument();
     }
 
     function expectEmptyForm(): void {
-      expect(screen.getByLabelText(/quick add/i)).toHaveValue('');
       expect(screen.getByLabelText(/amount/i)).toHaveValue('');
       within(screen.getByRole('radiogroup', { name: 'Category' })).getAllByRole('radio')
         .forEach(r => expect(r).not.toBeChecked());
-      expect(screen.getByRole('radio', { name: 'Today' })).toBeChecked();
+      expect(screen.getByRole('button', { name: 'Type: Spend' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Date: Today' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Note: No note' })).toBeInTheDocument();
     }
 
     it('restores what was typed when the sheet is closed and reopened', async () => {
@@ -976,16 +1175,28 @@ describe('TransactionSheet', () => {
       expectDraftRestored();
     });
 
+    it('restores a line that was being typed', async () => {
+      seedPreferences({ entryMode: 'quick' });
+      const user = userEvent.setup();
+      const { setProps } = renderSheet();
+      await user.type(screen.getByLabelText('Quick add'), 'cof');
+
+      setProps({ opened: false });
+      setProps({ opened: true });
+
+      expect(screen.getByLabelText('Quick add')).toHaveValue('cof');
+    });
+
     it('restores a typed income entry with its type', async () => {
       const user = userEvent.setup();
       const { setProps } = renderSheet();
-      await user.click(screen.getByRole('radio', { name: 'Income' }));
+      await pickType(user, 'Income');
       await user.click(screen.getByRole('radio', { name: 'Salary' }));
 
       setProps({ opened: false });
       setProps({ opened: true });
 
-      expect(screen.getByRole('radio', { name: 'Income' })).toBeChecked();
+      expect(screen.getByRole('button', { name: 'Type: Income' })).toBeInTheDocument();
       expect(screen.getByRole('radio', { name: 'Salary' })).toBeChecked();
     });
 
@@ -1024,16 +1235,16 @@ describe('TransactionSheet', () => {
       expectEmptyForm();
     });
 
-    it('removes the draft after Save & add another', async () => {
+    it('removes the draft after saving with the sheet kept open', async () => {
+      seedPreferences({ keepSheetOpen: 'yes' });
       const user = userEvent.setup();
       const { setProps } = renderSheet();
       await typeDraft(user);
-      await user.click(screen.getByRole('button', { name: /save & add another/i }));
+      await user.click(screen.getByRole('button', { name: /^save$/i }));
 
       setProps({ opened: false });
       setProps({ opened: true });
       expect(screen.getByLabelText(/amount/i)).toHaveValue('');
-      expect(screen.getByLabelText(/quick add/i)).toHaveValue('');
     });
 
     it('keeps the draft when Save finds a problem', async () => {
@@ -1066,7 +1277,7 @@ describe('TransactionSheet', () => {
       setProps({ opened: true, editing });
       expect(screen.getByLabelText(/amount/i)).toHaveValue('4.80');
       expect(screen.getByRole('radio', { name: 'Dining' })).toBeChecked();
-      expect(screen.getByLabelText(/note/i)).toHaveValue('Lunch');
+      expect(noteInput()).toHaveValue('Lunch');
       expect(screen.queryByRole('button', { name: 'Clear' })).not.toBeInTheDocument();
       await user.clear(screen.getByLabelText(/amount/i));
       await user.type(screen.getByLabelText(/amount/i), '5.00');
@@ -1084,12 +1295,78 @@ describe('TransactionSheet', () => {
 
       setProps({ opened: true, template: editing });
       expect(screen.getByLabelText(/amount/i)).toHaveValue('4.80');
-      expect(screen.getByLabelText(/quick add/i)).toHaveValue('');
       setProps({ opened: false, template: null });
 
       setProps({ opened: true, preset: { type: 'EXPENSE', categoryId: 'cat-dining' } });
       expect(screen.getByLabelText(/amount/i)).toHaveValue('');
       expect(screen.getByRole('radio', { name: 'Dining' })).toBeChecked();
+    });
+  });
+
+  describe('for a chosen day (catch up)', () => {
+    const day = addDaysIso(todayIso(), -5);
+    const dayName = formatDayLabel(day, todayIso());
+
+    it('shows the day prominently and starts blank on it', () => {
+      renderSheet({ forDate: day });
+      expect(screen.getByText(`Adding to ${dayName}`)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: `Date: ${dayName}` })).toBeInTheDocument();
+      expect(screen.getByLabelText(/amount/i)).toHaveValue('');
+    });
+
+    it('never restores a saved draft into it', () => {
+      saveTransactionDraft('', { ...EMPTY_DRAFT, amount: '9.99', categoryId: 'cat-dining' });
+      renderSheet({ forDate: day });
+      expect(screen.getByLabelText(/amount/i)).toHaveValue('');
+    });
+
+    it('saves the entry on that day', async () => {
+      const user = userEvent.setup();
+      renderSheet({ forDate: day });
+      await fillAndSave(user);
+      expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({ date: day }));
+    });
+
+    it('stays open and ready for the next entry, whatever the keep-open preference, keeping the day', async () => {
+      seedPreferences({ keepSheetOpen: 'no' });
+      const user = userEvent.setup();
+      const { onClose } = renderSheet({ forDate: day });
+      await fillAndSave(user);
+
+      expect(onClose).not.toHaveBeenCalled();
+      expect(screen.queryByText('Keep this open for the next entry?')).not.toBeInTheDocument();
+      expect(screen.getByLabelText(/amount/i)).toHaveValue('');
+      expect(screen.getByText(`Adding to ${dayName}`)).toBeInTheDocument();
+
+      await fillAndSave(user, '2.00', 'Groceries');
+      expect(mockCreate).toHaveBeenLastCalledWith(expect.objectContaining({ date: day, amount: 200 }));
+    });
+
+    it('marks the day as nothing to log and closes', async () => {
+      const user = userEvent.setup();
+      const onToggleNothingToLog = vi.fn();
+      const { onClose } = renderSheet({ forDate: day, onToggleNothingToLog });
+
+      await user.click(screen.getByRole('button', { name: 'Nothing to log for this day' }));
+
+      expect(onToggleNothingToLog).toHaveBeenCalledTimes(1);
+      expect(onClose).toHaveBeenCalled();
+    });
+
+    it('offers to clear the mark on a day already marked', () => {
+      renderSheet({ forDate: day, dayMarkedEmpty: true, onToggleNothingToLog: vi.fn() });
+      expect(screen.getByRole('button', { name: 'Clear “Nothing to log” for this day' })).toBeInTheDocument();
+    });
+
+    it('does not offer Nothing to log outside catch up', () => {
+      renderSheet({ onToggleNothingToLog: vi.fn() });
+      expect(screen.queryByRole('button', { name: /nothing to log/i })).not.toBeInTheDocument();
+      expect(screen.queryByText(/^Adding to/)).not.toBeInTheDocument();
+    });
+
+    it('does not show the day banner when editing', () => {
+      renderSheet({ forDate: day, editing });
+      expect(screen.queryByText(/^Adding to/)).not.toBeInTheDocument();
     });
   });
 });
