@@ -222,4 +222,79 @@ describe('Recurring page', () => {
       expect(screen.getByText('Monthly on the 28th · remind 3 days before')).toBeInTheDocument();
     });
   });
+
+  describe('Add bills to your calendar', () => {
+    const downloads: string[] = [];
+    const blobs: Blob[] = [];
+
+    function readBlob(blob: Blob): Promise<string> {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = () => reject(reader.error);
+        reader.readAsText(blob);
+      });
+    }
+
+    beforeEach(() => {
+      downloads.length = 0;
+      blobs.length = 0;
+      URL.createObjectURL = vi.fn((blob: Blob) => { blobs.push(blob); return 'blob:test'; });
+      URL.revokeObjectURL = vi.fn();
+      vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function click(this: HTMLAnchorElement) {
+        downloads.push(this.download);
+      });
+    });
+
+    afterEach(() => { vi.restoreAllMocks(); });
+
+    const rent = () => rec({ recurringId: 'rent', type: 'EXPENSE', categoryId: 'cat-housing', description: 'Rent', amount: 85000, dayOfMonth: 1 });
+
+    it('offers the button, with one line of help, once there is a bill', () => {
+      mockQuery.data = [rent()];
+      renderPage();
+      expect(screen.getByRole('button', { name: 'Add bills to your calendar' })).toBeInTheDocument();
+      expect(screen.getByText('Adds each bill to your calendar with a reminder. Download again after changing bills.')).toBeInTheDocument();
+    });
+
+    it('is not offered when there is nothing to add', () => {
+      renderPage();
+      expect(screen.queryByRole('button', { name: 'Add bills to your calendar' })).not.toBeInTheDocument();
+    });
+
+    it('is not offered when the only recurring item is income', () => {
+      mockQuery.data = [rec({})];
+      renderPage();
+      expect(screen.queryByRole('button', { name: 'Add bills to your calendar' })).not.toBeInTheDocument();
+    });
+
+    it('downloads budget-bills.ics containing each bill, made in the browser', async () => {
+      mockQuery.data = [rent(), rec({ recurringId: 'salary' })];
+      renderPage();
+
+      await userEvent.setup().click(screen.getByRole('button', { name: 'Add bills to your calendar' }));
+
+      expect(downloads).toEqual(['budget-bills.ics']);
+      expect(blobs).toHaveLength(1);
+      expect(blobs[0].type).toBe('text/calendar;charset=utf-8');
+      const text = await readBlob(blobs[0]);
+      expect(text.startsWith('BEGIN:VCALENDAR\r\n')).toBe(true);
+      expect(text).toContain('UID:rent@budget');
+      expect(text).toContain('SUMMARY:Rent £850.00');
+      expect(text).not.toContain('salary@budget');
+      expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:test');
+    });
+
+    it('does not reach the network to make the file', async () => {
+      const fetchSpy = vi.fn();
+      vi.stubGlobal('fetch', fetchSpy);
+      mockQuery.data = [rent()];
+      renderPage();
+
+      await userEvent.setup().click(screen.getByRole('button', { name: 'Add bills to your calendar' }));
+
+      expect(fetchSpy).not.toHaveBeenCalled();
+      vi.unstubAllGlobals();
+    });
+  });
 });
