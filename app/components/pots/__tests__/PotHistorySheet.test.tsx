@@ -152,16 +152,16 @@ describe('PotHistorySheet', () => {
     expect(save.mutate).toHaveBeenCalledTimes(2);
   });
 
-  it('shows a negative balance with a minus sign and the danger colour', () => {
-    const danger = Array(10).fill('#c00') as unknown as MantineColorsTuple;
+  it('shows a negative balance with a minus sign and the calm attention colour, not danger', () => {
+    const attention = Array(10).fill('#44c') as unknown as MantineColorsTuple;
     render(
-      <MantineProvider theme={{ colors: { danger } }}>
+      <MantineProvider theme={{ colors: { attention } }}>
         <PotHistorySheet pot={makePot({ balance: -3000 })} category={category} onClose={vi.fn()} />
       </MantineProvider>,
     );
     const balance = screen.getByText('Balance').nextElementSibling as HTMLElement;
     expect(balance).toHaveTextContent('−£30.00');
-    expect(balance).toHaveStyle({ color: 'var(--mantine-color-danger-text)' });
+    expect(balance).toHaveStyle({ color: 'var(--mantine-color-attention-text)' });
   });
 
   it('shows an error and does not save for an invalid amount', async () => {

@@ -57,6 +57,13 @@ export function addDaysIso(iso: string, delta: number): string {
   return todayIso(new Date(year, month - 1, day + delta));
 }
 
+// The Monday of the week containing `iso` (weeks run Monday to Sunday).
+export function startOfWeekIso(iso: string): string {
+  const [year, month, day] = iso.split('-').map(Number);
+  const daysSinceMonday = (new Date(year, month - 1, day).getDay() + 6) % 7;
+  return addDaysIso(iso, -daysSinceMonday);
+}
+
 export function daysBetweenIso(from: string, to: string): number {
   const [fromYear, fromMonth, fromDay] = from.split('-').map(Number);
   const [toYear, toMonth, toDay] = to.split('-').map(Number);

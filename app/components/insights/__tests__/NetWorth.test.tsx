@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MantineProvider } from '@mantine/core';
+import { theme } from '~/root';
 import { NetWorth } from '../NetWorth';
 import type { Account } from '~/lib/types';
 
@@ -35,6 +36,15 @@ describe('NetWorth', () => {
     // Both the current figure and the change (from a zero starting point,
     // since the debt only began this month) read −£500.00 here.
     expect(screen.getAllByText('−£500.00')).toHaveLength(2);
+  });
+
+  it('shows a negative net worth in plain text with a minus sign, not in an alarm colour', () => {
+    const { container } = render(<MantineProvider theme={theme}><NetWorth accounts={[
+      account({ kind: 'LIABILITY', type: 'LOAN', balances: [{ date: '2026-09-01', pence: 50000 }] }),
+    ]} months={['2026-09']} /></MantineProvider>);
+    const [figure] = screen.getAllByText('−£500.00');
+    expect(figure).not.toHaveStyle({ color: 'var(--mantine-color-danger-text)' });
+    expect(container.querySelector('.mantine-Stack-root')?.innerHTML).not.toMatch(/danger/);
   });
 
   it('shows a message instead of a chart with no accounts', () => {

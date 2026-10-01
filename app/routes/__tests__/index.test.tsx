@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MantineProvider } from '@mantine/core';
@@ -20,6 +20,9 @@ vi.mock('~/components/recurring/RecurringForm', () => ({ RecurringForm: () => nu
 const data = vi.hoisted(() => ({
   categories: [] as unknown[], targets: [] as unknown[], pots: [] as unknown[], transactions: [] as unknown[],
   potsCalls: [] as [string, boolean | undefined][],
+  // When set for a month, that month's transactions come from here instead of `transactions`.
+  byMonth: {} as Record<string, unknown[]>,
+  txCalls: [] as [string, boolean | undefined][],
 }));
 vi.mock('~/lib/queries', () => ({
   useCategories: () => ({ data: data.categories, isLoading: false, error: null, refetch: vi.fn() }),
@@ -28,7 +31,10 @@ vi.mock('~/lib/queries', () => ({
     data.potsCalls.push([asOf, enabled]);
     return { data: data.pots, isLoading: false, error: null };
   },
-  useTransactions: () => ({ data: data.transactions, isLoading: false, error: null, refetch: vi.fn() }),
+  useTransactions: (month: string, enabled?: boolean) => {
+    data.txCalls.push([month, enabled]);
+    return { data: data.byMonth[month] ?? data.transactions, isLoading: false, error: null, refetch: vi.fn() };
+  },
   useDeleteTransaction: () => ({ mutate: vi.fn(), mutateAsync: vi.fn() }),
   useRestoreFromTrash: () => ({ mutateAsync: vi.fn() }),
 }));
@@ -67,6 +73,8 @@ describe('Home', () => {
     data.pots = [];
     data.transactions = [];
     data.potsCalls = [];
+    data.byMonth = {};
+    data.txCalls = [];
     window.localStorage.clear();
   });
 
@@ -292,6 +300,77 @@ describe('Home page title', () => {
     await userEvent.setup().click(screen.getByRole('button', { name: 'Previous month' }));
 
     expect(document.title).toBe(`Home – ${formatMonthLabel(shiftMonth(currentYearMonth(), -1))} – Budget`);
+  });
+});
+
+describe('Home pace and weekly targets', () => {
+  const weeklyGroceries = [{ categoryId: 'g', targetAmount: 2000, period: 'WEEKLY', updatedAt: '' }];
+  const monthlyGroceries = [{ categoryId: 'g', targetAmount: 25000, period: 'MONTHLY', updatedAt: '' }];
+
+  function pretendItIs(year: number, monthIndex: number, day: number): void {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(year, monthIndex, day, 12));
+  }
+
+  beforeEach(() => {
+    data.categories = [groceries];
+    data.pots = [];
+    data.potsCalls = [];
+    data.transactions = [];
+    data.byMonth = {};
+    data.txCalls = [];
+    window.localStorage.clear();
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it('marks how far through the month it is on each row', () => {
+    pretendItIs(2026, 9, 14); // 14 October: day 14 of 31
+    data.targets = monthlyGroceries;
+    data.transactions = [txn({ yearMonth: '2026-10', date: '2026-10-05', amount: 5000 })];
+    renderHome();
+    expect(screen.getByTestId('pace-marker')).toHaveStyle({ left: '45%' });
+  });
+
+  it('shows no pace marker for a past month', () => {
+    pretendItIs(2026, 9, 14);
+    data.targets = monthlyGroceries;
+    renderHome();
+    fireEvent.click(screen.getByRole('button', { name: 'Previous month' }));
+    expect(screen.queryByTestId('pace-marker')).not.toBeInTheDocument();
+  });
+
+  it('measures a weekly target against this week, counting days from last month', () => {
+    pretendItIs(2026, 9, 1); // Thursday 1 October: the week began Monday 28 September
+    data.targets = weeklyGroceries;
+    data.byMonth = {
+      '2026-10': [txn({ transactionId: 'a', yearMonth: '2026-10', date: '2026-10-01', amount: 300 })],
+      '2026-09': [
+        txn({ transactionId: 'b', yearMonth: '2026-09', date: '2026-09-29', amount: 900 }),
+        txn({ transactionId: 'c', yearMonth: '2026-09', date: '2026-09-10', amount: 4000 }), // earlier in September: not this week
+      ],
+    };
+    renderHome();
+    expect(screen.getByText('£8.00 left this week')).toBeInTheDocument();
+    expect(screen.getByText(/£12\.00 of £20\.00 this week/)).toBeInTheDocument();
+  });
+
+  it('only asks for last month when a weekly target\'s week began in it', () => {
+    pretendItIs(2026, 9, 14); // 14 October: the week began 12 October, inside the month
+    data.targets = weeklyGroceries;
+    renderHome();
+    expect(data.txCalls.filter(([, enabled]) => enabled !== false).map(([month]) => month)).not.toContain('2026-09');
+
+    data.txCalls = [];
+    vi.setSystemTime(new Date(2026, 9, 1, 12));
+    renderHome();
+    expect(data.txCalls.some(([month, enabled]) => month === '2026-09' && enabled === true)).toBe(true);
+  });
+
+  it('does not ask for last month when there is no weekly target', () => {
+    pretendItIs(2026, 9, 1);
+    data.targets = monthlyGroceries;
+    renderHome();
+    expect(data.txCalls.every(([month, enabled]) => month !== '2026-09' || enabled === false)).toBe(true);
   });
 });
 

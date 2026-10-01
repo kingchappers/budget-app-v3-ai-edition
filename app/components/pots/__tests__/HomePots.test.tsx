@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MantineProvider } from '@mantine/core';
 import { MemoryRouter } from 'react-router';
+import { theme } from '~/root';
 import { HomePots } from '../HomePots';
 import type { Category, PotSummary } from '~/lib/types';
 
@@ -60,5 +61,19 @@ describe('HomePots', () => {
     renderPots([pot('c')]);
     expect(screen.queryByText('Pots')).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'See all pots' })).not.toBeInTheDocument();
+  });
+});
+
+describe('HomePots below zero', () => {
+  it('shows a pot below zero with a minus sign in the calm attention colour, not danger', () => {
+    render(
+      <MantineProvider theme={theme}>
+        <MemoryRouter>
+          <HomePots pots={[pot('a', { balance: -1200 })]} categories={categories} />
+        </MemoryRouter>
+      </MantineProvider>,
+    );
+    const balance = screen.getByText('−£12.00');
+    expect(balance).toHaveStyle({ color: 'var(--mantine-color-attention-text)' });
   });
 });

@@ -24,9 +24,10 @@ export function MonthlyTrendChart({ rows }: { rows: MonthlyTrendRow[] }) {
       data={data}
       dataKey="month"
       series={[
-        { name: 'Income', color: 'teal.6' },
-        { name: 'Spent', color: 'red.6' },
-        { name: NAMES.addedToPots, color: 'blue.6' },
+        // Meaning, not alarm: income is positive, spending is neutral text, saving is the brand.
+        { name: 'Income', color: 'success.7' },
+        { name: 'Spent', color: 'var(--mantine-color-text)' },
+        { name: NAMES.addedToPots, color: 'primary.7' },
       ]}
       valueFormatter={formatPence}
       withLegend

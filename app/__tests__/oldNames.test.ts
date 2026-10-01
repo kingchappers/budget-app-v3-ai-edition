@@ -19,11 +19,13 @@ function sourceFiles(dir: string): string[] {
   });
 }
 
+// Code inside a template's ${...} is code, not words, so it is emptied before the strings are read.
 function withoutComments(source: string): string {
   return source
     .split('\n')
     .filter(line => !/^\s*(\/\/|\*|\/\*)/.test(line))
-    .join('\n');
+    .join('\n')
+    .replace(/\$\{(?:[^{}]|\{[^{}]*\})*\}/g, '${}');
 }
 
 // A string a person could read: it has a space in it, or is a single capitalised word such as 'Targets'.
@@ -56,6 +58,11 @@ describe('one word for each idea', () => {
   it('would notice if one came back (the scan itself works)', () => {
     const found = readableStrings('const a = <Text>Targets are optional.</Text>; const b = "Set aside to a pot"; const c = { value: \'EXPENSE\' };');
     expect(found.filter(text => OLD_WORDS.test(text))).toEqual(['Set aside to a pot', 'Targets are optional.']);
+  });
+
+  it('ignores code inside a template string\'s ${...}', () => {
+    const found = readableStrings('const t = `${formatPence(week.target)} of the total ${period === \'WEEKLY\' ? 1 : 2}`;');
+    expect(found.filter(text => OLD_WORDS.test(text))).toEqual([]);
   });
 
   it('ignores comments, keys, paths and stored values', () => {

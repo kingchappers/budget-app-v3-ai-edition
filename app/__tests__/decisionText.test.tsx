@@ -114,6 +114,6 @@ describe('insights', () => {
       />,
     );
     expectReadable(screen.getByText('Income'));
-    expectReadable(screen.getByText('+£100.00 (+11%)'));
+    expectReadable(screen.getByText('£100.00 more (11%)'));
   });
 });

@@ -159,7 +159,7 @@ export function PotHistorySheet({ pot, category, suggestedMonthly, onClose }: Po
         <Stack gap="md">
           <div>
             <Text size="sm">Balance</Text>
-            <Text fw={700} size="xl" c={pot.balance < 0 ? 'danger' : undefined}>{formatBalance(pot.balance)}</Text>
+            <Text fw={700} size="xl" c={pot.balance < 0 ? 'attention' : undefined}>{formatBalance(pot.balance)}</Text>
           </div>
           <PotTrend values={pot.months.map(m => m.closing)} />
           {months.length === 0 ? (

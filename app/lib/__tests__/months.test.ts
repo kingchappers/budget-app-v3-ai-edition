@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   currentYearMonth, shiftMonth, formatMonthLabel, todayIso, yesterdayIso, dateChoiceFor,
   lastDayOfMonth, addDaysIso, daysBetweenIso, formatShortDate, monthName, monthPhrase, daysLeftInMonth, formatMonthName,
-  formatDayLabel, isYearMonth,
+  formatDayLabel, isYearMonth, startOfWeekIso,
 } from '../months';
 
 describe('currentYearMonth', () => {
@@ -149,6 +149,19 @@ describe('daysLeftInMonth', () => {
 
   it('is 1 on the last day', () => {
     expect(daysLeftInMonth(new Date(2026, 1, 28))).toBe(1);
+  });
+});
+
+describe('startOfWeekIso', () => {
+  it('returns the Monday of the week for any day in it', () => {
+    expect(startOfWeekIso('2026-09-28')).toBe('2026-09-28'); // Monday
+    expect(startOfWeekIso('2026-09-30')).toBe('2026-09-28'); // Wednesday
+    expect(startOfWeekIso('2026-10-04')).toBe('2026-09-28'); // Sunday
+  });
+
+  it('can reach back into the previous month and year', () => {
+    expect(startOfWeekIso('2026-10-01')).toBe('2026-09-28');
+    expect(startOfWeekIso('2027-01-01')).toBe('2026-12-28');
   });
 });
 

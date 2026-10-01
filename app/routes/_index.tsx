@@ -16,10 +16,10 @@ import { DueRecurringCard } from '~/components/recurring/DueRecurringCard';
 import { TransactionRow } from '~/components/transactions/TransactionRow';
 import { useTransactionEditing } from '~/components/transactions/useTransactionEditing';
 import { groupItems, bucketKeyFor } from '~/lib/categoryGroups';
-import { buildMonthSummary } from '~/lib/summary';
+import { buildMonthSummary, monthPacePercent } from '~/lib/summary';
 import type { CategoryProgress } from '~/lib/summary';
 import { formatPence } from '~/lib/money';
-import { currentYearMonth, formatMonthLabel, monthPhrase, shiftMonth } from '~/lib/months';
+import { currentYearMonth, formatMonthLabel, monthPhrase, shiftMonth, startOfWeekIso, todayIso } from '~/lib/months';
 import { useDocumentTitle } from '~/hooks/useDocumentTitle';
 import { useSelectedMonth } from '~/hooks/useSelectedMonth';
 import { useCategories, usePots, useTargets, useTransactions } from '~/lib/queries';
@@ -31,13 +31,14 @@ function categoryTransactionsUrl(yearMonth: string, categoryId: string): string 
 }
 
 function GroupedProgress({ items, yearMonth }: { items: CategoryProgress[]; yearMonth: string }) {
+  const pace = monthPacePercent(yearMonth);
   return (
     <>
       {groupItems(items, p => bucketKeyFor({ group: p.group, type: 'EXPENSE' }), p => p.name).map(bucket => (
         <div key={bucket.key}>
           <Text size="sm" fw={600} mb={4}>{bucket.label}</Text>
           {bucket.items.map(p => (
-            <CategoryProgressRow key={p.categoryId} progress={p} to={categoryTransactionsUrl(yearMonth, p.categoryId)} />
+            <CategoryProgressRow key={p.categoryId} progress={p} pace={pace} to={categoryTransactionsUrl(yearMonth, p.categoryId)} />
           ))}
         </div>
       ))}
@@ -55,15 +56,29 @@ function HomeContent() {
   const pots = usePots(yearMonth, potsEnabled);
   const { rowActions, sheets } = useTransactionEditing(yearMonth);
 
-  const isLoading = categories.isLoading || targets.isLoading || transactions.isLoading;
-  const error = categories.error || targets.error || transactions.error;
+  // A weekly target is measured against this week. When that week began in the
+  // previous month, last month's transactions are needed to count it fully.
+  const today = todayIso();
+  const viewingCurrentMonth = yearMonth === currentYearMonth();
+  const hasWeeklyTarget = (targets.data ?? []).some(t => t.period === 'WEEKLY');
+  const weekNeedsPreviousMonth = viewingCurrentMonth && hasWeeklyTarget && startOfWeekIso(today).slice(0, 7) < yearMonth;
+  const previousMonth = useTransactions(shiftMonth(yearMonth, -1), weekNeedsPreviousMonth);
+
+  const isLoading = categories.isLoading || targets.isLoading || transactions.isLoading
+    || (weekNeedsPreviousMonth && previousMonth.isLoading);
+  const error = categories.error || targets.error || transactions.error
+    || (weekNeedsPreviousMonth ? previousMonth.error : null);
 
   const summary = useMemo(() => buildMonthSummary({
     transactions: transactions.data ?? [],
     categories: categories.data ?? [],
     targets: targets.data ?? [],
     yearMonth,
-  }), [transactions.data, categories.data, targets.data, yearMonth]);
+    today: viewingCurrentMonth ? today : undefined,
+    weekTransactions: weekNeedsPreviousMonth
+      ? [...(transactions.data ?? []), ...(previousMonth.data ?? [])]
+      : undefined,
+  }), [transactions.data, categories.data, targets.data, yearMonth, viewingCurrentMonth, today, weekNeedsPreviousMonth, previousMonth.data]);
 
   const nameFor = (id: string) =>
     categories.data?.find(c => c.categoryId === id)?.name ?? 'Unknown category';

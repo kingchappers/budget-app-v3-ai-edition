@@ -30,7 +30,7 @@ export function HomePots({ pots, categories }: { pots: PotSummary[]; categories:
           <Stack key={pot.categoryId} gap={4} mb="sm">
             <Group justify="space-between" wrap="nowrap">
               <Text fw={500}>{categoryLabel(category)}</Text>
-              <Text fw={600} c={pot.balance < 0 ? 'danger' : undefined}>{formatBalance(pot.balance)}</Text>
+              <Text fw={600} c={pot.balance < 0 ? 'attention' : undefined}>{formatBalance(pot.balance)}</Text>
             </Group>
             {pot.goalAmount !== null && (
               <>
