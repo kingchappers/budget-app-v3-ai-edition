@@ -1,11 +1,12 @@
+import { GLOSSARY } from './glossary';
 import { formatPence } from './money';
 import type { CategoryType, TransactionType } from './types';
 
 export const TYPE_OPTIONS: { label: string; value: TransactionType }[] = [
-  { label: 'Spend', value: 'EXPENSE' },
-  { label: 'Income', value: 'INCOME' },
-  { label: 'Set aside', value: 'SET_ASIDE' },
-  { label: 'Take out', value: 'TAKE_OUT' },
+  { label: GLOSSARY.spend.term, value: 'EXPENSE' },
+  { label: GLOSSARY.income.term, value: 'INCOME' },
+  { label: GLOSSARY.setAside.term, value: 'SET_ASIDE' },
+  { label: GLOSSARY.takeOut.term, value: 'TAKE_OUT' },
 ];
 
 const CATEGORY_TYPES_BY_TRANSACTION_TYPE: Record<TransactionType, CategoryType[]> = {

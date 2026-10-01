@@ -35,7 +35,7 @@ function DeletedRow({ label, deletedAt, restoring, onRestore }: DeletedRowProps)
     <Group justify="space-between" wrap="nowrap" py={4}>
       <div style={{ minWidth: 0 }}>
         <Text truncate>{label}</Text>
-        <Text size="xs" c="dimmed">Deleted {deletedAtFormat.format(new Date(deletedAt))}</Text>
+        <Text size="sm">Deleted {deletedAtFormat.format(new Date(deletedAt))}</Text>
       </div>
       <Button variant="light" size="compact-sm" loading={restoring} onClick={onRestore} aria-label={`Restore ${label}`}>
         Restore

@@ -1,8 +1,12 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { Link } from 'react-router';
 import { Button, Group, Loader, Stack, Text, Title } from '@mantine/core';
 import { LoadError } from '~/components/layout/LoadError';
 import { DefaultLayout } from '~/components/layout/DefaultLayout';
+import { RELEASE_NOTES } from '~/lib/glossary';
+import { WelcomeBackCard } from '~/components/budget/WelcomeBackCard';
+import { WhatsChanged } from '~/components/layout/WhatsChanged';
+import { GuidedTour } from '~/components/layout/GuidedTour';
 import { MonthHeader } from '~/components/budget/MonthHeader';
 import { CategoryProgressRow } from '~/components/budget/CategoryProgressRow';
 import { HomeSummary, OtherSpendingRow } from '~/components/budget/HomeSummary';
@@ -17,6 +21,7 @@ import type { CategoryProgress } from '~/lib/summary';
 import { formatPence } from '~/lib/money';
 import { currentYearMonth, formatMonthLabel, monthPhrase, shiftMonth } from '~/lib/months';
 import { useDocumentTitle } from '~/hooks/useDocumentTitle';
+import { useSelectedMonth } from '~/hooks/useSelectedMonth';
 import { useCategories, usePots, useTargets, useTransactions } from '~/lib/queries';
 import { pageTitle } from '~/lib/pageTitle';
 import type { Route } from './+types/_index';
@@ -30,7 +35,7 @@ function GroupedProgress({ items, yearMonth }: { items: CategoryProgress[]; year
     <>
       {groupItems(items, p => bucketKeyFor({ group: p.group, type: 'EXPENSE' }), p => p.name).map(bucket => (
         <div key={bucket.key}>
-          <Text size="xs" fw={600} c="dimmed" tt="uppercase" mb={4}>{bucket.label}</Text>
+          <Text size="sm" fw={600} mb={4}>{bucket.label}</Text>
           {bucket.items.map(p => (
             <CategoryProgressRow key={p.categoryId} progress={p} to={categoryTransactionsUrl(yearMonth, p.categoryId)} />
           ))}
@@ -41,7 +46,7 @@ function GroupedProgress({ items, yearMonth }: { items: CategoryProgress[]; year
 }
 
 function HomeContent() {
-  const [yearMonth, setYearMonth] = useState(currentYearMonth());
+  const [yearMonth, setYearMonth] = useSelectedMonth();
   useDocumentTitle(pageTitle('Home', formatMonthLabel(yearMonth)));
   const categories = useCategories();
   const targets = useTargets();
@@ -79,6 +84,9 @@ function HomeContent() {
 
   return (
     <Stack>
+      <WhatsChanged releaseKey="menu-2026-10">{RELEASE_NOTES.menu}</WhatsChanged>
+      <WhatsChanged releaseKey="names-2026-10">{RELEASE_NOTES.names}</WhatsChanged>
+      <WelcomeBackCard />
       <DueRecurringCard />
       <MonthHeader yearMonth={yearMonth} onChange={setYearMonth} />
       <HomeSummary summary={summary} yearMonth={yearMonth} />
@@ -87,7 +95,7 @@ function HomeContent() {
 
       {hasTargets && (
         <div>
-          <Title order={5} mb="xs">Spending vs target</Title>
+          <Title order={5} mb="xs">Spending vs budget</Title>
           <GroupedProgress items={summary.spending} yearMonth={yearMonth} />
           {summary.spentUnbudgeted > 0 && <OtherSpendingRow amount={summary.spentUnbudgeted} yearMonth={yearMonth} />}
         </div>
@@ -100,7 +108,7 @@ function HomeContent() {
       ))}
 
       <Group justify="space-between">
-        <Text c="dimmed">Income {phrase}</Text>
+        <Text>Income {phrase}</Text>
         <Text fw={600}>{formatPence(summary.incomeTotal)}</Text>
       </Group>
 
@@ -120,7 +128,7 @@ function HomeContent() {
         <Button component={Link} to={`/transactions?month=${yearMonth}`} variant="subtle" mt="xs">See all</Button>
       </div>
 
-      <Button component={Link} to="/recurring" variant="subtle" style={{ alignSelf: 'flex-start' }}>
+      <Button component={Link} to="/plan?tab=recurring" variant="subtle" style={{ alignSelf: 'flex-start' }}>
         Manage recurring
       </Button>
 
@@ -135,6 +143,7 @@ export default function Home() {
   return (
     <DefaultLayout>
       <HomeContent />
+      <GuidedTour />
     </DefaultLayout>
   );
 }

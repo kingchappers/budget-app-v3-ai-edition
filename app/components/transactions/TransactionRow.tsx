@@ -2,6 +2,7 @@ import { useRef } from 'react';
 import { ActionIcon, Button, Group, Loader, Menu, Text, ThemeIcon, UnstyledButton } from '@mantine/core';
 import { IconClock, IconCopy, IconDots, IconPencil, IconRepeat, IconTrash } from '@tabler/icons-react';
 import { formatPence } from '~/lib/money';
+import { formatDayLabel, todayIso } from '~/lib/months';
 import { CategoryIcon } from '~/components/categories/CategoryIcon';
 import type { Transaction } from '~/lib/types';
 
@@ -18,7 +19,7 @@ function SyncStatus({ label, saving, pending, pendingError, onRetry }: {
     return (
       <Group gap={6} mt={2}>
         <IconClock size={12} color="var(--mantine-color-warning-6)" aria-hidden />
-        <Text size="xs">Not synced. Tap to retry.</Text>
+        <Text size="sm">Not synced. Tap to retry.</Text>
         {onRetry && (
           <Button size="compact-sm" variant="light" aria-label={`Retry syncing ${label}`} onClick={onRetry}>Retry</Button>
         )}
@@ -29,7 +30,7 @@ function SyncStatus({ label, saving, pending, pendingError, onRetry }: {
     return (
       <Group gap={4} mt={2}>
         <IconClock size={12} color="var(--mantine-color-dimmed)" aria-hidden />
-        <Text size="xs" c="dimmed">Waiting to sync</Text>
+        <Text size="sm">Waiting to sync</Text>
       </Group>
     );
   }
@@ -37,7 +38,7 @@ function SyncStatus({ label, saving, pending, pendingError, onRetry }: {
     return (
       <Group gap={4} mt={2}>
         <Loader size={10} aria-hidden />
-        <Text size="xs" c="dimmed">Saving</Text>
+        <Text size="sm">Saving</Text>
       </Group>
     );
   }
@@ -75,7 +76,7 @@ export function TransactionRow({
       </ThemeIcon>
       <div style={{ minWidth: 0 }}>
         <Text truncate>{label}</Text>
-        <Text size="xs" c="dimmed">{categoryName} · {transaction.date}</Text>
+        <Text size="sm">{categoryName} · {formatDayLabel(transaction.date, todayIso())}</Text>
         <SyncStatus label={label} saving={saving} pending={pending} pendingError={pendingError} onRetry={onRetry} />
       </div>
     </Group>
@@ -94,6 +95,17 @@ export function TransactionRow({
       ) : summary}
       <Group gap="xs" wrap="nowrap">
         <Text fw={500}>{sign}{formatPence(transaction.amount)}</Text>
+        {onDuplicate && !pending && (
+          <Button
+            variant="subtle"
+            size="compact-sm"
+            leftSection={<IconCopy size={14} />}
+            aria-label={`Duplicate ${label}`}
+            onClick={() => onDuplicate(transaction)}
+          >
+            Duplicate
+          </Button>
+        )}
         {pending ? (
           onDiscard && (
             <Menu position="bottom-end">
@@ -109,8 +121,8 @@ export function TransactionRow({
             </Menu>
           )
         ) : (
-          (onEdit || onDelete || onDuplicate || onRepeat) && (
-            // Edit/Duplicate/Repeat monthly each open a ResponsiveSheet elsewhere in the tree
+          (onEdit || onDelete || onRepeat) && (
+            // Edit/Repeat monthly each open a ResponsiveSheet elsewhere in the tree
             // on the same render this menu closes. Mantine's default returnFocus schedules a
             // focus() back onto this Actions button 10ms after close (useFocusReturn), which
             // races the opened sheet's own focus trap and can steal focus back out of it. We
@@ -130,7 +142,6 @@ export function TransactionRow({
               </Menu.Target>
               <Menu.Dropdown>
                 {onEdit && <Menu.Item leftSection={<IconPencil size={14} />} onClick={() => { opensSheetRef.current = true; onEdit(transaction); }}>Edit</Menu.Item>}
-                {onDuplicate && <Menu.Item leftSection={<IconCopy size={14} />} onClick={() => { opensSheetRef.current = true; onDuplicate(transaction); }}>Duplicate</Menu.Item>}
                 {onRepeat && <Menu.Item leftSection={<IconRepeat size={14} />} onClick={() => { opensSheetRef.current = true; onRepeat(transaction); }}>Repeat monthly</Menu.Item>}
                 {onDelete && <Menu.Item color="danger" leftSection={<IconTrash size={14} />} onClick={() => onDelete(transaction)}>Delete</Menu.Item>}
               </Menu.Dropdown>

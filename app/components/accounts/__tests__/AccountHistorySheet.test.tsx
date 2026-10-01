@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MantineProvider } from '@mantine/core';
 import { AccountHistorySheet } from '../AccountHistorySheet';
+import { addDaysIso, todayIso } from '~/lib/months';
 import type { Account } from '~/lib/types';
 
 function account(overrides: Partial<Account> = {}): Account {
@@ -46,5 +47,10 @@ describe('AccountHistorySheet', () => {
     const { onUpdate } = renderSheet(account());
     await userEvent.setup().click(screen.getAllByRole('button', { name: 'Update' })[1]);
     expect(onUpdate).toHaveBeenCalled();
+  });
+
+  it('says how long ago the balance was entered, under the balance', () => {
+    renderSheet(account({ balances: [{ date: addDaysIso(todayIso(), -23), pence: 200000 }] }));
+    expect(screen.getByText('Updated 23 days ago')).toBeInTheDocument();
   });
 });

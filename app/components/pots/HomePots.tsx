@@ -35,13 +35,13 @@ export function HomePots({ pots, categories }: { pots: PotSummary[]; categories:
             {pot.goalAmount !== null && (
               <>
                 <Progress value={percent ?? 0} aria-label={`${category.name} goal progress`} />
-                <Text size="xs" c="dimmed">{formatPence(Math.max(0, pot.balance))} of {formatPence(pot.goalAmount)}</Text>
+                <Text size="sm">{formatPence(Math.max(0, pot.balance))} of {formatPence(pot.goalAmount)}</Text>
               </>
             )}
           </Stack>
         );
       })}
-      <Anchor component={Link} to="/pots" size="sm">See all pots</Anchor>
+      <Anchor component={Link} to="/plan?tab=pots" size="sm">See all pots</Anchor>
     </div>
   );
 }

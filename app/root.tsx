@@ -16,6 +16,8 @@ import type { Route } from "./+types/root";
 import "./app.css";
 import { pageTitle } from "./lib/pageTitle";
 import { ReduceMotion } from "./components/layout/ReduceMotion";
+import { TextSize } from "./components/layout/TextSize";
+import { TEXT_SIZE_SCRIPT } from "./lib/textSize";
 
 import { Button, ColorSchemeScript, Group, MantineProvider, Stack, Text, Title, mantineHtmlProps, createTheme, useMantineTheme, type CSSVariablesResolver } from '@mantine/core';
 import { DatesProvider } from '@mantine/dates';
@@ -121,6 +123,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <meta name="apple-mobile-web-app-title" content="Budget" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <ColorSchemeScript defaultColorScheme="auto" />
+        <script dangerouslySetInnerHTML={{ __html: TEXT_SIZE_SCRIPT }} />
         <Meta />
         <Links />
       </head>
@@ -128,6 +131,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <QueryClientProvider client={queryClient}>
           <MantineProvider defaultColorScheme="auto" theme={theme} cssVariablesResolver={cssVariablesResolver}>
             <ReduceMotion />
+            <TextSize />
             <ResponsiveNotifications />
             <DatesProvider settings={{ locale: 'en-gb' }}>{children}</DatesProvider>
           </MantineProvider>

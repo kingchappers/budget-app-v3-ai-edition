@@ -19,6 +19,6 @@ describe('TargetAdherence', () => {
 
   it('shows a message when no category has a target', () => {
     render(<MantineProvider><TargetAdherence rows={[]} /></MantineProvider>);
-    expect(screen.getByText(/no targets set/i)).toBeInTheDocument();
+    expect(screen.getByText(/no budgets set/i)).toBeInTheDocument();
   });
 });

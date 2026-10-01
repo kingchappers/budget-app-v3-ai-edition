@@ -53,7 +53,7 @@ describe('HomePots', () => {
 
   it('links to the Pots page', () => {
     renderPots([pot('a', { balance: 100 })]);
-    expect(screen.getByRole('link', { name: 'See all pots' })).toHaveAttribute('href', '/pots');
+    expect(screen.getByRole('link', { name: 'See all pots' })).toHaveAttribute('href', '/plan?tab=pots');
   });
 
   it('renders nothing when no pot qualifies', () => {
