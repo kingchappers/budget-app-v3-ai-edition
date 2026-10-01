@@ -8,6 +8,7 @@ vi.mock('~/components/layout/DefaultLayout', () => ({
   DefaultLayout: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 vi.mock('~/components/budget/WelcomeBackCard', () => ({ WelcomeBackCard: () => null }));
+vi.mock('~/components/layout/WhatsChanged', () => ({ WhatsChanged: () => null }));
 vi.mock('~/components/recurring/DueRecurringCard', () => ({ DueRecurringCard: () => <div>Due card</div> }));
 vi.mock('~/hooks/useOfflineQueue', () => ({ useOfflineQueue: () => ({ pendingMap: {}, flushNow: vi.fn(), discard: vi.fn() }) }));
 vi.mock('~/components/transactions/TransactionSheet', () => ({
@@ -77,7 +78,7 @@ describe('Home', () => {
 
   it('always links to the Recurring page', () => {
     renderHome();
-    expect(screen.getByRole('link', { name: 'Manage recurring' })).toHaveAttribute('href', '/recurring');
+    expect(screen.getByRole('link', { name: 'Manage recurring' })).toHaveAttribute('href', '/plan?tab=recurring');
   });
 
   it('shows group sub-headings inside the spending section, in group order', () => {
@@ -106,7 +107,7 @@ describe('Home', () => {
     renderHome();
     expect(screen.getByRole('heading', { name: 'Pots' })).toBeInTheDocument();
     expect(screen.getByText('£120.00')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'See all pots' })).toHaveAttribute('href', '/pots');
+    expect(screen.getByRole('link', { name: 'See all pots' })).toHaveAttribute('href', '/plan?tab=pots');
   });
 
   it('does not show a Pots section when there are no pots', () => {
@@ -257,7 +258,7 @@ describe('Home without targets', () => {
   it('explains that targets are optional', () => {
     renderHome();
     expect(screen.getByText("Targets are optional. Set one to see what's left in a category.")).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Set targets' })).toHaveAttribute('href', '/targets');
+    expect(screen.getByRole('link', { name: 'Set targets' })).toHaveAttribute('href', '/plan?tab=targets');
   });
 
   it('hides the targets card for good after "Just tracking for now"', async () => {

@@ -13,6 +13,8 @@ import { formatSignedPence } from '~/lib/transactionTypes';
 import type { Category, Recurring, Transaction } from '~/lib/types';
 import { pageTitle } from '~/lib/pageTitle';
 import type { Route } from './+types/recurring';
+import { redirect } from 'react-router';
+import { planPath } from '~/lib/planTabs';
 
 function scheduleText(item: Recurring): string {
   const day = `Monthly on the ${formatDayOfMonth(item.dayOfMonth)}`;
@@ -91,7 +93,7 @@ function useSkipWindowTransactions(today: string): Transaction[] | null {
   return [...current.data, ...next.data];
 }
 
-function RecurringContent() {
+export function RecurringContent() {
   const recurring = useRecurring();
   const categories = useCategories();
   const remove = useDeleteRecurring();
@@ -162,6 +164,11 @@ function RecurringContent() {
       />
     </Stack>
   );
+}
+
+// This page now lives under Plan. The old address still works and leads there.
+export function clientLoader({ request }: Route.ClientLoaderArgs) {
+  throw redirect(planPath('recurring', new URL(request.url).search));
 }
 
 export const meta: Route.MetaFunction = () => [{ title: pageTitle('Recurring') }];

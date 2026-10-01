@@ -146,4 +146,15 @@ describe('usePreferences', () => {
     window.localStorage.setItem(prefs.PREFERENCES_KEY, JSON.stringify({ welcomeBackHiddenUntil: 'soon' }));
     expect(prefs.readPreferences(window.localStorage).welcomeBackHiddenUntil).toBe('');
   });
+
+  it('keeps dismissed release notes as unique, non-empty keys', () => {
+    window.localStorage.setItem(prefs.PREFERENCES_KEY, JSON.stringify({ seenReleases: ['a', 'b', 'a', '', 7, 'x'.repeat(65)] }));
+    expect(prefs.readPreferences(window.localStorage).seenReleases).toEqual(['a', 'b']);
+  });
+
+  it('starts with no release notes dismissed, and ignores a malformed value', () => {
+    expect(prefs.DEFAULT_PREFERENCES.seenReleases).toEqual([]);
+    window.localStorage.setItem(prefs.PREFERENCES_KEY, JSON.stringify({ seenReleases: 'menu' }));
+    expect(prefs.readPreferences(window.localStorage).seenReleases).toEqual([]);
+  });
 });

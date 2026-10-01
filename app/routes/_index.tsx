@@ -3,6 +3,7 @@ import { Link } from 'react-router';
 import { Alert, Button, Group, Loader, Stack, Text, Title } from '@mantine/core';
 import { DefaultLayout } from '~/components/layout/DefaultLayout';
 import { WelcomeBackCard } from '~/components/budget/WelcomeBackCard';
+import { WhatsChanged } from '~/components/layout/WhatsChanged';
 import { MonthHeader } from '~/components/budget/MonthHeader';
 import { CategoryProgressRow } from '~/components/budget/CategoryProgressRow';
 import { HomeSummary, OtherSpendingRow } from '~/components/budget/HomeSummary';
@@ -85,6 +86,10 @@ function HomeContent() {
 
   return (
     <Stack>
+      <WhatsChanged releaseKey="menu-2026-10">
+        The menu has changed. Targets, Pots and Recurring are now together under Plan. Add is in the middle of the bottom bar.
+        Categories and Accounts are in Settings.
+      </WhatsChanged>
       <WelcomeBackCard />
       <DueRecurringCard />
       <MonthHeader yearMonth={yearMonth} onChange={setYearMonth} />
@@ -127,7 +132,7 @@ function HomeContent() {
         <Button component={Link} to={`/transactions?month=${yearMonth}`} variant="subtle" mt="xs">See all</Button>
       </div>
 
-      <Button component={Link} to="/recurring" variant="subtle" style={{ alignSelf: 'flex-start' }}>
+      <Button component={Link} to="/plan?tab=recurring" variant="subtle" style={{ alignSelf: 'flex-start' }}>
         Manage recurring
       </Button>
 

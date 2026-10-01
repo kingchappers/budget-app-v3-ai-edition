@@ -1,74 +1,92 @@
 import { useCallback, useState } from 'react';
-import { ActionIcon, AppShell, Flex, Text, NavLink, Group, Loader, Paper, Tooltip, UnstyledButton } from '@mantine/core';
+import { ActionIcon, AppShell, Button, Flex, Text, NavLink, Group, Loader, Paper, Tooltip, UnstyledButton } from '@mantine/core';
 import { useHotkeys } from '@mantine/hooks';
 import { Auth0Provider, useAuth0 } from '@auth0/auth0-react';
 import Authentication from "../authentication/Authentication";
 import { ColorSchemeToggle } from './ColorSchemeToggle';
 import { QuickEntryTips } from './QuickEntryTips';
-import { IconHome, IconList, IconTarget, IconPlus, IconPigMoney, IconMenu2 } from '@tabler/icons-react';
-import { NavLink as RouterNavLink, useLocation } from 'react-router';
+import { IconChartBar, IconHome, IconList, IconPlus, IconSettings, IconTarget } from '@tabler/icons-react';
+import { Link, NavLink as RouterNavLink, useLocation } from 'react-router';
 import { TransactionSheet } from '../transactions/TransactionSheet';
 import { LaunchIntent } from './LaunchIntent';
 import { OfflineQueueBanner } from './OfflineQueueBanner';
 import { currentYearMonth } from '~/lib/months';
-import { MoreSheet, MORE_ITEMS } from './MoreSheet';
 import { SignedOutPanel } from './SignedOutPanel';
 import { isSessionEndedError, useSessionEnded } from '~/lib/session';
 import { usePreferences } from '~/lib/preferences';
 import { useNavTarget } from '~/hooks/useNavTarget';
 
-const NAV_ITEMS = [
+// The same four places on every device. Add and Settings sit beside them, not among them.
+export const NAV_ITEMS = [
   { to: '/', label: 'Home', Icon: IconHome },
   { to: '/transactions', label: 'Transactions', Icon: IconList },
-  { to: '/targets', label: 'Targets', Icon: IconTarget },
-  { to: '/pots', label: 'Pots', Icon: IconPigMoney },
+  { to: '/plan', label: 'Plan', Icon: IconTarget },
+  { to: '/insights', label: 'Insights', Icon: IconChartBar },
 ];
 
 function isNavItemActive(pathname: string, to: string) {
   return to === '/' ? pathname === '/' : pathname.startsWith(to);
 }
 
-function isMoreActive(pathname: string): boolean {
-  return MORE_ITEMS.some(item => isNavItemActive(pathname, item.to));
+// Settings also covers the pages kept under "Manage".
+const SETTINGS_PATHS = ['/settings', '/categories', '/accounts', '/deleted', '/catch-up'];
+
+function isSettingsActive(pathname: string): boolean {
+  return SETTINGS_PATHS.some(path => pathname.startsWith(path));
 }
 
-function BottomTabs() {
-  const { pathname } = useLocation();
-  const [moreOpen, setMoreOpen] = useState(false);
-  const navTarget = useNavTarget();
-  const moreActive = isMoreActive(pathname);
+// An active tab is bold and has a bar above it, so it is not told apart by colour alone.
+function TabLink({ to, label, Icon, active }: { to: string; label: string; Icon: typeof IconHome; active: boolean }) {
   return (
-    <>
-      <Paper
-        component="nav"
-        aria-label="Primary"
-        withBorder
-        hiddenFrom="sm"
-        style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 100 }}
-        p="xs"
-      >
-        <Group justify="space-around">
-          {NAV_ITEMS.map(({ to, label, Icon }) => {
-            const active = isNavItemActive(pathname, to);
-            return (
-              <RouterNavLink key={to} to={navTarget(to)} style={{ textDecoration: 'none' }} aria-label={label}>
-                <Group gap={2} justify="center" style={{ flexDirection: 'column' }}>
-                  <Icon size={22} stroke={active ? 2.4 : 1.6} />
-                  <Text size="xs" fw={active ? 700 : 400}>{label}</Text>
-                </Group>
-              </RouterNavLink>
-            );
-          })}
-          <UnstyledButton onClick={() => setMoreOpen(true)} aria-label="More">
+    <RouterNavLink to={to} style={{ textDecoration: 'none', minWidth: 44, minHeight: 44 }} aria-label={label}>
+      <Group gap={2} justify="center" style={{ flexDirection: 'column' }}>
+        <span
+          aria-hidden
+          style={{ height: 3, width: 24, borderRadius: 2, background: active ? 'currentColor' : 'transparent' }}
+        />
+        <Icon size={22} stroke={active ? 2.4 : 1.6} />
+        <Text size="xs" fw={active ? 700 : 400}>{label}</Text>
+      </Group>
+    </RouterNavLink>
+  );
+}
+
+function BottomTabs({ signedIn, onAdd }: { signedIn: boolean; onAdd: () => void }) {
+  const { pathname } = useLocation();
+  const navTarget = useNavTarget();
+  const [first, second, ...rest] = NAV_ITEMS;
+  const tab = ({ to, label, Icon }: typeof first) => (
+    <TabLink key={to} to={navTarget(to)} label={label} Icon={Icon} active={isNavItemActive(pathname, to)} />
+  );
+
+  return (
+    <Paper
+      component="nav"
+      aria-label="Primary"
+      withBorder
+      hiddenFrom="sm"
+      // The height is shared with the page padding, scroll padding and toasts (see app.css).
+      style={{
+        position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 100,
+        height: 'var(--tab-bar-height)', paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+      }}
+    >
+      <Group justify="space-around" align="center" h="100%" px="xs">
+        {tab(first)}
+        {tab(second)}
+        {signedIn && (
+          <UnstyledButton onClick={onAdd} aria-label="Add transaction" style={{ minWidth: 44, minHeight: 44 }}>
             <Group gap={2} justify="center" style={{ flexDirection: 'column' }}>
-              <IconMenu2 size={22} stroke={moreActive ? 2.4 : 1.6} />
-              <Text size="xs" fw={moreActive ? 700 : 400}>More</Text>
+              <ActionIcon component="span" size={40} radius="xl" variant="filled" aria-hidden>
+                <IconPlus size={22} />
+              </ActionIcon>
+              <Text size="xs" fw={700}>Add</Text>
             </Group>
           </UnstyledButton>
-        </Group>
-      </Paper>
-      <MoreSheet opened={moreOpen} onClose={() => setMoreOpen(false)} />
-    </>
+        )}
+        {rest.map(tab)}
+      </Group>
+    </Paper>
   );
 }
 
@@ -77,16 +95,22 @@ function SidebarNav() {
   const navTarget = useNavTarget();
   return (
     <>
-      {[...NAV_ITEMS, ...MORE_ITEMS].map(({ to, label, Icon }) => (
-        <NavLink
-          key={to}
-          component={RouterNavLink}
-          to={navTarget(to)}
-          label={label}
-          active={isNavItemActive(pathname, to)}
-          leftSection={<Icon size={16} stroke={1.5} />}
-        />
-      ))}
+      {NAV_ITEMS.map(({ to, label, Icon }) => {
+        const active = isNavItemActive(pathname, to);
+        return (
+          <NavLink
+            key={to}
+            component={RouterNavLink}
+            to={navTarget(to)}
+            label={label}
+            active={active}
+            leftSection={<Icon size={16} stroke={1.5} />}
+            // Bold with a bar at the edge, in addition to the highlight.
+            styles={{ label: { fontWeight: active ? 700 : 400 } }}
+            style={{ borderLeft: `3px solid ${active ? 'currentColor' : 'transparent'}`, minHeight: 44 }}
+          />
+        );
+      })}
     </>
   );
 }
@@ -118,6 +142,28 @@ function MainContent({ session, children }: { session: SessionState; children: R
   return <SignedOutPanel sessionEnded={session === 'sessionEnded'} />;
 }
 
+function SettingsLink() {
+  const { pathname } = useLocation();
+  const active = isSettingsActive(pathname);
+  return (
+    <Tooltip label="Settings">
+      <ActionIcon
+        component={Link}
+        to="/settings"
+        // Settings also stands for the pages under Manage, so the current page is set by hand.
+        aria-current={active ? 'page' : undefined}
+        variant={active ? 'light' : 'subtle'}
+        size={44}
+        aria-label="Settings"
+        // A ring as well as the tint, so the current page is not shown by colour alone.
+        style={{ outline: active ? '2px solid currentColor' : undefined, outlineOffset: -2 }}
+      >
+        <IconSettings size={22} />
+      </ActionIcon>
+    </Tooltip>
+  );
+}
+
 function LayoutShell({ children }: { children: React.ReactNode }) {
   const [addOpen, setAddOpen] = useState(false);
   const openAdd = useCallback(() => setAddOpen(true), []);
@@ -140,6 +186,12 @@ function LayoutShell({ children }: { children: React.ReactNode }) {
         <Flex h="100%" px="md" justify="space-between" align="center">
           <Text fw={700}>Budget</Text>
           <Group gap="sm">
+            {signedIn && (
+              <Tooltip label={shortcutN ? 'Add transaction (N)' : 'Add transaction'} events={{ hover: true, focus: true, touch: false }}>
+                <Button visibleFrom="sm" leftSection={<IconPlus size={18} />} onClick={openAdd}>Add transaction</Button>
+              </Tooltip>
+            )}
+            <SettingsLink />
             <QuickEntryTips />
             <ColorSchemeToggle />
             <Authentication />
@@ -150,29 +202,14 @@ function LayoutShell({ children }: { children: React.ReactNode }) {
         <SidebarNav />
       </AppShell.Navbar>
 
-      {/* The floating "Add transaction" button sits at bottom:84 with a
-          56px diameter, so its top edge reaches bottom:140 — pb must
-          clear that or the last card on a page renders underneath it. */}
-      <AppShell.Main pb={150}>
+      {/* Clears the phone tab bar, which is fixed to the bottom of the screen. */}
+      <AppShell.Main style={{ paddingBottom: 'calc(var(--tab-bar-height) + var(--mantine-spacing-xl))' }}>
         <OfflineQueueBanner />
         <MainContent session={session}>{children}</MainContent>
       </AppShell.Main>
-      {signedIn && (
-        <>
-          <Tooltip label={shortcutN ? 'Add transaction (N)' : 'Add transaction'} events={{ hover: true, focus: true, touch: false }}>
-            <ActionIcon
-              size={56} radius="xl" variant="filled" aria-label="Add transaction"
-              onClick={() => setAddOpen(true)}
-              style={{ position: 'fixed', right: 16, bottom: 84, zIndex: 101 }}
-            >
-              <IconPlus size={26} />
-            </ActionIcon>
-          </Tooltip>
-          <TransactionSheet opened={addOpen} onClose={() => setAddOpen(false)} yearMonth={currentYearMonth()} />
-        </>
-      )}
+      {signedIn && <TransactionSheet opened={addOpen} onClose={() => setAddOpen(false)} yearMonth={currentYearMonth()} />}
       <LaunchIntent onOpenAdd={openAdd} />
-      <BottomTabs />
+      <BottomTabs signedIn={signedIn} onAdd={openAdd} />
     </AppShell>
   );
 }

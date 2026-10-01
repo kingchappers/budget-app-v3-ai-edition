@@ -12,6 +12,8 @@ import { useCategories, useDeleteTarget, useSetTarget, useTargets } from '~/lib/
 import type { Category, TargetPeriod } from '~/lib/types';
 import { pageTitle } from '~/lib/pageTitle';
 import type { Route } from './+types/targets';
+import { redirect } from 'react-router';
+import { planPath } from '~/lib/planTabs';
 
 function isDirty(value: string, period: TargetPeriod, savedPence: number | null, savedPeriod: TargetPeriod): boolean {
   if (period !== savedPeriod) return true;
@@ -114,7 +116,7 @@ function TargetRow({ category, amountPence, period }: {
   );
 }
 
-function TargetsContent() {
+export function TargetsContent() {
   const categories = useCategories();
   const targets = useTargets();
 
@@ -149,6 +151,11 @@ function TargetsContent() {
       ))}
     </Stack>
   );
+}
+
+// This page now lives under Plan. The old address still works and leads there.
+export function clientLoader({ request }: Route.ClientLoaderArgs) {
+  throw redirect(planPath('targets', new URL(request.url).search));
 }
 
 export const meta: Route.MetaFunction = () => [{ title: pageTitle('Targets') }];

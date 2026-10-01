@@ -59,4 +59,22 @@ describe('Settings page', () => {
     expect(screen.getByRole('switch', { name: /^Press N to add a transaction/ })).not.toBeChecked();
     expect(screen.getByRole('switch', { name: /^Open Add sheet when the installed app starts/ })).toBeChecked();
   });
+
+  it('holds the pages that used to be in the More menu, one link each', () => {
+    renderSettings();
+    const manage = screen.getByRole('heading', { name: 'Manage' }).closest('.mantine-Card-root') as HTMLElement;
+    const links = [...manage.querySelectorAll('a')].map(link => [link.textContent, link.getAttribute('href')]);
+    expect(links).toEqual([
+      ['CategoriesAdd, rename or remove spending and income categories.', '/categories'],
+      ['AccountsBalances of your bank accounts, savings and debts.', '/accounts'],
+      ['Recently deletedBring back something you removed.', '/deleted'],
+      ['Catch upAdd what you remember from the last few weeks.', '/catch-up'],
+    ]);
+  });
+
+  it('gives each link a 44px target', () => {
+    renderSettings();
+    screen.getByRole('link', { name: /^Categories/ });
+    expect(screen.getByRole('link', { name: /^Categories/ })).toHaveStyle({ minHeight: '44px' });
+  });
 });

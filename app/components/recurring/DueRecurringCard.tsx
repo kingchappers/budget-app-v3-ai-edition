@@ -208,7 +208,7 @@ export function DueRecurringCard() {
       <Card withBorder>
         <Group justify="space-between" mb="xs">
           <Title order={5}>Due</Title>
-          <Anchor component={Link} to="/recurring" size="sm">Manage</Anchor>
+          <Anchor component={Link} to="/plan?tab=recurring" size="sm">Manage</Anchor>
         </Group>
         {groups.current.map(renderRow)}
         {groups.older.map((group, index) => (

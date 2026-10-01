@@ -41,7 +41,7 @@ export function HomePots({ pots, categories }: { pots: PotSummary[]; categories:
           </Stack>
         );
       })}
-      <Anchor component={Link} to="/pots" size="sm">See all pots</Anchor>
+      <Anchor component={Link} to="/plan?tab=pots" size="sm">See all pots</Anchor>
     </div>
   );
 }
