@@ -58,3 +58,15 @@ html[data-text-size='largest'] {
     font-size: 1rem !important;
   }
 }
+
+/* "Reduce motion" in Settings. Mantine sets transition durations inline, so
+   this needs !important to win. The device-level setting is handled by
+   respectReducedMotion in the theme. */
+:root[data-reduce-motion] *,
+:root[data-reduce-motion] *::before,
+:root[data-reduce-motion] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}

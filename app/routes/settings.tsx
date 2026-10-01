@@ -61,6 +61,12 @@ function SettingsContent() {
               data={APPEARANCE_OPTIONS}
             />
           </Input.Wrapper>
+          <Switch
+            label="Reduce motion"
+            description="Stops sliding and fading when sheets, menus and messages open. The app already follows your device's setting; this switch turns it on for the app only."
+            checked={preferences.reduceMotion}
+            onChange={event => setPreferences({ reduceMotion: event.currentTarget.checked })}
+          />
         </Stack>
       </Card>
 

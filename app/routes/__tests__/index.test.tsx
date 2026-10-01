@@ -148,7 +148,7 @@ describe('Home', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Next month' }));
       expect(lastCall()[1]).toBe(false);
       expect(screen.queryByRole('heading', { name: 'Pots' })).not.toBeInTheDocument();
-      expect(screen.queryByText('Could not load pots.')).not.toBeInTheDocument();
+      expect(screen.queryByText("We couldn't load your pots. Nothing has been lost.")).not.toBeInTheDocument();
     });
   });
 });

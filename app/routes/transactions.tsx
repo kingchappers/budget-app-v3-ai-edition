@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useSearchParams } from 'react-router';
-import { ActionIcon, Alert, Button, Divider, Group, Loader, Select, Stack, Text, TextInput, Title } from '@mantine/core';
+import { ActionIcon, Divider, Group, Loader, Select, Stack, Text, TextInput, Title } from '@mantine/core';
+import { LoadError } from '~/components/layout/LoadError';
 import { IconSearch, IconX } from '@tabler/icons-react';
 import { DefaultLayout } from '~/components/layout/DefaultLayout';
 import { MonthHeader } from '~/components/budget/MonthHeader';
@@ -62,9 +63,7 @@ function TransactionsContent() {
 
   if (transactions.error) {
     return (
-      <Alert color="danger" title="Could not load transactions">
-        <Button onClick={() => transactions.refetch()}>Try again</Button>
-      </Alert>
+      <LoadError thing="transactions" onRetry={() => transactions.refetch()} />
     );
   }
 

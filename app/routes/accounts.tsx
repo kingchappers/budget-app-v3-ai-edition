@@ -1,6 +1,7 @@
 import { TermHelp } from '~/components/layout/TermHelp';
 import { useState } from 'react';
-import { Alert, Button, Group, Loader, Modal, Select, SimpleGrid, Stack, Text, TextInput, Title } from '@mantine/core';
+import { Button, Group, Loader, Modal, Select, SimpleGrid, Stack, Text, TextInput, Title } from '@mantine/core';
+import { LoadError } from '~/components/layout/LoadError';
 import { DefaultLayout } from '~/components/layout/DefaultLayout';
 import { SaveStatus, type SaveState } from '~/components/layout/SaveStatus';
 import { AccountRow } from '~/components/accounts/AccountRow';
@@ -66,9 +67,7 @@ function AccountsContent() {
 
   if (accounts.error) {
     return (
-      <Alert color="danger" title="Could not load accounts">
-        <Button onClick={() => accounts.refetch()}>Try again</Button>
-      </Alert>
+      <LoadError thing="accounts" onRetry={() => accounts.refetch()} />
     );
   }
   if (accounts.isLoading) return <Group justify="center" py="xl"><Loader /></Group>;

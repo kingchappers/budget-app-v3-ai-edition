@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
-import { ActionIcon, Alert, Anchor, Button, Card, Divider, Group, Menu, Stack, Text, ThemeIcon, Title } from '@mantine/core';
+import { ActionIcon, Anchor, Button, Card, Divider, Group, Menu, Stack, Text, ThemeIcon, Title } from '@mantine/core';
+import { LoadError } from '~/components/layout/LoadError';
 import { notifications } from '@mantine/notifications';
 import { IconBellPause, IconDots, IconPencil, IconPlayerSkipForward } from '@tabler/icons-react';
 import { useAuth0 } from '@auth0/auth0-react';
@@ -204,9 +205,7 @@ export function DueRecurringCard() {
   let card: React.ReactNode = null;
   if (error) {
     card = (
-      <Alert color="danger" title="Could not load recurring items">
-        <Button size="compact-sm" onClick={() => refetch()}>Try again</Button>
-      </Alert>
+      <LoadError thing="recurring items" onRetry={() => refetch()} />
     );
   } else if (!isLoading && visible.length > 0) {
     card = (

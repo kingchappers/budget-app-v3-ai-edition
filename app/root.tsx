@@ -15,10 +15,11 @@ import {
 import type { Route } from "./+types/root";
 import "./app.css";
 import { pageTitle } from "./lib/pageTitle";
+import { ReduceMotion } from "./components/layout/ReduceMotion";
 import { TextSize } from "./components/layout/TextSize";
 import { TEXT_SIZE_SCRIPT } from "./lib/textSize";
 
-import { ColorSchemeScript, MantineProvider, mantineHtmlProps, createTheme, useMantineTheme, type CSSVariablesResolver } from '@mantine/core';
+import { Button, ColorSchemeScript, Group, MantineProvider, Stack, Text, Title, mantineHtmlProps, createTheme, useMantineTheme, type CSSVariablesResolver } from '@mantine/core';
 import { DatesProvider } from '@mantine/dates';
 import { useMediaQuery } from '@mantine/hooks';
 import { Notifications } from '@mantine/notifications';
@@ -32,6 +33,7 @@ const queryClient = new QueryClient({
 
 export const theme = createTheme({
   primaryColor: 'primary',
+  respectReducedMotion: true,
   // Mantine's autoContrast text-color decision for a color used without an
   // explicit shade (e.g. color="primary") always reads primaryShade.light's
   // luminance, even when the button is actually rendering in dark mode —
@@ -128,6 +130,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <body>
         <QueryClientProvider client={queryClient}>
           <MantineProvider defaultColorScheme="auto" theme={theme} cssVariablesResolver={cssVariablesResolver}>
+            <ReduceMotion />
             <TextSize />
             <ResponsiveNotifications />
             <DatesProvider settings={{ locale: 'en-gb' }}>{children}</DatesProvider>
@@ -145,30 +148,30 @@ export default function App() {
 }
 
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
-  let message = "Oops!";
-  let details = "An unexpected error occurred.";
-  let stack: string | undefined;
-
-  if (isRouteErrorResponse(error)) {
-    message = error.status === 404 ? "404" : "Error";
-    details =
-      error.status === 404
-        ? "The requested page could not be found."
-        : error.statusText || details;
-  } else if (import.meta.env.DEV && error && error instanceof Error) {
-    details = error.message;
-    stack = error.stack;
-  }
+  const notFound = isRouteErrorResponse(error) && error.status === 404;
+  const stack = import.meta.env.DEV && error instanceof Error ? error.stack : undefined;
 
   return (
     <main className="pt-16 p-4 container mx-auto">
-      <h1>{message}</h1>
-      <p>{details}</p>
-      {stack && (
-        <pre className="w-full p-4 overflow-x-auto">
-          <code>{stack}</code>
-        </pre>
-      )}
+      <Stack maw={560}>
+        <Title order={1} size="h2">
+          {notFound ? "We couldn't find that page" : "Something didn't load. Your data is safe."}
+        </Title>
+        <Text>
+          {notFound
+            ? 'The link may be out of date. You can go back to Home.'
+            : 'Reload the page to try again. If it keeps happening, go back to Home.'}
+        </Text>
+        <Group>
+          {!notFound && <Button onClick={() => window.location.reload()}>Reload</Button>}
+          <Button component="a" href="/" variant={notFound ? 'filled' : 'default'}>Go to Home</Button>
+        </Group>
+        {stack && (
+          <pre className="w-full p-4 overflow-x-auto">
+            <code>{stack}</code>
+          </pre>
+        )}
+      </Stack>
     </main>
   );
 }

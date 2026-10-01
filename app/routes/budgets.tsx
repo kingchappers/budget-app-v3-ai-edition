@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { ActionIcon, Alert, Button, Card, Group, Loader, Menu, Paper, SegmentedControl, Stack, Text, TextInput, Title } from '@mantine/core';
+import { ActionIcon, Button, Card, Group, Loader, Menu, Paper, SegmentedControl, Stack, Text, TextInput, Title } from '@mantine/core';
 import { IconDots, IconTrash } from '@tabler/icons-react';
+import { LoadError } from '~/components/layout/LoadError';
 import { DefaultLayout } from '~/components/layout/DefaultLayout';
 import { SaveStatus, type SaveState } from '~/components/layout/SaveStatus';
 import { useUndoableDelete } from '~/hooks/useUndoableDelete';
@@ -145,9 +146,7 @@ export function BudgetsContent() {
 
   if (categories.error || targets.error) {
     return (
-      <Alert color="danger" title="Could not load budgets">
-        <Button onClick={() => { categories.refetch(); targets.refetch(); }}>Try again</Button>
-      </Alert>
+      <LoadError thing="budgets" onRetry={() => { categories.refetch(); targets.refetch(); }} />
     );
   }
   if (categories.isLoading || targets.isLoading) {

@@ -26,3 +26,9 @@ describe('dark mode dimmed text contrast', () => {
     expect(contrastRatio(gray6, '#ffffff')).toBeGreaterThanOrEqual(4.5);
   });
 });
+
+describe('motion', () => {
+  it('follows the device reduced-motion setting', () => {
+    expect(mergedTheme.respectReducedMotion).toBe(true);
+  });
+});

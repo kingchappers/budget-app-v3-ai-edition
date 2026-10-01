@@ -115,7 +115,7 @@ describe('Pots page', () => {
   it('shows an error with a retry when the pots fail to load', () => {
     state.potsError = true;
     renderPage();
-    expect(screen.getByText('Could not load pots')).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent("We couldn't load your pots");
     expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
   });
 

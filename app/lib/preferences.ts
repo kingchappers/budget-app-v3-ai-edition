@@ -20,6 +20,8 @@ export interface Preferences {
   undoDuration: UndoDuration;
   shortcutN: boolean;
   openAddOnLaunch: boolean;
+  // Overrides the device's reduced-motion setting for people who don't know it exists.
+  reduceMotion: boolean;
   // Category chips the user chose to keep first, in the order they chose them.
   pinnedCategoryIds: string[];
   keepSheetOpen: KeepSheetOpen;
@@ -40,6 +42,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   undoDuration: 'until-closed',
   shortcutN: true,
   openAddOnLaunch: false,
+  reduceMotion: false,
   pinnedCategoryIds: [],
   keepSheetOpen: 'ask',
   entryMode: 'form',
@@ -50,7 +53,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   tourStep: 0,
 };
 
-const BOOLEAN_KEYS = ['shortcutN', 'openAddOnLaunch', 'quickAddTipDismissed'] as const;
+const BOOLEAN_KEYS = ['shortcutN', 'openAddOnLaunch', 'quickAddTipDismissed', 'reduceMotion'] as const;
 const KEEP_SHEET_OPEN_VALUES: readonly KeepSheetOpen[] = ['ask', 'yes', 'no'];
 const ENTRY_MODES: readonly EntryMode[] = ['form', 'quick'];
 const TEXT_SIZES: readonly TextSize[] = ['standard', 'large', 'largest'];

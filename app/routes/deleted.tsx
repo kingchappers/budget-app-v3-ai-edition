@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Alert, Button, Group, Loader, Stack, Text, Title } from '@mantine/core';
+import { Button, Group, Loader, Stack, Text, Title } from '@mantine/core';
+import { LoadError } from '~/components/layout/LoadError';
 import { notifications } from '@mantine/notifications';
 import { DefaultLayout } from '~/components/layout/DefaultLayout';
 import { TOAST_MS } from '~/components/layout/ToastAction';
@@ -72,9 +73,7 @@ function DeletedContent() {
     return (
       <Stack>
         {intro}
-        <Alert color="danger" title="Could not load recently deleted items">
-          <Button onClick={() => trash.refetch()}>Try again</Button>
-        </Alert>
+        <LoadError thing="recently deleted items" onRetry={() => trash.refetch()} />
       </Stack>
     );
   }

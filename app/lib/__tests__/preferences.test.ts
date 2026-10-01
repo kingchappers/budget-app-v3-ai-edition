@@ -184,4 +184,11 @@ describe('usePreferences', () => {
     window.localStorage.setItem(prefs.PREFERENCES_KEY, JSON.stringify({ textSize: 'huge', undoDuration: 5000 }));
     expect(prefs.readPreferences(window.localStorage)).toMatchObject({ textSize: 'standard', undoDuration: 'until-closed' });
   });
+
+  it('keeps reduce motion off until it is turned on, and remembers it', () => {
+    expect(prefs.DEFAULT_PREFERENCES.reduceMotion).toBe(false);
+    expect(prefs.readPreferences(window.localStorage).reduceMotion).toBe(false);
+    prefs.writePreferences(window.localStorage, { ...prefs.DEFAULT_PREFERENCES, reduceMotion: true });
+    expect(prefs.readPreferences(window.localStorage).reduceMotion).toBe(true);
+  });
 });
