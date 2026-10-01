@@ -1,7 +1,7 @@
 import { LineChart } from '@mantine/charts';
 import { Button, Group, Stack, Table, Text } from '@mantine/core';
 import { ResponsiveSheet } from '~/components/layout/ResponsiveSheet';
-import { balanceAsOf } from '~/lib/accounts';
+import { balanceAsOf, updatedAgo } from '~/lib/accounts';
 import { formatPence } from '~/lib/money';
 import { formatShortDate, todayIso } from '~/lib/months';
 import type { Account } from '~/lib/types';
@@ -24,6 +24,7 @@ export function AccountHistorySheet({
             <div>
               <Text size="xs" c="dimmed">Balance</Text>
               <Text fw={700} size="xl">{formatPence(balance)}</Text>
+              <Text size="xs" c="dimmed">{updatedAgo(account.balances, todayIso())}</Text>
             </div>
             <Button size="compact-sm" onClick={onUpdate}>Update</Button>
           </Group>

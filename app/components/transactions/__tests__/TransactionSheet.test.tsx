@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { MantineProvider } from '@mantine/core';
 import { Notifications, notifications } from '@mantine/notifications';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { todayIso, yesterdayIso } from '~/lib/months';
+import { addDaysIso, formatDayLabel, todayIso, yesterdayIso } from '~/lib/months';
 import { PREFERENCES_KEY } from '~/lib/preferences';
 import type { Transaction } from '~/lib/types';
 import { ApiError } from '~/lib/apiError';
@@ -1300,6 +1300,73 @@ describe('TransactionSheet', () => {
       setProps({ opened: true, preset: { type: 'EXPENSE', categoryId: 'cat-dining' } });
       expect(screen.getByLabelText(/amount/i)).toHaveValue('');
       expect(screen.getByRole('radio', { name: 'Dining' })).toBeChecked();
+    });
+  });
+
+  describe('for a chosen day (catch up)', () => {
+    const day = addDaysIso(todayIso(), -5);
+    const dayName = formatDayLabel(day, todayIso());
+
+    it('shows the day prominently and starts blank on it', () => {
+      renderSheet({ forDate: day });
+      expect(screen.getByText(`Adding to ${dayName}`)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: `Date: ${dayName}` })).toBeInTheDocument();
+      expect(screen.getByLabelText(/amount/i)).toHaveValue('');
+    });
+
+    it('never restores a saved draft into it', () => {
+      saveTransactionDraft('', { ...EMPTY_DRAFT, amount: '9.99', categoryId: 'cat-dining' });
+      renderSheet({ forDate: day });
+      expect(screen.getByLabelText(/amount/i)).toHaveValue('');
+    });
+
+    it('saves the entry on that day', async () => {
+      const user = userEvent.setup();
+      renderSheet({ forDate: day });
+      await fillAndSave(user);
+      expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({ date: day }));
+    });
+
+    it('stays open and ready for the next entry, whatever the keep-open preference, keeping the day', async () => {
+      seedPreferences({ keepSheetOpen: 'no' });
+      const user = userEvent.setup();
+      const { onClose } = renderSheet({ forDate: day });
+      await fillAndSave(user);
+
+      expect(onClose).not.toHaveBeenCalled();
+      expect(screen.queryByText('Keep this open for the next entry?')).not.toBeInTheDocument();
+      expect(screen.getByLabelText(/amount/i)).toHaveValue('');
+      expect(screen.getByText(`Adding to ${dayName}`)).toBeInTheDocument();
+
+      await fillAndSave(user, '2.00', 'Groceries');
+      expect(mockCreate).toHaveBeenLastCalledWith(expect.objectContaining({ date: day, amount: 200 }));
+    });
+
+    it('marks the day as nothing to log and closes', async () => {
+      const user = userEvent.setup();
+      const onToggleNothingToLog = vi.fn();
+      const { onClose } = renderSheet({ forDate: day, onToggleNothingToLog });
+
+      await user.click(screen.getByRole('button', { name: 'Nothing to log for this day' }));
+
+      expect(onToggleNothingToLog).toHaveBeenCalledTimes(1);
+      expect(onClose).toHaveBeenCalled();
+    });
+
+    it('offers to clear the mark on a day already marked', () => {
+      renderSheet({ forDate: day, dayMarkedEmpty: true, onToggleNothingToLog: vi.fn() });
+      expect(screen.getByRole('button', { name: 'Clear “Nothing to log” for this day' })).toBeInTheDocument();
+    });
+
+    it('does not offer Nothing to log outside catch up', () => {
+      renderSheet({ onToggleNothingToLog: vi.fn() });
+      expect(screen.queryByRole('button', { name: /nothing to log/i })).not.toBeInTheDocument();
+      expect(screen.queryByText(/^Adding to/)).not.toBeInTheDocument();
+    });
+
+    it('does not show the day banner when editing', () => {
+      renderSheet({ forDate: day, editing });
+      expect(screen.queryByText(/^Adding to/)).not.toBeInTheDocument();
     });
   });
 });

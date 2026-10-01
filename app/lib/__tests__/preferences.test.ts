@@ -123,4 +123,27 @@ describe('usePreferences', () => {
 
     expect(result.current[0].shortcutN).toBe(false);
   });
+
+  it('keeps "nothing to log" days per user, valid, unique and sorted', () => {
+    window.localStorage.setItem(prefs.PREFERENCES_KEY, JSON.stringify({
+      nothingToLog: {
+        'auth0|a': ['2026-09-03', '2026-09-01', '2026-09-03', '2026-9-1', 7],
+        'auth0|b': 'nope',
+        '': ['2026-09-01'],
+      },
+    }));
+    expect(prefs.readPreferences(window.localStorage).nothingToLog).toEqual({ 'auth0|a': ['2026-09-01', '2026-09-03'] });
+  });
+
+  it('ignores a malformed nothing-to-log value', () => {
+    window.localStorage.setItem(prefs.PREFERENCES_KEY, JSON.stringify({ nothingToLog: ['2026-09-01'] }));
+    expect(prefs.readPreferences(window.localStorage).nothingToLog).toEqual({});
+  });
+
+  it('only accepts a real date, or nothing, for when the welcome card is hidden until', () => {
+    window.localStorage.setItem(prefs.PREFERENCES_KEY, JSON.stringify({ welcomeBackHiddenUntil: '2026-10-05' }));
+    expect(prefs.readPreferences(window.localStorage).welcomeBackHiddenUntil).toBe('2026-10-05');
+    window.localStorage.setItem(prefs.PREFERENCES_KEY, JSON.stringify({ welcomeBackHiddenUntil: 'soon' }));
+    expect(prefs.readPreferences(window.localStorage).welcomeBackHiddenUntil).toBe('');
+  });
 });
