@@ -139,7 +139,7 @@ describe('createRecurring', () => {
     ['string day', { dayOfMonth: '5' }],
     ['missing day', { dayOfMonth: undefined }],
     ['negative leadDays', { leadDays: -1 }],
-    ['leadDays 15', { leadDays: 15 }],
+    ['leadDays 31 for a monthly item', { leadDays: 31 }],
     ['fractional leadDays', { leadDays: 2.5 }],
     ['a 201 character note', { description: 'a'.repeat(201) }],
     ['a non-string note', { description: 42 }],
@@ -278,7 +278,8 @@ describe('setRecurringHandled', () => {
     ['month 13', { period: '2026-13' }],
     ['month 00', { period: '2026-00' }],
     ['a one-digit month', { period: '2026-1' }],
-    ['a full date', { period: '2026-09-01' }],
+    ['an impossible date', { period: '2026-02-30' }],
+    ['a date with a one-digit day', { period: '2026-09-1' }],
     ['a number', { period: 202609 }],
     ['text', { period: 'abc' }],
     ['a missing period', {}],
@@ -310,5 +311,109 @@ describe('validateRecurringInput amount cap', () => {
 
   it('rejects an amount one pence over the cap', () => {
     expect(validateRecurringInput({ ...body, amount: MAX_AMOUNT_PENCE + 1 }).ok).toBe(false);
+  });
+});
+
+describe('validateRecurringInput schedules', () => {
+  const base = { type: 'EXPENSE', categoryId: 'cat-insurance', amount: 36000, description: 'Insurance', leadDays: 3 };
+
+  it('treats a missing frequency as monthly, keeping dayOfMonth and no anchor', () => {
+    const result = validateRecurringInput({ ...base, dayOfMonth: 14 });
+    expect(result).toMatchObject({ ok: true, value: { frequency: 'MONTHLY', anchorDate: null, dayOfMonth: 14 } });
+  });
+
+  it('ignores an anchor date on a monthly item', () => {
+    const result = validateRecurringInput({ ...base, frequency: 'MONTHLY', dayOfMonth: 5, anchorDate: '2026-03-14' });
+    expect(result).toMatchObject({ ok: true, value: { anchorDate: null, dayOfMonth: 5 } });
+  });
+
+  it.each(['WEEKLY', 'FOUR_WEEKLY', 'QUARTERLY', 'YEARLY'])('accepts %s with an anchor date and takes the day from it', frequency => {
+    const result = validateRecurringInput({ ...base, frequency, anchorDate: '2026-03-14' });
+    expect(result).toMatchObject({ ok: true, value: { frequency, anchorDate: '2026-03-14', dayOfMonth: 14 } });
+  });
+
+  it.each(['WEEKLY', 'FOUR_WEEKLY', 'QUARTERLY', 'YEARLY'])('requires an anchor date for %s', frequency => {
+    expect(validateRecurringInput({ ...base, frequency }).ok).toBe(false);
+  });
+
+  it.each(['2026-02-30', '2026-13-01', '2026-3-14', '14/03/2026', 20260314, null])('rejects the anchor date %s', anchorDate => {
+    expect(validateRecurringInput({ ...base, frequency: 'YEARLY', anchorDate }).ok).toBe(false);
+  });
+
+  it('accepts 29 February in a leap year and rejects it otherwise', () => {
+    expect(validateRecurringInput({ ...base, frequency: 'YEARLY', anchorDate: '2028-02-29' }).ok).toBe(true);
+    expect(validateRecurringInput({ ...base, frequency: 'YEARLY', anchorDate: '2027-02-29' }).ok).toBe(false);
+  });
+
+  it.each(['HOURLY', 'weekly', 7, ''])('rejects the frequency %s', frequency => {
+    expect(validateRecurringInput({ ...base, frequency, anchorDate: '2026-03-14', dayOfMonth: 14 }).ok).toBe(false);
+  });
+
+  it.each([
+    ['WEEKLY', 14, 15],
+    ['FOUR_WEEKLY', 14, 15],
+    ['MONTHLY', 30, 31],
+    ['QUARTERLY', 60, 61],
+    ['YEARLY', 60, 61],
+  ])('allows %s warnings up to %i days and rejects %i', (frequency, max, over) => {
+    const extra = { ...base, frequency, anchorDate: '2026-03-14', dayOfMonth: 14 };
+    expect(validateRecurringInput({ ...extra, leadDays: max }).ok).toBe(true);
+    expect(validateRecurringInput({ ...extra, leadDays: over }).ok).toBe(false);
+  });
+
+  it('defaults the warning to three days', () => {
+    const result = validateRecurringInput({ ...base, leadDays: undefined, dayOfMonth: 1 });
+    expect(result).toMatchObject({ ok: true, value: { leadDays: 3 } });
+  });
+});
+
+describe('recurring schedules over the API', () => {
+  beforeEach(() => { mockSend.mockReset(); });
+
+  it('stores the frequency and anchor on create and returns them', async () => {
+    mockSend.mockResolvedValueOnce({});
+    const res = await createRecurring(
+      makeEvent({ ...validBody, type: 'EXPENSE', frequency: 'YEARLY', anchorDate: '2027-03-14', leadDays: 30 }),
+      'user-1',
+      {},
+    );
+    expect(res.statusCode).toBe(201);
+    expect(mockSend.mock.calls[0][0].Item).toMatchObject({ frequency: 'YEARLY', anchorDate: '2027-03-14', dayOfMonth: 14 });
+    expect(JSON.parse(res.body).recurring).toMatchObject({ frequency: 'YEARLY', anchorDate: '2027-03-14' });
+  });
+
+  it('updates the schedule fields', async () => {
+    mockSend.mockResolvedValueOnce({ Attributes: { recurringId: 'r1', frequency: 'WEEKLY', anchorDate: '2026-09-07' } });
+    await updateRecurring(
+      makeEvent({ ...validBody, frequency: 'WEEKLY', anchorDate: '2026-09-07' }),
+      'user-1',
+      { recurringId: 'r1' },
+    );
+    const command = mockSend.mock.calls[0][0];
+    expect(command.UpdateExpression).toContain('frequency = :frequency');
+    expect(command.ExpressionAttributeValues).toMatchObject({ ':frequency': 'WEEKLY', ':anchorDate': '2026-09-07' });
+  });
+
+  it('clears the anchor when an item goes back to monthly', async () => {
+    mockSend.mockResolvedValueOnce({ Attributes: { recurringId: 'r1' } });
+    await updateRecurring(makeEvent({ ...validBody, frequency: 'MONTHLY', anchorDate: '2026-09-07' }), 'user-1', { recurringId: 'r1' });
+    expect(mockSend.mock.calls[0][0].ExpressionAttributeValues).toMatchObject({ ':frequency': 'MONTHLY', ':anchorDate': null });
+  });
+
+  it('reads an item saved before schedules existed as monthly', async () => {
+    mockSend.mockResolvedValueOnce({ Items: [{
+      PK: 'USER#user-1', SK: 'RECUR#r1', recurringId: 'r1', type: 'INCOME', categoryId: 'cat-salary',
+      amount: 240000, description: 'Salary', dayOfMonth: 28, leadDays: 3, handledPeriod: '2026-08',
+      createdAt: 'c', updatedAt: 'u',
+    }] });
+    const res = await getRecurring(makeEvent(), 'user-1', {});
+    expect(JSON.parse(res.body).recurring[0]).toMatchObject({ frequency: 'MONTHLY', anchorDate: null, handledPeriod: '2026-08' });
+  });
+
+  it('accepts an occurrence date as the handled marker', async () => {
+    mockSend.mockResolvedValueOnce({ Attributes: { recurringId: 'r1', handledPeriod: '2026-09-14' } });
+    const res = await setRecurringHandled(makeEvent({ period: '2026-09-14' }), 'user-1', { recurringId: 'r1' });
+    expect(res.statusCode).toBe(200);
+    expect(mockSend.mock.calls[0][0].ExpressionAttributeValues[':period']).toBe('2026-09-14');
   });
 });

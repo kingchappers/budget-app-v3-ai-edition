@@ -9,7 +9,7 @@ import * as insights from '../insights';
 import * as pots from '../pots';
 import * as recurring from '../recurring';
 import * as settings from '../settings';
-import * as targets from '../targets';
+import * as budgets from '../budgets';
 import * as test from '../test';
 import * as transactions from '../transactions';
 import * as root from '../../root';
@@ -21,7 +21,7 @@ interface RouteWithMeta {
 const cases: [string, RouteWithMeta, string][] = [
   ['Home', home, 'Home – Budget'],
   ['Transactions', transactions, 'Transactions – Budget'],
-  ['Targets', targets, 'Targets – Budget'],
+  ['Budgets', budgets, 'Budgets – Budget'],
   ['Pots', pots, 'Pots – Budget'],
   ['Categories', categories, 'Categories – Budget'],
   ['Recurring', recurring, 'Recurring – Budget'],

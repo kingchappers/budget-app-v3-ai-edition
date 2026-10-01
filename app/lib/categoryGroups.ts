@@ -11,7 +11,7 @@ export interface Bucket<T> {
 
 export const BUCKET_LABELS: Record<BucketKey, string> = {
   BILLS: 'Bills',
-  SINKING_FUNDS: 'Sinking Funds',
+  SINKING_FUNDS: 'Saving for known costs',
   EVERYDAY: 'Everyday Spending',
   SAVING_INVESTMENT: 'Saving & Investment',
   INCOME: 'Income',

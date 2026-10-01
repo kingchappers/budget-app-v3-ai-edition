@@ -13,9 +13,8 @@ export function useInlineCategoryRename(
   const update = useUpdateCategory();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(category?.name ?? '');
-  // Committing on Enter triggers a blur (the input unmounts on the next
-  // render, which fires synchronously before React re-renders) — this
-  // guards against that blur re-running the same commit a second time.
+  // Guards against committing twice, for example a double click on Save
+  // before the field has unmounted.
   const committedRef = useRef(false);
 
   function start(): void {

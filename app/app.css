@@ -16,10 +16,37 @@ body {
   outline-offset: 2px;
 }
 
-/* Narrow screens: lift bottom-centre toasts above the tab bar and the floating add button. */
+/* The phone tab bar is the only fixed layer at the bottom. Its height is used for the
+   page padding, for scrolling a focused control clear of it, and for where toasts sit. */
+:root {
+  --tab-bar-height: 0px;
+}
+
+html {
+  scroll-padding-bottom: 16px;
+}
+
+/* Text size (Settings). Mantine sizes are in rem, so scaling the root scales the text. */
+html[data-text-size='large'] {
+  font-size: 112.5%;
+}
+
+html[data-text-size='largest'] {
+  font-size: 125%;
+}
+
 @media (max-width: 47.99em) {
+  :root {
+    --tab-bar-height: calc(68px + env(safe-area-inset-bottom, 0px));
+  }
+
+  html {
+    scroll-padding-bottom: calc(var(--tab-bar-height) + 16px);
+  }
+
+  /* Toasts sit just above the tab bar on phones, and bottom-left on desktop (set in root.tsx). */
   .mantine-Notifications-root[data-position='bottom-center'] {
-    bottom: 150px;
+    bottom: calc(var(--tab-bar-height) + 12px);
   }
 
   /* iOS Safari auto-zooms the page on focus for any input under 16px; Mantine's
@@ -28,6 +55,18 @@ body {
   input,
   select,
   textarea {
-    font-size: 16px !important;
+    font-size: 1rem !important;
   }
+}
+
+/* "Reduce motion" in Settings. Mantine sets transition durations inline, so
+   this needs !important to win. The device-level setting is handled by
+   respectReducedMotion in the theme. */
+:root[data-reduce-motion] *,
+:root[data-reduce-motion] *::before,
+:root[data-reduce-motion] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
 }

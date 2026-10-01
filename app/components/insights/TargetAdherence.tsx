@@ -3,7 +3,7 @@ import type { TargetAdherenceRow } from '~/lib/insights';
 
 export function TargetAdherence({ rows }: { rows: TargetAdherenceRow[] }) {
   if (rows.length === 0) {
-    return <Text c="dimmed" size="sm">No targets set for this period.</Text>;
+    return <Text c="dimmed" size="sm">No budgets set for this period.</Text>;
   }
 
   const sorted = [...rows].sort((a, b) => b.monthsOverTarget - a.monthsOverTarget);

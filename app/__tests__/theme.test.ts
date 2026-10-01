@@ -47,3 +47,9 @@ describe('meaning colours', () => {
     expect(mergedTheme.colors.attention[7]).not.toBe(mergedTheme.colors.danger[7]);
   });
 });
+
+describe('motion', () => {
+  it('follows the device reduced-motion setting', () => {
+    expect(mergedTheme.respectReducedMotion).toBe(true);
+  });
+});

@@ -28,9 +28,9 @@ export function GroupBreakdownChart({ rows, onSelectGroup }: { rows: GroupBreakd
           <Group justify="space-between">
             <Text>{row.label}</Text>
             <Group gap={4}>
-              <Text size="sm" c="dimmed">{formatPence(row.current)}</Text>
+              <Text size="sm">{formatPence(row.current)}</Text>
               <Text size="sm" c="dimmed">·</Text>
-              <Text size="sm" c="dimmed">{formatPence(row.previous)}</Text>
+              <Text size="sm">{formatPence(row.previous)}</Text>
             </Group>
           </Group>
         </UnstyledButton>
