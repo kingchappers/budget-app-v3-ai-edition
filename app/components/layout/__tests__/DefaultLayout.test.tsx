@@ -6,6 +6,7 @@ import { MemoryRouter } from 'react-router';
 import { PENDING_ADD_KEY } from '~/lib/launchIntent';
 import { DEFAULT_PREFERENCES, writePreferences } from '~/lib/preferences';
 import { clearSessionEnded, markSessionEnded } from '~/lib/session';
+import { SESSION_LIFETIME_TEXT } from '~/lib/sessionLifetime';
 
 const auth = vi.hoisted(() => ({
   isAuthenticated: true,
@@ -187,6 +188,12 @@ describe('DefaultLayout signed out', () => {
     expect(screen.getByText('Your data is safe. Sign in to see it.')).toBeInTheDocument();
     expect(screen.queryByText('Income this month £0.00')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Add transaction' })).not.toBeInTheDocument();
+  });
+
+  it('says how long you stay signed in, and makes the panel the page\'s one h1', () => {
+    renderLayout();
+    expect(screen.getByText(SESSION_LIFETIME_TEXT)).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: "You're signed out" })).toBeInTheDocument();
   });
 
   it('starts sign-in from the panel button', async () => {

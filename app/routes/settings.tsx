@@ -1,6 +1,7 @@
 import { Card, Stack, Switch, Text, Title } from '@mantine/core';
 import { DefaultLayout } from '~/components/layout/DefaultLayout';
 import { usePreferences } from '~/lib/preferences';
+import { SESSION_LIFETIME_TEXT } from '~/lib/sessionLifetime';
 import { pageTitle } from '~/lib/pageTitle';
 import type { Route } from './+types/settings';
 
@@ -9,11 +10,16 @@ function SettingsContent() {
 
   return (
     <Stack maw={640}>
-      <Title order={3}>Settings</Title>
+      <Title order={1} size="h3">Settings</Title>
       <Text size="sm" c="dimmed">Settings are saved on this device.</Text>
 
       <Card withBorder>
-        <Title order={4} mb="sm">Keyboard shortcut</Title>
+        <Title order={2} size="h4" mb="sm">Signing in</Title>
+        <Text size="sm">{SESSION_LIFETIME_TEXT}</Text>
+      </Card>
+
+      <Card withBorder>
+        <Title order={2} size="h4" mb="sm">Keyboard shortcut</Title>
         <Switch
           label="Press N to add a transaction"
           description="Turn this off if it opens the Add sheet when you don't mean it to, for example while using dictation."
@@ -23,7 +29,7 @@ function SettingsContent() {
       </Card>
 
       <Card withBorder>
-        <Title order={4} mb="sm">Installed app</Title>
+        <Title order={2} size="h4" mb="sm">Installed app</Title>
         <Switch
           label="Open Add sheet when the installed app starts"
           description="Only applies when the app is installed on this device."
