@@ -17,6 +17,7 @@ import { usePreferences } from '~/lib/preferences';
 import { useCategories, useLinkTransaction, useSetRecurringHandled } from '~/lib/queries';
 import { undoAutoClose } from '~/lib/undoDuration';
 import { dueLabel, groupDueItems, occurrenceLabel, olderGroupHeading, type DueGroup, type DueItem } from '~/lib/recurring';
+import { formatPence } from '~/lib/money';
 import { formatSignedPence } from '~/lib/transactionTypes';
 import type { Transaction } from '~/lib/types';
 
@@ -88,6 +89,27 @@ function DueRow({ item, label, icon, match, onAdd, onEdit, onSkip, onSnooze, onC
   );
 }
 
+// Adding several old bills at once writes entries at the saved amounts, so it asks first and says how many and how much.
+function AddAllButton({ group, onConfirm }: { group: DueGroup; onConfirm: (group: DueGroup) => void }) {
+  const [confirming, setConfirming] = useState(false);
+  const month = formatMonthName(group.period);
+  const total = group.items.reduce((sum, item) => sum + item.recurring.amount, 0);
+  if (!confirming) {
+    return (
+      <Button size="compact-sm" variant="light" aria-label={`Add all from ${month}`} onClick={() => setConfirming(true)}>
+        Add all
+      </Button>
+    );
+  }
+  return (
+    <Group gap="xs" wrap="wrap" justify="flex-end" role="group" aria-label={`Confirm adding all from ${month}`}>
+      <Text size="sm">{`Add ${group.items.length} ${group.items.length === 1 ? 'bill' : 'bills'}, ${formatPence(total)} in all?`}</Text>
+      <Button size="compact-sm" onClick={() => { setConfirming(false); onConfirm(group); }}>Yes, add them</Button>
+      <Button size="compact-sm" variant="subtle" onClick={() => setConfirming(false)}>Cancel</Button>
+    </Group>
+  );
+}
+
 export function DueRecurringCard() {
   const { items, isLoading, error, refetch } = useDueRecurring();
   const { data: categories = [] } = useCategories();
@@ -98,6 +120,7 @@ export function DueRecurringCard() {
   const link = useLinkTransaction();
   const addingRef = useRef<Set<string>>(new Set());
   const [editing, setEditing] = useState<DueItem | null>(null);
+  const [showOlder, setShowOlder] = useState(false);
   const [, setPrefsVersion] = useState(0);
   const template = useMemo(() => (editing ? syntheticTransaction(editing) : null), [editing]);
   const today = todayIso();
@@ -219,23 +242,36 @@ export function DueRecurringCard() {
           <Anchor component={Link} to="/plan?tab=recurring" size="sm" style={{ display: 'inline-flex', alignItems: 'center', minHeight: 24 }}>Manage</Anchor>
         </Group>
         {groups.current.map(renderRow)}
-        {groups.older.map((group, index) => (
-          <section key={group.period} aria-label={olderGroupHeading(group.period)}>
-            {(index > 0 || groups.current.length > 0) && <Divider my="xs" />}
-            <Group justify="space-between" wrap="nowrap" mb={4}>
-              <Title order={3} size="h6">{olderGroupHeading(group.period)}</Title>
-              <Button
-                size="compact-sm"
-                variant="light"
-                aria-label={`Add all from ${formatMonthName(group.period)}`}
-                onClick={() => addAll(group)}
-              >
-                Add all
-              </Button>
-            </Group>
-            {group.items.map(renderRow)}
-          </section>
-        ))}
+        {groups.older.length > 0 && (
+          <>
+            {groups.current.length > 0 && <Divider my="xs" />}
+            <Button
+              variant="subtle"
+              size="compact-sm"
+              aria-expanded={showOlder}
+              aria-controls="due-older"
+              onClick={() => setShowOlder(open => !open)}
+              style={{ minHeight: 44 }}
+            >
+              {showOlder ? 'Hide earlier bills' : `Earlier bills (${groups.older.reduce((n, g) => n + g.items.length, 0)}), when you are ready`}
+            </Button>
+          </>
+        )}
+        {showOlder && (
+          <div id="due-older">
+            {groups.older.map((group, index) => (
+              <section key={group.period} aria-label={olderGroupHeading(group.period)}>
+                {index > 0 && <Divider my="xs" />}
+                <Group justify="space-between" wrap="wrap" mb={4}>
+                  <Title order={3} size="h6">{olderGroupHeading(group.period)}</Title>
+                  <AddAllButton group={group} onConfirm={addAll} />
+                </Group>
+                <Text size="sm" mb={4}>Not recorded yet. Add the ones you paid, or choose Didn't happen from the menu.</Text>
+                {group.items.map(renderRow)}
+              </section>
+            ))}
+          </div>
+        )}
       </Card>
     );
   }

@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { Link } from 'react-router';
-import { Button, Group, Loader, Stack, Text, Title } from '@mantine/core';
+import { Button, Group, Loader, Stack, Text, Title, VisuallyHidden } from '@mantine/core';
 import { LoadError } from '~/components/layout/LoadError';
 import { DefaultLayout } from '~/components/layout/DefaultLayout';
 import { RELEASE_NOTES } from '~/lib/glossary';
@@ -22,7 +22,7 @@ import { formatPence } from '~/lib/money';
 import { currentYearMonth, formatMonthLabel, monthPhrase, shiftMonth, startOfWeekIso, todayIso } from '~/lib/months';
 import { useDocumentTitle } from '~/hooks/useDocumentTitle';
 import { useSelectedMonth } from '~/hooks/useSelectedMonth';
-import { useCategories, usePots, useTargets, useTransactions } from '~/lib/queries';
+import { useCategories, usePots, useTargets, useTransactions, useTransactionsRange } from '~/lib/queries';
 import { pageTitle } from '~/lib/pageTitle';
 import type { Route } from './+types/_index';
 
@@ -55,6 +55,8 @@ function HomeContent() {
   const potsEnabled = yearMonth <= shiftMonth(currentYearMonth(), 1);
   const pots = usePots(yearMonth, potsEnabled);
   const { rowActions, sheets } = useTransactionEditing(yearMonth);
+  const lastMonth = currentYearMonth();
+  const history = useTransactionsRange(shiftMonth(lastMonth, -11), lastMonth);
 
   // A weekly target is measured against this week. When that week began in the
   // previous month, last month's transactions are needed to count it fully.
@@ -99,18 +101,27 @@ function HomeContent() {
 
   return (
     <Stack>
-      <WhatsChanged releaseKey="menu-2026-10">{RELEASE_NOTES.menu}</WhatsChanged>
-      <WhatsChanged releaseKey="names-2026-10">{RELEASE_NOTES.names}</WhatsChanged>
-      <WelcomeBackCard />
+      <VisuallyHidden><Title order={1}>Home</Title></VisuallyHidden>
       <DueRecurringCard />
-      <MonthHeader yearMonth={yearMonth} onChange={setYearMonth} pageTitle="Home" />
+      <MonthHeader yearMonth={yearMonth} onChange={setYearMonth} />
       <HomeSummary summary={summary} yearMonth={yearMonth} />
+      <WelcomeBackCard />
+      <WhatsChanged
+        isNewUser={history.isSuccess && history.data.length === 0}
+        notes={[
+          { key: 'menu-2026-10', text: RELEASE_NOTES.menu },
+          { key: 'names-2026-10', text: RELEASE_NOTES.names },
+        ]}
+      />
 
       {!hasTargets && <TargetsOptionalCard />}
 
       {hasTargets && (
         <div>
           <Title order={2} size="h5" mb="xs">Spending vs budget</Title>
+          {viewingCurrentMonth && summary.spending.some(p => !p.week) && (
+            <Text size="sm" mb="xs">The thin line on a bar marks today.</Text>
+          )}
           <GroupedProgress items={summary.spending} yearMonth={yearMonth} />
           {summary.spentUnbudgeted > 0 && <OtherSpendingRow amount={summary.spentUnbudgeted} yearMonth={yearMonth} />}
         </div>

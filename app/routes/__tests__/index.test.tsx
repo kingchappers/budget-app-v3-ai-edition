@@ -23,6 +23,8 @@ const data = vi.hoisted(() => ({
   // When set for a month, that month's transactions come from here instead of `transactions`.
   byMonth: {} as Record<string, unknown[]>,
   txCalls: [] as [string, boolean | undefined][],
+  // Transactions in the last 12 months: any entry means the person has used the app before.
+  history: [{}] as unknown[],
 }));
 vi.mock('~/lib/queries', () => ({
   useCategories: () => ({ data: data.categories, isLoading: false, error: null, refetch: vi.fn() }),
@@ -35,6 +37,7 @@ vi.mock('~/lib/queries', () => ({
     data.txCalls.push([month, enabled]);
     return { data: data.byMonth[month] ?? data.transactions, isLoading: false, error: null, refetch: vi.fn() };
   },
+  useTransactionsRange: () => ({ isSuccess: true, data: data.history }),
   useDeleteTransaction: () => ({ mutate: vi.fn(), mutateAsync: vi.fn() }),
   useRestoreFromTrash: () => ({ mutateAsync: vi.fn() }),
 }));
@@ -84,6 +87,13 @@ describe('Home', () => {
     const card = screen.getByText('Due card');
     const header = screen.getByRole('heading', { level: 2, name: formatMonthLabel(currentYearMonth()) });
     expect(card.compareDocumentPosition(header) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('puts the page heading first in the page', () => {
+    renderHome();
+    const [first] = screen.getAllByRole('heading');
+    expect(first).toHaveTextContent('Home');
+    expect(first.tagName).toBe('H1');
   });
 
   it('always links to the Recurring page', () => {
@@ -177,7 +187,7 @@ describe('Home left to spend', () => {
 
   it('opens with how much is left and how many days remain', () => {
     renderHome();
-    expect(screen.getByText(/^£67\.60 left to spend this month · \d+ days? to go$/)).toBeInTheDocument();
+    expect(screen.getByText(/^£67\.60 left in your budgets this month · \d+ days? to go$/)).toBeInTheDocument();
   });
 
   it('describes going over calmly', () => {
@@ -189,7 +199,7 @@ describe('Home left to spend', () => {
   it('describes a past month without a days count', () => {
     renderHome();
     fireEvent.click(screen.getByRole('button', { name: 'Previous month' }));
-    expect(screen.getByText(`£67.60 left at the end of ${monthName(lastMonth)}`)).toBeInTheDocument();
+    expect(screen.getByText(`£67.60 left in your budgets at the end of ${monthName(lastMonth)}`)).toBeInTheDocument();
     expect(screen.queryByText(/days? to go/)).not.toBeInTheDocument();
   });
 

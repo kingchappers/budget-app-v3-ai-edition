@@ -248,7 +248,7 @@ describe('groupDueItems', () => {
 
 describe('olderGroupHeading', () => {
   it('names the month in plain words', () => {
-    expect(olderGroupHeading('2026-09')).toBe('From September, not logged');
+    expect(olderGroupHeading('2026-09')).toBe('From September');
   });
 });
 
