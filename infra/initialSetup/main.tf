@@ -283,7 +283,10 @@ data "aws_iam_policy_document" "github_iam_policy_document" {
       "arn:aws:apigateway:${var.aws_region}::/v2/apis",
       "arn:aws:apigateway:${var.aws_region}::/v2/apis/*",
       "arn:aws:apigateway:${var.aws_region}::/tags/*",
-      "arn:aws:apigateway:${var.aws_region}::/domainnames"
+      "arn:aws:apigateway:${var.aws_region}::/domainnames",
+      "arn:aws:apigateway:${var.aws_region}::/domainnames/*",
+      "arn:aws:apigateway:${var.aws_region}::/v2/domainnames",
+      "arn:aws:apigateway:${var.aws_region}::/v2/domainnames/*"
     ]
   }
 
