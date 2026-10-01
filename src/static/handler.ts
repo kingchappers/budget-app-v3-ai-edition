@@ -72,6 +72,7 @@ export function buildCsp(indexHtml: string, auth0Domain: string | undefined): st
     "object-src 'none'",
     "base-uri 'self'",
     "manifest-src 'self'",
+    "worker-src 'self'",
     "frame-ancestors 'none'",
   ].join('; ');
 }

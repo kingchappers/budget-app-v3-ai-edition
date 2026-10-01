@@ -8,6 +8,8 @@ vi.mock('~/components/layout/DefaultLayout', () => ({
   DefaultLayout: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
+vi.mock('~/lib/queries', () => ({ useApi: () => ({}) }));
+
 import Settings from '../settings';
 import { SESSION_LIFETIME_TEXT } from '~/lib/sessionLifetime';
 import { TextSize } from '~/components/layout/TextSize';
@@ -109,10 +111,10 @@ describe('Settings page', () => {
   });
 
   describe('grouping', () => {
-    it('groups the controls under Signing in, Display, Messages, Keyboard and launch, and Manage, in that order', () => {
+    it('groups the controls under Signing in, Display, Messages, Keyboard and launch, Reminders and Manage, in that order', () => {
       renderSettings();
       const headings = screen.getAllByRole('heading', { level: 2 }).map(heading => heading.textContent);
-      expect(headings).toEqual(['Signing in', 'Display', 'Messages', 'Keyboard and launch', 'Manage']);
+      expect(headings).toEqual(['Signing in', 'Display', 'Messages', 'Keyboard and launch', 'Reminders', 'Manage']);
     });
 
     it('keeps to a handful of controls, each with a line of plain help', () => {
@@ -229,5 +231,11 @@ describe('Accessibility', () => {
     renderSettings();
     expect(screen.getByRole('heading', { name: 'Signing in' })).toBeInTheDocument();
     expect(screen.getByText(SESSION_LIFETIME_TEXT)).toBeInTheDocument();
+  });
+
+  it('has a Reminders section with bill reminders off', () => {
+    renderSettings();
+    expect(screen.getByRole('heading', { name: 'Reminders' })).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: /^Remind me about bills/ })).not.toBeChecked();
   });
 });

@@ -170,6 +170,34 @@ describe('usePreferences', () => {
     expect(result.current[0].shortcutN).toBe(false);
   });
 
+  it('has bill reminders off by default, at 08:00 with quiet hours from 22:00 to 07:00', () => {
+    expect(prefs.DEFAULT_PREFERENCES).toMatchObject({ billReminders: false, reminderHour: 8, quietHours: true, quietStart: 22, quietEnd: 7 });
+  });
+
+  it('keeps valid reminder settings', () => {
+    window.localStorage.setItem(prefs.PREFERENCES_KEY, JSON.stringify({
+      billReminders: true, reminderHour: 18, quietHours: false, quietStart: 23, quietEnd: 6,
+    }));
+    expect(prefs.readPreferences(window.localStorage)).toMatchObject({
+      billReminders: true, reminderHour: 18, quietHours: false, quietStart: 23, quietEnd: 6,
+    });
+  });
+
+  it.each([24, -1, 8.5, '8', null, Number.NaN])('ignores a reminder hour of %s and keeps the default', value => {
+    window.localStorage.setItem(prefs.PREFERENCES_KEY, JSON.stringify({ reminderHour: value, quietStart: value, quietEnd: value }));
+    expect(prefs.readPreferences(window.localStorage)).toMatchObject({ reminderHour: 8, quietStart: 22, quietEnd: 7 });
+  });
+
+  it('accepts the first and last hour of the day', () => {
+    window.localStorage.setItem(prefs.PREFERENCES_KEY, JSON.stringify({ reminderHour: 0, quietStart: 23 }));
+    expect(prefs.readPreferences(window.localStorage)).toMatchObject({ reminderHour: 0, quietStart: 23 });
+  });
+
+  it('ignores a reminders switch that is not a boolean', () => {
+    window.localStorage.setItem(prefs.PREFERENCES_KEY, JSON.stringify({ billReminders: 'yes' }));
+    expect(prefs.readPreferences(window.localStorage).billReminders).toBe(false);
+  });
+
   it('keeps "nothing to log" days per user, valid, unique and sorted', () => {
     window.localStorage.setItem(prefs.PREFERENCES_KEY, JSON.stringify({
       nothingToLog: {

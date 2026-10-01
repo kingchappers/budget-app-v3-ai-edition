@@ -26,6 +26,13 @@ export interface Preferences {
   undoDuration: UndoDuration;
   shortcutN: boolean;
   openAddOnLaunch: boolean;
+  // Bill reminders on this device. Off until the person turns them on and allows notifications.
+  billReminders: boolean;
+  // The hour of the day, 0 to 23, reminders arrive.
+  reminderHour: number;
+  quietHours: boolean;
+  quietStart: number;
+  quietEnd: number;
   // Outcome-only acknowledgements on Insights. Off unless asked for.
   showMilestones: boolean;
   // Months (YYYY-MM) the user said they did not track, left out of comparisons.
@@ -54,6 +61,11 @@ export const DEFAULT_PREFERENCES: Preferences = {
   undoDuration: 'until-closed',
   shortcutN: true,
   openAddOnLaunch: false,
+  billReminders: false,
+  reminderHour: 8,
+  quietHours: true,
+  quietStart: 22,
+  quietEnd: 7,
   showMilestones: false,
   notTrackedMonths: [],
   insightsOpenSections: [],
@@ -68,7 +80,8 @@ export const DEFAULT_PREFERENCES: Preferences = {
   tourStep: 0,
 };
 
-const BOOLEAN_KEYS = ['shortcutN', 'openAddOnLaunch', 'quickAddTipDismissed', 'reduceMotion', 'showMilestones'] as const;
+const BOOLEAN_KEYS = ['shortcutN', 'openAddOnLaunch', 'billReminders', 'quietHours', 'quickAddTipDismissed', 'reduceMotion', 'showMilestones'] as const;
+const HOUR_KEYS = ['reminderHour', 'quietStart', 'quietEnd'] as const;
 const KEEP_SHEET_OPEN_VALUES: readonly KeepSheetOpen[] = ['ask', 'yes', 'no'];
 const ENTRY_MODES: readonly EntryMode[] = ['form', 'quick'];
 const TEXT_SIZES: readonly TextSize[] = ['standard', 'large', 'largest'];
@@ -160,6 +173,10 @@ function fromStored(stored: Record<string, unknown>, legacyOpenOnLaunch: string 
   for (const key of BOOLEAN_KEYS) {
     const value = stored[key];
     if (typeof value === 'boolean') result[key] = value;
+  }
+  for (const key of HOUR_KEYS) {
+    const value = stored[key];
+    if (typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 23) result[key] = value;
   }
   result.notTrackedMonths = monthsFrom(stored.notTrackedMonths);
   result.insightsOpenSections = sectionsFrom(stored.insightsOpenSections);

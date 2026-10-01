@@ -3,7 +3,7 @@ import { act, cleanup, render, screen, waitFor, within } from '@testing-library/
 import userEvent from '@testing-library/user-event';
 import { MantineProvider } from '@mantine/core';
 import { Notifications, notifications } from '@mantine/notifications';
-import { MemoryRouter } from 'react-router';
+import { MemoryRouter, useLocation } from 'react-router';
 import type { DueItem } from '~/lib/recurring';
 import type { Recurring, Transaction } from '~/lib/types';
 
@@ -61,12 +61,17 @@ function item(over: Partial<DueItem> = {}, template: Partial<Recurring> = {}): D
   };
 }
 
-function renderCard() {
+function CurrentSearch() {
+  return <output data-testid="search">{useLocation().search}</output>;
+}
+
+function renderCard(url = '/') {
   return render(
     <MantineProvider>
       <Notifications />
-      <MemoryRouter>
+      <MemoryRouter initialEntries={[url]}>
         <DueRecurringCard />
+        <CurrentSearch />
       </MemoryRouter>
     </MantineProvider>,
   );
@@ -417,6 +422,105 @@ describe('DueRecurringCard', () => {
       await user.click(await screen.findByRole('menuitem', { name: 'Remind me tomorrow' }));
 
       expect(container.querySelector('.mantine-Card-root')).toBeNull();
+    });
+  });
+
+  describe('opened from a reminder notification', () => {
+    it('adds the bill when the notification\'s Add was tapped, the usual way, and clears the address', async () => {
+      renderCard('/?due=r1&period=2026-09&action=add');
+
+      await waitFor(() => expect(mockSave).toHaveBeenCalledTimes(1));
+      expect(mockSave).toHaveBeenCalledWith(expect.objectContaining({ recurringId: 'r1', amount: 240000, date: '2026-09-28' }));
+      expect(screen.getByTestId('search')).toHaveTextContent('');
+      expect(screen.getByTestId('search').textContent).toBe('');
+    });
+
+    it('skips the bill when Skip was tapped, with the usual Undo', async () => {
+      renderCard('/?due=r1&period=2026-09&action=skip');
+
+      await waitFor(() => expect(mockHandled).toHaveBeenCalledWith({ recurringId: 'r1', period: '2026-09' }));
+      expect(await screen.findByText('Skipped Salary for September')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Undo' })).toBeInTheDocument();
+    });
+
+    it('only opens Home when the notification itself was tapped, doing nothing to the bill', async () => {
+      renderCard('/?due=r1&period=2026-09');
+
+      await waitFor(() => expect(screen.getByTestId('search').textContent).toBe(''));
+      expect(mockSave).not.toHaveBeenCalled();
+      expect(mockHandled).not.toHaveBeenCalled();
+    });
+
+    it('ignores an action it does not know', async () => {
+      renderCard('/?due=r1&period=2026-09&action=delete');
+
+      await waitFor(() => expect(screen.getByTestId('search').textContent).toBe(''));
+      expect(mockSave).not.toHaveBeenCalled();
+      expect(mockHandled).not.toHaveBeenCalled();
+    });
+
+    it('says so, calmly, when the bill has already been dealt with', async () => {
+      dueState.items = [];
+      renderCard('/?due=r1&period=2026-09&action=add');
+
+      expect(await screen.findByText('That one is already taken care of.')).toBeInTheDocument();
+      expect(mockSave).not.toHaveBeenCalled();
+    });
+
+    it('does nothing for a different period of the same bill', async () => {
+      renderCard('/?due=r1&period=2026-08&action=add');
+
+      expect(await screen.findByText('That one is already taken care of.')).toBeInTheDocument();
+      expect(mockSave).not.toHaveBeenCalled();
+    });
+
+    it('waits until the bills have loaded, then acts once', async () => {
+      dueState = { ...dueState, isLoading: true, items: [] };
+      const view = renderCard('/?due=r1&period=2026-09&action=add');
+      expect(mockSave).not.toHaveBeenCalled();
+      expect(screen.getByTestId('search').textContent).toContain('action=add');
+
+      dueState = { ...dueState, isLoading: false, items: [item()] };
+      view.rerender(
+        <MantineProvider>
+          <Notifications />
+          <MemoryRouter initialEntries={['/?due=r1&period=2026-09&action=add']}>
+            <DueRecurringCard />
+            <CurrentSearch />
+          </MemoryRouter>
+        </MantineProvider>,
+      );
+
+      await waitFor(() => expect(mockSave).toHaveBeenCalledTimes(1));
+    });
+
+    it('does not add it twice if the page renders again', async () => {
+      const view = renderCard('/?due=r1&period=2026-09&action=add');
+      await waitFor(() => expect(mockSave).toHaveBeenCalledTimes(1));
+
+      view.rerender(
+        <MantineProvider>
+          <Notifications />
+          <MemoryRouter initialEntries={['/?due=r1&period=2026-09&action=add']}>
+            <DueRecurringCard />
+            <CurrentSearch />
+          </MemoryRouter>
+        </MantineProvider>,
+      );
+
+      expect(mockSave).toHaveBeenCalledTimes(1);
+    });
+
+    it('does nothing for an address that does not look like a reminder\'s', async () => {
+      renderCard('/?due=../../admin&action=add');
+      expect(mockSave).not.toHaveBeenCalled();
+      expect(mockHandled).not.toHaveBeenCalled();
+    });
+
+    it('keeps other parts of the address', async () => {
+      renderCard('/?month=2026-08&due=r1&period=2026-09&action=skip');
+      await waitFor(() => expect(mockHandled).toHaveBeenCalled());
+      expect(screen.getByTestId('search').textContent).toBe('?month=2026-08');
     });
   });
 });

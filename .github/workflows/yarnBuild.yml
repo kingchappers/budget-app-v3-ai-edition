@@ -22,6 +22,8 @@ jobs:
       TF_VAR_state_bucket: kingchappers-terraform-state-bucket
       TF_VAR_app_name: budget-app-v3-ai-edition
       TF_VAR_environment: production
+      # The public half of the reminder key pair. Empty until the secret is created, and the feature stays off.
+      TF_VAR_vapid_public_key: ${{ secrets.VAPID_PUBLIC_KEY }}
     name: Build Package
     runs-on: ubuntu-latest
     strategy:
@@ -61,6 +63,7 @@ jobs:
         VITE_AUTH0_DOMAIN: ${{ secrets.AUTH0_DOMAIN }}
         VITE_AUTH0_CLIENT_ID: ${{ secrets.AUTH0_CLIENT_ID }}
         VITE_AUTH0_AUDIENCE: ${{ secrets.AUTH0_AUDIENCE }}
+        VITE_VAPID_PUBLIC_KEY: ${{ secrets.VAPID_PUBLIC_KEY }}
       run: yarn run build
 
     - name: Configure AWS Credentials
