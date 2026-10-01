@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MantineProvider } from '@mantine/core';
+import { MemoryRouter, useLocation } from 'react-router';
 import type { Category, PotSummary } from '~/lib/types';
 
 const state = vi.hoisted(() => ({
@@ -18,8 +19,8 @@ vi.mock('~/components/transactions/TransactionSheet', () => ({
     (opened ? <div>Add sheet: {preset?.type} {preset?.categoryId}</div> : null),
 }));
 vi.mock('~/components/pots/PotHistorySheet', () => ({
-  PotHistorySheet: ({ pot }: { pot: { categoryId: string } | null }) =>
-    (pot ? <div>History: {pot.categoryId}</div> : null),
+  PotHistorySheet: ({ pot, suggestedMonthly, onClose }: { pot: { categoryId: string } | null; suggestedMonthly?: number; onClose: () => void }) =>
+    (pot ? <div>History: {pot.categoryId} {suggestedMonthly ?? 'no suggestion'}<button onClick={onClose}>close pot</button></div> : null),
 }));
 vi.mock('~/lib/queries', () => ({
   useSavePot: () => ({ mutate: vi.fn(), isPending: false }),
@@ -45,8 +46,12 @@ function pot(categoryId: string, overrides: Partial<PotSummary> = {}): PotSummar
   };
 }
 
-function renderPage() {
-  return render(<MantineProvider><Pots /></MantineProvider>);
+function CurrentSearch() {
+  return <output data-testid="search">{useLocation().search}</output>;
+}
+
+function renderPage(url = '/pots') {
+  return render(<MantineProvider><MemoryRouter initialEntries={[url]}><Pots /><CurrentSearch /></MemoryRouter></MantineProvider>);
 }
 
 beforeEach(() => {
@@ -97,7 +102,7 @@ describe('Pots page', () => {
   it('opens the history sheet for the tapped pot', async () => {
     renderPage();
     await userEvent.setup().click(screen.getByRole('button', { name: 'Open Holidays history' }));
-    expect(screen.getByText('History: cat-holidays')).toBeInTheDocument();
+    expect(screen.getByText('History: cat-holidays no suggestion')).toBeInTheDocument();
   });
 
   it('shows an empty state when there are no pots', () => {
@@ -112,5 +117,33 @@ describe('Pots page', () => {
     renderPage();
     expect(screen.getByText('Could not load pots')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
+  });
+
+  describe('opened from a recurring bill', () => {
+    beforeEach(() => {
+      state.categories = [cat('holidays', 'Holidays', 'SINKING_FUNDS')];
+      state.pots = [pot('holidays')];
+    });
+
+    it('opens that pot with the suggested monthly amount', () => {
+      renderPage('/pots?pot=holidays&monthly=3000');
+      expect(screen.getByText('History: holidays 3000')).toBeInTheDocument();
+    });
+
+    it('ignores a monthly amount that is not a whole number of pence', () => {
+      renderPage('/pots?pot=holidays&monthly=abc');
+      expect(screen.getByText('History: holidays no suggestion')).toBeInTheDocument();
+    });
+
+    it('keeps the Plan tab in the address when the pot is closed, and drops only what opened it', async () => {
+      renderPage('/plan?tab=pots&pot=holidays&monthly=3000');
+      await userEvent.setup().click(screen.getByRole('button', { name: 'close pot' }));
+      expect(screen.getByTestId('search').textContent).toBe('?tab=pots');
+    });
+
+    it('opens nothing for a pot that does not exist', () => {
+      renderPage('/pots?pot=gone&monthly=3000');
+      expect(screen.queryByText(/History:/)).not.toBeInTheDocument();
+    });
   });
 });

@@ -37,11 +37,11 @@ function makePot(overrides: Partial<PotSummary> = {}): PotSummary {
   };
 }
 
-function renderSheet(pot: PotSummary | null, cat: Category = category) {
+function renderSheet(pot: PotSummary | null, cat: Category = category, suggestedMonthly?: number) {
   const onClose = vi.fn();
   render(
     <MantineProvider>
-      <PotHistorySheet pot={pot} category={cat} onClose={onClose} />
+      <PotHistorySheet pot={pot} category={cat} suggestedMonthly={suggestedMonthly} onClose={onClose} />
     </MantineProvider>,
   );
   return onClose;
@@ -237,5 +237,15 @@ describe('PotHistorySheet rename', () => {
     await user.type(input, 'New Boiler{Enter}');
 
     expect(await screen.findByText(/could not rename/i)).toBeInTheDocument();
+  });
+
+  it('fills in a suggested monthly amount without saving it', () => {
+    renderSheet(makePot({ monthlyAmount: 1000 }), category, 3000);
+    expect(screen.getByLabelText('Monthly amount')).toHaveValue('30.00');
+  });
+
+  it('keeps the saved monthly amount when nothing is suggested', () => {
+    renderSheet(makePot({ monthlyAmount: 1000 }));
+    expect(screen.getByLabelText('Monthly amount')).toHaveValue('10.00');
   });
 });

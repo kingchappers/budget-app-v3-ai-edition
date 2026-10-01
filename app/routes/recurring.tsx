@@ -5,9 +5,9 @@ import { DefaultLayout } from '~/components/layout/DefaultLayout';
 import { RecurringForm } from '~/components/recurring/RecurringForm';
 import { CategoryIcon } from '~/components/categories/CategoryIcon';
 import { useUndoableDelete } from '~/hooks/useUndoableDelete';
-import { formatMonthName, shiftMonth, todayIso } from '~/lib/months';
+import { shiftMonth, todayIso } from '~/lib/months';
 import { useCategories, useDeleteRecurring, useRecurring, useSetRecurringHandled, useTransactions } from '~/lib/queries';
-import { formatDayOfMonth, skippedPeriod } from '~/lib/recurring';
+import { describeSchedule, occurrenceLabel, previousOccurrenceKey, skippedPeriod } from '~/lib/recurring';
 import { transactionLabel } from '~/lib/trash';
 import { formatSignedPence } from '~/lib/transactionTypes';
 import type { Category, Recurring, Transaction } from '~/lib/types';
@@ -15,12 +15,6 @@ import { pageTitle } from '~/lib/pageTitle';
 import type { Route } from './+types/recurring';
 import { redirect } from 'react-router';
 import { planPath } from '~/lib/planTabs';
-
-function scheduleText(item: Recurring): string {
-  const day = `Monthly on the ${formatDayOfMonth(item.dayOfMonth)}`;
-  if (item.leadDays === 0) return `${day} · no early reminder`;
-  return `${day} · remind ${item.leadDays} ${item.leadDays === 1 ? 'day' : 'days'} before`;
-}
 
 function byDay(a: Recurring, b: Recurring): number {
   if (a.dayOfMonth !== b.dayOfMonth) return a.dayOfMonth - b.dayOfMonth;
@@ -52,11 +46,11 @@ function RecurringRow({ item, category, categoriesLoaded, skipped, onEdit, onDel
         </ThemeIcon>
         <div style={{ minWidth: 0 }}>
           <Text truncate>{label}</Text>
-          <Text size="sm">{scheduleText(item)}</Text>
+          <Text size="sm">{describeSchedule(item)}</Text>
           {categoriesLoaded && !category && <Text size="sm" c="danger">Category deleted</Text>}
           {skipped && (
             <Group gap={4} wrap="nowrap">
-              <Text size="sm">{`Skipped for ${formatMonthName(skipped)}`}</Text>
+              <Text size="sm">{`Skipped for ${occurrenceLabel(skipped)}`}</Text>
               <Button
                 variant="subtle"
                 size="compact-xs"
@@ -105,7 +99,7 @@ export function RecurringContent() {
   const [creating, setCreating] = useState(false);
 
   function undoSkip(item: Recurring, skipped: string): void {
-    setHandled.mutate({ recurringId: item.recurringId, period: shiftMonth(skipped, -1) });
+    setHandled.mutate({ recurringId: item.recurringId, period: previousOccurrenceKey(item, skipped) });
   }
 
   function deleteItem(item: Recurring): void {

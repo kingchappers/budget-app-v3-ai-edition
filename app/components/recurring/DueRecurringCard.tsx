@@ -14,7 +14,7 @@ import { currentYearMonth, formatMonthName, formatShortDate, todayIso } from '~/
 import { usePreferences } from '~/lib/preferences';
 import { useCategories, useLinkTransaction, useSetRecurringHandled } from '~/lib/queries';
 import { undoAutoClose } from '~/lib/undoDuration';
-import { dueLabel, groupDueItems, olderGroupHeading, type DueGroup, type DueItem } from '~/lib/recurring';
+import { dueLabel, groupDueItems, occurrenceLabel, olderGroupHeading, type DueGroup, type DueItem } from '~/lib/recurring';
 import { formatSignedPence } from '~/lib/transactionTypes';
 import type { Transaction } from '~/lib/types';
 
@@ -22,7 +22,7 @@ function syntheticTransaction(item: DueItem): Transaction {
   const { recurring } = item;
   return {
     transactionId: `recurring-${recurring.recurringId}`,
-    yearMonth: item.period,
+    yearMonth: item.dueDate.slice(0, 7),
     amount: recurring.amount,
     type: recurring.type,
     categoryId: recurring.categoryId,
@@ -149,7 +149,7 @@ export function DueRecurringCard() {
       closeButtonProps: { 'aria-label': 'Close notification' },
       message: (
         <ToastAction
-          text={`Skipped ${labelFor(item)} for ${formatMonthName(item.period)}`}
+          text={`Skipped ${labelFor(item)} for ${occurrenceLabel(item.period)}`}
           actionLabel="Undo"
           onAction={() => {
             notifications.hide(toastId);

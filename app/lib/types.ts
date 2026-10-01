@@ -32,6 +32,8 @@ export interface CategoryTarget {
   updatedAt: string;
 }
 
+export type RecurringFrequency = 'WEEKLY' | 'FOUR_WEEKLY' | 'MONTHLY' | 'QUARTERLY' | 'YEARLY';
+
 export interface Recurring {
   recurringId: string;
   type: TransactionType;
@@ -39,7 +41,11 @@ export interface Recurring {
   amount: number;
   description: string;
   dayOfMonth: number;
+  // A missing frequency means monthly, as for items saved before schedules existed.
+  frequency?: RecurringFrequency;
+  anchorDate?: string | null;
   leadDays: number;
+  // YYYY-MM for monthly items, YYYY-MM-DD for the rest.
   handledPeriod: string | null;
   createdAt: string;
   updatedAt: string;

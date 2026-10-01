@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router';
 import { Alert, Button, Group, Loader, Stack, Text, Title } from '@mantine/core';
 import { DefaultLayout } from '~/components/layout/DefaultLayout';
 import { PotHistorySheet } from '~/components/pots/PotHistorySheet';
@@ -18,7 +19,13 @@ export function PotsContent() {
   const categories = useCategories();
   const pots = usePots(asOf);
   const [addingTo, setAddingTo] = useState<string | null>(null);
-  const [openId, setOpenId] = useState<string | null>(null);
+  const [params, setParams] = useSearchParams();
+  // A link from a recurring bill: open this pot with a monthly amount filled in but not saved.
+  const [openId, setOpenId] = useState<string | null>(() => params.get('pot'));
+  const [suggestedMonthly] = useState<number | undefined>(() => {
+    const value = params.get('monthly');
+    return value !== null && /^\d{1,9}$/.test(value) && Number(value) > 0 ? Number(value) : undefined;
+  });
   const preset = useMemo(
     () => (addingTo ? { type: 'SET_ASIDE' as const, categoryId: addingTo } : null),
     [addingTo],
@@ -67,7 +74,17 @@ export function PotsContent() {
       <PotHistorySheet
         pot={rows.find(row => row.pot.categoryId === openId)?.pot ?? null}
         category={rows.find(row => row.pot.categoryId === openId)?.category}
-        onClose={() => setOpenId(null)}
+        suggestedMonthly={suggestedMonthly}
+        onClose={() => {
+          setOpenId(null);
+          if (params.has('pot') || params.has('monthly')) {
+            // Only what opened the pot goes; the Plan page's own ?tab=pots stays.
+            const next = new URLSearchParams(params);
+            next.delete('pot');
+            next.delete('monthly');
+            setParams(next, { replace: true });
+          }
+        }}
       />
     </Stack>
   );

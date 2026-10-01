@@ -142,6 +142,25 @@ describe('DueRecurringCard', () => {
     expect(mockHandled).not.toHaveBeenCalled();
   });
 
+  it('skips a dated occurrence by its date and puts back the previous one on Undo', async () => {
+    const user = userEvent.setup();
+    dueState.items = [item(
+      { period: '2026-09-14', dueDate: '2026-09-14', status: 'past', daysAway: -14 },
+      { description: 'Car insurance', frequency: 'YEARLY', anchorDate: '2026-09-14', handledPeriod: '2025-09-14' },
+    )];
+    renderCard();
+
+    await user.click(screen.getByRole('button', { name: 'More actions for Car insurance' }));
+    await user.click(await screen.findByRole('menuitem', { name: "Didn't happen" }));
+
+    expect(mockHandled).toHaveBeenCalledWith({ recurringId: 'r1', period: '2026-09-14' });
+    expect(await screen.findByText('Skipped Car insurance for 14 Sep')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Undo' }));
+
+    expect(mockHandled).toHaveBeenLastCalledWith({ recurringId: 'r1', period: '2025-09-14' });
+  });
+
   it.each([
     [undefined, false],
     ['30s', 30000],
