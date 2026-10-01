@@ -1,4 +1,4 @@
-import { ActionIcon, Button, Card, Group, Menu, Text, UnstyledButton } from '@mantine/core';
+import { ActionIcon, Button, Card, Group, Menu, Text, UnstyledButton, VisuallyHidden } from '@mantine/core';
 import { IconDots, IconTrash } from '@tabler/icons-react';
 import { accountTypeLabel, balanceAsOf } from '~/lib/accounts';
 import { todayIso } from '~/lib/months';
@@ -18,9 +18,10 @@ export function AccountRow({
   return (
     <Card withBorder mb="xs">
       <Group justify="space-between" wrap="nowrap" align="center">
-        <UnstyledButton onClick={onOpen} aria-label={`Open ${account.name} history`} style={{ flex: 1, minWidth: 0 }}>
+        <UnstyledButton onClick={onOpen} style={{ flex: 1, minWidth: 0 }}>
           <Text fw={500}>{account.name}</Text>
           <Text size="xs" c="dimmed">{accountTypeLabel(account.type)}</Text>
+          <VisuallyHidden>Open {account.name} history</VisuallyHidden>
         </UnstyledButton>
         <Text fw={700}>{formatPence(balance)}</Text>
         <Button size="compact-sm" variant="light" onClick={onUpdate} aria-label={`Update ${account.name}`}>Update</Button>

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAuth0 } from '@auth0/auth0-react';
-import { Button, Group, SegmentedControl, Stack, Text, TextInput } from '@mantine/core';
+import { Button, Group, Input, SegmentedControl, Stack, Text, TextInput } from '@mantine/core';
 import { DateInput } from '@mantine/dates';
 import { ResponsiveSheet } from '~/components/layout/ResponsiveSheet';
 import { useNoteHistory } from '~/hooks/useNoteHistory';
@@ -377,12 +377,15 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, preset, 
           error={fieldErrors.amount}
           errorProps={FIELD_ERROR_PROPS}
         />
-        <SegmentedControl
-          fullWidth
-          value={type}
-          onChange={value => handleTypeChange(value as TransactionType)}
-          data={TYPE_OPTIONS}
-        />
+        <Input.Wrapper label="Type">
+          <SegmentedControl
+            fullWidth
+            mt={4}
+            value={type}
+            onChange={value => handleTypeChange(value as TransactionType)}
+            data={TYPE_OPTIONS}
+          />
+        </Input.Wrapper>
         <div ref={chipsRef}>
           <CategoryChips
             chips={chips}

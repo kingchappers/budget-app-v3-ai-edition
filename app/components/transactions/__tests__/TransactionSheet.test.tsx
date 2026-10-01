@@ -1092,4 +1092,9 @@ describe('TransactionSheet', () => {
       expect(screen.getByRole('radio', { name: 'Dining' })).toBeChecked();
     });
   });
+
+  it('labels the type switch where it can be seen', () => {
+    renderSheet();
+    expect(screen.getByText('Type')).toBeInTheDocument();
+  });
 });
