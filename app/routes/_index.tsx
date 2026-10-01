@@ -11,6 +11,7 @@ import { GuidedTour } from '~/components/layout/GuidedTour';
 import { MonthHeader } from '~/components/budget/MonthHeader';
 import { CategoryProgressRow } from '~/components/budget/CategoryProgressRow';
 import { HomeSummary, OtherSpendingRow } from '~/components/budget/HomeSummary';
+import { MoneyAhead } from '~/components/budget/MoneyAhead';
 import { TargetsOptionalCard } from '~/components/budget/TargetsOptionalCard';
 import { HomePots } from '~/components/pots/HomePots';
 import { DueRecurringCard } from '~/components/recurring/DueRecurringCard';
@@ -23,7 +24,9 @@ import { formatPence } from '~/lib/money';
 import { currentYearMonth, formatMonthLabel, monthPhrase, shiftMonth, startOfWeekIso, todayIso } from '~/lib/months';
 import { useDocumentTitle } from '~/hooks/useDocumentTitle';
 import { useSelectedMonth } from '~/hooks/useSelectedMonth';
-import { useCategories, usePots, useTargets, useTransactions, useTransactionsRange } from '~/lib/queries';
+import { useCategories, usePots, useRecurring, useTargets, useTransactions, useTransactionsRange } from '~/lib/queries';
+import { billsBeforePayday } from '~/lib/moneyAhead';
+import { usePreferences } from '~/lib/preferences';
 import { pageTitle } from '~/lib/pageTitle';
 import type { Route } from './+types/_index';
 
@@ -57,6 +60,8 @@ function HomeContent() {
   const pots = usePots(yearMonth, potsEnabled);
   const { rowActions, sheets } = useTransactionEditing(yearMonth);
   const lastMonth = currentYearMonth();
+  const [{ payDay }] = usePreferences();
+  const recurring = useRecurring();
   const history = useTransactionsRange(shiftMonth(lastMonth, -11), lastMonth);
 
   // A weekly target is measured against this week. When that week began in the
@@ -98,6 +103,9 @@ function HomeContent() {
   if (isLoading) return <Group justify="center" py="xl"><Loader /></Group>;
 
   const hasTargets = summary.spending.length > 0;
+  const moneyAhead = viewingCurrentMonth && payDay !== null && recurring.data
+    ? billsBeforePayday(recurring.data, transactions.data ?? [], today, payDay)
+    : null;
   const phrase = monthPhrase(yearMonth);
 
   return (
@@ -106,6 +114,7 @@ function HomeContent() {
       <DueRecurringCard />
       <MonthHeader yearMonth={yearMonth} onChange={setYearMonth} />
       <HomeSummary summary={summary} yearMonth={yearMonth} />
+      {moneyAhead && <MoneyAhead ahead={moneyAhead} />}
       <WelcomeBackCard />
       <WhatsChanged
         isNewUser={history.isSuccess && history.data.length === 0}
@@ -133,11 +142,6 @@ function HomeContent() {
       ) : (
         <HomePots pots={pots.data ?? []} categories={categories.data ?? []} />
       ))}
-
-      <Group justify="space-between">
-        <Text>Income {phrase}</Text>
-        <Text fw={600}>{formatPence(summary.incomeTotal)}</Text>
-      </Group>
 
       <div>
         <Title order={2} size="h5" mb="xs">Recent</Title>

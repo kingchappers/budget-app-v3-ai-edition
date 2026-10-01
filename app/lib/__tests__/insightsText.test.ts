@@ -141,8 +141,8 @@ describe('chart summaries', () => {
   });
 
   it('describes net worth and its movement', () => {
-    expect(netWorthSummary(400000, 20000)).toBe('Net worth is £4,000.00, up £200.00 over the period.');
-    expect(netWorthSummary(-10000, -5000)).toBe('Net worth is −£100.00, down £50.00 over the period.');
-    expect(netWorthSummary(0, 0)).toBe('Net worth is £0.00, unchanged over the period.');
+    expect(netWorthSummary(400000, 20000)).toBe('Net worth is £4,000.00, £200.00 higher than at the start of the period.');
+    expect(netWorthSummary(-10000, -5000)).toBe('Net worth is −£100.00, £50.00 lower than at the start of the period.');
+    expect(netWorthSummary(0, 0)).toBe('Net worth is £0.00, unchanged since the start of the period.');
   });
 });

@@ -114,6 +114,8 @@ export function potSummary(name: string, months: PotMonth[]): string {
 
 export function netWorthSummary(current: number, change: number): string {
   const format = (pence: number) => (pence < 0 ? `−${formatPence(-pence)}` : formatPence(pence));
-  const movement = change === 0 ? 'unchanged over the period' : `${change > 0 ? 'up' : 'down'} ${formatPence(Math.abs(change))} over the period`;
+  const movement = change === 0
+    ? 'unchanged since the start of the period'
+    : `${formatPence(Math.abs(change))} ${change > 0 ? 'higher' : 'lower'} than at the start of the period`;
   return `Net worth is ${format(current)}, ${movement}.`;
 }

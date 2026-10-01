@@ -1,6 +1,6 @@
 import { ActionIcon, Button, Card, Group, Menu, Text, UnstyledButton, VisuallyHidden } from '@mantine/core';
 import { IconDots, IconTrash } from '@tabler/icons-react';
-import { accountTypeLabel, balanceAsOf, updatedAgo } from '~/lib/accounts';
+import { accountTypeLabel, balanceAsOf, balanceChangeNote, updatedAgo } from '~/lib/accounts';
 import { todayIso } from '~/lib/months';
 import { formatPence } from '~/lib/money';
 import type { Account } from '~/lib/types';
@@ -14,6 +14,7 @@ export function AccountRow({
   onUpdate: () => void;
 }) {
   const balance = balanceAsOf(account.balances, todayIso());
+  const change = account.kind === 'LIABILITY' ? balanceChangeNote(account.balances, todayIso()) : null;
 
   return (
     <Card withBorder mb="xs">
@@ -26,6 +27,7 @@ export function AccountRow({
         <div style={{ textAlign: 'right' }}>
           <Text fw={700}>{formatPence(balance)}</Text>
           <Text size="sm">{updatedAgo(account.balances, todayIso())}</Text>
+          {change && <Text size="sm">{change}</Text>}
         </div>
         <Button size="compact-sm" variant="light" onClick={onUpdate} aria-label={`Update ${account.name}`}>Update</Button>
         <Menu position="bottom-end">
