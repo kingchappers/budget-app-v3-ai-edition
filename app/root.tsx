@@ -85,11 +85,12 @@ export const theme = createTheme({
 // dark body background (dark.7, #242424) — under WCAG AA's 4.5:1 for normal
 // text. Override just the CSS variable rather than redefining the whole dark
 // palette, so borders/backgrounds/disabled colors keep Mantine's defaults.
+// #9a9a9a also clears 4.5:1 on a card (#2e2e2e), where #909090 only reached 4.25:1.
 export const cssVariablesResolver: CSSVariablesResolver = () => ({
   variables: {},
   light: {},
   dark: {
-    '--mantine-color-dimmed': '#909090',
+    '--mantine-color-dimmed': '#9a9a9a',
   },
 });
 

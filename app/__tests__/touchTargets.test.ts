@@ -32,4 +32,9 @@ describe('touch targets', () => {
     expect(css).toMatch(/@media \(pointer: coarse\)/);
     expect(coarse).not.toMatch(/max-width/);
   });
+
+  it('keeps the tab bar labels at 12px at larger text sizes so all five tabs fit', () => {
+    const rule = block("html[data-text-size='large'] .tab-label");
+    expect(rule).toMatch(/font-size:\s*12px/);
+  });
 });

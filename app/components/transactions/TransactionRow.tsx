@@ -83,12 +83,12 @@ export function TransactionRow({
   );
 
   return (
-    <Group justify="space-between" wrap="nowrap" py={4}>
+    <Group justify="space-between" wrap="wrap" py={4}>
       {onEdit && !pending ? (
         <UnstyledButton
           aria-label={`Edit ${label}`}
           onClick={() => onEdit(transaction)}
-          style={{ flex: 1, minWidth: 0, borderRadius: 'var(--mantine-radius-sm)' }}
+          style={{ flex: '1 1 10rem', minWidth: 0, borderRadius: 'var(--mantine-radius-sm)' }}
         >
           {summary}
         </UnstyledButton>

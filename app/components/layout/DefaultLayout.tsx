@@ -38,14 +38,14 @@ function isSettingsActive(pathname: string): boolean {
 // An active tab is bold and has a bar above it, so it is not told apart by colour alone.
 function TabLink({ to, label, Icon, active }: { to: string; label: string; Icon: typeof IconHome; active: boolean }) {
   return (
-    <RouterNavLink to={to} style={{ textDecoration: 'none', minWidth: 44, minHeight: 44 }} aria-label={label}>
+    <RouterNavLink to={to} style={{ textDecoration: 'none', minWidth: 0, minHeight: 44, flex: '1 1 0' }} aria-label={label}>
       <Group gap={2} justify="center" style={{ flexDirection: 'column' }}>
         <span
           aria-hidden
           style={{ height: 3, width: 24, borderRadius: 2, background: active ? 'currentColor' : 'transparent' }}
         />
         <Icon size={22} stroke={active ? 2.4 : 1.6} />
-        <Text size="xs" fw={active ? 700 : 400}>{label}</Text>
+        <Text size="xs" fw={active ? 700 : 400} className="tab-label">{label}</Text>
       </Group>
     </RouterNavLink>
   );
@@ -71,16 +71,16 @@ function BottomTabs({ signedIn, onAdd }: { signedIn: boolean; onAdd: () => void 
         height: 'var(--tab-bar-height)', paddingBottom: 'env(safe-area-inset-bottom, 0px)',
       }}
     >
-      <Group justify="space-around" align="center" h="100%" px="xs">
+      <Group justify="space-around" align="center" wrap="nowrap" gap={0} h="100%" px={4}>
         {tab(first)}
         {tab(second)}
         {signedIn && (
-          <UnstyledButton onClick={onAdd} aria-label="Add transaction" style={{ minWidth: 44, minHeight: 44 }}>
+          <UnstyledButton onClick={onAdd} aria-label="Add transaction" style={{ minWidth: 0, minHeight: 44, flex: '1 1 0' }}>
             <Group gap={2} justify="center" style={{ flexDirection: 'column' }}>
               <ActionIcon component="span" size={40} radius="xl" variant="filled" aria-hidden>
                 <IconPlus size={22} />
               </ActionIcon>
-              <Text size="xs" fw={700}>Add</Text>
+              <Text size="xs" fw={700} className="tab-label">Add</Text>
             </Group>
           </UnstyledButton>
         )}

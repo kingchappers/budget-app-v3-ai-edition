@@ -301,11 +301,14 @@ describe('Recurring page', () => {
 });
 
 describe('Accessibility', () => {
-  it('has one h1 and no skipped heading levels', () => {
+  it('has no skipped heading levels under the Plan page\'s h1', () => {
     mockQuery = { data: [rec({})], isLoading: false, error: null };
     mockCategories = categories;
     mockMonthTransactions = {};
     renderPage();
+    const planHeading = document.createElement('h1');
+    planHeading.textContent = 'Plan';
+    document.body.prepend(planHeading);
     expectSoundHeadings(document.body);
   });
 

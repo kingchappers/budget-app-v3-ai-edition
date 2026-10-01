@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MantineProvider } from '@mantine/core';
 import { ResponsiveSheet } from '../ResponsiveSheet';
@@ -15,6 +15,21 @@ function renderSheet(opened = true, onClose: () => void = () => {}) {
 }
 
 describe('ResponsiveSheet', () => {
+  it('names its close button, whichever form the sheet takes', () => {
+    const original = window.matchMedia;
+    renderSheet();
+    expect(screen.getByRole('button', { name: 'Close' })).toBeInTheDocument();
+    cleanup();
+
+    window.matchMedia = ((query: string) => ({ ...original(query), matches: true })) as typeof window.matchMedia;
+    try {
+      renderSheet();
+      expect(screen.getByRole('button', { name: 'Close' })).toBeInTheDocument();
+    } finally {
+      window.matchMedia = original;
+    }
+  });
+
   it('is a bottom drawer on narrow screens', () => {
     renderSheet();
     expect(document.querySelector('.mantine-Drawer-root')).not.toBeNull();

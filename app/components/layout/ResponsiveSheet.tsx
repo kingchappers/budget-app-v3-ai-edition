@@ -8,13 +8,16 @@ export interface ResponsiveSheetProps {
   children: React.ReactNode;
 }
 
+// Mantine's close button is an icon with no text, so it needs a name for screen readers.
+const CLOSE_BUTTON_PROPS = { 'aria-label': 'Close' };
+
 export function ResponsiveSheet({ opened, onClose, title, children }: ResponsiveSheetProps) {
   const theme = useMantineTheme();
   const isDesktop = useMediaQuery(`(min-width: ${theme.breakpoints.sm})`);
 
   if (isDesktop) {
     return (
-      <Modal opened={opened} onClose={onClose} title={title} centered size={440}>
+      <Modal opened={opened} onClose={onClose} title={title} centered size={440} closeButtonProps={CLOSE_BUTTON_PROPS}>
         {children}
       </Modal>
     );
@@ -27,6 +30,7 @@ export function ResponsiveSheet({ opened, onClose, title, children }: Responsive
       position="bottom"
       size="auto"
       title={title}
+      closeButtonProps={CLOSE_BUTTON_PROPS}
       styles={{
         content: {
           flex: '0 0 auto',

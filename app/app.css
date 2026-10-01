@@ -35,6 +35,13 @@ html[data-text-size='largest'] {
   font-size: 125%;
 }
 
+/* The five tabs have to share the phone's width, so at larger text sizes their labels stay at the
+   standard 12px instead of growing, which would push the last tab off the bar. */
+html[data-text-size='large'] .tab-label,
+html[data-text-size='largest'] .tab-label {
+  font-size: 12px;
+}
+
 /* Touch screens: small icon buttons and compact buttons get a 44px target. The icon inside stays
    its size; only the area that can be tapped grows. */
 @media (pointer: coarse) {
