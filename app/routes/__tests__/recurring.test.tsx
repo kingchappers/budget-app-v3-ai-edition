@@ -41,6 +41,7 @@ vi.mock('~/lib/queries', () => ({
 vi.mock('~/hooks/useUndoableDelete', () => ({ useUndoableDelete: () => mockUndoableDelete }));
 
 import RecurringPage from '../recurring';
+import { expectReadable } from '~/test-utils/readableText';
 
 function renderPage() {
   return render(
@@ -116,6 +117,7 @@ describe('Recurring page', () => {
     ];
     renderPage();
 
+    screen.getAllByText(/Monthly on the/).forEach(expectReadable);
     const schedules = screen.getAllByText(/Monthly on the/).map(node => node.textContent);
     expect(schedules).toEqual([
       'Monthly on the 1st · remind 1 day before',

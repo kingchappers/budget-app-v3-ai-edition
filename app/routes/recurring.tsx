@@ -13,6 +13,8 @@ import { formatSignedPence } from '~/lib/transactionTypes';
 import type { Category, Recurring, Transaction } from '~/lib/types';
 import { pageTitle } from '~/lib/pageTitle';
 import type { Route } from './+types/recurring';
+import { redirect } from 'react-router';
+import { planPath } from '~/lib/planTabs';
 
 function byDay(a: Recurring, b: Recurring): number {
   if (a.dayOfMonth !== b.dayOfMonth) return a.dayOfMonth - b.dayOfMonth;
@@ -44,11 +46,11 @@ function RecurringRow({ item, category, categoriesLoaded, skipped, onEdit, onDel
         </ThemeIcon>
         <div style={{ minWidth: 0 }}>
           <Text truncate>{label}</Text>
-          <Text size="xs" c="dimmed" truncate>{describeSchedule(item)}</Text>
-          {categoriesLoaded && !category && <Text size="xs" c="danger">Category deleted</Text>}
+          <Text size="sm">{describeSchedule(item)}</Text>
+          {categoriesLoaded && !category && <Text size="sm" c="danger">Category deleted</Text>}
           {skipped && (
             <Group gap={4} wrap="nowrap">
-              <Text size="xs" c="dimmed">{`Skipped for ${occurrenceLabel(skipped)}`}</Text>
+              <Text size="sm">{`Skipped for ${occurrenceLabel(skipped)}`}</Text>
               <Button
                 variant="subtle"
                 size="compact-xs"
@@ -85,7 +87,7 @@ function useSkipWindowTransactions(today: string): Transaction[] | null {
   return [...current.data, ...next.data];
 }
 
-function RecurringContent() {
+export function RecurringContent() {
   const recurring = useRecurring();
   const categories = useCategories();
   const remove = useDeleteRecurring();
@@ -156,6 +158,11 @@ function RecurringContent() {
       />
     </Stack>
   );
+}
+
+// This page now lives under Plan. The old address still works and leads there.
+export function clientLoader({ request }: Route.ClientLoaderArgs) {
+  throw redirect(planPath('recurring', new URL(request.url).search));
 }
 
 export const meta: Route.MetaFunction = () => [{ title: pageTitle('Recurring') }];

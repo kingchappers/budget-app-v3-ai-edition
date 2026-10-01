@@ -83,7 +83,7 @@ describe('PotHistorySheet', () => {
     expect(within(rows[1]).getByText('July 2026')).toBeInTheDocument();
   });
 
-  it('marks auto-added amounts in the set aside column', () => {
+  it('marks auto-added amounts in the added to pot column', () => {
     renderSheet(makePot());
     expect(screen.getByText('£100.00 (£20.00 auto)')).toBeInTheDocument();
   });
@@ -108,7 +108,7 @@ describe('PotHistorySheet', () => {
     save.mutate.mockImplementation((_vars: unknown, options: { onSuccess: () => void }) => options.onSuccess());
     const onClose = renderSheet(makePot());
     await user.type(screen.getByLabelText('Monthly amount'), '50');
-    await user.type(screen.getByLabelText('Goal'), '3000');
+    await user.type(screen.getByLabelText('Pot goal'), '3000');
     await user.click(screen.getByRole('switch', { name: /^Auto-contribute/ }));
     await user.click(screen.getByRole('button', { name: 'Save' }));
 
@@ -126,7 +126,7 @@ describe('PotHistorySheet', () => {
   it('starts from the pot\'s current settings', () => {
     renderSheet(makePot({ monthlyAmount: 5000, goalAmount: 300000, autoAmountNow: 5000 }));
     expect(screen.getByLabelText('Monthly amount')).toHaveValue('50.00');
-    expect(screen.getByLabelText('Goal')).toHaveValue('3000.00');
+    expect(screen.getByLabelText('Pot goal')).toHaveValue('3000.00');
     expect(screen.getByRole('switch', { name: /^Auto-contribute/ })).toBeChecked();
   });
 
