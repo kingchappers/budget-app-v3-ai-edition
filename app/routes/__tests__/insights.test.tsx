@@ -226,8 +226,8 @@ describe('Insights page comparisons', () => {
     await chooseThisMonth(user);
 
     expect(screen.getByText('There is nothing to compare yet.')).toBeInTheDocument();
-    expect(screen.getAllByText('September is partly tracked, so it is left out of comparisons.').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Not compared')).toHaveLength(4);
+    expect(screen.getAllByText('September has too few entries to compare, so it is left out of comparisons.')).toHaveLength(1);
+    expect(screen.queryByText('Not compared')).not.toBeInTheDocument();
     expect(screen.queryByText(/%\)/)).not.toBeInTheDocument();
   });
 
@@ -278,7 +278,7 @@ describe('Insights page comparisons', () => {
     await user.click(screen.getByRole('radio', { name: '3 months' }));
 
     // Only July counts: August is barely logged and September is not finished.
-    expect(screen.getByText('Groceries: within target in 1 of 1 month')).toBeInTheDocument();
+    expect(screen.getByText('Groceries: within budget in 1 of 1 month')).toBeInTheDocument();
   });
 });
 

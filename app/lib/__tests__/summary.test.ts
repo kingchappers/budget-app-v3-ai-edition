@@ -237,11 +237,11 @@ describe('leftToSpendSentence', () => {
   const over = { spending: progress, leftToSpend: -4000 };
 
   it('says what is left and how many days remain in the current month', () => {
-    expect(leftToSpendSentence(withTargets, '2026-09', now)).toBe('£412.00 left to spend this month · 19 days to go');
+    expect(leftToSpendSentence(withTargets, '2026-09', now)).toBe('£412.00 left in your budgets this month · 19 days to go');
   });
 
   it('says "1 day to go" on the last day', () => {
-    expect(leftToSpendSentence(withTargets, '2026-09', new Date(2026, 8, 30))).toBe('£412.00 left to spend this month · 1 day to go');
+    expect(leftToSpendSentence(withTargets, '2026-09', new Date(2026, 8, 30))).toBe('£412.00 left in your budgets this month · 1 day to go');
   });
 
   it('describes going over calmly, without a days count', () => {
@@ -250,16 +250,16 @@ describe('leftToSpendSentence', () => {
   });
 
   it('describes a past month by name', () => {
-    expect(leftToSpendSentence(withTargets, '2026-08', now)).toBe('£412.00 left at the end of August');
+    expect(leftToSpendSentence(withTargets, '2026-08', now)).toBe('£412.00 left in your budgets at the end of August');
     expect(leftToSpendSentence(over, '2026-08', now)).toBe('£40.00 over in August');
   });
 
   it('includes the year for a month in another year', () => {
-    expect(leftToSpendSentence(withTargets, '2025-08', now)).toBe('£412.00 left at the end of August 2025');
+    expect(leftToSpendSentence(withTargets, '2025-08', now)).toBe('£412.00 left in your budgets at the end of August 2025');
   });
 
   it('describes a future month without a days count', () => {
-    expect(leftToSpendSentence(withTargets, '2026-10', now)).toBe('£412.00 left to spend in October');
+    expect(leftToSpendSentence(withTargets, '2026-10', now)).toBe('£412.00 left in your budgets in October');
   });
 
   it('never gives a per-day figure', () => {

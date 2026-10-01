@@ -170,9 +170,9 @@ export function leftToSpendSentence(
   if (yearMonth === current) {
     return isOver
       ? `${amount} over so far. Nothing needs doing today.`
-      : `${amount} left to spend this month · ${daysToGo(now)}`;
+      : `${amount} left in your budgets this month · ${daysToGo(now)}`;
   }
   if (isOver) return `${amount} over in ${name}`;
-  if (yearMonth < current) return `${amount} left at the end of ${name}`;
-  return `${amount} left to spend in ${name}`;
+  if (yearMonth < current) return `${amount} left in your budgets at the end of ${name}`;
+  return `${amount} left in your budgets in ${name}`;
 }

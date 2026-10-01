@@ -70,7 +70,7 @@ describe('headlineSentences', () => {
     });
     expect(sentences).toEqual([
       'There is nothing to compare yet.',
-      'September is partly tracked, so it is left out of comparisons.',
+      'September has too few entries to compare, so it is left out of comparisons.',
     ]);
   });
 
@@ -86,7 +86,7 @@ describe('headlineSentences', () => {
       }),
       currentTotals: zero, previousTotals: zero, movers: none, outcomes: [],
     });
-    expect(sentences).toContain('July and August are partly tracked, so they are left out of comparisons.');
+    expect(sentences).toContain('July and August have too few entries to compare, so they are left out of comparisons.');
     expect(sentences).toContain('June is marked as not tracked, so it is left out of comparisons.');
   });
 
@@ -105,7 +105,7 @@ describe('leftOutNote', () => {
 
   it('lists each reason once, even when a month appears twice', () => {
     const note = leftOutNote([{ yearMonth: '2026-07', status: 'partly' }, { yearMonth: '2026-07', status: 'partly' }]);
-    expect(note).toBe('July is partly tracked, so it is left out of comparisons.');
+    expect(note).toBe('July has too few entries to compare, so it is left out of comparisons.');
   });
 });
 

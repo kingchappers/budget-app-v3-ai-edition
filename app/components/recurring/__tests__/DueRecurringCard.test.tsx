@@ -293,23 +293,67 @@ describe('DueRecurringCard', () => {
       ];
     }
 
-    it('groups them under their month, separate from this month\'s bills', () => {
+    async function openEarlier(user: ReturnType<typeof userEvent.setup>): Promise<void> {
+      await user.click(screen.getByRole('button', { name: /^Earlier bills \(2\)/ }));
+    }
+
+    it('keeps them folded away until asked, with this month\'s bills in view', () => {
       dueState.items = older();
       renderCard();
 
-      const group = screen.getByRole('region', { name: 'From August, not logged' });
-      expect(within(group).getByRole('heading', { name: 'From August, not logged' })).toBeInTheDocument();
+      expect(screen.getByText('Salary')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /^Earlier bills \(2\), when you are ready/ })).toHaveAttribute('aria-expanded', 'false');
+      expect(screen.queryByText('Rent')).not.toBeInTheDocument();
+      expect(screen.queryByText(/not logged/i)).not.toBeInTheDocument();
+    });
+
+    it('groups them under their month, separate from this month\'s bills', async () => {
+      dueState.items = older();
+      renderCard();
+      await openEarlier(userEvent.setup());
+
+      const group = screen.getByRole('region', { name: 'From August' });
+      expect(within(group).getByRole('heading', { name: 'From August' })).toBeInTheDocument();
+      expect(within(group).getByText(/Not recorded yet\./)).toBeInTheDocument();
       expect(within(group).getByText('Rent')).toBeInTheDocument();
       expect(within(group).getByText('Gym')).toBeInTheDocument();
       expect(within(group).queryByText('Salary')).not.toBeInTheDocument();
       expect(screen.getByText('Salary')).toBeInTheDocument();
     });
 
-    it('Add all adds every bill in the group, each linked to its bill', async () => {
+    it('Add all asks first, saying how many bills and how much', async () => {
+      const user = userEvent.setup();
       dueState.items = older();
       renderCard();
+      await openEarlier(user);
 
-      await userEvent.setup().click(screen.getByRole('button', { name: 'Add all from August' }));
+      await user.click(screen.getByRole('button', { name: 'Add all from August' }));
+
+      expect(screen.getByText('Add 2 bills, £980.00 in all?')).toBeInTheDocument();
+      expect(mockSave).not.toHaveBeenCalled();
+    });
+
+    it('Cancel leaves the bills as they were', async () => {
+      const user = userEvent.setup();
+      dueState.items = older();
+      renderCard();
+      await openEarlier(user);
+
+      await user.click(screen.getByRole('button', { name: 'Add all from August' }));
+      await user.click(screen.getByRole('button', { name: 'Cancel' }));
+
+      expect(mockSave).not.toHaveBeenCalled();
+      expect(screen.getByRole('button', { name: 'Add all from August' })).toBeInTheDocument();
+    });
+
+    it('adds every bill in the group once confirmed, each linked to its bill', async () => {
+      const user = userEvent.setup();
+      dueState.items = older();
+      renderCard();
+      await openEarlier(user);
+
+      await user.click(screen.getByRole('button', { name: 'Add all from August' }));
+      await user.click(screen.getByRole('button', { name: 'Yes, add them' }));
 
       expect(mockSave).toHaveBeenCalledTimes(2);
       expect(mockSave).toHaveBeenCalledWith(expect.objectContaining({ recurringId: 'rent', date: '2026-08-01', amount: 95000 }));
@@ -320,6 +364,7 @@ describe('DueRecurringCard', () => {
       const user = userEvent.setup();
       dueState.items = older();
       renderCard();
+      await openEarlier(user);
 
       await user.click(screen.getByRole('button', { name: 'More actions for Gym' }));
       await user.click(await screen.findByRole('menuitem', { name: "Didn't happen" }));

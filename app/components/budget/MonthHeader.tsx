@@ -3,11 +3,11 @@ import { IconChevronLeft, IconChevronRight } from '@tabler/icons-react';
 import { currentYearMonth, formatMonthLabel, shiftMonth } from '~/lib/months';
 
 // `pageTitle` is the page's own name for screen readers, since the month is only part of what the page is about.
-export function MonthHeader({ yearMonth, onChange, pageTitle }: { yearMonth: string; onChange: (ym: string) => void; pageTitle: string }) {
+export function MonthHeader({ yearMonth, onChange, pageTitle }: { yearMonth: string; onChange: (ym: string) => void; pageTitle?: string }) {
   const isCurrent = yearMonth === currentYearMonth();
   return (
     <Stack gap={4} mb="md" align="stretch">
-      <VisuallyHidden><Title order={1}>{pageTitle}</Title></VisuallyHidden>
+      {pageTitle && <VisuallyHidden><Title order={1}>{pageTitle}</Title></VisuallyHidden>}
       <Group justify="space-between">
         <ActionIcon variant="subtle" aria-label="Previous month" onClick={() => onChange(shiftMonth(yearMonth, -1))}>
           <IconChevronLeft size={20} />

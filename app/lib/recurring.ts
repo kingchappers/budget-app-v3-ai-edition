@@ -318,7 +318,7 @@ export function occurrenceLabel(key: string): string {
 }
 
 export function olderGroupHeading(period: string): string {
-  return `From ${formatMonthName(period)}, not logged`;
+  return `From ${formatMonthName(period)}`;
 }
 
 export function dueLabel(item: Pick<DueItem, 'status' | 'daysAway' | 'dueDate'>): string {

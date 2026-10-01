@@ -28,7 +28,6 @@ function Figure({ label, pence, previousPence, previousLabel, higherIsGood }: Fi
       <Paper withBorder p="sm">
         <Text size="xs" c="dimmed">{label}</Text>
         <Text fw={700} size="lg">{formatPence(pence)}</Text>
-        <Text size="xs" c="dimmed">Not compared</Text>
       </Paper>
     );
   }

@@ -5,7 +5,7 @@ function months(count: number): string {
   return `${count} ${count === 1 ? 'month' : 'months'}`;
 }
 
-// Leads with what went well, then the areas worth a look.
+// Leads with what went well, then where spending went over.
 export function TargetAdherence({ rows }: { rows: TargetAdherenceRow[] }) {
   if (rows.length === 0) {
     return <Text c="dimmed" size="sm">No budgets set for this period.</Text>;
@@ -27,7 +27,7 @@ export function TargetAdherence({ rows }: { rows: TargetAdherenceRow[] }) {
           <List spacing="xs">
             {wentWell.map(row => (
               <List.Item key={row.categoryId}>
-                {row.name}: within target in {row.monthsWithin} of {months(row.monthsInSpan)}
+                {row.name}: within budget in {row.monthsWithin} of {months(row.monthsInSpan)}
               </List.Item>
             ))}
           </List>
@@ -35,11 +35,11 @@ export function TargetAdherence({ rows }: { rows: TargetAdherenceRow[] }) {
       )}
       {toLookAt.length > 0 && (
         <div>
-          <Text fw={600}>Areas to look at</Text>
+          <Text fw={600}>Went over budget</Text>
           <List spacing="xs">
             {toLookAt.map(row => (
               <List.Item key={row.categoryId}>
-                {row.name}: over target in {row.monthsOverTarget} of {months(row.monthsInSpan)}
+                {row.name}: over budget in {row.monthsOverTarget} of {months(row.monthsInSpan)}
               </List.Item>
             ))}
           </List>

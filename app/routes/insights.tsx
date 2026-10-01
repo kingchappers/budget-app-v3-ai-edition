@@ -114,7 +114,7 @@ function InsightsContent() {
   const laterLabel = monthRange(shiftMonth(laterAnchor, -(months - 1)), laterAnchor);
   const note = plan.comparable
     ? [`Comparing ${plan.currentLabel} with ${plan.previousLabel}.`, leftOutNote(plan.leftOut)].filter(Boolean).join(' ')
-    : leftOutNote(plan.leftOut);
+    : null;
 
   return (
     <Stack>

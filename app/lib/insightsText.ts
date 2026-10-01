@@ -35,8 +35,12 @@ function leftOutSentences(leftOut: LeftOut[]): string[] {
   const partly = named('partly');
   const marked = named('marked');
   const sentences: string[] = [];
-  if (partly.length > 0) {
-    sentences.push(`${joinNames(partly)} ${partly.length === 1 ? 'is' : 'are'} partly tracked, so ${partly.length === 1 ? 'it is' : 'they are'} left out of comparisons.`);
+  // A long list of months reads as a list of failures, so past two the count is enough.
+  if (partly.length > 0 && partly.length <= 2) {
+    sentences.push(`${joinNames(partly)} ${partly.length === 1 ? 'has' : 'have'} too few entries to compare, so ${partly.length === 1 ? 'it is' : 'they are'} left out of comparisons.`);
+  }
+  if (partly.length > 2) {
+    sentences.push(`${partly.length} months have too few entries to compare, so they are left out of comparisons.`);
   }
   if (marked.length > 0) {
     sentences.push(`${joinNames(marked)} ${marked.length === 1 ? 'is' : 'are'} marked as not tracked, so ${marked.length === 1 ? 'it is' : 'they are'} left out of comparisons.`);

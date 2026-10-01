@@ -85,7 +85,7 @@ describe('CategoryProgressRow weekly targets', () => {
   it('compares this week\'s spending with the weekly amount', () => {
     renderRow(weekly);
     expect(screen.getByText('£8.00 left this week')).toBeInTheDocument();
-    expect(screen.getByText('£12.00 of £20.00 this week · about £86.67 a month')).toBeInTheDocument();
+    expect(screen.getByText('£12.00 of £20.00 this week')).toBeInTheDocument();
   });
 
   it('is not judged by the month: heavy spending earlier in the month does not make it "over"', () => {

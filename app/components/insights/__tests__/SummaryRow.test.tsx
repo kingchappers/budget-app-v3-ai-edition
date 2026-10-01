@@ -73,7 +73,7 @@ describe('SummaryRow', () => {
   it('shows no comparison, and says so, when the period cannot be compared fairly', () => {
     renderRow(totals({ spent: 11000 }), null);
     expect(screen.getByText('£110.00')).toBeInTheDocument();
-    expect(screen.getAllByText('Not compared')).toHaveLength(4);
+    expect(screen.queryByText('Not compared')).not.toBeInTheDocument();
     expect(screen.queryByText(/%/)).not.toBeInTheDocument();
   });
 });
