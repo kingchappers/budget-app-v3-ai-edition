@@ -1,0 +1,35 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { describe, expect, it } from 'vitest';
+
+const css = readFileSync(resolve(__dirname, '../app.css'), 'utf8');
+
+function block(selectorStart: string): string {
+  const start = css.indexOf(selectorStart);
+  const open = css.indexOf('{', start);
+  let depth = 0;
+  for (let index = open; index < css.length; index += 1) {
+    if (css[index] === '{') depth += 1;
+    if (css[index] === '}') depth -= 1;
+    if (depth === 0) return css.slice(open + 1, index);
+  }
+  return '';
+}
+
+describe('touch targets', () => {
+  const coarse = block('@media (pointer: coarse)');
+
+  it('gives icon buttons a 44px target on touch screens', () => {
+    expect(coarse).toMatch(/\.mantine-ActionIcon-root[\s\S]*min-width:\s*44px/);
+    expect(coarse).toMatch(/\.mantine-ActionIcon-root[\s\S]*min-height:\s*44px/);
+  });
+
+  it('gives compact buttons a 44px target on touch screens too', () => {
+    expect(coarse).toMatch(/\.mantine-Button-root\[data-size\^='compact'\]/);
+  });
+
+  it('only applies to touch, so mouse layouts keep their density', () => {
+    expect(css).toMatch(/@media \(pointer: coarse\)/);
+    expect(coarse).not.toMatch(/max-width/);
+  });
+});

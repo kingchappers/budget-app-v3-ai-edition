@@ -16,6 +16,16 @@ body {
   outline-offset: 2px;
 }
 
+/* Touch screens: small icon buttons and compact buttons get a 44px target. The icon inside stays
+   its size; only the area that can be tapped grows. */
+@media (pointer: coarse) {
+  .mantine-ActionIcon-root,
+  .mantine-Button-root[data-size^='compact'] {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
 /* Narrow screens: lift bottom-centre toasts above the tab bar and the floating add button. */
 @media (max-width: 47.99em) {
   .mantine-Notifications-root[data-position='bottom-center'] {
