@@ -27,9 +27,9 @@ describe('thisMonthSummary', () => {
     expect(thisMonthSummary(pot())).toBeNull();
   });
 
-  it('joins set aside (including auto), take out and spent with signs', () => {
+  it('joins added to pot (including auto), taken from pot and spent with signs', () => {
     expect(thisMonthSummary(pot({ setAside: 3000, autoAdded: 2000, takeOut: 500, spent: 1250 })))
-      .toBe('+£50.00 set aside · −£5.00 taken out · −£12.50 spent');
+      .toBe('+£50.00 added to pot · −£5.00 taken from pot · −£12.50 spent');
   });
 
   it('omits the parts that are zero', () => {

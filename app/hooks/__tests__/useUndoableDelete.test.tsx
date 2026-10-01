@@ -114,4 +114,37 @@ describe('useUndoableDelete', () => {
 
     expect(await screen.findByText("Coffee is already in place, so it wasn't restored.")).toBeInTheDocument();
   });
+
+  describe('how long the Deleted message stays (Settings)', () => {
+    afterEach(() => { window.localStorage.removeItem('budget.preferences'); });
+
+    function autoCloseOfDeletedMessage(): unknown {
+      const show = vi.spyOn(notifications, 'show');
+      const result = renderUndoableDelete();
+      act(() => { result.current({ label: '£3.50 · Coffee', name: 'Coffee', ref, run: () => new Promise<void>(() => {}) }); });
+      return show.mock.calls.map(call => call[0]).find(options => String(options.id).startsWith('deleted-'))?.autoClose;
+    }
+
+    it('stays until closed by default, with a close button to close it with', async () => {
+      expect(autoCloseOfDeletedMessage()).toBe(false);
+      expect(await screen.findByRole('button', { name: 'Close notification' })).toBeInTheDocument();
+    });
+
+    it.each([['30s', 30000], ['10s', 10000]])('goes after %s if asked', (undoDuration, milliseconds) => {
+      window.localStorage.setItem('budget.preferences', JSON.stringify({ undoDuration }));
+      expect(autoCloseOfDeletedMessage()).toBe(milliseconds);
+    });
+
+    it('leaves the Restored confirmation on its short timer', async () => {
+      const show = vi.spyOn(notifications, 'show');
+      mockRestore.mutateAsync.mockResolvedValue({});
+      const user = userEvent.setup();
+      const result = renderUndoableDelete();
+      act(() => { result.current({ label: '£3.50 · Coffee', name: 'Coffee', ref, run: () => Promise.resolve() }); });
+      await user.click(await screen.findByRole('button', { name: 'Undo' }));
+
+      await waitFor(() => expect(show.mock.calls.some(call => call[0].message === 'Restored £3.50 · Coffee')).toBe(true));
+      expect(show.mock.calls.find(call => call[0].message === 'Restored £3.50 · Coffee')?.[0].autoClose).toBe(5000);
+    });
+  });
 });

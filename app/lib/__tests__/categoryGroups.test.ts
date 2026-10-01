@@ -7,7 +7,7 @@ function cat(categoryId: string, type: Category['type'], group?: string): Catego
 }
 
 describe('groupCategories', () => {
-  it('orders buckets Bills, Sinking Funds, Everyday, Saving, Income, Other', () => {
+  it('orders buckets Bills, Saving for known costs, Everyday, Saving, Income, Other', () => {
     const buckets = groupCategories([
       cat('inc', 'INCOME'),
       cat('other', 'EXPENSE'),
@@ -17,7 +17,7 @@ describe('groupCategories', () => {
       cat('bill', 'EXPENSE', 'BILLS'),
     ]);
     expect(buckets.map(b => b.label)).toEqual([
-      'Bills', 'Sinking Funds', 'Everyday Spending', 'Saving & Investment', 'Income', 'Other',
+      'Bills', 'Saving for known costs', 'Everyday Spending', 'Saving & Investment', 'Income', 'Other',
     ]);
   });
 
@@ -102,7 +102,7 @@ describe('categorySelectData', () => {
 });
 
 describe('defaultGroupFor', () => {
-  it('returns null for income, Sinking Funds for pot and Everyday for spending', () => {
+  it('returns null for income, Saving for known costs for pot and Everyday for spending', () => {
     expect(defaultGroupFor('INCOME')).toBeNull();
     expect(defaultGroupFor('POT')).toBe('SINKING_FUNDS');
     expect(defaultGroupFor('EXPENSE')).toBe('EVERYDAY');
@@ -114,7 +114,7 @@ describe('groupsForType', () => {
     expect(groupsForType('EXPENSE').map(o => o.value)).toEqual(['BILLS', 'EVERYDAY']);
   });
 
-  it('offers Sinking Funds and Saving & Investment for POT', () => {
+  it('offers Saving for known costs and Saving & Investment for POT', () => {
     expect(groupsForType('POT').map(o => o.value)).toEqual(['SINKING_FUNDS', 'SAVING_INVESTMENT']);
   });
 

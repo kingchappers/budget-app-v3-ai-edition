@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { MantineProvider } from '@mantine/core';
 import { Notifications, notifications } from '@mantine/notifications';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { addDaysIso, formatDayLabel, todayIso } from '~/lib/months';
 
 vi.mock('@auth0/auth0-react', () => ({ useAuth0: () => ({ user: { sub: 'user-1' } }) }));
 
@@ -47,7 +48,7 @@ async function clearQueue(): Promise<void> {
   await Promise.all(entries.map(e => dequeue(e.id)));
 }
 
-const input = { amount: 480, type: 'EXPENSE' as const, categoryId: 'cat-dining', description: '', date: '2026-09-20' };
+const input = { amount: 480, type: 'EXPENSE' as const, categoryId: 'cat-dining', description: '', date: todayIso() };
 const created = { transactionId: 't-real', yearMonth: '2026-09' };
 
 describe('useSaveWithUndo', () => {
@@ -152,6 +153,142 @@ describe('useSaveWithUndo', () => {
 
     expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
     expect(mockRemove.mutate).not.toHaveBeenCalled();
+  });
+
+  describe('the date in the message', () => {
+    function renderSaver() {
+      const client = new QueryClient();
+      const wrapper = ({ children }: { children: React.ReactNode }) => (
+        <QueryClientProvider client={client}><MantineProvider><Notifications />{children}</MantineProvider></QueryClientProvider>
+      );
+      return renderHook(() => useSaveWithUndo(), { wrapper });
+    }
+
+    it('leaves the date out for an entry dated today', async () => {
+      mockCreate.mutateAsync.mockResolvedValue({ transactionId: 't1', yearMonth: input.date.slice(0, 7) });
+      const { result } = renderSaver();
+      await act(async () => { await result.current(input); });
+      expect(await screen.findByText('Saved £4.80 · Dining')).toBeInTheDocument();
+    });
+
+    it('says Yesterday for yesterday', async () => {
+      mockCreate.mutateAsync.mockResolvedValue({ transactionId: 't1', yearMonth: '2026-09' });
+      const { result } = renderSaver();
+      await act(async () => { await result.current({ ...input, date: addDaysIso(todayIso(), -1) }); });
+      expect(await screen.findByText('Saved £4.80 · Dining · Yesterday')).toBeInTheDocument();
+    });
+
+    it('names the day for an earlier entry', async () => {
+      const date = addDaysIso(todayIso(), -12);
+      mockCreate.mutateAsync.mockResolvedValue({ transactionId: 't1', yearMonth: date.slice(0, 7) });
+      const { result } = renderSaver();
+      await act(async () => { await result.current({ ...input, date }); });
+      expect(await screen.findByText(`Saved £4.80 · Dining · ${formatDayLabel(date, todayIso())}`)).toBeInTheDocument();
+    });
+
+    it('uses a category name it was given when the list does not have the category yet', async () => {
+      mockCreate.mutateAsync.mockResolvedValue({ transactionId: 't1', yearMonth: input.date.slice(0, 7) });
+      const { result } = renderSaver();
+      await act(async () => { await result.current({ ...input, categoryId: 'cat-new' }, { categoryName: 'Untracked' }); });
+      expect(await screen.findByText('Saved £4.80 · Untracked')).toBeInTheDocument();
+    });
+  });
+
+  describe('how long the Saved message stays (Settings)', () => {
+    function renderSaver() {
+      const client = new QueryClient();
+      const wrapper = ({ children }: { children: React.ReactNode }) => (
+        <QueryClientProvider client={client}><MantineProvider><Notifications />{children}</MantineProvider></QueryClientProvider>
+      );
+      return renderHook(() => useSaveWithUndo(), { wrapper });
+    }
+
+    async function saveAndGetAutoClose(): Promise<unknown> {
+      const update = vi.spyOn(notifications, 'update');
+      mockCreate.mutateAsync.mockResolvedValue({ transactionId: 't1', yearMonth: input.date.slice(0, 7) });
+      const { result } = renderSaver();
+      await act(async () => { await result.current(input); });
+      return update.mock.calls.at(-1)?.[0].autoClose;
+    }
+
+    afterEach(() => { window.localStorage.removeItem('budget.preferences'); });
+
+    it('stays until closed by default', async () => {
+      expect(await saveAndGetAutoClose()).toBe(false);
+    });
+
+    it.each([['30s', 30000], ['10s', 10000]])('goes after %s once the save has settled, if asked', async (undoDuration, milliseconds) => {
+      window.localStorage.setItem('budget.preferences', JSON.stringify({ undoDuration }));
+      expect(await saveAndGetAutoClose()).toBe(milliseconds);
+    });
+
+    it('waits while still saving, then starts the clock', async () => {
+      window.localStorage.setItem('budget.preferences', JSON.stringify({ undoDuration: '10s' }));
+      const show = vi.spyOn(notifications, 'show');
+      let finish!: (value: unknown) => void;
+      mockCreate.mutateAsync.mockReturnValue(new Promise(resolve => { finish = resolve; }));
+      const { result } = renderSaver();
+      act(() => { void result.current(input); });
+
+      expect(show.mock.calls.at(-1)?.[0].autoClose).toBe(false);
+      await act(async () => { finish({ transactionId: 't1', yearMonth: input.date.slice(0, 7) }); });
+    });
+
+    it('never makes an error message go away by itself', async () => {
+      window.localStorage.setItem('budget.preferences', JSON.stringify({ undoDuration: '10s' }));
+      const show = vi.spyOn(notifications, 'show');
+      mockCreate.mutateAsync.mockRejectedValue(new ApiError(400, 'Bad Request'));
+      const { result } = renderSaver();
+      await act(async () => { await result.current(input); });
+
+      const failure = show.mock.calls.map(call => call[0]).find(options => String(options.id).startsWith('failed-'));
+      expect(failure?.autoClose).toBe(false);
+    });
+  });
+
+  describe('undo from outside the toast', () => {
+    it('hands the caller a label and an undo as soon as the save starts', async () => {
+      mockCreate.mutateAsync.mockResolvedValue(created);
+      const { result } = renderSaveWithUndo();
+      const onSaveStarted = vi.fn();
+
+      await act(async () => { await result.current(input, { onSaveStarted }); });
+
+      expect(onSaveStarted).toHaveBeenCalledTimes(1);
+      expect(onSaveStarted).toHaveBeenCalledWith({ label: '£4.80 · Dining', undo: expect.any(Function) });
+    });
+
+    it('undoes the save when the handle\'s undo is called, closing the notification and calling onUndo', async () => {
+      mockCreate.mutateAsync.mockResolvedValue(created);
+      const { result } = renderSaveWithUndo();
+      const onUndo = vi.fn();
+      let handle: { undo: () => void } | undefined;
+
+      await act(async () => {
+        await result.current(input, { onUndo, onSaveStarted: h => { handle = h; } });
+      });
+      expect(await screen.findByText('Saved £4.80 · Dining')).toBeInTheDocument();
+      await act(async () => { handle?.undo(); });
+
+      await waitFor(() => expect(mockRemove.mutate).toHaveBeenCalledWith({ transactionId: 't-real', yearMonth: '2026-09' }));
+      expect(onUndo).toHaveBeenCalledTimes(1);
+      await waitFor(() => expect(screen.queryByText('Saved £4.80 · Dining')).not.toBeInTheDocument());
+    });
+
+    it('does nothing the second time undo is called, so the toast and the sheet can both offer it', async () => {
+      mockCreate.mutateAsync.mockResolvedValue(created);
+      const { result } = renderSaveWithUndo();
+      const onUndo = vi.fn();
+      let handle: { undo: () => void } | undefined;
+
+      await act(async () => {
+        await result.current(input, { onUndo, onSaveStarted: h => { handle = h; } });
+      });
+      await act(async () => { handle?.undo(); handle?.undo(); });
+
+      await waitFor(() => expect(onUndo).toHaveBeenCalledTimes(1));
+      expect(mockRemove.mutate).toHaveBeenCalledTimes(1);
+    });
   });
 
   it('calls onUndo after issuing the delete when Undo is pressed', async () => {

@@ -11,7 +11,7 @@ export function HomeSummary({ summary, yearMonth }: { summary: MonthSummary; yea
     <Stack gap="xs">
       {sentence && <Text size="lg" fw={600}>{sentence}</Text>}
       <Group justify="space-between">
-        <Text c="dimmed">Spent {monthPhrase(yearMonth)}</Text>
+        <Text>Spent {monthPhrase(yearMonth)}</Text>
         <Text fw={600}>{formatPence(summary.spentTotal)}</Text>
       </Group>
     </Stack>
@@ -28,7 +28,7 @@ export function OtherSpendingRow({ amount, yearMonth }: { amount: number; yearMo
       style={{ borderRadius: 'var(--mantine-radius-sm)' }}
     >
       <Group justify="space-between" wrap="nowrap">
-        <Text fw={500}>Other spending (no target)</Text>
+        <Text fw={500}>Other spending (no budget)</Text>
         <Group gap={4} wrap="nowrap">
           <Text fw={600}>{formatPence(amount)}</Text>
           <IconChevronRight size={16} aria-hidden color="var(--mantine-color-dimmed)" />

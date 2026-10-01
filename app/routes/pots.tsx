@@ -11,8 +11,10 @@ import { useCategories, usePots } from '~/lib/queries';
 import type { Category, PotSummary } from '~/lib/types';
 import { pageTitle } from '~/lib/pageTitle';
 import type { Route } from './+types/pots';
+import { redirect } from 'react-router';
+import { planPath } from '~/lib/planTabs';
 
-function PotsContent() {
+export function PotsContent() {
   const asOf = currentYearMonth();
   const categories = useCategories();
   const pots = usePots(asOf);
@@ -75,11 +77,22 @@ function PotsContent() {
         suggestedMonthly={suggestedMonthly}
         onClose={() => {
           setOpenId(null);
-          if (params.has('pot')) setParams({}, { replace: true });
+          if (params.has('pot') || params.has('monthly')) {
+            // Only what opened the pot goes; the Plan page's own ?tab=pots stays.
+            const next = new URLSearchParams(params);
+            next.delete('pot');
+            next.delete('monthly');
+            setParams(next, { replace: true });
+          }
         }}
       />
     </Stack>
   );
+}
+
+// This page now lives under Plan. The old address still works and leads there.
+export function clientLoader({ request }: Route.ClientLoaderArgs) {
+  throw redirect(planPath('pots', new URL(request.url).search));
 }
 
 export const meta: Route.MetaFunction = () => [{ title: pageTitle('Pots') }];
