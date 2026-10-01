@@ -79,6 +79,38 @@ describe('readPreferences', () => {
     expect(prefs.readPreferences(window.localStorage)).toEqual({ ...prefs.DEFAULT_PREFERENCES, shortcutN: true, openAddOnLaunch: true });
   });
 
+  it('keeps milestones off unless asked for', () => {
+    expect(prefs.DEFAULT_PREFERENCES.showMilestones).toBe(false);
+    window.localStorage.setItem(prefs.PREFERENCES_KEY, JSON.stringify({ showMilestones: 'yes' }));
+    expect(prefs.readPreferences(window.localStorage).showMilestones).toBe(false);
+    window.localStorage.setItem(prefs.PREFERENCES_KEY, JSON.stringify({ showMilestones: true }));
+    expect(prefs.readPreferences(window.localStorage).showMilestones).toBe(true);
+  });
+
+  it('keeps only valid, unique, sorted not-tracked months', () => {
+    window.localStorage.setItem(prefs.PREFERENCES_KEY, JSON.stringify({
+      notTrackedMonths: ['2026-03', '2026-01', '2026-03', '2026-13', 'March', 7, '2026-1'],
+    }));
+    expect(prefs.readPreferences(window.localStorage).notTrackedMonths).toEqual(['2026-01', '2026-03']);
+
+    window.localStorage.setItem(prefs.PREFERENCES_KEY, JSON.stringify({ notTrackedMonths: 'nope' }));
+    expect(prefs.readPreferences(window.localStorage).notTrackedMonths).toEqual([]);
+  });
+
+  it('caps how many not-tracked months are kept, dropping the oldest', () => {
+    const months = Array.from({ length: 130 }, (_, index) => `${2000 + Math.floor(index / 12)}-${String((index % 12) + 1).padStart(2, '0')}`);
+    window.localStorage.setItem(prefs.PREFERENCES_KEY, JSON.stringify({ notTrackedMonths: months }));
+    const kept = prefs.readPreferences(window.localStorage).notTrackedMonths;
+    expect(kept).toHaveLength(120);
+    expect(kept[kept.length - 1]).toBe(months[months.length - 1]);
+  });
+
+  it('starts with every Insights section closed and ignores unknown ones', () => {
+    expect(prefs.DEFAULT_PREFERENCES.insightsOpenSections).toEqual([]);
+    window.localStorage.setItem(prefs.PREFERENCES_KEY, JSON.stringify({ insightsOpenSections: ['trend', 'bogus', 'groups', 'trend'] }));
+    expect(prefs.readPreferences(window.localStorage).insightsOpenSections).toEqual(['groups', 'trend']);
+  });
+
   it('keeps the guided tour step within range and ignores a bad one', () => {
     window.localStorage.setItem(prefs.PREFERENCES_KEY, JSON.stringify({ tourStep: 99 }));
     expect(prefs.readPreferences(window.localStorage).tourStep).toBe(prefs.TOUR_SCREENS);

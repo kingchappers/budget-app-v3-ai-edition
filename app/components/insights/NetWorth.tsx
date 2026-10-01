@@ -1,9 +1,12 @@
 import { LineChart } from '@mantine/charts';
 import { Group, Stack, Text } from '@mantine/core';
 import { monthEndIso, netWorthAsOf } from '~/lib/accounts';
+import { CHART_COLORS } from '~/lib/chartColors';
+import { netWorthSummary } from '~/lib/insightsText';
 import { formatMonthLabel, shiftMonth } from '~/lib/months';
 import { formatPence } from '~/lib/money';
 import type { Account } from '~/lib/types';
+import { ChartData } from './ChartData';
 
 function formatSigned(pence: number): string {
   return pence < 0 ? `−${formatPence(-pence)}` : `+${formatPence(pence)}`;
@@ -32,14 +35,21 @@ export function NetWorth({ accounts, months }: { accounts: Account[]; months: st
         <Text fw={700} size="lg">{current < 0 ? `−${formatPence(-current)}` : formatPence(current)}</Text>
         <Text size="sm">{formatSigned(change)}</Text>
       </Group>
-      <LineChart
-        h={180}
-        data={trend.map(row => ({ month: formatMonthLabel(row.yearMonth), 'Net worth': row.netWorth }))}
-        dataKey="month"
-        series={[{ name: 'Net worth', color: 'teal.6' }]}
-        valueFormatter={formatPence}
-        withDots={false}
-      />
+      <ChartData
+        summary={netWorthSummary(current, change)}
+        caption="Net worth at the end of each month"
+        columns={['Month', 'Net worth']}
+        rows={trend.map(row => [formatMonthLabel(row.yearMonth), row.netWorth < 0 ? `−${formatPence(-row.netWorth)}` : formatPence(row.netWorth)])}
+      >
+        <LineChart
+          h={180}
+          data={trend.map(row => ({ month: formatMonthLabel(row.yearMonth), 'Net worth': row.netWorth }))}
+          dataKey="month"
+          series={[{ name: 'Net worth', color: CHART_COLORS.info }]}
+          valueFormatter={formatPence}
+          withDots
+        />
+      </ChartData>
     </Stack>
   );
 }

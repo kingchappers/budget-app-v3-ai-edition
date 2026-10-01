@@ -1,5 +1,11 @@
 import { useCallback, useSyncExternalStore } from 'react';
 
+// The Insights sections that can be opened and closed, in page order.
+export const INSIGHTS_SECTIONS = ['tracking', 'groups', 'trend', 'movers', 'targets', 'pots', 'netWorth', 'milestones'] as const;
+export type InsightsSection = typeof INSIGHTS_SECTIONS[number];
+
+const MAX_NOT_TRACKED_MONTHS = 120;
+const YEAR_MONTH = /^\d{4}-(0[1-9]|1[0-2])$/;
 export const MAX_PINNED_CHIPS = 6;
 
 // After saving in the Add sheet: 'ask' the first time, then remember the answer.
@@ -20,6 +26,12 @@ export interface Preferences {
   undoDuration: UndoDuration;
   shortcutN: boolean;
   openAddOnLaunch: boolean;
+  // Outcome-only acknowledgements on Insights. Off unless asked for.
+  showMilestones: boolean;
+  // Months (YYYY-MM) the user said they did not track, left out of comparisons.
+  notTrackedMonths: string[];
+  // Insights sections the user left open. All start closed.
+  insightsOpenSections: InsightsSection[];
   // Overrides the device's reduced-motion setting for people who don't know it exists.
   reduceMotion: boolean;
   // Category chips the user chose to keep first, in the order they chose them.
@@ -42,6 +54,9 @@ export const DEFAULT_PREFERENCES: Preferences = {
   undoDuration: 'until-closed',
   shortcutN: true,
   openAddOnLaunch: false,
+  showMilestones: false,
+  notTrackedMonths: [],
+  insightsOpenSections: [],
   reduceMotion: false,
   pinnedCategoryIds: [],
   keepSheetOpen: 'ask',
@@ -53,7 +68,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   tourStep: 0,
 };
 
-const BOOLEAN_KEYS = ['shortcutN', 'openAddOnLaunch', 'quickAddTipDismissed', 'reduceMotion'] as const;
+const BOOLEAN_KEYS = ['shortcutN', 'openAddOnLaunch', 'quickAddTipDismissed', 'reduceMotion', 'showMilestones'] as const;
 const KEEP_SHEET_OPEN_VALUES: readonly KeepSheetOpen[] = ['ask', 'yes', 'no'];
 const ENTRY_MODES: readonly EntryMode[] = ['form', 'quick'];
 const TEXT_SIZES: readonly TextSize[] = ['standard', 'large', 'largest'];
@@ -106,6 +121,17 @@ function parseStored(raw: string | null): Record<string, unknown> {
   }
 }
 
+function monthsFrom(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  const months = value.filter((item): item is string => typeof item === 'string' && YEAR_MONTH.test(item));
+  return [...new Set(months)].sort().slice(-MAX_NOT_TRACKED_MONTHS);
+}
+
+function sectionsFrom(value: unknown): InsightsSection[] {
+  if (!Array.isArray(value)) return [];
+  return INSIGHTS_SECTIONS.filter(section => value.includes(section));
+}
+
 function pinnedFrom(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   const ids = value.filter((id): id is string => typeof id === 'string' && id.length > 0 && id.length <= MAX_CATEGORY_ID_LENGTH);
@@ -135,6 +161,8 @@ function fromStored(stored: Record<string, unknown>, legacyOpenOnLaunch: string 
     const value = stored[key];
     if (typeof value === 'boolean') result[key] = value;
   }
+  result.notTrackedMonths = monthsFrom(stored.notTrackedMonths);
+  result.insightsOpenSections = sectionsFrom(stored.insightsOpenSections);
   result.pinnedCategoryIds = pinnedFrom(stored.pinnedCategoryIds);
   if (KEEP_SHEET_OPEN_VALUES.includes(stored.keepSheetOpen as KeepSheetOpen)) result.keepSheetOpen = stored.keepSheetOpen as KeepSheetOpen;
   if (TEXT_SIZES.includes(stored.textSize as TextSize)) result.textSize = stored.textSize as TextSize;

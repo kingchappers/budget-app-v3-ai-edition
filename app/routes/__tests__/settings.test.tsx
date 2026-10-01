@@ -72,6 +72,22 @@ describe('Settings page', () => {
     expect(screen.getByRole('switch', { name: /^Open Add sheet when the installed app starts/ })).toBeChecked();
   });
 
+  it('keeps milestones off until they are switched on', async () => {
+    renderSettings();
+    const toggle = screen.getByRole('switch', { name: /^Show milestones/ });
+    expect(toggle).not.toBeChecked();
+
+    await userEvent.setup().click(toggle);
+
+    expect(toggle).toBeChecked();
+    expect(readPreferences(window.localStorage).showMilestones).toBe(true);
+  });
+
+  it('says what milestones are and what they are not', () => {
+    renderSettings();
+    expect(screen.getByText(/no streaks, sounds or animations/i)).toBeInTheDocument();
+  });
+
   it('holds the pages that used to be in the More menu, one link each', () => {
     renderSettings();
     const manage = screen.getByRole('heading', { name: 'Manage' }).closest('.mantine-Card-root') as HTMLElement;

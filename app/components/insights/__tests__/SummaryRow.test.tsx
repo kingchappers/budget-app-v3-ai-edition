@@ -9,8 +9,8 @@ function totals(overrides: Partial<SummaryTotals> = {}): SummaryTotals {
   return { income: 0, spent: 0, saved: 0, net: 0, ...overrides };
 }
 
-function renderRow(current: SummaryTotals, previous: SummaryTotals) {
-  return render(<MantineProvider theme={theme}><SummaryRow current={current} previous={previous} /></MantineProvider>);
+function renderRow(current: SummaryTotals, previous: SummaryTotals | null, previousLabel?: string) {
+  return render(<MantineProvider theme={theme}><SummaryRow current={current} previous={previous} previousLabel={previousLabel} /></MantineProvider>);
 }
 
 describe('SummaryRow', () => {
@@ -63,5 +63,17 @@ describe('SummaryRow', () => {
     const [incomeChange, spentChange] = screen.getAllByText('£10.00 more (10%)');
     expect(spentChange).toHaveStyle({ color: 'var(--mantine-color-attention-text)' });
     expect(incomeChange).toHaveStyle({ color: 'var(--mantine-color-success-text)' });
+  });
+
+  it('names the period each previous figure belongs to', () => {
+    renderRow(totals({ spent: 11000 }), totals({ spent: 10000 }), '1–15 Aug');
+    expect(screen.getByText('1–15 Aug £100.00')).toBeInTheDocument();
+  });
+
+  it('shows no comparison, and says so, when the period cannot be compared fairly', () => {
+    renderRow(totals({ spent: 11000 }), null);
+    expect(screen.getByText('£110.00')).toBeInTheDocument();
+    expect(screen.getAllByText('Not compared')).toHaveLength(4);
+    expect(screen.queryByText(/%/)).not.toBeInTheDocument();
   });
 });

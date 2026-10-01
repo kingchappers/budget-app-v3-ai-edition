@@ -67,6 +67,12 @@ function SettingsContent() {
             checked={preferences.reduceMotion}
             onChange={event => setPreferences({ reduceMotion: event.currentTarget.checked })}
           />
+          <Switch
+            label="Show milestones"
+            description="A short text note on Insights when a pot reaches its goal or a month finishes under budget. No streaks, sounds or animations."
+            checked={preferences.showMilestones}
+            onChange={event => setPreferences({ showMilestones: event.currentTarget.checked })}
+          />
         </Stack>
       </Card>
 

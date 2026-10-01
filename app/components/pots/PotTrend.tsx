@@ -1,3 +1,5 @@
+import { formatPence } from '~/lib/money';
+
 const WIDTH = 100;
 const HEIGHT = 32;
 
@@ -17,15 +19,18 @@ export function trendPoints(values: number[], width: number = WIDTH, height: num
 export function PotTrend({ values }: { values: number[] }) {
   const points = trendPoints(values);
   if (points === '') return null;
+  const first = values[0];
+  const last = values[values.length - 1];
+  const label = `Balance trend: ${formatPence(first)} at the start, ${formatPence(last)} at the end, over ${values.length} months`;
   return (
     <svg
       role="img"
-      aria-label="Balance trend"
+      aria-label={label}
       viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
       preserveAspectRatio="none"
       style={{ width: '100%', height: 48, display: 'block' }}
     >
-      <polyline points={points} fill="none" stroke="var(--mantine-color-primary-6)" strokeWidth={2} vectorEffect="non-scaling-stroke" />
+      <polyline points={points} fill="none" stroke="var(--mantine-color-teal-8)" strokeWidth={2} vectorEffect="non-scaling-stroke" />
     </svg>
   );
 }
