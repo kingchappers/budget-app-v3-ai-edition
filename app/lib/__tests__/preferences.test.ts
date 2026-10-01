@@ -29,7 +29,7 @@ afterEach(() => {
 
 describe('readPreferences', () => {
   it('returns the defaults when nothing is saved', () => {
-    expect(prefs.readPreferences(window.localStorage)).toEqual({ shortcutN: true, openAddOnLaunch: false });
+    expect(prefs.readPreferences(window.localStorage)).toEqual({ ...prefs.DEFAULT_PREFERENCES, shortcutN: true, openAddOnLaunch: false });
   });
 
   it('returns the defaults when storage is unavailable', () => {
@@ -37,18 +37,38 @@ describe('readPreferences', () => {
   });
 
   it('reads back what was written', () => {
-    prefs.writePreferences(window.localStorage, { shortcutN: false, openAddOnLaunch: true });
-    expect(prefs.readPreferences(window.localStorage)).toEqual({ shortcutN: false, openAddOnLaunch: true });
+    prefs.writePreferences(window.localStorage, { ...prefs.DEFAULT_PREFERENCES, shortcutN: false, openAddOnLaunch: true });
+    expect(prefs.readPreferences(window.localStorage)).toEqual({ ...prefs.DEFAULT_PREFERENCES, shortcutN: false, openAddOnLaunch: true });
+  });
+
+  it('remembers pinned chips, the keep-open answer, the entry mode and the dismissed tip', () => {
+    const chosen: import('../preferences').Preferences = { ...prefs.DEFAULT_PREFERENCES, pinnedCategoryIds: ['a', 'b'], keepSheetOpen: 'yes', entryMode: 'quick', quickAddTipDismissed: true };
+    prefs.writePreferences(window.localStorage, chosen);
+    expect(prefs.readPreferences(window.localStorage)).toEqual(chosen);
+  });
+
+  it('repairs pinned chips: only text ids, no repeats, at most six', () => {
+    window.localStorage.setItem(prefs.PREFERENCES_KEY, JSON.stringify({ pinnedCategoryIds: ['a', 1, 'a', '', 'b', 'c', 'd', 'e', 'f', 'g', null] }));
+    expect(prefs.readPreferences(window.localStorage).pinnedCategoryIds).toEqual(['a', 'b', 'c', 'd', 'e', 'f']);
+    window.localStorage.setItem(prefs.PREFERENCES_KEY, JSON.stringify({ pinnedCategoryIds: 'a' }));
+    expect(prefs.readPreferences(window.localStorage).pinnedCategoryIds).toEqual([]);
+  });
+
+  it('falls back to the default for an unknown keep-open answer or entry mode', () => {
+    window.localStorage.setItem(prefs.PREFERENCES_KEY, JSON.stringify({ keepSheetOpen: 'sometimes', entryMode: 'voice' }));
+    const read = prefs.readPreferences(window.localStorage);
+    expect(read.keepSheetOpen).toBe('ask');
+    expect(read.entryMode).toBe('form');
   });
 
   it('carries over the old launch setting and drops the old value on the next save', () => {
     window.localStorage.setItem('budget.openAddOnLaunch', '1');
     expect(prefs.readPreferences(window.localStorage).openAddOnLaunch).toBe(true);
 
-    prefs.writePreferences(window.localStorage, { shortcutN: false, openAddOnLaunch: true });
+    prefs.writePreferences(window.localStorage, { ...prefs.DEFAULT_PREFERENCES, shortcutN: false, openAddOnLaunch: true });
 
     expect(window.localStorage.getItem('budget.openAddOnLaunch')).toBeNull();
-    expect(prefs.readPreferences(window.localStorage)).toEqual({ shortcutN: false, openAddOnLaunch: true });
+    expect(prefs.readPreferences(window.localStorage)).toEqual({ ...prefs.DEFAULT_PREFERENCES, shortcutN: false, openAddOnLaunch: true });
   });
 
   it('ignores unreadable JSON and values of the wrong type', () => {
@@ -56,18 +76,18 @@ describe('readPreferences', () => {
     expect(prefs.readPreferences(window.localStorage)).toEqual(prefs.DEFAULT_PREFERENCES);
 
     window.localStorage.setItem(prefs.PREFERENCES_KEY, JSON.stringify({ shortcutN: 'no', openAddOnLaunch: true, extra: 1 }));
-    expect(prefs.readPreferences(window.localStorage)).toEqual({ shortcutN: true, openAddOnLaunch: true });
+    expect(prefs.readPreferences(window.localStorage)).toEqual({ ...prefs.DEFAULT_PREFERENCES, shortcutN: true, openAddOnLaunch: true });
   });
 
   it('survives storage that throws', () => {
     expect(prefs.readPreferences(brokenStorage())).toEqual(prefs.DEFAULT_PREFERENCES);
-    expect(prefs.writePreferences(brokenStorage(), { shortcutN: false, openAddOnLaunch: false })).toBe(false);
+    expect(prefs.writePreferences(brokenStorage(), { ...prefs.DEFAULT_PREFERENCES, shortcutN: false, openAddOnLaunch: false })).toBe(false);
   });
 });
 
 describe('usePreferences', () => {
   it('starts from the saved preferences', () => {
-    prefs.writePreferences(window.localStorage, { shortcutN: false, openAddOnLaunch: false });
+    prefs.writePreferences(window.localStorage, { ...prefs.DEFAULT_PREFERENCES, shortcutN: false, openAddOnLaunch: false });
     const { result } = renderHook(() => prefs.usePreferences());
     expect(result.current[0].shortcutN).toBe(false);
   });

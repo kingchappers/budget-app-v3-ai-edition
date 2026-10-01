@@ -15,8 +15,17 @@ import type { Transaction } from '~/lib/types';
 // recent save's Undo is on screen at a time.
 let latestSaveToastId: string | null = null;
 
+export interface SaveHandle {
+  // What was saved, e.g. "£4.80 · Dining", for wording an Undo button.
+  label: string;
+  undo: () => void;
+}
+
 export interface SaveOptions {
   onUndo?: () => void;
+  // Called as soon as the save starts, so a caller can offer its own Undo
+  // (for example inside a sheet that stays open) alongside the notification.
+  onSaveStarted?: (handle: SaveHandle) => void;
 }
 
 export function useSaveWithUndo(): (input: TransactionInput, options?: SaveOptions) => Promise<Transaction | null> {
@@ -121,6 +130,7 @@ export function useSaveWithUndo(): (input: TransactionInput, options?: SaveOptio
     );
 
     function undo(): void {
+      if (undone) return;
       undone = true;
       notifications.hide(toastId);
       void outcome.then(async created => {
@@ -138,6 +148,7 @@ export function useSaveWithUndo(): (input: TransactionInput, options?: SaveOptio
     }
 
     showSaveToast(toastId, `Saving ${description}…`, undo);
+    options?.onSaveStarted?.({ label: description, undo });
 
     return outcome;
   }

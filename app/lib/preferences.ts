@@ -1,14 +1,35 @@
 import { useCallback, useSyncExternalStore } from 'react';
 
+export const MAX_PINNED_CHIPS = 6;
+
+// After saving in the Add sheet: 'ask' the first time, then remember the answer.
+export type KeepSheetOpen = 'ask' | 'yes' | 'no';
+// How the Add sheet opens: the form, or the one-line "type it" box.
+export type EntryMode = 'form' | 'quick';
+
 export interface Preferences {
   shortcutN: boolean;
   openAddOnLaunch: boolean;
+  // Category chips the user chose to keep first, in the order they chose them.
+  pinnedCategoryIds: string[];
+  keepSheetOpen: KeepSheetOpen;
+  entryMode: EntryMode;
+  quickAddTipDismissed: boolean;
 }
 
 export const DEFAULT_PREFERENCES: Preferences = {
   shortcutN: true,
   openAddOnLaunch: false,
+  pinnedCategoryIds: [],
+  keepSheetOpen: 'ask',
+  entryMode: 'form',
+  quickAddTipDismissed: false,
 };
+
+const BOOLEAN_KEYS = ['shortcutN', 'openAddOnLaunch', 'quickAddTipDismissed'] as const;
+const KEEP_SHEET_OPEN_VALUES: readonly KeepSheetOpen[] = ['ask', 'yes', 'no'];
+const ENTRY_MODES: readonly EntryMode[] = ['form', 'quick'];
+const MAX_CATEGORY_ID_LENGTH = 64;
 
 export const PREFERENCES_KEY = 'budget.preferences';
 export const LEGACY_OPEN_ON_LAUNCH_KEY = 'budget.openAddOnLaunch';
@@ -51,12 +72,21 @@ function parseStored(raw: string | null): Record<string, unknown> {
   }
 }
 
+function pinnedFrom(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  const ids = value.filter((id): id is string => typeof id === 'string' && id.length > 0 && id.length <= MAX_CATEGORY_ID_LENGTH);
+  return [...new Set(ids)].slice(0, MAX_PINNED_CHIPS);
+}
+
 function fromStored(stored: Record<string, unknown>, legacyOpenOnLaunch: string | null): Preferences {
   const result: Preferences = { ...DEFAULT_PREFERENCES };
-  for (const key of Object.keys(DEFAULT_PREFERENCES) as PreferenceKey[]) {
+  for (const key of BOOLEAN_KEYS) {
     const value = stored[key];
-    if (typeof value === typeof DEFAULT_PREFERENCES[key]) result[key] = value as Preferences[typeof key];
+    if (typeof value === 'boolean') result[key] = value;
   }
+  result.pinnedCategoryIds = pinnedFrom(stored.pinnedCategoryIds);
+  if (KEEP_SHEET_OPEN_VALUES.includes(stored.keepSheetOpen as KeepSheetOpen)) result.keepSheetOpen = stored.keepSheetOpen as KeepSheetOpen;
+  if (ENTRY_MODES.includes(stored.entryMode as EntryMode)) result.entryMode = stored.entryMode as EntryMode;
   if (typeof stored.openAddOnLaunch !== 'boolean' && legacyOpenOnLaunch === '1') result.openAddOnLaunch = true;
   return result;
 }
