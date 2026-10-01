@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
-import { ActionIcon, Alert, Anchor, Button, Card, Divider, Group, Menu, Stack, Text, ThemeIcon, Title } from '@mantine/core';
+import { ActionIcon, Anchor, Button, Card, Divider, Group, Menu, Stack, Text, ThemeIcon, Title } from '@mantine/core';
+import { LoadError } from '~/components/layout/LoadError';
 import { notifications } from '@mantine/notifications';
 import { IconBellPause, IconDots, IconPencil, IconPlayerSkipForward } from '@tabler/icons-react';
 import { useAuth0 } from '@auth0/auth0-react';
@@ -11,8 +12,10 @@ import { useSaveWithUndo } from '~/hooks/useSaveWithUndo';
 import { CategoryIcon } from '~/components/categories/CategoryIcon';
 import { dismissMatch, isMatchDismissed, isSnoozed, snoozeUntilTomorrow } from '~/lib/billPrefs';
 import { currentYearMonth, formatMonthName, formatShortDate, todayIso } from '~/lib/months';
+import { usePreferences } from '~/lib/preferences';
 import { useCategories, useLinkTransaction, useSetRecurringHandled } from '~/lib/queries';
-import { dueLabel, groupDueItems, olderGroupHeading, type DueGroup, type DueItem } from '~/lib/recurring';
+import { undoAutoClose } from '~/lib/undoDuration';
+import { dueLabel, groupDueItems, occurrenceLabel, olderGroupHeading, type DueGroup, type DueItem } from '~/lib/recurring';
 import { formatSignedPence } from '~/lib/transactionTypes';
 import type { Transaction } from '~/lib/types';
 
@@ -20,7 +23,7 @@ function syntheticTransaction(item: DueItem): Transaction {
   const { recurring } = item;
   return {
     transactionId: `recurring-${recurring.recurringId}`,
-    yearMonth: item.period,
+    yearMonth: item.dueDate.slice(0, 7),
     amount: recurring.amount,
     type: recurring.type,
     categoryId: recurring.categoryId,
@@ -53,7 +56,7 @@ function DueRow({ item, label, icon, match, onAdd, onEdit, onSkip, onSnooze, onC
           </ThemeIcon>
           <div style={{ minWidth: 0 }}>
             <Text truncate>{label}</Text>
-            <Text size="xs" truncate c="dimmed">{dueLabel(item)}</Text>
+            <Text size="sm">{dueLabel(item)}</Text>
           </div>
         </Group>
         <Group gap="xs" wrap="nowrap" style={{ flexShrink: 0 }}>
@@ -88,6 +91,7 @@ export function DueRecurringCard() {
   const { items, isLoading, error, refetch } = useDueRecurring();
   const { data: categories = [] } = useCategories();
   const userSub = useAuth0().user?.sub ?? '';
+  const [{ undoDuration }] = usePreferences();
   const saveWithUndo = useSaveWithUndo();
   const setHandled = useSetRecurringHandled();
   const link = useLinkTransaction();
@@ -141,10 +145,12 @@ export function DueRecurringCard() {
     const toastId = `skipped-${crypto.randomUUID()}`;
     notifications.show({
       id: toastId,
-      autoClose: TOAST_MS,
+      autoClose: undoAutoClose(undoDuration),
+      withCloseButton: true,
+      closeButtonProps: { 'aria-label': 'Close notification' },
       message: (
         <ToastAction
-          text={`Skipped ${labelFor(item)} for ${formatMonthName(item.period)}`}
+          text={`Skipped ${labelFor(item)} for ${occurrenceLabel(item.period)}`}
           actionLabel="Undo"
           onAction={() => {
             notifications.hide(toastId);
@@ -199,16 +205,14 @@ export function DueRecurringCard() {
   let card: React.ReactNode = null;
   if (error) {
     card = (
-      <Alert color="danger" title="Could not load recurring items">
-        <Button size="compact-sm" onClick={() => refetch()}>Try again</Button>
-      </Alert>
+      <LoadError thing="recurring items" onRetry={() => refetch()} />
     );
   } else if (!isLoading && visible.length > 0) {
     card = (
       <Card withBorder>
         <Group justify="space-between" mb="xs">
           <Title order={2} size="h5">Due</Title>
-          <Anchor component={Link} to="/recurring" size="sm">Manage</Anchor>
+          <Anchor component={Link} to="/plan?tab=recurring" size="sm">Manage</Anchor>
         </Group>
         {groups.current.map(renderRow)}
         {groups.older.map((group, index) => (

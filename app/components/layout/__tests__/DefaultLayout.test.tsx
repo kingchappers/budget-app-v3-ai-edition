@@ -26,10 +26,10 @@ vi.mock('../OfflineQueueBanner', () => ({ OfflineQueueBanner: () => null }));
 
 import { DefaultLayout } from '../DefaultLayout';
 
-function renderLayout(children: React.ReactNode = <p>page</p>) {
+function renderLayout(children: React.ReactNode = <p>page</p>, url: string = '/') {
   return render(
     <MantineProvider>
-      <MemoryRouter>
+      <MemoryRouter initialEntries={[url]}>
         <DefaultLayout>{children}</DefaultLayout>
       </MemoryRouter>
     </MantineProvider>,
@@ -72,10 +72,32 @@ describe('DefaultLayout add shortcut', () => {
     expect(screen.queryByText('Add sheet open')).not.toBeInTheDocument();
   });
 
-  it('opens the add sheet from the floating button', async () => {
+  it('opens the add sheet from the tab bar', async () => {
     renderLayout();
-    await userEvent.setup().click(screen.getByRole('button', { name: 'Add transaction' }));
+    const tabBar = screen.getByRole('navigation', { name: 'Primary' });
+    await userEvent.setup().click(within(tabBar).getByRole('button', { name: 'Add transaction' }));
     expect(screen.getByText('Add sheet open')).toBeInTheDocument();
+  });
+
+  it('opens the add sheet from the header button on wide screens', async () => {
+    renderLayout();
+    const header = screen.getByRole('banner');
+    await userEvent.setup().click(within(header).getByRole('button', { name: 'Add transaction' }));
+    expect(screen.getByText('Add sheet open')).toBeInTheDocument();
+  });
+
+  it('has no floating button: the tab bar is the only fixed layer', () => {
+    const { container } = renderLayout();
+    const fixed = [...container.querySelectorAll<HTMLElement>('[style]')].filter(element => element.style.position === 'fixed');
+    expect(fixed).toHaveLength(1);
+    expect(fixed[0]).toBe(screen.getByRole('navigation', { name: 'Primary' }));
+  });
+
+  it('clears the tab bar with page padding and keeps the tab bar height in one place', () => {
+    const { container } = renderLayout();
+    const main = container.querySelector('main') as HTMLElement;
+    expect(main.style.paddingBottom).toContain('var(--tab-bar-height)');
+    expect(screen.getByRole('navigation', { name: 'Primary' }).style.height).toBe('var(--tab-bar-height)');
   });
 
   it('shows the quick entry tips button in the header', async () => {
@@ -95,33 +117,73 @@ describe('DefaultLayout add shortcut', () => {
     expect(screen.queryByText('Add sheet open')).not.toBeInTheDocument();
   });
 
-  it('has four bottom-tab links plus a More button, and the sidebar lists everything including More items directly', () => {
+  it('has the same four destinations and Add in the tab bar, and no More menu', () => {
     renderLayout();
     const tabBar = screen.getByRole('navigation', { name: 'Primary' });
-    const tabLinks = ['Home', 'Transactions', 'Targets', 'Pots'].map(name =>
-      within(tabBar).getByRole('link', { name }),
-    );
-    expect(tabLinks).toHaveLength(4);
-    expect(within(tabBar).getByRole('button', { name: 'More' })).toBeInTheDocument();
-    expect(within(tabBar).queryByRole('link', { name: 'Categories' })).not.toBeInTheDocument();
-
-    expect(screen.getAllByRole('link', { name: 'Categories' })).toHaveLength(1);
-    expect(screen.getAllByRole('link', { name: 'Recurring' })).toHaveLength(1);
-    expect(screen.getAllByRole('link', { name: 'Insights' })).toHaveLength(1);
+    const names = within(tabBar).getAllByRole('link').map(link => link.getAttribute('aria-label'));
+    expect(names).toEqual(['Home', 'Transactions', 'Plan', 'Insights']);
+    expect(within(tabBar).getByRole('button', { name: 'Add transaction' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'More' })).not.toBeInTheDocument();
   });
 
-  it('opens the More sheet from the bottom tab and it lists Categories, Recurring and Insights', async () => {
-    const user = userEvent.setup();
+  it('puts Add in the middle of the tab bar', () => {
     renderLayout();
-    await user.click(screen.getByRole('button', { name: 'More' }));
-    expect(await screen.findByRole('link', { name: 'Categories' })).toBeInTheDocument();
+    const tabBar = screen.getByRole('navigation', { name: 'Primary' });
+    const order = within(tabBar).getAllByRole('link').map(link => link.getAttribute('aria-label'));
+    const items = [...tabBar.querySelectorAll('a, button')].map(element => element.getAttribute('aria-label'));
+    expect(items).toEqual(['Home', 'Transactions', 'Add transaction', 'Plan', 'Insights']);
+    expect(order).toHaveLength(4);
   });
 
-  it('links to Pots from both the bottom tab bar and the sidebar', () => {
+  it('shows the same destinations in the sidebar, once each, and Settings in the header', () => {
     renderLayout();
-    const links = screen.getAllByRole('link', { name: 'Pots' });
-    expect(links).toHaveLength(2);
-    links.forEach(link => expect(link).toHaveAttribute('href', '/pots'));
+    for (const name of ['Home', 'Transactions', 'Plan', 'Insights']) {
+      expect(screen.getAllByRole('link', { name })).toHaveLength(2);
+    }
+    const header = screen.getByRole('banner');
+    expect(within(header).getByRole('link', { name: 'Settings' })).toHaveAttribute('href', '/settings');
+  });
+
+  it('gives each place one route in: nothing that moved is still in the menus', () => {
+    renderLayout();
+    for (const name of ['Budgets', 'Pots', 'Recurring', 'Categories', 'Accounts', 'Recently deleted', 'Catch up']) {
+      expect(screen.queryByRole('link', { name })).not.toBeInTheDocument();
+    }
+  });
+
+  it('links Plan to /plan from both the tab bar and the sidebar', () => {
+    renderLayout();
+    const links = screen.getAllByRole('link', { name: 'Plan' });
+    links.forEach(link => expect(link).toHaveAttribute('href', '/plan'));
+  });
+
+  it('shows the current page by more than colour: aria-current, a bar and a bold label', () => {
+    renderLayout(<p>page</p>, '/plan');
+    const tabBar = screen.getByRole('navigation', { name: 'Primary' });
+    const plan = within(tabBar).getByRole('link', { name: 'Plan' });
+    const home = within(tabBar).getByRole('link', { name: 'Home' });
+
+    expect(plan).toHaveAttribute('aria-current', 'page');
+    expect(home).not.toHaveAttribute('aria-current');
+    expect((plan.querySelector('span[aria-hidden]') as HTMLElement).style.background).toBe('currentcolor');
+    expect((home.querySelector('span[aria-hidden]') as HTMLElement).style.background).toBe('transparent');
+  });
+
+  it('marks Settings as current on the pages kept under Manage', () => {
+    renderLayout(<p>page</p>, '/categories');
+    expect(within(screen.getByRole('banner')).getByRole('link', { name: 'Settings' })).toHaveAttribute('aria-current', 'page');
+  });
+
+  it('does not mark Settings as current elsewhere', () => {
+    renderLayout(<p>page</p>, '/plan');
+    expect(within(screen.getByRole('banner')).getByRole('link', { name: 'Settings' })).not.toHaveAttribute('aria-current');
+  });
+
+  it('keeps the Add tab away from signed-out people', () => {
+    auth.isAuthenticated = false;
+    renderLayout();
+    expect(screen.queryByRole('button', { name: 'Add transaction' })).not.toBeInTheDocument();
+    expect(within(screen.getByRole('navigation', { name: 'Primary' })).getAllByRole('link')).toHaveLength(4);
   });
 });
 
@@ -158,7 +220,7 @@ describe('DefaultLayout N shortcut setting', () => {
     writePreferences(window.localStorage, { ...DEFAULT_PREFERENCES, shortcutN: false });
     const user = userEvent.setup();
     renderLayout();
-    await user.hover(screen.getByRole('button', { name: 'Add transaction' }));
+    await user.hover(within(screen.getByRole('banner')).getByRole('button', { name: 'Add transaction' }));
     expect(await screen.findByText('Add transaction')).toBeInTheDocument();
     expect(screen.queryByText('Add transaction (N)')).not.toBeInTheDocument();
   });
@@ -240,5 +302,30 @@ describe('DefaultLayout signed out', () => {
     expect(screen.getByRole('status', { name: 'Checking your session' })).toBeInTheDocument();
     expect(screen.queryByText('Income this month £0.00')).not.toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: "You're signed out" })).not.toBeInTheDocument();
+  });
+});
+
+describe('DefaultLayout navigation keeps the month', () => {
+  function hrefsFor(name: string): (string | null)[] {
+    return screen.getAllByRole('link', { name }).map(link => link.getAttribute('href'));
+  }
+
+  it('carries the viewed month to the pages that show one', () => {
+    renderLayout(<p>page</p>, '/transactions?month=2026-08');
+    for (const name of ['Home', 'Transactions', 'Insights']) {
+      const expected = name === 'Home' ? '/?month=2026-08' : `/${name.toLowerCase()}?month=2026-08`;
+      expect(hrefsFor(name)).toContain(expected);
+      expect(hrefsFor(name).every(href => href === expected)).toBe(true);
+    }
+  });
+
+  it('leaves pages without a month alone', () => {
+    renderLayout(<p>page</p>, '/?month=2026-08');
+    expect(hrefsFor('Plan').every(href => href === '/plan')).toBe(true);
+  });
+
+  it('adds nothing when no month is selected', () => {
+    renderLayout(<p>page</p>, '/');
+    expect(hrefsFor('Transactions').every(href => href === '/transactions')).toBe(true);
   });
 });

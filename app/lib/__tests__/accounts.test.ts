@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { accountTypeLabel, balanceAsOf, monthEndIso, netWorthAsOf, typeOptionsForKind } from '../accounts';
+import { accountTypeLabel, balanceAsOf, monthEndIso, netWorthAsOf, typeOptionsForKind, updatedAgo } from '../accounts';
 import type { Account, BalanceEntry } from '../types';
 
 function account(overrides: Partial<Account> = {}): Account {
@@ -62,5 +62,31 @@ describe('accountTypeLabel', () => {
     ['CREDIT_CARD', 'Credit card'], ['LOAN', 'Loan'],
   ] as const)('%s -> %s', (type, label) => {
     expect(accountTypeLabel(type)).toBe(label);
+  });
+});
+
+describe('updatedAgo', () => {
+  const entries = (...dates: string[]): BalanceEntry[] => dates.map(date => ({ date, pence: 100 }));
+
+  it('says today and yesterday in words', () => {
+    expect(updatedAgo(entries('2026-09-28'), '2026-09-28')).toBe('Updated today');
+    expect(updatedAgo(entries('2026-09-27'), '2026-09-28')).toBe('Updated yesterday');
+  });
+
+  it('counts the days since the latest balance was entered', () => {
+    expect(updatedAgo(entries('2026-08-01', '2026-09-05'), '2026-09-28')).toBe('Updated 23 days ago');
+  });
+
+  it('uses the latest entry whatever order they are stored in', () => {
+    expect(updatedAgo(entries('2026-09-20', '2026-09-01'), '2026-09-28')).toBe('Updated 8 days ago');
+  });
+
+  it('ignores a balance dated in the future', () => {
+    expect(updatedAgo(entries('2026-09-01', '2026-12-01'), '2026-09-28')).toBe('Updated 27 days ago');
+  });
+
+  it('says so when there is nothing entered yet', () => {
+    expect(updatedAgo([], '2026-09-28')).toBe('Not updated yet');
+    expect(updatedAgo(entries('2026-12-01'), '2026-09-28')).toBe('Not updated yet');
   });
 });

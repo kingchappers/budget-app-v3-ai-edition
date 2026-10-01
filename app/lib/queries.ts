@@ -85,13 +85,13 @@ export function useTransactions(yearMonth: string, enabled: boolean = true) {
   return { ...query, data };
 }
 
-export function useTransactionsRange(from: string, to: string) {
+export function useTransactionsRange(from: string, to: string, enabled: boolean = true) {
   const api = useApi();
   const authReady = useAuthReady();
   return useQuery({
     queryKey: queryKeys.transactionsRange(from, to),
     queryFn: () => api.getTransactionsRange(from, to),
-    enabled: authReady,
+    enabled: authReady && enabled,
   });
 }
 

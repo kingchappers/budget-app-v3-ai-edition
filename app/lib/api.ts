@@ -1,5 +1,5 @@
 import type { TrashEntityType, TrashEntry } from './trash';
-import type { Account, AccountKind, AccountType, Category, CategoryGroup, CategoryTarget, PotSettingsInput, PotSummary, Recurring, TargetPeriod, Transaction, TransactionType } from './types';
+import type { Account, AccountKind, AccountType, Category, CategoryGroup, CategoryTarget, PotSettingsInput, PotSummary, Recurring, RecurringFrequency, TargetPeriod, Transaction, TransactionType } from './types';
 
 type Request = (endpoint: string, options?: RequestInit) => Promise<unknown>;
 
@@ -19,6 +19,8 @@ export interface RecurringInput {
   amount: number;
   description: string;
   dayOfMonth: number;
+  frequency?: RecurringFrequency;
+  anchorDate?: string | null;
   leadDays: number;
 }
 

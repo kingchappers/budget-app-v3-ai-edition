@@ -1,3 +1,4 @@
+import { NAMES } from './glossary';
 import { formatPence } from './money';
 import type { Account, Category, Transaction } from './types';
 
@@ -24,7 +25,7 @@ export interface TrashGroup {
 
 const GROUPS: { entityType: TrashEntityType; label: string }[] = [
   { entityType: 'TRANSACTION', label: 'Transactions' },
-  { entityType: 'TARGET', label: 'Targets' },
+  { entityType: 'TARGET', label: NAMES.budgets },
   { entityType: 'RECURRING', label: 'Recurring' },
   { entityType: 'ACCOUNT', label: 'Accounts' },
 ];
@@ -38,7 +39,7 @@ export function transactionLabel(transaction: Pick<Transaction, 'amount' | 'desc
 }
 
 export function targetLabel(targetAmount: number, categoryName: string): string {
-  return `${formatPence(targetAmount)} target · ${categoryName}`;
+  return `${formatPence(targetAmount)} budget · ${categoryName}`;
 }
 
 export function accountDeleteSummary(account: Pick<Account, 'name' | 'balances'>): string {

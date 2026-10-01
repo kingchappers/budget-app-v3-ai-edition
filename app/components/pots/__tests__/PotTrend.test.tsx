@@ -24,7 +24,7 @@ describe('trendPoints', () => {
 describe('PotTrend', () => {
   it('renders an image role with a polyline for two or more values', () => {
     const { container, getByRole } = render(<PotTrend values={[1, 2, 3]} />);
-    expect(getByRole('img', { name: 'Balance trend' })).toBeInTheDocument();
+    expect(getByRole('img', { name: 'Balance trend: £0.01 at the start, £0.03 at the end, over 3 months' })).toBeInTheDocument();
     expect(container.querySelector('polyline')).not.toBeNull();
   });
 

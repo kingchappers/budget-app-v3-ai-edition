@@ -1,24 +1,23 @@
 import { useState } from 'react';
-import { ActionIcon, Alert, Button, Group, Loader, Menu, Stack, Text, ThemeIcon, Title } from '@mantine/core';
-import { IconDots, IconPencil, IconPlus, IconTrash } from '@tabler/icons-react';
+import { ActionIcon, Button, Group, Loader, Menu, Stack, Text, ThemeIcon, Title } from '@mantine/core';
+import { LoadError } from '~/components/layout/LoadError';
+import { IconCalendarPlus, IconDots, IconPencil, IconPlus, IconTrash } from '@tabler/icons-react';
 import { DefaultLayout } from '~/components/layout/DefaultLayout';
 import { RecurringForm } from '~/components/recurring/RecurringForm';
 import { CategoryIcon } from '~/components/categories/CategoryIcon';
 import { useUndoableDelete } from '~/hooks/useUndoableDelete';
-import { formatMonthName, shiftMonth, todayIso } from '~/lib/months';
+import { shiftMonth, todayIso } from '~/lib/months';
 import { useCategories, useDeleteRecurring, useRecurring, useSetRecurringHandled, useTransactions } from '~/lib/queries';
-import { formatDayOfMonth, skippedPeriod } from '~/lib/recurring';
+import { downloadTextFile } from '~/lib/download';
+import { buildBillsCalendar, CALENDAR_FILENAME, isCalendarBill } from '~/lib/ics';
+import { describeSchedule, occurrenceLabel, previousOccurrenceKey, skippedPeriod } from '~/lib/recurring';
 import { transactionLabel } from '~/lib/trash';
 import { formatSignedPence } from '~/lib/transactionTypes';
 import type { Category, Recurring, Transaction } from '~/lib/types';
 import { pageTitle } from '~/lib/pageTitle';
 import type { Route } from './+types/recurring';
-
-function scheduleText(item: Recurring): string {
-  const day = `Monthly on the ${formatDayOfMonth(item.dayOfMonth)}`;
-  if (item.leadDays === 0) return `${day} · no early reminder`;
-  return `${day} · remind ${item.leadDays} ${item.leadDays === 1 ? 'day' : 'days'} before`;
-}
+import { redirect } from 'react-router';
+import { planPath } from '~/lib/planTabs';
 
 function byDay(a: Recurring, b: Recurring): number {
   if (a.dayOfMonth !== b.dayOfMonth) return a.dayOfMonth - b.dayOfMonth;
@@ -50,11 +49,11 @@ function RecurringRow({ item, category, categoriesLoaded, skipped, onEdit, onDel
         </ThemeIcon>
         <div style={{ minWidth: 0 }}>
           <Text truncate>{label}</Text>
-          <Text size="xs" c="dimmed" truncate>{scheduleText(item)}</Text>
-          {categoriesLoaded && !category && <Text size="xs" c="danger">Category deleted</Text>}
+          <Text size="sm">{describeSchedule(item)}</Text>
+          {categoriesLoaded && !category && <Text size="sm" c="danger">Category deleted</Text>}
           {skipped && (
             <Group gap={4} wrap="nowrap">
-              <Text size="xs" c="dimmed">{`Skipped for ${formatMonthName(skipped)}`}</Text>
+              <Text size="sm">{`Skipped for ${occurrenceLabel(skipped)}`}</Text>
               <Button
                 variant="subtle"
                 size="compact-xs"
@@ -91,7 +90,7 @@ function useSkipWindowTransactions(today: string): Transaction[] | null {
   return [...current.data, ...next.data];
 }
 
-function RecurringContent() {
+export function RecurringContent() {
   const recurring = useRecurring();
   const categories = useCategories();
   const remove = useDeleteRecurring();
@@ -103,7 +102,15 @@ function RecurringContent() {
   const [creating, setCreating] = useState(false);
 
   function undoSkip(item: Recurring, skipped: string): void {
-    setHandled.mutate({ recurringId: item.recurringId, period: shiftMonth(skipped, -1) });
+    setHandled.mutate({ recurringId: item.recurringId, period: previousOccurrenceKey(item, skipped) });
+  }
+
+  function downloadCalendar(): void {
+    downloadTextFile(
+      CALENDAR_FILENAME,
+      buildBillsCalendar({ bills: recurring.data ?? [], categories: categories.data ?? [] }),
+      'text/calendar;charset=utf-8',
+    );
   }
 
   function deleteItem(item: Recurring): void {
@@ -118,9 +125,7 @@ function RecurringContent() {
 
   if (recurring.error) {
     return (
-      <Alert color="danger" title="Could not load recurring items">
-        <Button onClick={() => recurring.refetch()}>Try again</Button>
-      </Alert>
+      <LoadError thing="recurring items" onRetry={() => recurring.refetch()} />
     );
   }
 
@@ -134,6 +139,15 @@ function RecurringContent() {
         <Title order={1} size="h3">Recurring</Title>
         <Button leftSection={<IconPlus size={16} />} onClick={() => setCreating(true)}>New</Button>
       </Group>
+
+      {items.some(isCalendarBill) && (
+        <Stack gap={4} align="flex-start">
+          <Button variant="default" leftSection={<IconCalendarPlus size={16} />} onClick={downloadCalendar}>
+            Add bills to your calendar
+          </Button>
+          <Text size="sm">Adds each bill to your calendar with a reminder. Download again after changing bills.</Text>
+        </Stack>
+      )}
 
       {items.length === 0 && (
         <Text c="dimmed">No recurring items yet. Use Repeat monthly on a transaction, or add one here.</Text>
@@ -162,6 +176,11 @@ function RecurringContent() {
       />
     </Stack>
   );
+}
+
+// This page now lives under Plan. The old address still works and leads there.
+export function clientLoader({ request }: Route.ClientLoaderArgs) {
+  throw redirect(planPath('recurring', new URL(request.url).search));
 }
 
 export const meta: Route.MetaFunction = () => [{ title: pageTitle('Recurring') }];

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildMonthSummary, leftToSpendSentence, normaliseTargetToMonth, targetedExpenseCategoryIds } from '../summary';
+import { buildMonthSummary, leftToSpendSentence, monthPacePercent, normaliseTargetToMonth, targetedExpenseCategoryIds } from '../summary';
 import type { Category, Transaction, CategoryTarget } from '../types';
 
 const categories: Category[] = [
@@ -279,5 +279,73 @@ describe('targetedExpenseCategoryIds', () => {
       { categoryId: 'cat-gone', targetAmount: 100, period: 'MONTHLY', updatedAt: '' },
     ]);
     expect([...ids]).toEqual(['cat-food']);
+  });
+});
+
+describe('monthPacePercent', () => {
+  it('is how far through the month today is, for the current month only', () => {
+    expect(monthPacePercent('2026-09', new Date(2026, 8, 15))).toBe(50); // day 15 of 30
+    expect(monthPacePercent('2026-09', new Date(2026, 8, 30))).toBe(100);
+    expect(monthPacePercent('2026-09', new Date(2026, 8, 1))).toBe(3);
+  });
+
+  it('is null for a past or future month', () => {
+    expect(monthPacePercent('2026-08', new Date(2026, 8, 15))).toBeNull();
+    expect(monthPacePercent('2026-10', new Date(2026, 8, 15))).toBeNull();
+  });
+});
+
+describe('weekly targets measured against this week', () => {
+  const weeklyFood: CategoryTarget[] = [{ categoryId: 'cat-food', targetAmount: 2000, period: 'WEEKLY', updatedAt: '' }];
+  // Wednesday 30 Sep 2026: the week runs Monday 28 Sep to Sunday 4 Oct.
+  const input = { categories, yearMonth: '2026-09', targets: weeklyFood, today: '2026-09-30' };
+
+  it('counts only spending from this week, not the rest of the month', () => {
+    const res = buildMonthSummary({
+      ...input,
+      transactions: [
+        txn({ yearMonth: '2026-09', amount: 500, date: '2026-09-02' }),
+        txn({ yearMonth: '2026-09', amount: 1200, date: '2026-09-29' }),
+      ],
+    });
+    expect(res.spending[0].week).toEqual({ spent: 1200, target: 2000 });
+    expect(res.spending[0].spent).toBe(1700); // the monthly figures are unchanged
+  });
+
+  it('includes the days of this week that fell in the previous month', () => {
+    const res = buildMonthSummary({
+      ...input,
+      yearMonth: '2026-10',
+      today: '2026-10-01',
+      transactions: [txn({ yearMonth: '2026-10', amount: 300, date: '2026-10-01' })],
+      weekTransactions: [
+        txn({ yearMonth: '2026-09', amount: 900, date: '2026-09-29' }),
+        txn({ yearMonth: '2026-10', amount: 300, date: '2026-10-01' }),
+      ],
+    });
+    expect(res.spending[0].week).toEqual({ spent: 1200, target: 2000 });
+  });
+
+  it('ignores other categories and income', () => {
+    const res = buildMonthSummary({
+      ...input,
+      transactions: [
+        txn({ amount: 700, categoryId: 'cat-dining', date: '2026-09-29' }),
+        txn({ amount: 5000, type: 'INCOME', categoryId: 'cat-food', date: '2026-09-29' }),
+      ],
+    });
+    expect(res.spending[0].week).toEqual({ spent: 0, target: 2000 });
+  });
+
+  it('gives no week figures for monthly targets, or when no date is given', () => {
+    const monthly = buildMonthSummary({
+      ...input,
+      targets: [{ categoryId: 'cat-food', targetAmount: 40000, period: 'MONTHLY', updatedAt: '' }],
+      transactions: [txn({ date: '2026-09-29' })],
+    });
+    expect(monthly.spending[0].week).toBeUndefined();
+
+    const noToday = buildMonthSummary({ categories, yearMonth: '2026-09', targets: weeklyFood, transactions: [] });
+    expect(noToday.spending[0].week).toBeUndefined();
   });
 });

@@ -37,11 +37,11 @@ function makePot(overrides: Partial<PotSummary> = {}): PotSummary {
   };
 }
 
-function renderSheet(pot: PotSummary | null, cat: Category = category) {
+function renderSheet(pot: PotSummary | null, cat: Category = category, suggestedMonthly?: number) {
   const onClose = vi.fn();
   render(
     <MantineProvider>
-      <PotHistorySheet pot={pot} category={cat} onClose={onClose} />
+      <PotHistorySheet pot={pot} category={cat} suggestedMonthly={suggestedMonthly} onClose={onClose} />
     </MantineProvider>,
   );
   return onClose;
@@ -83,7 +83,7 @@ describe('PotHistorySheet', () => {
     expect(within(rows[1]).getByText('July 2026')).toBeInTheDocument();
   });
 
-  it('marks auto-added amounts in the set aside column', () => {
+  it('marks auto-added amounts in the added to pot column', () => {
     renderSheet(makePot());
     expect(screen.getByText('£100.00 (£20.00 auto)')).toBeInTheDocument();
   });
@@ -108,7 +108,7 @@ describe('PotHistorySheet', () => {
     save.mutate.mockImplementation((_vars: unknown, options: { onSuccess: () => void }) => options.onSuccess());
     const onClose = renderSheet(makePot());
     await user.type(screen.getByLabelText('Monthly amount'), '50');
-    await user.type(screen.getByLabelText('Goal'), '3000');
+    await user.type(screen.getByLabelText('Pot goal'), '3000');
     await user.click(screen.getByRole('switch', { name: /^Auto-contribute/ }));
     await user.click(screen.getByRole('button', { name: 'Save' }));
 
@@ -126,7 +126,7 @@ describe('PotHistorySheet', () => {
   it('starts from the pot\'s current settings', () => {
     renderSheet(makePot({ monthlyAmount: 5000, goalAmount: 300000, autoAmountNow: 5000 }));
     expect(screen.getByLabelText('Monthly amount')).toHaveValue('50.00');
-    expect(screen.getByLabelText('Goal')).toHaveValue('3000.00');
+    expect(screen.getByLabelText('Pot goal')).toHaveValue('3000.00');
     expect(screen.getByRole('switch', { name: /^Auto-contribute/ })).toBeChecked();
   });
 
@@ -152,16 +152,16 @@ describe('PotHistorySheet', () => {
     expect(save.mutate).toHaveBeenCalledTimes(2);
   });
 
-  it('shows a negative balance with a minus sign and the danger colour', () => {
-    const danger = Array(10).fill('#c00') as unknown as MantineColorsTuple;
+  it('shows a negative balance with a minus sign and the calm attention colour, not danger', () => {
+    const attention = Array(10).fill('#44c') as unknown as MantineColorsTuple;
     render(
-      <MantineProvider theme={{ colors: { danger } }}>
+      <MantineProvider theme={{ colors: { attention } }}>
         <PotHistorySheet pot={makePot({ balance: -3000 })} category={category} onClose={vi.fn()} />
       </MantineProvider>,
     );
     const balance = screen.getByText('Balance').nextElementSibling as HTMLElement;
     expect(balance).toHaveTextContent('−£30.00');
-    expect(balance).toHaveStyle({ color: 'var(--mantine-color-danger-text)' });
+    expect(balance).toHaveStyle({ color: 'var(--mantine-color-attention-text)' });
   });
 
   it('shows an error and does not save for an invalid amount', async () => {
@@ -237,5 +237,15 @@ describe('PotHistorySheet rename', () => {
     await user.type(input, 'New Boiler{Enter}');
 
     expect(await screen.findByText(/could not rename/i)).toBeInTheDocument();
+  });
+
+  it('fills in a suggested monthly amount without saving it', () => {
+    renderSheet(makePot({ monthlyAmount: 1000 }), category, 3000);
+    expect(screen.getByLabelText('Monthly amount')).toHaveValue('30.00');
+  });
+
+  it('keeps the saved monthly amount when nothing is suggested', () => {
+    renderSheet(makePot({ monthlyAmount: 1000 }));
+    expect(screen.getByLabelText('Monthly amount')).toHaveValue('10.00');
   });
 });
