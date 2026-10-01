@@ -22,13 +22,13 @@ describe('TermHelp', () => {
     renderHelp(['target']);
 
     await user.tab();
-    expect(screen.getByRole('button', { name: /what's this\? target/i })).toHaveFocus();
+    expect(screen.getByRole('button', { name: /what's this\? budget/i })).toHaveFocus();
     await user.keyboard('{Enter}');
     expect(await screen.findByText(GLOSSARY.target.definition)).toBeInTheDocument();
 
     await user.keyboard('{Escape}');
     expect(screen.queryByText(GLOSSARY.target.definition)).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /what's this\? target/i })).toHaveFocus();
+    expect(screen.getByRole('button', { name: /what's this\? budget/i })).toHaveFocus();
   });
 
   it('lists every term it is given in one popover', async () => {

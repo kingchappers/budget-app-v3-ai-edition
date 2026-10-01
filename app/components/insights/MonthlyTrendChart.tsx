@@ -1,5 +1,6 @@
 import { LineChart } from '@mantine/charts';
 import { Text } from '@mantine/core';
+import { NAMES } from '~/lib/glossary';
 import { formatMonthLabel } from '~/lib/months';
 import { formatPence } from '~/lib/money';
 import type { MonthlyTrendRow } from '~/lib/insights';
@@ -14,7 +15,7 @@ export function MonthlyTrendChart({ rows }: { rows: MonthlyTrendRow[] }) {
     month: formatMonthLabel(row.yearMonth),
     Income: row.income,
     Spent: row.spent,
-    Saved: row.saved,
+    [NAMES.addedToPots]: row.saved,
   }));
 
   return (
@@ -25,7 +26,7 @@ export function MonthlyTrendChart({ rows }: { rows: MonthlyTrendRow[] }) {
       series={[
         { name: 'Income', color: 'teal.6' },
         { name: 'Spent', color: 'red.6' },
-        { name: 'Saved', color: 'blue.6' },
+        { name: NAMES.addedToPots, color: 'blue.6' },
       ]}
       valueFormatter={formatPence}
       withLegend

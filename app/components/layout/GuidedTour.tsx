@@ -9,9 +9,9 @@ export const TOUR_PARAM = 'tour';
 
 const SCREENS: { title: string; body: string; example: string }[] = [
   {
-    title: 'What a target is',
-    body: 'A target is the most you plan to spend on a category each month or week. The home page shows how much is left.',
-    example: 'For example, £300 a month for Food & Groceries. Targets are optional.',
+    title: 'What a budget is',
+    body: 'A budget is the most you plan to spend on a category each month or week. The home page shows how much is left.',
+    example: 'For example, £300 a month for Food & Groceries. Budgets are optional.',
   },
   {
     title: 'What pots are for',

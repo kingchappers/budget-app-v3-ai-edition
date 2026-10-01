@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { Link } from 'react-router';
 import { Alert, Button, Group, Loader, Stack, Text, Title } from '@mantine/core';
 import { DefaultLayout } from '~/components/layout/DefaultLayout';
+import { RELEASE_NOTES } from '~/lib/glossary';
 import { WelcomeBackCard } from '~/components/budget/WelcomeBackCard';
 import { WhatsChanged } from '~/components/layout/WhatsChanged';
 import { GuidedTour } from '~/components/layout/GuidedTour';
@@ -87,10 +88,8 @@ function HomeContent() {
 
   return (
     <Stack>
-      <WhatsChanged releaseKey="menu-2026-10">
-        The menu has changed. Targets, Pots and Recurring are now together under Plan. Add is in the middle of the bottom bar.
-        Categories and Accounts are in Settings.
-      </WhatsChanged>
+      <WhatsChanged releaseKey="menu-2026-10">{RELEASE_NOTES.menu}</WhatsChanged>
+      <WhatsChanged releaseKey="names-2026-10">{RELEASE_NOTES.names}</WhatsChanged>
       <WelcomeBackCard />
       <DueRecurringCard />
       <MonthHeader yearMonth={yearMonth} onChange={setYearMonth} />
@@ -100,7 +99,7 @@ function HomeContent() {
 
       {hasTargets && (
         <div>
-          <Title order={5} mb="xs">Spending vs target</Title>
+          <Title order={5} mb="xs">Spending vs budget</Title>
           <GroupedProgress items={summary.spending} yearMonth={yearMonth} />
           {summary.spentUnbudgeted > 0 && <OtherSpendingRow amount={summary.spentUnbudgeted} yearMonth={yearMonth} />}
         </div>

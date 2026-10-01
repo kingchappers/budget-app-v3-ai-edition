@@ -19,6 +19,7 @@ import { currentYearMonth, formatMonthLabel, shiftMonth } from '~/lib/months';
 import { formatPence } from '~/lib/money';
 import { useDocumentTitle } from '~/hooks/useDocumentTitle';
 import { useAccounts, useCategories, usePots, useTargets, useTransactionsRange } from '~/lib/queries';
+import { NAMES } from '~/lib/glossary';
 import { pageTitle } from '~/lib/pageTitle';
 import type { Route } from './+types/insights';
 
@@ -99,7 +100,7 @@ function InsightsContent() {
       <Title order={5} mt="md">Biggest movers</Title>
       <BiggestMoversList up={movers.up} down={movers.down} />
 
-      <Title order={5} mt="md">Targets</Title>
+      <Title order={5} mt="md">{NAMES.budgets}</Title>
       <TargetAdherence rows={adherence} />
 
       <Title order={5} mt="md">Pots</Title>

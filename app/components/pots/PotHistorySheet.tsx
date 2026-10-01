@@ -5,6 +5,7 @@ import { IconPencil } from '@tabler/icons-react';
 import { SaveStatus, type SaveState } from '~/components/layout/SaveStatus';
 import { ResponsiveSheet } from '~/components/layout/ResponsiveSheet';
 import { useInlineCategoryRename } from '~/hooks/useInlineCategoryRename';
+import { NAMES } from '~/lib/glossary';
 import { categoryLabel } from '~/lib/categoryIcons';
 import { formatPence, formatPencePlain, parsePounds } from '~/lib/money';
 import { currentYearMonth, formatMonthLabel } from '~/lib/months';
@@ -110,7 +111,7 @@ function PotSettingsForm({ pot, category }: { pot: PotSummary; category: Categor
           <TermHelp terms={['monthlyAmount']} />
         </Group>
         <Group align="flex-end" wrap="nowrap" gap={0}>
-          <TextInput label="Goal" placeholder="0.00" inputMode="decimal" value={goal} style={{ flex: 1 }}
+          <TextInput label={NAMES.potGoal} placeholder="0.00" inputMode="decimal" value={goal} style={{ flex: 1 }}
             onChange={e => { setGoal(e.currentTarget.value); setSaveState('idle'); }} />
           <TermHelp terms={['potGoal']} />
         </Group>
@@ -163,7 +164,7 @@ export function PotHistorySheet({ pot, category, onClose }: PotHistorySheetProps
                   <Table.Tr>
                     <Table.Th>Month</Table.Th>
                     <Table.Th>Opening</Table.Th>
-                    <Table.Th>Set aside</Table.Th>
+                    <Table.Th>Added to pot</Table.Th>
                     <Table.Th>Taken out</Table.Th>
                     <Table.Th>Spent</Table.Th>
                     <Table.Th>Closing</Table.Th>

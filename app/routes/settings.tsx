@@ -118,7 +118,7 @@ function SettingsContent() {
           ))}
         </Stack>
         <Text fw={500} mt="md">Guided tour</Text>
-        <Text size="sm" mb="xs">Three short screens on targets, pots and recurring bills.</Text>
+        <Text size="sm" mb="xs">Three short screens on budgets, pots and recurring bills.</Text>
         <Button variant="default" onClick={replayTour}>Take the tour again</Button>
       </Card>
     </Stack>

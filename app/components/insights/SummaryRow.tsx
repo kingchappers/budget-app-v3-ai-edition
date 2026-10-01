@@ -1,5 +1,6 @@
 import { Group, Paper, SimpleGrid, Text } from '@mantine/core';
 import { IconArrowDown, IconArrowUp } from '@tabler/icons-react';
+import { NAMES } from '~/lib/glossary';
 import { formatPence } from '~/lib/money';
 import type { SummaryTotals } from '~/lib/insights';
 
@@ -47,7 +48,7 @@ export function SummaryRow({ current, previous }: { current: SummaryTotals; prev
     <SimpleGrid cols={{ base: 2, sm: 4 }}>
       <Figure label="Income" pence={current.income} previousPence={previous.income} higherIsGood />
       <Figure label="Spent" pence={current.spent} previousPence={previous.spent} higherIsGood={false} />
-      <Figure label="Saved" pence={current.saved} previousPence={previous.saved} higherIsGood />
+      <Figure label={NAMES.addedToPots} pence={current.saved} previousPence={previous.saved} higherIsGood />
       <Figure label="Net" pence={current.net} previousPence={previous.net} higherIsGood />
     </SimpleGrid>
   );

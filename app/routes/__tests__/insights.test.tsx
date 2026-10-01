@@ -108,12 +108,12 @@ describe('Insights page', () => {
     expect(within(dialog).getByText('Mortgage')).toBeInTheDocument();
   });
 
-  it('shows the targets and pots sections', () => {
+  it('shows the budgets and pots sections', () => {
     data.targets = [{ categoryId: 'cat-groceries', targetAmount: 20000, period: 'MONTHLY', updatedAt: '' }];
     data.categories = [{ categoryId: 'cat-groceries', name: 'Groceries', type: 'EXPENSE', group: 'EVERYDAY', icon: 'tag', isDefault: true, createdAt: '' }];
     data.pots = [{ categoryId: 'cat-holidays', monthlyAmount: null, goalAmount: null, autoAmountNow: 0, balance: 1000, thisMonth: { setAside: 0, autoAdded: 0, takeOut: 0, spent: 0 }, months: [] }];
     renderPage();
-    expect(screen.getByRole('heading', { name: 'Targets' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Budgets' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Pots' })).toBeInTheDocument();
   });
 

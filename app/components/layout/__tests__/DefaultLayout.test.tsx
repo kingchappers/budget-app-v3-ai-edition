@@ -145,7 +145,7 @@ describe('DefaultLayout add shortcut', () => {
 
   it('gives each place one route in: nothing that moved is still in the menus', () => {
     renderLayout();
-    for (const name of ['Targets', 'Pots', 'Recurring', 'Categories', 'Accounts', 'Recently deleted', 'Catch up']) {
+    for (const name of ['Budgets', 'Pots', 'Recurring', 'Categories', 'Accounts', 'Recently deleted', 'Catch up']) {
       expect(screen.queryByRole('link', { name })).not.toBeInTheDocument();
     }
   });

@@ -31,20 +31,20 @@ beforeEach(() => {
 describe('GuidedTour', () => {
   it('opens on the first screen for someone with no transactions', async () => {
     renderTour();
-    expect(await screen.findByText('What a target is')).toBeInTheDocument();
+    expect(await screen.findByText('What a budget is')).toBeInTheDocument();
     expect(screen.getByText(`Step 1 of ${TOUR_SCREENS}`)).toBeInTheDocument();
   });
 
   it('stays away from someone who already has transactions', () => {
     history.value = { isSuccess: true, data: [{}] };
     renderTour();
-    expect(screen.queryByText('What a target is')).not.toBeInTheDocument();
+    expect(screen.queryByText('What a budget is')).not.toBeInTheDocument();
   });
 
   it('waits until the history has loaded', () => {
     history.value = { isSuccess: false, data: undefined as unknown as unknown[] };
     renderTour();
-    expect(screen.queryByText('What a target is')).not.toBeInTheDocument();
+    expect(screen.queryByText('What a budget is')).not.toBeInTheDocument();
   });
 
   it('walks through all three screens and then stays finished', async () => {
@@ -60,7 +60,7 @@ describe('GuidedTour', () => {
     expect(savedStep()).toBe(TOUR_SCREENS);
     unmount();
     renderTour();
-    expect(screen.queryByText('What a target is')).not.toBeInTheDocument();
+    expect(screen.queryByText('What a budget is')).not.toBeInTheDocument();
   });
 
   it('resumes where it was left', async () => {
@@ -78,13 +78,13 @@ describe('GuidedTour', () => {
     expect(savedStep()).toBe(TOUR_SCREENS);
     unmount();
     renderTour();
-    expect(screen.queryByText('What a target is')).not.toBeInTheDocument();
+    expect(screen.queryByText('What a budget is')).not.toBeInTheDocument();
   });
 
   it('counts closing it with Escape as skipping', async () => {
     const user = userEvent.setup();
     renderTour();
-    await screen.findByText('What a target is');
+    await screen.findByText('What a budget is');
     await user.keyboard('{Escape}');
     expect(savedStep()).toBe(TOUR_SCREENS);
   });
@@ -93,6 +93,6 @@ describe('GuidedTour', () => {
     window.localStorage.setItem(PREFERENCES_KEY, JSON.stringify({ tourStep: 0 }));
     history.value = { isSuccess: true, data: [{}] };
     renderTour('/?tour=1');
-    expect(await screen.findByText('What a target is')).toBeInTheDocument();
+    expect(await screen.findByText('What a budget is')).toBeInTheDocument();
   });
 });

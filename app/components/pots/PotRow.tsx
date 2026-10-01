@@ -1,4 +1,5 @@
 import { Badge, Button, Card, Group, Progress, Stack, Text, UnstyledButton } from '@mantine/core';
+import { GLOSSARY } from '~/lib/glossary';
 import { categoryLabel } from '~/lib/categoryIcons';
 import { formatPence } from '~/lib/money';
 import { goalPercent, thisMonthSummary } from '~/lib/pots';
@@ -44,8 +45,8 @@ export function PotRow({ pot, category, onSetAside, onOpen }: PotRowProps) {
         {onOpen
           ? <UnstyledButton onClick={onOpen} style={{ flex: 1, minWidth: 0 }} aria-label={`Open ${category.name} history`}>{details}</UnstyledButton>
           : <div style={{ flex: 1, minWidth: 0 }}>{details}</div>}
-        <Button size="compact-sm" variant="light" onClick={onSetAside} aria-label={`Set aside to ${category.name}`}>
-          Set aside
+        <Button size="compact-sm" variant="light" onClick={onSetAside} aria-label={`Add to ${category.name} pot`}>
+          {GLOSSARY.setAside.term}
         </Button>
       </Group>
     </Card>
