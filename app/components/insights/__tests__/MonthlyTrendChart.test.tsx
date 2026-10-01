@@ -28,7 +28,7 @@ describe('MonthlyTrendChart', () => {
   it('summarises the chart in words and says how the lines differ without colour', () => {
     renderChart();
     expect(screen.getByText(/Spending was highest in September 2026 at £1,200\.00\./)).toBeInTheDocument();
-    expect(screen.getByText(/Income is the solid line, spent is dashed and saved is dotted\./)).toBeInTheDocument();
+    expect(screen.getByText(/Income is the solid line, spent is dashed and added to pots is dotted\./)).toBeInTheDocument();
   });
 
   it('draws spent dashed and saved dotted, so series differ by more than hue', () => {
@@ -41,7 +41,7 @@ describe('MonthlyTrendChart', () => {
     renderChart();
     await userEvent.setup().click(screen.getByRole('button', { name: 'Show as table' }));
 
-    const table = screen.getByRole('table', { name: 'Income, spent and saved by month' });
+    const table = screen.getByRole('table', { name: 'Income, spent and added to pots by month' });
     const september = within(table).getByRole('rowheader', { name: 'September 2026' }).closest('tr') as HTMLElement;
     expect(within(september).getByText('£1,200.00')).toBeInTheDocument();
     expect(within(september).getByText('−£20.00')).toBeInTheDocument();

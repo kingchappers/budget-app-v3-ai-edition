@@ -5,8 +5,8 @@ import { formatPence } from '~/lib/money';
 
 function outcomeText({ yearMonth, targeted, spent }: MonthTargetOutcome): string | null {
   const month = formatMonthName(yearMonth);
-  if (spent < targeted) return `${month} finished ${formatPence(targeted - spent)} under target.`;
-  if (spent === targeted) return `${month} finished on target.`;
+  if (spent < targeted) return `${month} finished ${formatPence(targeted - spent)} under budget.`;
+  if (spent === targeted) return `${month} finished on budget.`;
   return null;
 }
 

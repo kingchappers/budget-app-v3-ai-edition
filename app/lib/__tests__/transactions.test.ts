@@ -106,6 +106,39 @@ describe('topCategories', () => {
   });
 });
 
+describe('topCategories with pinned categories', () => {
+  const list = [cat('a'), cat('b'), cat('c'), cat('d'), cat('salary', 'INCOME'), cat('holidays', 'POT')];
+  const busyC = [txn({ categoryId: 'c' }), txn({ categoryId: 'c' }), txn({ categoryId: 'c' })];
+
+  it('puts pinned categories first, in the order they were pinned, whatever the usage', () => {
+    const result = topCategories(busyC, list, 'EXPENSE', 5, ['d', 'a']);
+    expect(result.map(c => c.categoryId)).toEqual(['d', 'a', 'c', 'b', 'holidays']);
+  });
+
+  it('fills the remaining places by usage and never lists a category twice', () => {
+    const result = topCategories(busyC, list, 'EXPENSE', 5, ['c', 'c', 'a']);
+    expect(result.map(c => c.categoryId)).toEqual(['c', 'a', 'b', 'd', 'holidays']);
+  });
+
+  it('skips pins that no longer exist or do not fit the transaction type', () => {
+    const result = topCategories([], list, 'EXPENSE', 5, ['gone', 'salary', 'b']);
+    expect(result.map(c => c.categoryId)).toEqual(['b', 'a', 'c', 'd', 'holidays']);
+    expect(topCategories([], list, 'INCOME', 5, ['b', 'salary']).map(c => c.categoryId)).toEqual(['salary']);
+  });
+
+  it('keeps pins within the limit', () => {
+    const result = topCategories([], list, 'EXPENSE', 2, ['d', 'c', 'b']);
+    expect(result.map(c => c.categoryId)).toEqual(['d', 'c']);
+  });
+
+  it('gives the same order for the same history however the months fall', () => {
+    const early = [txn({ categoryId: 'b', date: '2026-01-31' }), txn({ categoryId: 'b', date: '2026-02-01' }), txn({ categoryId: 'a', date: '2026-02-01' })];
+    const late = [...early].reverse();
+    expect(topCategories(early, list, 'EXPENSE', 5).map(c => c.categoryId))
+      .toEqual(topCategories(late, list, 'EXPENSE', 5).map(c => c.categoryId));
+  });
+});
+
 describe('filterTransactions untargeted spending', () => {
   const withDining: Category[] = [
     ...categories,

@@ -26,3 +26,30 @@ describe('dark mode dimmed text contrast', () => {
     expect(contrastRatio(gray6, '#ffffff')).toBeGreaterThanOrEqual(4.5);
   });
 });
+
+// Colour carries a small set of meanings, and each must be readable as text in
+// both modes. Mantine uses shade 7 for text in light mode and shade 4 in dark
+// mode (see getCSSColorVariables), so those are the shades checked here.
+//   primary   - the brand, and neutral "good" progress
+//   attention - something worth a look, in a calm hue that isn't red
+//   success   - a change for the better
+//   danger    - reserved for real errors and destructive actions, never ordinary data
+describe('meaning colours', () => {
+  it.each(['primary', 'attention', 'success'])('%s text reads at 4.5:1 in light mode', name => {
+    expect(contrastRatio(mergedTheme.colors[name][7], '#ffffff')).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it.each(['primary', 'attention', 'success'])('%s text reads at 4.5:1 in dark mode', name => {
+    expect(contrastRatio(mergedTheme.colors[name][4], MANTINE_DEFAULT_DARK_BODY)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it('keeps attention visibly different from danger', () => {
+    expect(mergedTheme.colors.attention[7]).not.toBe(mergedTheme.colors.danger[7]);
+  });
+});
+
+describe('motion', () => {
+  it('follows the device reduced-motion setting', () => {
+    expect(mergedTheme.respectReducedMotion).toBe(true);
+  });
+});

@@ -5,8 +5,11 @@ import { ToastAction } from '~/components/layout/ToastAction';
 import { ApiError } from '~/lib/apiError';
 import type { TransactionInput } from '~/lib/api';
 import { formatPence } from '~/lib/money';
+import { formatDayLabel, todayIso } from '~/lib/months';
 import { enqueue } from '~/lib/offlineQueue';
 import { clearPendingEntry, discardQueuedEntry, setPendingEntry } from '~/lib/pendingEntries';
+import { usePreferences } from '~/lib/preferences';
+import { undoAutoClose } from '~/lib/undoDuration';
 import { useCategories, useCreateTransaction, useDeleteTransaction } from '~/lib/queries';
 import type { Transaction } from '~/lib/types';
 
@@ -15,8 +18,19 @@ import type { Transaction } from '~/lib/types';
 // recent save's Undo is on screen at a time.
 let latestSaveToastId: string | null = null;
 
+export interface SaveHandle {
+  // What was saved, e.g. "£4.80 · Dining", for wording an Undo button.
+  label: string;
+  undo: () => void;
+}
+
 export interface SaveOptions {
+  // For a category that was only just created, which the loaded list does not have yet.
+  categoryName?: string;
   onUndo?: () => void;
+  // Called as soon as the save starts, so a caller can offer its own Undo
+  // (for example inside a sheet that stays open) alongside the notification.
+  onSaveStarted?: (handle: SaveHandle) => void;
 }
 
 export function useSaveWithUndo(): (input: TransactionInput, options?: SaveOptions) => Promise<Transaction | null> {
@@ -25,10 +39,14 @@ export function useSaveWithUndo(): (input: TransactionInput, options?: SaveOptio
   const remove = useDeleteTransaction();
   const qc = useQueryClient();
   const userSub = useAuth0().user?.sub ?? '';
+  const [{ undoDuration }] = usePreferences();
 
-  function describeInput(input: TransactionInput): string {
-    const categoryName = categories.find(c => c.categoryId === input.categoryId)?.name ?? 'Transaction';
-    return `${formatPence(input.amount)} · ${categoryName}`;
+  // "£3.50 · Coffee", with the day added when the entry is not for today: "£3.50 · Coffee · Mon 22 Sep".
+  function describeInput(input: TransactionInput, categoryName?: string): string {
+    const name = categoryName ?? categories.find(c => c.categoryId === input.categoryId)?.name ?? 'Transaction';
+    const base = `${formatPence(input.amount)} · ${name}`;
+    const day = formatDayLabel(input.date, todayIso());
+    return day === 'Today' ? base : `${base} · ${day}`;
   }
 
   function showFailureToast(input: TransactionInput, options?: SaveOptions): void {
@@ -40,7 +58,7 @@ export function useSaveWithUndo(): (input: TransactionInput, options?: SaveOptio
       closeButtonProps: { 'aria-label': 'Close notification' },
       message: (
         <ToastAction
-          text={`Couldn't save ${describeInput(input)}`}
+          text={`Couldn't save ${describeInput(input, options?.categoryName)}`}
           actionLabel="Retry"
           onAction={() => {
             notifications.hide(toastId);
@@ -54,6 +72,7 @@ export function useSaveWithUndo(): (input: TransactionInput, options?: SaveOptio
   function showSaveToast(toastId: string, text: string, onUndo: () => void): void {
     if (latestSaveToastId && latestSaveToastId !== toastId) notifications.hide(latestSaveToastId);
     latestSaveToastId = toastId;
+    // While it is still saving the message waits; the chosen time starts once it has settled.
     notifications.show({
       id: toastId,
       autoClose: false,
@@ -66,6 +85,7 @@ export function useSaveWithUndo(): (input: TransactionInput, options?: SaveOptio
   function relabelSaveToast(toastId: string, text: string, onUndo: () => void): void {
     notifications.update({
       id: toastId,
+      autoClose: undoAutoClose(undoDuration),
       message: <ToastAction text={text} actionLabel="Undo" onAction={onUndo} />,
     });
   }
@@ -75,7 +95,7 @@ export function useSaveWithUndo(): (input: TransactionInput, options?: SaveOptio
     const transactionId = crypto.randomUUID();
     const withId: TransactionInput = { ...input, transactionId };
     const queuedAt = new Date().toISOString();
-    const description = describeInput(input);
+    const description = describeInput(input, options?.categoryName);
     let undone = false;
 
     // Show the row immediately, the same instant Save is pressed, whether
@@ -121,6 +141,7 @@ export function useSaveWithUndo(): (input: TransactionInput, options?: SaveOptio
     );
 
     function undo(): void {
+      if (undone) return;
       undone = true;
       notifications.hide(toastId);
       void outcome.then(async created => {
@@ -138,6 +159,7 @@ export function useSaveWithUndo(): (input: TransactionInput, options?: SaveOptio
     }
 
     showSaveToast(toastId, `Saving ${description}…`, undo);
+    options?.onSaveStarted?.({ label: description, undo });
 
     return outcome;
   }

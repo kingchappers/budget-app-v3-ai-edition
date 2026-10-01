@@ -23,7 +23,7 @@ export function TrackingList({ months, onMark, onInclude }: {
   return (
     <Stack gap="xs">
       <Text size="sm" c="dimmed">
-        Months with entries on fewer than a quarter of their days are left out of comparisons and target counts.
+        Months with entries on fewer than a quarter of their days are left out of comparisons and budget counts.
         You can also leave a month out yourself, for example if you were away.
       </Text>
       {months.map(month => {

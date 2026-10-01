@@ -1,5 +1,5 @@
 import { formatPence } from './money';
-import { currentYearMonth, daysLeftInMonth, monthName } from './months';
+import { addDaysIso, currentYearMonth, daysLeftInMonth, monthName, startOfWeekIso } from './months';
 import type { Category, CategoryGroup, CategoryTarget, TargetPeriod, Transaction } from './types';
 
 export interface CategoryProgress {
@@ -13,6 +13,9 @@ export interface CategoryProgress {
   percent: number;
   isOver: boolean;
   group?: CategoryGroup;
+  // Only for a weekly target while viewing the current month: what was spent
+  // this week (Monday to Sunday) against the weekly amount.
+  week?: { spent: number; target: number };
 }
 
 export interface MonthSummary {
@@ -29,6 +32,13 @@ export interface MonthSummary {
 export function daysInMonth(yearMonth: string): number {
   const [year, month] = yearMonth.split('-').map(Number);
   return new Date(year, month, 0).getDate();
+}
+
+// How far through the month today is, as a whole percentage. Only meaningful
+// for the current month, so it is null for any other.
+export function monthPacePercent(yearMonth: string, now: Date = new Date()): number | null {
+  if (yearMonth !== currentYearMonth(now)) return null;
+  return Math.round((now.getDate() / daysInMonth(yearMonth)) * 100);
 }
 
 export function normaliseTargetToMonth(
@@ -78,8 +88,17 @@ export function buildMonthSummary(input: {
   targets: CategoryTarget[];
   yearMonth: string;
   recentLimit?: number;
+  // Today's date, when viewing the current month. Weekly targets are then
+  // measured against this week's spending.
+  today?: string;
+  // Every transaction dated in this week, including any from the previous
+  // month. Falls back to `transactions` when the week sits inside this month.
+  weekTransactions?: Transaction[];
 }): MonthSummary {
-  const { transactions, categories, targets, yearMonth, recentLimit = 5 } = input;
+  const { transactions, categories, targets, yearMonth, recentLimit = 5, today, weekTransactions } = input;
+  const weekStart = today ? startOfWeekIso(today) : null;
+  const weekEnd = weekStart ? addDaysIso(weekStart, 6) : null;
+  const weekPool = weekTransactions ?? transactions;
 
   const categoryById = new Map(categories.map(c => [c.categoryId, c]));
 
@@ -98,7 +117,14 @@ export function buildMonthSummary(input: {
       const spent = transactions
         .filter(t => t.categoryId === category.categoryId && t.type === 'EXPENSE')
         .reduce((sum, t) => sum + t.amount, 0);
-      spending.push(toProgress(category, target, spent, yearMonth));
+      const progress = toProgress(category, target, spent, yearMonth);
+      if (target.period === 'WEEKLY' && weekStart && weekEnd) {
+        const weekSpent = weekPool
+          .filter(t => t.categoryId === category.categoryId && t.type === 'EXPENSE' && t.date >= weekStart && t.date <= weekEnd)
+          .reduce((sum, t) => sum + t.amount, 0);
+        progress.week = { spent: weekSpent, target: target.targetAmount };
+      }
+      spending.push(progress);
     }
   }
 

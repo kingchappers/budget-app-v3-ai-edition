@@ -32,8 +32,8 @@ export function NetWorth({ accounts, months }: { accounts: Account[]; months: st
   return (
     <Stack gap="xs">
       <Group justify="space-between">
-        <Text fw={700} size="lg" c={current < 0 ? 'danger' : undefined}>{current < 0 ? `−${formatPence(-current)}` : formatPence(current)}</Text>
-        <Text size="sm" c={change >= 0 ? 'primary' : 'danger'}>{formatSigned(change)}</Text>
+        <Text fw={700} size="lg">{current < 0 ? `−${formatPence(-current)}` : formatPence(current)}</Text>
+        <Text size="sm">{formatSigned(change)}</Text>
       </Group>
       <ChartData
         summary={netWorthSummary(current, change)}
@@ -45,7 +45,7 @@ export function NetWorth({ accounts, months }: { accounts: Account[]; months: st
           h={180}
           data={trend.map(row => ({ month: formatMonthLabel(row.yearMonth), 'Net worth': row.netWorth }))}
           dataKey="month"
-          series={[{ name: 'Net worth', color: CHART_COLORS.positive }]}
+          series={[{ name: 'Net worth', color: CHART_COLORS.info }]}
           valueFormatter={formatPence}
           withDots
         />

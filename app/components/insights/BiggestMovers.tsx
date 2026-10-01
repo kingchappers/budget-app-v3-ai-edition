@@ -2,11 +2,12 @@ import { Group, SimpleGrid, Stack, Text } from '@mantine/core';
 import { formatPence } from '~/lib/money';
 import type { Mover } from '~/lib/insights';
 
-function MoverRow({ mover, sign }: { mover: Mover; sign: '+' | '−' }) {
+// Words carry the meaning; colour only backs them up.
+function MoverRow({ mover, direction }: { mover: Mover; direction: 'more' | 'less' }) {
   return (
     <Group justify="space-between">
       <Text>{mover.name}</Text>
-      <Text c={sign === '+' ? 'red' : 'teal'}>{sign}{formatPence(Math.abs(mover.deltaPence))}</Text>
+      <Text c={direction === 'more' ? 'attention' : 'success'}>{formatPence(Math.abs(mover.deltaPence))} {direction}</Text>
     </Group>
   );
 }
@@ -31,11 +32,11 @@ export function BiggestMoversList({ up, down, comparedWith }: BiggestMoversListP
     <SimpleGrid cols={{ base: 1, sm: 2 }}>
       <Stack gap="xs">
         <Text fw={600}>{`Spending up${against}`}</Text>
-        {up.map(mover => <MoverRow key={mover.categoryId} mover={mover} sign="+" />)}
+        {up.map(mover => <MoverRow key={mover.categoryId} mover={mover} direction="more" />)}
       </Stack>
       <Stack gap="xs">
         <Text fw={600}>{`Spending down${against}`}</Text>
-        {down.map(mover => <MoverRow key={mover.categoryId} mover={mover} sign="−" />)}
+        {down.map(mover => <MoverRow key={mover.categoryId} mover={mover} direction="less" />)}
       </Stack>
     </SimpleGrid>
   );

@@ -1,11 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MantineProvider } from '@mantine/core';
+import { theme } from '~/root';
 import { BiggestMoversList } from '../BiggestMovers';
 import type { BiggestMovers } from '~/lib/insights';
 
 function renderList(data: BiggestMovers, comparedWith?: string) {
-  return render(<MantineProvider><BiggestMoversList up={data.up} down={data.down} comparedWith={comparedWith} /></MantineProvider>);
+  return render(<MantineProvider theme={theme}><BiggestMoversList up={data.up} down={data.down} comparedWith={comparedWith} /></MantineProvider>);
 }
 
 describe('BiggestMoversList', () => {
@@ -16,10 +17,10 @@ describe('BiggestMoversList', () => {
     });
     expect(screen.getByText('Spending up')).toBeInTheDocument();
     expect(screen.getByText('A')).toBeInTheDocument();
-    expect(screen.getByText('+£80.00')).toBeInTheDocument();
+    expect(screen.getByText('£80.00 more')).toBeInTheDocument();
     expect(screen.getByText('Spending down')).toBeInTheDocument();
     expect(screen.getByText('B')).toBeInTheDocument();
-    expect(screen.getByText('−£80.00')).toBeInTheDocument();
+    expect(screen.getByText('£80.00 less')).toBeInTheDocument();
   });
 
   it('shows a message instead of empty lists when nothing moved', () => {
@@ -35,5 +36,14 @@ describe('BiggestMoversList', () => {
   it('says it was not compared, rather than listing movers, when there was no fair comparison', () => {
     renderList({ up: [], down: [] }, '');
     expect(screen.getByText(/not compared/i)).toBeInTheDocument();
+  });
+
+  it('uses the attention colour for a rise and the positive colour for a fall, never red', () => {
+    renderList({
+      up: [{ categoryId: 'cat-a', name: 'A', currentPence: 10000, previousPence: 2000, deltaPence: 8000 }],
+      down: [{ categoryId: 'cat-b', name: 'B', currentPence: 1000, previousPence: 9000, deltaPence: -8000 }],
+    });
+    expect(screen.getByText('£80.00 more')).toHaveStyle({ color: 'var(--mantine-color-attention-text)' });
+    expect(screen.getByText('£80.00 less')).toHaveStyle({ color: 'var(--mantine-color-success-text)' });
   });
 });

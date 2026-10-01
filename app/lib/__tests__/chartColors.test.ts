@@ -1,6 +1,10 @@
-import { DEFAULT_THEME } from '@mantine/core';
+import { DEFAULT_THEME, mergeMantineTheme } from '@mantine/core';
 import { describe, expect, it } from 'vitest';
+import { theme } from '../../root';
 import { CHART_COLORS } from '../chartColors';
+
+// Uses the app's own palette (success, primary and the rest are its custom ramps).
+const colors = mergeMantineTheme(DEFAULT_THEME, theme).colors;
 
 function luminance(hex: string): number {
   const [r, g, b] = [1, 3, 5].map(start => parseInt(hex.slice(start, start + 2), 16) / 255)
@@ -15,13 +19,20 @@ function contrast(a: string, b: string): number {
 
 function hexFor(token: string): string {
   const [name, shade] = token.split('.');
-  return DEFAULT_THEME.colors[name][Number(shade)];
+  return colors[name][Number(shade)];
 }
 
 describe('chart colours', () => {
-  it.each(Object.entries(CHART_COLORS))('%s is at least 3:1 on the light and dark page', (_name, token) => {
+  const shaded = Object.entries(CHART_COLORS).filter(([, token]) => !token.startsWith('var('));
+
+  it.each(shaded)('%s is at least 3:1 on the light and dark page', (_name, token) => {
     expect(contrast(hexFor(token), '#ffffff')).toBeGreaterThanOrEqual(3);
     expect(contrast(hexFor(token), '#242424')).toBeGreaterThanOrEqual(3);
+  });
+
+  it('draws spending in the page\'s own text colour, never red', () => {
+    expect(CHART_COLORS.spending).toBe('var(--mantine-color-text)');
+    expect(JSON.stringify(CHART_COLORS)).not.toMatch(/red|danger/);
   });
 
   it('no longer uses the 2.55:1 teal the audit flagged', () => {

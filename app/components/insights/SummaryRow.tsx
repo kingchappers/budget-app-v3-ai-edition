@@ -1,5 +1,6 @@
 import { Group, Paper, SimpleGrid, Text } from '@mantine/core';
 import { IconArrowDown, IconArrowUp } from '@tabler/icons-react';
+import { NAMES } from '~/lib/glossary';
 import { formatPence } from '~/lib/money';
 import type { SummaryTotals } from '~/lib/insights';
 
@@ -36,17 +37,17 @@ function Figure({ label, pence, previousPence, previousLabel, higherIsGood }: Fi
   const percent = percentChange(deltaPence, previousPence);
   const up = deltaPence >= 0;
   const good = up === higherIsGood;
-  const color = good ? 'primary' : 'danger';
+  const color = good ? 'success' : 'attention';
   const Arrow = up ? IconArrowUp : IconArrowDown;
   return (
     <Paper withBorder p="sm">
-      <Text size="xs" c="dimmed">{label}</Text>
+      <Text size="sm">{label}</Text>
       <Text fw={700} size="lg">{formatPence(pence)}</Text>
       {deltaPence !== 0 && (
         <Group gap={4} wrap="nowrap" data-tone={good ? 'good' : 'bad'}>
-          <Arrow size={12} color={`var(--mantine-color-${color}-6)`} />
-          <Text size="xs" c={color}>
-            {up ? '+' : '−'}{formatPence(Math.abs(deltaPence))}{percent !== null ? ` (${up ? '+' : '−'}${Math.abs(percent)}%)` : ''}
+          <Arrow size={12} color={`var(--mantine-color-${color}-text)`} aria-hidden />
+          <Text size="sm" c={color}>
+            {formatPence(Math.abs(deltaPence))} {up ? 'more' : 'less'}{percent !== null ? ` (${Math.abs(percent)}%)` : ''}
           </Text>
         </Group>
       )}
@@ -78,7 +79,7 @@ export function SummaryRow({ current, previous, previousLabel = 'Previous period
     <SimpleGrid cols={{ base: 2, sm: 4 }}>
       {figure('income', 'Income', true)}
       {figure('spent', 'Spent', false)}
-      {figure('saved', 'Saved', true)}
+      {figure('saved', NAMES.addedToPots, true)}
       {figure('net', 'Net', true)}
     </SimpleGrid>
   );

@@ -25,8 +25,8 @@ export function GroupBreakdownChart({ rows, onSelectGroup, currentLabel = '', pr
     ? { label: row.label, [thisName]: row.current, [previousLabel]: row.previous }
     : { label: row.label, [thisName]: row.current }));
   const series = compared
-    ? [{ name: thisName, color: CHART_COLORS.positive }, { name: previousLabel, color: CHART_COLORS.neutral }]
-    : [{ name: thisName, color: CHART_COLORS.positive }];
+    ? [{ name: thisName, color: CHART_COLORS.info }, { name: previousLabel, color: CHART_COLORS.neutral }]
+    : [{ name: thisName, color: CHART_COLORS.info }];
 
   return (
     <ChartData
@@ -53,7 +53,7 @@ export function GroupBreakdownChart({ rows, onSelectGroup, currentLabel = '', pr
           <UnstyledButton key={row.group} onClick={() => onSelectGroup(row.group)} style={{ minHeight: 44 }}>
             <Group justify="space-between" wrap="wrap">
               <Text>{row.label}</Text>
-              <Text size="sm" c="dimmed">
+              <Text size="sm">
                 {compared
                   ? `${thisName} ${formatPence(row.current)} · ${previousLabel} ${formatPence(row.previous)}`
                   : `${thisName} ${formatPence(row.current)}`}

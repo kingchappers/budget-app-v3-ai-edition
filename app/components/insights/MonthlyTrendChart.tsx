@@ -3,6 +3,7 @@ import { Text } from '@mantine/core';
 import { CHART_COLORS, CHART_DASHES } from '~/lib/chartColors';
 import type { MonthlyTrendRow, TrackingStatus } from '~/lib/insights';
 import { trendSummary } from '~/lib/insightsText';
+import { NAMES } from '~/lib/glossary';
 import { formatMonthLabel } from '~/lib/months';
 import { formatPence } from '~/lib/money';
 import { ChartData } from './ChartData';
@@ -23,15 +24,15 @@ export function MonthlyTrendChart({ rows, statuses = {} }: { rows: MonthlyTrendR
     month: formatMonthLabel(row.yearMonth),
     Income: row.income,
     Spent: row.spent,
-    Saved: row.saved,
+    [NAMES.addedToPots]: row.saved,
   }));
   const showStatus = rows.some(row => (statuses[row.yearMonth] ?? 'tracked') !== 'tracked');
 
   return (
     <ChartData
-      summary={`${trendSummary(rows)} Income is the solid line, spent is dashed and saved is dotted.`}
-      caption="Income, spent and saved by month"
-      columns={['Month', 'Income', 'Spent', 'Saved', ...(showStatus ? ['Tracking'] : [])]}
+      summary={`${trendSummary(rows)} Income is the solid line, spent is dashed and added to pots is dotted.`}
+      caption="Income, spent and added to pots by month"
+      columns={['Month', 'Income', 'Spent', NAMES.addedToPots, ...(showStatus ? ['Tracking'] : [])]}
       rows={rows.map(row => [
         formatMonthLabel(row.yearMonth),
         formatPence(row.income),
@@ -46,8 +47,8 @@ export function MonthlyTrendChart({ rows, statuses = {} }: { rows: MonthlyTrendR
         dataKey="month"
         series={[
           { name: 'Income', color: CHART_COLORS.positive, strokeDasharray: CHART_DASHES.solid },
-          { name: 'Spent', color: CHART_COLORS.negative, strokeDasharray: CHART_DASHES.dashed },
-          { name: 'Saved', color: CHART_COLORS.info, strokeDasharray: CHART_DASHES.dotted },
+          { name: 'Spent', color: CHART_COLORS.spending, strokeDasharray: CHART_DASHES.dashed },
+          { name: NAMES.addedToPots, color: CHART_COLORS.info, strokeDasharray: CHART_DASHES.dotted },
         ]}
         valueFormatter={formatPence}
         withLegend

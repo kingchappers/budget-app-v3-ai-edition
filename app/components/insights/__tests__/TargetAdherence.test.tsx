@@ -48,7 +48,7 @@ describe('TargetAdherence', () => {
 
   it('shows a message when no category has a target', () => {
     renderRows([]);
-    expect(screen.getByText(/no targets set/i)).toBeInTheDocument();
+    expect(screen.getByText(/no budgets set/i)).toBeInTheDocument();
   });
 
   it('uses the singular for one month', () => {

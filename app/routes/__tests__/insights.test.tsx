@@ -3,6 +3,7 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MantineProvider } from '@mantine/core';
 import { PREFERENCES_KEY, readPreferences } from '~/lib/preferences';
+import { MemoryRouter } from 'react-router';
 
 const data = vi.hoisted(() => ({
   categories: [] as unknown[],
@@ -29,8 +30,8 @@ vi.mock('~/lib/queries', () => ({
 
 import Insights from '../insights';
 
-function renderPage() {
-  return render(<MantineProvider><Insights /></MantineProvider>);
+function renderPage(url: string = '/insights') {
+  return render(<MantineProvider><MemoryRouter initialEntries={[url]}><Insights /></MemoryRouter></MantineProvider>);
 }
 
 function renderInsightsUser() {
@@ -54,6 +55,11 @@ describe('Insights page', () => {
   it('defaults to a 6-month span ending at the current month', () => {
     renderPage();
     expect(data.rangeCalls.at(-1)).toEqual(['2025-10', '2026-09']);
+  });
+
+  it('starts from the month named in the link, so it matches the other pages', () => {
+    renderPage('/insights?month=2026-06');
+    expect(data.rangeCalls.at(-1)).toEqual(['2025-07', '2026-06']);
   });
 
   it('narrows to the current month when "This month" is chosen', async () => {
@@ -105,12 +111,12 @@ describe('Insights page', () => {
     expect(within(dialog).getByText('Mortgage')).toBeInTheDocument();
   });
 
-  it('shows the targets and pots sections', () => {
+  it('shows the budgets and pots sections', () => {
     data.targets = [{ categoryId: 'cat-groceries', targetAmount: 20000, period: 'MONTHLY', updatedAt: '' }];
     data.categories = [{ categoryId: 'cat-groceries', name: 'Groceries', type: 'EXPENSE', group: 'EVERYDAY', icon: 'tag', isDefault: true, createdAt: '' }];
     data.pots = [{ categoryId: 'cat-holidays', monthlyAmount: null, goalAmount: null, autoAmountNow: 0, balance: 1000, thisMonth: { setAside: 0, autoAdded: 0, takeOut: 0, spent: 0 }, months: [] }];
     renderPage();
-    expect(screen.getByRole('heading', { name: 'Targets' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Budgets' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Pots' })).toBeInTheDocument();
   });
 
@@ -165,7 +171,7 @@ describe('Insights page sections', () => {
     data.transactions = [...entries('2026-08', 31, 100), ...entries('2026-09', 15, 100)];
     renderPage();
 
-    for (const name of ['How much was tracked', 'Spending by group', 'Monthly trend', 'Biggest movers', 'Targets', 'Pots', 'Net worth']) {
+    for (const name of ['How much was tracked', 'Spending by group', 'Monthly trend', 'Biggest movers', 'Budgets', 'Pots', 'Net worth']) {
       expect(screen.getByRole('button', { name })).toHaveAttribute('aria-expanded', 'false');
     }
     expect(screen.queryByText('Nothing to show for this period.')).not.toBeInTheDocument();
@@ -198,7 +204,7 @@ describe('Insights page comparisons', () => {
     expect(screen.getByText(/Comparing 1–15 Sep with 1–15 Aug\./)).toBeInTheDocument();
     expect(screen.getByText('£45.00')).toBeInTheDocument();
     expect(screen.getByText('1–15 Aug £15.00')).toBeInTheDocument();
-    expect(screen.getByText('+£30.00 (+200%)')).toBeInTheDocument();
+    expect(screen.getByText('£30.00 more (200%)')).toBeInTheDocument();
   });
 
   it('writes the findings as plain sentences at the top', async () => {

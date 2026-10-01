@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useSearchParams } from 'react-router';
-import { ActionIcon, Alert, Button, Divider, Group, Loader, Select, Stack, Text, TextInput } from '@mantine/core';
+import { ActionIcon, Divider, Group, Loader, Select, Stack, Text, TextInput, Title } from '@mantine/core';
+import { LoadError } from '~/components/layout/LoadError';
 import { IconSearch, IconX } from '@tabler/icons-react';
 import { DefaultLayout } from '~/components/layout/DefaultLayout';
 import { MonthHeader } from '~/components/budget/MonthHeader';
@@ -9,37 +10,49 @@ import { useTransactionEditing } from '~/components/transactions/useTransactionE
 import { filterTransactions, parseTransactionsParams, UNTARGETED_FILTER, type TransactionFilter } from '~/lib/transactions';
 import { categorySelectData } from '~/lib/categoryGroups';
 import { formatPence } from '~/lib/money';
-import { currentYearMonth, formatMonthLabel, monthPhrase } from '~/lib/months';
+import { currentYearMonth, formatDayLabel, formatMonthLabel, monthPhrase, shiftMonth, todayIso } from '~/lib/months';
 import { useDocumentTitle } from '~/hooks/useDocumentTitle';
+import { useSelectedMonth } from '~/hooks/useSelectedMonth';
 import { targetedExpenseCategoryIds } from '~/lib/summary';
-import { useCategories, useTargets, useTransactions } from '~/lib/queries';
+import { useCategories, useTargets, useTransactions, useTransactionsRange } from '~/lib/queries';
 import type { Transaction, TransactionType } from '~/lib/types';
+import { NAMES } from '~/lib/glossary';
 import { pageTitle } from '~/lib/pageTitle';
+import { TYPE_OPTIONS } from '~/lib/transactionTypes';
 import type { Route } from './+types/transactions';
 
-const TYPE_OPTIONS: { value: TransactionType; label: string }[] = [
-  { value: 'EXPENSE', label: 'Expense' },
-  { value: 'INCOME', label: 'Income' },
-  { value: 'SET_ASIDE', label: 'Set aside' },
-  { value: 'TAKE_OUT', label: 'Take out' },
-];
+const UNTARGETED_OPTION = { value: UNTARGETED_FILTER, label: NAMES.otherSpendingNoBudget };
 
-const UNTARGETED_OPTION = { value: UNTARGETED_FILTER, label: 'Other spending (no target)' };
+// Searching looks back this far, whichever month is on screen.
+const SEARCH_MONTHS = 24;
 
-function countLine(count: number, yearMonth: string): string {
+function countLine(count: number, yearMonth: string, searching: boolean): string {
   const noun = count === 1 ? 'transaction' : 'transactions';
-  return `${count} ${noun} ${monthPhrase(yearMonth)}`;
+  return searching ? `${count} ${noun} found` : `${count} ${noun} ${monthPhrase(yearMonth)}`;
+}
+
+function groupBy<T>(items: T[], keyOf: (item: T) => string): [string, T[]][] {
+  const groups = new Map<string, T[]>();
+  for (const item of items) {
+    const key = keyOf(item);
+    groups.set(key, [...(groups.get(key) ?? []), item]);
+  }
+  return [...groups];
 }
 
 function TransactionsContent() {
   const [searchParams] = useSearchParams();
   const [initial] = useState(() => parseTransactionsParams(searchParams));
-  const [yearMonth, setYearMonth] = useState(initial.yearMonth ?? currentYearMonth());
+  const [yearMonth, setYearMonth] = useSelectedMonth();
   useDocumentTitle(pageTitle('Transactions', formatMonthLabel(yearMonth)));
   const [filter, setFilter] = useState<TransactionFilter>({ query: '', categoryId: initial.categoryId, type: null });
   const categories = useCategories();
   const targets = useTargets();
-  const transactions = useTransactions(yearMonth);
+  const monthTransactions = useTransactions(yearMonth);
+  const searching = filter.query.trim() !== '';
+  const searchRange = useTransactionsRange(shiftMonth(currentYearMonth(), -(SEARCH_MONTHS - 1)), currentYearMonth(), searching);
+  // Searching looks across the last two years; otherwise it's the month on screen.
+  const transactions = searching ? searchRange : monthTransactions;
   const { rowActions, sheets } = useTransactionEditing(yearMonth);
 
   const nameFor = (id: string) =>
@@ -50,9 +63,7 @@ function TransactionsContent() {
 
   if (transactions.error) {
     return (
-      <Alert color="danger" title="Could not load transactions">
-        <Button onClick={() => transactions.refetch()}>Try again</Button>
-      </Alert>
+      <LoadError thing="transactions" onRetry={() => transactions.refetch()} />
     );
   }
 
@@ -67,17 +78,18 @@ function TransactionsContent() {
     .filter(t => t.type === 'EXPENSE')
     .reduce((sum, t) => sum + t.amount, 0);
 
-  const byDate = items.reduce<Record<string, Transaction[]>>((acc, t) => {
-    (acc[t.date] ||= []).push(t);
-    return acc;
-  }, {});
+  const today = todayIso();
+  const byDate = groupBy(items, t => t.date);
+  const byMonth = groupBy(items, t => t.date.slice(0, 7));
 
   const categoryOptions = [UNTARGETED_OPTION, ...categorySelectData(categories.data ?? [])];
   const isFiltering = filter.query !== '' || filter.categoryId !== null || filter.type !== null;
 
   return (
     <Stack>
-      <MonthHeader yearMonth={yearMonth} onChange={setYearMonth} />
+      {searching
+        ? <Text size="sm">Searching the last 2 years. Clear the search to go back to {formatMonthLabel(yearMonth)}.</Text>
+        : <MonthHeader yearMonth={yearMonth} onChange={setYearMonth} />}
 
       <TextInput
         placeholder="Search transactions"
@@ -114,27 +126,42 @@ function TransactionsContent() {
       </Group>
 
       <Group justify="space-between">
-        <Text c="dimmed">{countLine(items.length, yearMonth)}</Text>
+        <Text c="dimmed">{countLine(items.length, yearMonth, searching)}</Text>
         <Text fw={600}>{formatPence(outgoing)} spent</Text>
       </Group>
 
-      {items.length === 0 && all.length === 0 && <Text c="dimmed">Nothing logged {monthPhrase(yearMonth)}.</Text>}
+      {items.length === 0 && all.length === 0 && !searching && <Text c="dimmed">Nothing logged {monthPhrase(yearMonth)}.</Text>}
       {items.length === 0 && all.length > 0 && isFiltering && <Text c="dimmed">No transactions match your search.</Text>}
 
-      {Object.entries(byDate).map(([date, dayItems]) => (
-        <div key={date}>
-          <Divider my="xs" label={date} labelPosition="left" />
-          {dayItems.map(t => (
-            <TransactionRow
-              key={t.transactionId}
-              transaction={t}
-              categoryName={nameFor(t.categoryId)}
-              categoryIcon={iconFor(t.categoryId)}
-              {...rowActions(t)}
-            />
-          ))}
-        </div>
-      ))}
+      {searching
+        ? byMonth.map(([month, monthItems]) => (
+          <div key={month}>
+            <Title order={5} mt="md" mb="xs">{formatMonthLabel(month)}</Title>
+            {monthItems.map(t => (
+              <TransactionRow
+                key={t.transactionId}
+                transaction={t}
+                categoryName={nameFor(t.categoryId)}
+                categoryIcon={iconFor(t.categoryId)}
+                {...rowActions(t)}
+              />
+            ))}
+          </div>
+        ))
+        : byDate.map(([date, dayItems]) => (
+          <div key={date}>
+            <Divider my="xs" label={formatDayLabel(date, today)} labelPosition="left" />
+            {dayItems.map(t => (
+              <TransactionRow
+                key={t.transactionId}
+                transaction={t}
+                categoryName={nameFor(t.categoryId)}
+                categoryIcon={iconFor(t.categoryId)}
+                {...rowActions(t)}
+              />
+            ))}
+          </div>
+        ))}
 
       {sheets}
     </Stack>

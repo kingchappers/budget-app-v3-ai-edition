@@ -8,12 +8,12 @@ function months(count: number): string {
 // Leads with what went well, then the areas worth a look.
 export function TargetAdherence({ rows }: { rows: TargetAdherenceRow[] }) {
   if (rows.length === 0) {
-    return <Text c="dimmed" size="sm">No targets set for this period.</Text>;
+    return <Text c="dimmed" size="sm">No budgets set for this period.</Text>;
   }
 
   const counted = rows.filter(row => row.monthsInSpan > 0);
   if (counted.length === 0) {
-    return <Text c="dimmed" size="sm">No finished, tracked months in this period to count against your targets yet.</Text>;
+    return <Text c="dimmed" size="sm">No finished, tracked months in this period to count against your budgets yet.</Text>;
   }
 
   const wentWell = [...counted].filter(row => row.monthsWithin > 0).sort((a, b) => b.monthsWithin / b.monthsInSpan - a.monthsWithin / a.monthsInSpan);

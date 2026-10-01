@@ -1,5 +1,8 @@
+import { TermHelp } from '~/components/layout/TermHelp';
 import { useState } from 'react';
-import { Alert, Button, Group, Loader, SegmentedControl, Stack, Text, Title } from '@mantine/core';
+import { useSelectedMonth } from '~/hooks/useSelectedMonth';
+import { Button, Group, Loader, SegmentedControl, Stack, Text, Title } from '@mantine/core';
+import { LoadError } from '~/components/layout/LoadError';
 import { IconChevronLeft, IconChevronRight } from '@tabler/icons-react';
 import { DefaultLayout } from '~/components/layout/DefaultLayout';
 import { ResponsiveSheet } from '~/components/layout/ResponsiveSheet';
@@ -25,6 +28,7 @@ import { usePreferences } from '~/lib/preferences';
 import { formatPence } from '~/lib/money';
 import { useDocumentTitle } from '~/hooks/useDocumentTitle';
 import { useAccounts, useCategories, usePots, useTargets, useTransactionsRange } from '~/lib/queries';
+import { NAMES } from '~/lib/glossary';
 import { pageTitle } from '~/lib/pageTitle';
 import type { Route } from './+types/insights';
 
@@ -44,7 +48,7 @@ const NOTHING: Slice = { months: [], cap: null };
 function InsightsContent() {
   const [preferences, setPreferences] = usePreferences();
   const [months, setMonths] = useState(6);
-  const [anchor, setAnchor] = useState(currentYearMonth());
+  const [anchor, setAnchor] = useSelectedMonth();
   const [openGroup, setOpenGroup] = useState<string | null>(null);
   const { from, to } = fetchRangeForAnchor(anchor, months);
   const { current, previous } = splitPeriods(from, to);
@@ -58,9 +62,7 @@ function InsightsContent() {
 
   if (categories.error || targets.error || pots.error || range.error) {
     return (
-      <Alert color="danger" title="Could not load insights">
-        <Button onClick={() => { categories.refetch(); targets.refetch(); pots.refetch(); range.refetch(); }}>Try again</Button>
-      </Alert>
+      <LoadError thing="insights" onRetry={() => { categories.refetch(); targets.refetch(); pots.refetch(); range.refetch(); }} />
     );
   }
   if (categories.isLoading || targets.isLoading || pots.isLoading || range.isLoading) {
@@ -172,7 +174,7 @@ function InsightsContent() {
         <BiggestMoversList up={movers.up} down={movers.down} comparedWith={plan.comparable ? plan.previousLabel : ''} />
       </CollapsibleSection>
 
-      <CollapsibleSection id="targets" title="Targets">
+      <CollapsibleSection id="targets" title={NAMES.budgets}>
         <TargetAdherence rows={adherence} />
       </CollapsibleSection>
 
@@ -181,6 +183,7 @@ function InsightsContent() {
       </CollapsibleSection>
 
       <CollapsibleSection id="netWorth" title="Net worth">
+        <TermHelp terms={['netWorth']} />
         <NetWorth accounts={accounts.data ?? []} months={trendMonths} />
       </CollapsibleSection>
 

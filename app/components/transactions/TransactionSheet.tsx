@@ -1,17 +1,19 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth0 } from '@auth0/auth0-react';
 import { Button, Group, SegmentedControl, Stack, Text, TextInput } from '@mantine/core';
 import { DateInput } from '@mantine/dates';
+import { TermHelp } from '~/components/layout/TermHelp';
 import { ResponsiveSheet } from '~/components/layout/ResponsiveSheet';
-import { useNoteHistory } from '~/hooks/useNoteHistory';
-import { useSaveWithUndo } from '~/hooks/useSaveWithUndo';
+import { useRecentTransactions } from '~/hooks/useRecentTransactions';
+import { useSaveWithUndo, type SaveHandle } from '~/hooks/useSaveWithUndo';
 import { useSnapshotWhileOpen } from '~/hooks/useSnapshotWhileOpen';
 import type { TransactionInput } from '~/lib/api';
 import { formatPencePlain, parsePounds } from '~/lib/money';
-import { currentYearMonth, dateChoiceFor, todayIso, yesterdayIso, type DateChoice } from '~/lib/months';
-import { categoryForNote } from '~/lib/noteMemory';
+import { dateChoiceFor, formatDayLabel, todayIso, yesterdayIso, type DateChoice } from '~/lib/months';
+import { buildNoteIndex, categoryForNote } from '~/lib/noteMemory';
+import { MAX_PINNED_CHIPS, usePreferences, type EntryMode } from '~/lib/preferences';
 import { parseQuickAdd } from '~/lib/quickAdd';
-import { useCategories, useTransactions, useUpdateTransaction } from '~/lib/queries';
+import { useCategories, useUpdateTransaction } from '~/lib/queries';
 import {
   EMPTY_DRAFT,
   clearTransactionDraft,
@@ -22,10 +24,8 @@ import {
 } from '~/lib/transactionDraft';
 import { topCategories } from '~/lib/transactions';
 import { TYPE_OPTIONS, categoryTypesFor } from '~/lib/transactionTypes';
-import type { Transaction, TransactionType } from '~/lib/types';
+import type { Category, Transaction, TransactionType } from '~/lib/types';
 import { CategoryChips } from './CategoryChips';
-
-const CHIP_LIMIT = 5;
 
 const DATE_OPTIONS: { label: string; value: DateChoice }[] = [
   { label: 'Today', value: 'today' },
@@ -37,15 +37,41 @@ const CATEGORY_ERROR = 'Choose a category';
 const DATE_ERROR = 'Enter a date, for example 27/09/2026';
 const FIELD_ERROR_PROPS = { role: 'alert' };
 
-type SaveMode = 'close' | 'addAnother';
-type CategorySource = 'none' | 'memory' | 'user';
+// What a category of each type is called, for "Salary isn't a spending category."
+const CATEGORY_KIND: Record<TransactionType, string> = {
+  EXPENSE: 'a spending category',
+  INCOME: 'an income category',
+  SET_ASIDE: 'a pot',
+  TAKE_OUT: 'a pot',
+};
+
 type ErrorField = 'amount' | 'category' | 'date';
 type FieldErrors = Partial<Record<ErrorField, string>>;
+// The one value in the "Spend · Today · No note" line that is open for editing.
+type OpenField = 'type' | 'date' | 'note';
+
+const OPEN_FIELD_NAME: Record<OpenField, string> = { type: 'Type', date: 'Date', note: 'Note' };
 
 function dateForChoice(choice: DateChoice, date: string): string {
   if (choice === 'today') return todayIso();
   if (choice === 'yesterday') return yesterdayIso();
   return date;
+}
+
+function typeLabel(type: TransactionType): string {
+  return TYPE_OPTIONS.find(option => option.value === type)?.label ?? type;
+}
+
+function dateLabel(choice: DateChoice, date: string): string {
+  if (choice === 'today') return 'Today';
+  if (choice === 'yesterday') return 'Yesterday';
+  return date ? formatDayLabel(date, todayIso()) : 'Pick a date';
+}
+
+function noteLabel(note: string): string {
+  const trimmed = note.trim();
+  if (trimmed === '') return 'No note';
+  return trimmed.length > 24 ? `${trimmed.slice(0, 23)}…` : trimmed;
 }
 
 interface Validation {
@@ -61,28 +87,42 @@ export interface TransactionSheetProps {
   preset?: { type: TransactionType; categoryId: string } | null;
   template?: Transaction | null;
   templateDate?: string;
+  // Open a blank entry for this day (YYYY-MM-DD), as when catching up. The sheet stays open between saves.
+  forDate?: string | null;
+  // Whether that day has been marked "Nothing to log", and how to toggle it.
+  dayMarkedEmpty?: boolean;
+  onToggleNothingToLog?: () => void;
   recurringId?: string;
   onSaved?: (created: Transaction) => void;
   onUndone?: () => void;
 }
 
-export function TransactionSheet({ opened, onClose, yearMonth, editing, preset, template, templateDate, recurringId, onSaved, onUndone }: TransactionSheetProps) {
+export function TransactionSheet({ opened, onClose, yearMonth, editing, preset, template, templateDate, forDate, dayMarkedEmpty, onToggleNothingToLog, recurringId, onSaved, onUndone }: TransactionSheetProps) {
   const { data: categories = [], isLoading: categoriesLoading, error: categoriesError } = useCategories();
-  const monthTransactions = useSnapshotWhileOpen(useTransactions(currentYearMonth(), opened).data, opened);
-  const noteIndex = useNoteHistory(opened);
+  // Chips and category memory both learn from the same snapshot of recent
+  // transactions, taken when the sheet opens, so nothing reshuffles while it's open.
+  const recent = useSnapshotWhileOpen(useRecentTransactions(opened), opened);
+  const noteIndex = useMemo(() => buildNoteIndex(recent ?? []), [recent]);
+  const [preferences, setPreferences] = usePreferences();
+  const preferencesRef = useRef(preferences);
+  preferencesRef.current = preferences;
   const update = useUpdateTransaction(yearMonth);
   const saveWithUndo = useSaveWithUndo();
   const draftOwner = useAuth0().user?.sub ?? '';
   const draftOwnerRef = useRef(draftOwner);
   draftOwnerRef.current = draftOwner;
   const isAddFlow = !editing && !template && !preset;
+  // A day chosen in Catch up starts blank and is never mixed with the saved draft.
+  const usesDraft = isAddFlow && !forDate;
   const amountRef = useRef<HTMLInputElement>(null);
   const dateRef = useRef<HTMLInputElement>(null);
+  const saveRef = useRef<HTMLButtonElement>(null);
+  const chipsRef = useRef<HTMLDivElement>(null);
   const createSubmittedRef = useRef(false);
   const recurringLinkUsedRef = useRef(false);
-  const saveAnotherRef = useRef<HTMLButtonElement>(null);
-  const chipsRef = useRef<HTMLDivElement>(null);
-  const focusChipsAfterRenderRef = useRef(false);
+  const focusAmountAfterRenderRef = useRef(false);
+  const focusSaveAfterRenderRef = useRef(false);
+  const focusDateAfterRenderRef = useRef(false);
 
   const [amount, setAmount] = useState('');
   const [type, setType] = useState<TransactionType>('EXPENSE');
@@ -90,12 +130,18 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, preset, 
   const [description, setDescription] = useState('');
   const [date, setDate] = useState(todayIso());
   const [dateChoice, setDateChoice] = useState<DateChoice>('today');
-  const [noteOpen, setNoteOpen] = useState(false);
+  const [openField, setOpenField] = useState<OpenField | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [categorySource, setCategorySource] = useState<CategorySource>('none');
+  const [mode, setMode] = useState<EntryMode>('form');
   const [quickAdd, setQuickAdd] = useState('');
   const [quickAddError, setQuickAddError] = useState<string | null>(null);
+  // The note the quick-add line's category was remembered from, until the user changes it.
+  const [filledFromNote, setFilledFromNote] = useState<string | null>(null);
+  // The last save made in this sheet, so it can be undone without the notification.
+  const [lastSave, setLastSave] = useState<SaveHandle | null>(null);
+  // After the first save, a one-time question about what Save should do next.
+  const [askKeepOpen, setAskKeepOpen] = useState(false);
 
   useEffect(() => {
     if (!opened) return;
@@ -109,7 +155,6 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, preset, 
       setDescription(editing.description);
       setDate(editing.date);
       setDateChoice(dateChoiceFor(editing.date));
-      setCategorySource('none');
     } else if (template) {
       setAmount(formatPencePlain(template.amount));
       setType(template.type);
@@ -117,7 +162,6 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, preset, 
       setDescription(template.description);
       setDate(templateDate ?? todayIso());
       setDateChoice(templateDate ? dateChoiceFor(templateDate) : 'today');
-      setCategorySource('user');
     } else if (preset) {
       setAmount('');
       setType(preset.type);
@@ -125,38 +169,39 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, preset, 
       setDescription('');
       setDate(todayIso());
       setDateChoice('today');
-      setCategorySource('user');
+    } else if (forDate) {
+      applyDraftFields({ ...EMPTY_DRAFT, dateChoice: dateChoiceFor(forDate), date: forDate });
     } else {
       draft = loadTransactionDraft(draftOwnerRef.current) ?? EMPTY_DRAFT;
       applyDraftFields(draft);
     }
-    const templateNote = !editing && template != null && template.description !== '';
-    setNoteOpen(templateNote || (draft !== null && draft.description !== ''));
+    setOpenField(!editing && template != null && template.description !== '' ? 'note' : null);
     setFieldErrors({});
     setSaveError(null);
     setQuickAdd(draft?.quickAdd ?? '');
     setQuickAddError(null);
-  }, [opened, editing, preset, template, templateDate]);
+    setFilledFromNote(null);
+    setLastSave(null);
+    setAskKeepOpen(false);
+    setMode(!editing && !template && !preset ? preferencesRef.current.entryMode : 'form');
+  }, [opened, editing, preset, template, templateDate, forDate]);
 
   useEffect(() => {
-    if (!focusChipsAfterRenderRef.current) return;
-    focusChipsAfterRenderRef.current = false;
-    chipsRef.current?.querySelector<HTMLInputElement>('input[type="radio"]')?.focus();
+    if (focusAmountAfterRenderRef.current && amountRef.current) {
+      focusAmountAfterRenderRef.current = false;
+      amountRef.current.focus();
+    }
+    if (focusSaveAfterRenderRef.current && saveRef.current) {
+      focusSaveAfterRenderRef.current = false;
+      saveRef.current.focus();
+    }
+    if (focusDateAfterRenderRef.current && dateRef.current) {
+      focusDateAfterRenderRef.current = false;
+      dateRef.current.focus();
+    }
   });
 
   const categoriesLoaded = categories.length > 0;
-  const recalledForRef = useRef({ noteIndex, categoriesLoaded });
-  useEffect(() => {
-    const last = recalledForRef.current;
-    if (last.noteIndex === noteIndex && last.categoriesLoaded === categoriesLoaded) return;
-    recalledForRef.current = { noteIndex, categoriesLoaded };
-    if (!opened || editing || categorySource === 'user' || description.trim() === '') return;
-
-    const recalled = categoryForNote(noteIndex, description, type, categories);
-    if (!recalled) return;
-    setCategoryId(recalled);
-    setCategorySource('memory');
-  }, [noteIndex, categoriesLoaded, opened, editing, categorySource, description, type, categories]);
 
   const draftFields: TransactionDraftFields = { amount, type, categoryId, dateChoice, date, description, quickAdd };
   const draftKey = JSON.stringify(draftFields);
@@ -166,18 +211,30 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, preset, 
   useEffect(() => {
     if (draftKey === lastDraftKeyRef.current) return;
     lastDraftKeyRef.current = draftKey;
-    if (!opened || !isAddFlow || createSubmittedRef.current) return;
+    if (!opened || !usesDraft || createSubmittedRef.current) return;
     saveTransactionDraft(draftOwner, draftFields);
-  }, [draftKey, opened, isAddFlow, draftOwner]);
+  }, [draftKey, opened, usesDraft, draftOwner]);
 
   const eligible = categories.filter(c => categoryTypesFor(type).includes(c.type));
-  const chips = topCategories(monthTransactions ?? [], categories, type, CHIP_LIMIT);
+  const chips = topCategories(recent ?? [], categories, type, MAX_PINNED_CHIPS, preferences.pinnedCategoryIds);
+
+  const chosen: Category | undefined = categories.find(c => c.categoryId === categoryId);
+  const categoryFitsType = chosen !== undefined && eligible.some(c => c.categoryId === chosen.categoryId);
+  // Changing the type never clears the category. If it no longer fits, say so
+  // next to the field and let the user choose.
+  const categoryMismatch = chosen !== undefined && !categoryFitsType
+    ? `${chosen.name} isn't ${CATEGORY_KIND[type]}. Choose another.`
+    : null;
+
+  // Remembered from an earlier entry with the same note. Offered, never applied,
+  // and dropped once the user has chosen a category of their own.
+  const suggestedId = editing || categoryFitsType ? null : categoryForNote(noteIndex, description, type, categories);
+  const suggestedCategory = suggestedId === null ? undefined : categories.find(c => c.categoryId === suggestedId);
 
   function applyDraftFields(fields: TransactionDraftFields): void {
     setAmount(fields.amount);
     setType(fields.type);
     setCategoryId(fields.categoryId);
-    setCategorySource(fields.categoryId ? 'user' : 'none');
     setDescription(fields.description);
     setDateChoice(fields.dateChoice);
     setDate(dateForChoice(fields.dateChoice, fields.date));
@@ -186,10 +243,12 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, preset, 
   function handleClear(): void {
     clearTransactionDraft();
     applyDraftFields(EMPTY_DRAFT);
-    setNoteOpen(false);
+    setOpenField(null);
     setQuickAdd('');
     setQuickAddError(null);
+    setFilledFromNote(null);
     setFieldErrors({});
+    focusAmountAfterRenderRef.current = true;
     amountRef.current?.focus();
   }
 
@@ -202,6 +261,7 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, preset, 
     clearFieldError('date');
     if (choice === 'today') setDate(todayIso());
     if (choice === 'yesterday') setDate(yesterdayIso());
+    if (choice !== 'other' && !editing) setOpenField(null);
   }
 
   function handleAmountChange(value: string): void {
@@ -216,77 +276,64 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, preset, 
 
   function handleCategoryChange(id: string): void {
     setCategoryId(id);
-    setCategorySource('user');
+    setFilledFromNote(null);
     clearFieldError('category');
-  }
-
-  function handleNoteChange(note: string): void {
-    setDescription(note);
-    if (editing || categorySource === 'user') return;
-
-    const recalled = categoryForNote(noteIndex, note, type, categories);
-    if (recalled) {
-      setCategoryId(recalled);
-      setCategorySource('memory');
-      return;
-    }
-    if (categorySource === 'memory') {
-      setCategoryId(null);
-      setCategorySource('none');
-    }
   }
 
   function handleTypeChange(next: TransactionType): void {
     setType(next);
-    const recalled = editing ? null : categoryForNote(noteIndex, description, next, categories);
-    setCategoryId(recalled);
-    setCategorySource(recalled ? 'memory' : 'none');
+    clearFieldError('category');
+    if (!editing) setOpenField(null);
   }
 
-  function handleQuickAddChange(value: string): void {
-    setQuickAdd(value);
+  function toggleField(field: OpenField): void {
+    setOpenField(current => (current === field ? null : field));
+  }
+
+  function switchMode(next: EntryMode): void {
+    setMode(next);
+    setPreferences({ entryMode: next });
     setQuickAddError(null);
+    if (next === 'form') focusAmountAfterRenderRef.current = true;
   }
 
-  function handleQuickAddKeyDown(event: React.KeyboardEvent<HTMLInputElement>): void {
-    if (event.key !== 'Enter') return;
-    event.preventDefault();
-
+  function fillFromQuickAdd(): void {
     const parsed = parseQuickAdd(quickAdd);
     if (!parsed.ok) {
       setQuickAddError(parsed.message);
       return;
     }
 
+    // Typing a line is a deliberate request to fill the form, so a remembered
+    // category is applied here, and the form says where it came from.
     const recalled = categoryForNote(noteIndex, parsed.note, parsed.type, categories);
     setAmount(formatPencePlain(parsed.amount));
     setType(parsed.type);
     setDescription(parsed.note);
-    if (parsed.note !== '') setNoteOpen(true);
     setCategoryId(recalled);
-    setCategorySource(recalled ? 'memory' : 'none');
+    setFilledFromNote(recalled && parsed.note !== '' ? parsed.note : null);
+    setOpenField(null);
     setFieldErrors({});
     setQuickAdd('');
     setQuickAddError(null);
-
-    if (recalled) {
-      saveAnotherRef.current?.focus();
-      return;
-    }
-    focusChipsAfterRenderRef.current = true;
+    // Show the filled-in form for this entry without changing the remembered mode.
+    setMode('form');
+    // However it was filled in, the next step is always the Save button.
+    focusSaveAfterRenderRef.current = true;
   }
 
   function validate(): Validation {
     const parsed = parsePounds(amount);
     const dateValid = /^\d{4}-\d{2}-\d{2}$/.test(date);
-    const categoryGone = isAddFlow && categoriesLoaded && !categories.some(c => c.categoryId === categoryId);
+    const categoryGone = isAddFlow && categoriesLoaded && chosen === undefined;
     const errors: FieldErrors = {};
     if (!parsed.ok) errors.amount = parsed.message;
     if (!categoryId || categoryGone) errors.category = CATEGORY_ERROR;
+    else if (categoryMismatch) errors.category = categoryMismatch;
     if (!dateValid) errors.date = DATE_ERROR;
 
-    if (!parsed.ok || !categoryId || categoryGone || !dateValid) return { input: null, errors };
-    return { input: { amount: parsed.pence, type, categoryId, description, date }, errors };
+    if (!parsed.ok || errors.category || !dateValid) return { input: null, errors };
+    return { input: { amount: parsed.pence, type, categoryId: categoryId as string, description, date }, errors };
   }
 
   function focusFirstError(errors: FieldErrors): void {
@@ -300,23 +347,32 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, preset, 
       target?.focus();
       return;
     }
-    if (errors.date) dateRef.current?.focus();
+    if (errors.date) {
+      if (dateRef.current) {
+        dateRef.current.focus();
+        return;
+      }
+      // The date control is tucked away in the summary line; open it, then focus it.
+      focusDateAfterRenderRef.current = true;
+      setOpenField('date');
+    }
   }
 
   function resetForNextEntry(): void {
     createSubmittedRef.current = false;
     setAmount('');
     setCategoryId(null);
-    setCategorySource('none');
     setDescription('');
-    setNoteOpen(false);
+    setOpenField(null);
     setQuickAdd('');
     setQuickAddError(null);
+    setFilledFromNote(null);
     setFieldErrors({});
-    amountRef.current?.focus();
+    setMode(preferencesRef.current.entryMode);
+    focusAmountAfterRenderRef.current = true;
   }
 
-  async function handleSubmit(mode: SaveMode): Promise<void> {
+  async function handleSubmit(): Promise<void> {
     const { input, errors } = validate();
     setFieldErrors(errors);
     setSaveError(null);
@@ -341,123 +397,260 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, preset, 
     clearTransactionDraft();
     const linked = recurringId && !recurringLinkUsedRef.current ? { ...input, recurringId } : input;
     recurringLinkUsedRef.current = true;
-    void saveWithUndo(linked, { onUndo: onUndone }).then(created => {
+    setLastSave(null);
+    void saveWithUndo(linked, {
+      onUndo: () => {
+        setLastSave(null);
+        onUndone?.();
+      },
+      onSaveStarted: setLastSave,
+    }).then(created => {
       if (created) onSaved?.(created);
     });
-    if (mode === 'addAnother') {
+
+    const keepOpen = forDate ? 'yes' : preferences.keepSheetOpen;
+    if (keepOpen === 'ask') {
+      setAskKeepOpen(true);
+      return;
+    }
+    if (keepOpen === 'yes') {
       resetForNextEntry();
       return;
     }
     onClose();
   }
 
-  const form = (
-    <form onSubmit={e => { e.preventDefault(); void handleSubmit(editing ? 'close' : 'addAnother'); }}>
-      <Stack>
-        {!editing && (
-          <TextInput
-            label="Quick add"
-            description="e.g. coffee 3.50 · 3.50 coffee · +2400 salary (income)"
-            placeholder="coffee 3.50"
-            value={quickAdd}
-            error={quickAddError}
-            onChange={e => handleQuickAddChange(e.currentTarget.value)}
-            onKeyDown={handleQuickAddKeyDown}
-          />
-        )}
-        <TextInput
-          ref={amountRef}
-          label="Amount"
-          placeholder="0.00"
-          leftSection="£"
-          inputMode="decimal"
-          data-autofocus
-          value={amount}
-          onChange={e => handleAmountChange(e.currentTarget.value)}
-          error={fieldErrors.amount}
+  function answerKeepOpen(keep: boolean): void {
+    setPreferences({ keepSheetOpen: keep ? 'yes' : 'no' });
+    setAskKeepOpen(false);
+    if (keep) {
+      resetForNextEntry();
+      return;
+    }
+    onClose();
+  }
+
+  const quickActive = isAddFlow && mode === 'quick';
+
+  const dateControls = (
+    <>
+      <SegmentedControl
+        fullWidth
+        aria-label="Quick date"
+        value={dateChoice}
+        onChange={value => chooseDate(value as DateChoice)}
+        data={DATE_OPTIONS}
+      />
+      {dateChoice === 'other' && (
+        <DateInput
+          label="Date"
+          valueFormat="DD/MM/YYYY"
+          allowDeselect
+          ref={dateRef}
+          value={date || null}
+          onChange={handleDateChange}
+          error={fieldErrors.date}
           errorProps={FIELD_ERROR_PROPS}
         />
-        <SegmentedControl
-          fullWidth
-          value={type}
-          onChange={value => handleTypeChange(value as TransactionType)}
-          data={TYPE_OPTIONS}
+      )}
+    </>
+  );
+
+  const categoryField = (
+    <>
+      <div ref={chipsRef}>
+        <CategoryChips
+          chips={chips}
+          all={eligible}
+          value={categoryId}
+          onChange={handleCategoryChange}
+          loading={categoriesLoading}
+          error={categoriesError ? "We couldn't load your categories. Nothing has been lost." : null}
+          fieldError={fieldErrors.category ?? categoryMismatch}
+          pinnedIds={preferences.pinnedCategoryIds}
+          onPinnedChange={ids => setPreferences({ pinnedCategoryIds: ids })}
         />
-        <div ref={chipsRef}>
-          <CategoryChips
-            chips={chips}
-            all={eligible}
-            value={categoryId}
-            onChange={handleCategoryChange}
-            loading={categoriesLoading}
-            error={categoriesError ? 'Could not load categories' : null}
-            fieldError={fieldErrors.category ?? null}
-          />
-        </div>
-        {categorySource === 'memory' && description.trim() !== '' && (
-          <Text size="xs" c="dimmed" role="status">Suggested from your earlier '{description.trim()}'</Text>
-        )}
-        {editing ? (
-          <DateInput
-            label="Date"
-            valueFormat="DD/MM/YYYY"
-            allowDeselect
-            ref={dateRef}
-            value={date || null}
-            onChange={handleDateChange}
-            error={fieldErrors.date}
-            errorProps={FIELD_ERROR_PROPS}
-          />
-        ) : (
-          <>
-            <SegmentedControl
-              fullWidth
-              aria-label="Quick date"
-              value={dateChoice}
-              onChange={value => chooseDate(value as DateChoice)}
-              data={DATE_OPTIONS}
-            />
-            {dateChoice === 'other' && (
-              <DateInput
-                label="Date"
-                valueFormat="DD/MM/YYYY"
-                allowDeselect
-                ref={dateRef}
-                value={date || null}
-                onChange={handleDateChange}
-                error={fieldErrors.date}
-                errorProps={FIELD_ERROR_PROPS}
-              />
-            )}
-          </>
-        )}
-        {editing || noteOpen ? (
-          <TextInput
-            label="Note (optional)"
-            value={description}
-            onChange={e => handleNoteChange(e.currentTarget.value)}
-            maxLength={200}
-          />
-        ) : (
-          <Button variant="subtle" size="compact-sm" style={{ alignSelf: 'flex-start' }} onClick={() => setNoteOpen(true)}>
-            + Add note
+      </div>
+      {filledFromNote !== null && (
+        <Text size="sm" role="status">Category filled in from your earlier ‘{filledFromNote}’.</Text>
+      )}
+      {suggestedCategory && (
+        <Group gap="xs" role="status">
+          <Text size="sm">You used {suggestedCategory.name} for ‘{description.trim()}’ before.</Text>
+          <Button size="compact-sm" variant="light" onClick={() => handleCategoryChange(suggestedCategory.categoryId)}>
+            Use {suggestedCategory.name}?
           </Button>
+        </Group>
+      )}
+    </>
+  );
+
+  const amountField = (
+    <TextInput
+      ref={amountRef}
+      label="Amount"
+      placeholder="0.00"
+      leftSection="£"
+      inputMode="decimal"
+      data-autofocus
+      value={amount}
+      onChange={e => handleAmountChange(e.currentTarget.value)}
+      error={fieldErrors.amount}
+      errorProps={FIELD_ERROR_PROPS}
+    />
+  );
+
+  const noteField = (
+    <TextInput
+      label="Note (optional)"
+      value={description}
+      onChange={e => setDescription(e.currentTarget.value)}
+      maxLength={200}
+      autoFocus={openField === 'note' && !editing}
+    />
+  );
+
+  const typeControl = (
+    <Group wrap="nowrap" gap={0}>
+      <SegmentedControl
+        fullWidth
+        style={{ flex: 1 }}
+        aria-label="Type"
+        value={type}
+        onChange={value => handleTypeChange(value as TransactionType)}
+        data={TYPE_OPTIONS}
+      />
+      <TermHelp terms={['spend', 'income', 'setAside', 'takeOut']} />
+    </Group>
+  );
+
+  const editFields = (
+    <>
+      {amountField}
+      {typeControl}
+      {categoryField}
+      <DateInput
+        label="Date"
+        valueFormat="DD/MM/YYYY"
+        allowDeselect
+        ref={dateRef}
+        value={date || null}
+        onChange={handleDateChange}
+        error={fieldErrors.date}
+        errorProps={FIELD_ERROR_PROPS}
+      />
+      {noteField}
+    </>
+  );
+
+  const valueButton = (field: OpenField, text: string) => (
+    <Button
+      variant="subtle"
+      size="compact-sm"
+      aria-expanded={openField === field}
+      aria-label={`${OPEN_FIELD_NAME[field]}: ${text}`}
+      onClick={() => toggleField(field)}
+    >
+      {text}
+    </Button>
+  );
+
+  const addFields = (
+    <>
+      {amountField}
+      {categoryField}
+      <Group gap={2} wrap="wrap" role="group" aria-label="Type, date and note">
+        {valueButton('type', typeLabel(type))}
+        <Text c="dimmed" aria-hidden>·</Text>
+        {valueButton('date', dateLabel(dateChoice, date))}
+        <Text c="dimmed" aria-hidden>·</Text>
+        {valueButton('note', noteLabel(description))}
+      </Group>
+      {openField === 'type' && typeControl}
+      {openField === 'date' && dateControls}
+      {openField === 'note' && noteField}
+      {fieldErrors.date && openField !== 'date' && <Text size="sm" role="alert">{fieldErrors.date}</Text>}
+      {isAddFlow && (
+        <Button variant="subtle" size="compact-sm" style={{ alignSelf: 'flex-start' }} onClick={() => switchMode('quick')}>
+          Type it instead
+        </Button>
+      )}
+    </>
+  );
+
+  const quickFields = (
+    <>
+      <TextInput
+        label="Quick add"
+        description="e.g. coffee 3.50 · 3.50 coffee · +2400 salary (income)"
+        placeholder="coffee 3.50"
+        autoFocus
+        value={quickAdd}
+        error={quickAddError}
+        onChange={e => { setQuickAdd(e.currentTarget.value); setQuickAddError(null); }}
+      />
+      {!preferences.quickAddTipDismissed && (
+        <Group gap="xs" role="note">
+          <Text size="sm">Tip: type +2400 salary for income.</Text>
+          <Button variant="subtle" size="compact-sm" onClick={() => setPreferences({ quickAddTipDismissed: true })}>Got it</Button>
+        </Group>
+      )}
+      <Button variant="subtle" size="compact-sm" style={{ alignSelf: 'flex-start' }} onClick={() => switchMode('form')}>
+        Use the form instead
+      </Button>
+    </>
+  );
+
+  const undoButton = lastSave && (
+    <Button variant="subtle" size="compact-sm" style={{ alignSelf: 'flex-start' }} onClick={lastSave.undo}>
+      Undo last save ({lastSave.label})
+    </Button>
+  );
+
+  const keepOpenQuestion = (
+    <Stack>
+      <Text role="status">{lastSave ? `Saved ${lastSave.label}.` : 'Saved.'}</Text>
+      <Text>Keep this open for the next entry?</Text>
+      <Group>
+        <Button onClick={() => answerKeepOpen(true)}>Yes, keep it open</Button>
+        <Button variant="default" onClick={() => answerKeepOpen(false)}>No, just close</Button>
+      </Group>
+      {undoButton}
+    </Stack>
+  );
+
+  const form = (
+    <form onSubmit={e => { e.preventDefault(); if (quickActive) fillFromQuickAdd(); else void handleSubmit(); }}>
+      <Stack>
+        {forDate && !editing && (
+          <Stack gap={4}>
+            <Text fw={700} size="lg">{`Adding to ${formatDayLabel(dateForChoice(dateChoice, date), todayIso())}`}</Text>
+            {onToggleNothingToLog && (
+              <Button
+                variant="subtle"
+                size="compact-sm"
+                style={{ alignSelf: 'flex-start' }}
+                onClick={() => { onToggleNothingToLog(); onClose(); }}
+              >
+                {dayMarkedEmpty ? 'Clear “Nothing to log” for this day' : 'Nothing to log for this day'}
+              </Button>
+            )}
+          </Stack>
         )}
+        {editing ? editFields : quickActive ? quickFields : addFields}
         {saveError && <Text size="sm" role="alert">{saveError}</Text>}
+        {!editing && !quickActive && undoButton}
         <Group justify="flex-end">
           <Group gap="xs">
-            {isAddFlow && !isEmptyDraft(draftFields) && (
+            {usesDraft && !isEmptyDraft(draftFields) && (
               <Button variant="subtle" color="gray" onClick={handleClear}>Clear</Button>
             )}
             <Button variant="subtle" onClick={onClose}>Cancel</Button>
           </Group>
-          {editing ? (
-            <Button type="submit" loading={update.isPending}>Save</Button>
+          {quickActive ? (
+            <Button type="submit">Fill in the form</Button>
           ) : (
-            <Group gap="xs">
-              <Button ref={saveAnotherRef} type="submit" variant="light">Save & add another</Button>
-              <Button onClick={() => void handleSubmit('close')}>Save</Button>
-            </Group>
+            <Button ref={saveRef} type="submit" loading={editing ? update.isPending : false}>Save</Button>
           )}
         </Group>
       </Stack>
@@ -468,7 +661,7 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, preset, 
 
   return (
     <ResponsiveSheet opened={opened} onClose={onClose} title={title}>
-      {form}
+      {askKeepOpen ? keepOpenQuestion : form}
     </ResponsiveSheet>
   );
 }

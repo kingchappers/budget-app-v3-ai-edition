@@ -14,12 +14,12 @@ describe('Milestones', () => {
       months: [{ yearMonth: '2026-09', targeted: 100000, spent: 94000 }],
     });
     expect(screen.getByText('Holiday pot: goal reached.')).toBeInTheDocument();
-    expect(screen.getByText('September finished £60.00 under target.')).toBeInTheDocument();
+    expect(screen.getByText('September finished £60.00 under budget.')).toBeInTheDocument();
   });
 
   it('says a month finished on target when it did exactly', () => {
     renderMilestones({ pots: [], months: [{ yearMonth: '2026-09', targeted: 100000, spent: 100000 }] });
-    expect(screen.getByText('September finished on target.')).toBeInTheDocument();
+    expect(screen.getByText('September finished on budget.')).toBeInTheDocument();
   });
 
   it('says nothing about a month that finished over target', () => {
