@@ -3,7 +3,10 @@ import { Button, Group, Loader, Stack, Text, Title } from '@mantine/core';
 import { LoadError } from '~/components/layout/LoadError';
 import { notifications } from '@mantine/notifications';
 import { DefaultLayout } from '~/components/layout/DefaultLayout';
-import { TOAST_MS } from '~/components/layout/ToastAction';
+import { usePreferences } from '~/lib/preferences';
+import { pageTitle } from '~/lib/pageTitle';
+import type { Route } from './+types/deleted';
+import { undoAutoClose } from '~/lib/undoDuration';
 import { ApiError } from '~/lib/apiError';
 import { useCategories, useRestoreFromTrash, useTrash } from '~/lib/queries';
 import { groupTrash, trashEntryLabel, type TrashEntry } from '~/lib/trash';
@@ -48,13 +51,14 @@ function DeletedContent() {
   const trash = useTrash();
   const categories = useCategories();
   const restore = useRestoreFromTrash();
+  const [{ undoDuration }] = usePreferences();
   const [restoring, setRestoring] = useState<string | null>(null);
 
   function restoreEntry(entry: TrashEntry, label: string): void {
     const key = entryKey(entry);
     setRestoring(key);
     restore.mutateAsync({ entityType: entry.entityType, id: entry.id }).then(
-      () => notifications.show({ message: `Restored ${label}`, autoClose: TOAST_MS }),
+      () => notifications.show({ message: `Restored ${label}`, autoClose: undoAutoClose(undoDuration) }),
       (error: unknown) => {
         console.error('Restore from Recently deleted failed', { entityType: entry.entityType, error });
         notifications.show({ message: restoreFailedMessage(error, label), autoClose: false });
@@ -108,6 +112,8 @@ function DeletedContent() {
     </Stack>
   );
 }
+
+export const meta: Route.MetaFunction = () => [{ title: pageTitle('Recently deleted') }];
 
 export default function Deleted() {
   return (

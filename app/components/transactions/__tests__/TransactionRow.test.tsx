@@ -49,6 +49,15 @@ describe('TransactionRow menu', () => {
   });
 });
 
+describe('TransactionRow tap targets', () => {
+  it('gives Duplicate and the actions menu a 44px target, with the amount kept on one line', () => {
+    renderRow({ onEdit: vi.fn(), onDuplicate: vi.fn(), onDelete: vi.fn() });
+    // 2.75rem is 44px at the standard size, and grows with the text size.
+    expect(screen.getByRole('button', { name: 'Duplicate Weekly Shop' }).getAttribute('style')).toMatch(/2\.75rem/);
+    expect(screen.getByRole('button', { name: 'Actions for Weekly Shop' }).getAttribute('style')).toMatch(/2\.75rem/);
+  });
+});
+
 describe('TransactionRow Duplicate', () => {
   it('is a visible, labelled button, not tucked in the menu, and reports the transaction', async () => {
     const onDuplicate = vi.fn();

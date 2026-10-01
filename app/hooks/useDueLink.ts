@@ -2,6 +2,8 @@ import { useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router';
 import { notifications } from '@mantine/notifications';
 import { parseDueLink, withoutDueLink } from '~/lib/dueLink';
+import { usePreferences } from '~/lib/preferences';
+import { undoAutoClose } from '~/lib/undoDuration';
 import type { DueItem } from '~/lib/recurring';
 
 export interface DueLinkHandlers {
@@ -14,6 +16,7 @@ export interface DueLinkHandlers {
 // and takes the parameters back out of the address so a reload does not do it twice.
 export function useDueLink(items: DueItem[], ready: boolean, handlers: DueLinkHandlers): void {
   const [params, setParams] = useSearchParams();
+  const [{ undoDuration }] = usePreferences();
   const latest = useRef(handlers);
   latest.current = handlers;
   const handled = useRef<string | null>(null);
@@ -31,10 +34,10 @@ export function useDueLink(items: DueItem[], ready: boolean, handlers: DueLinkHa
     const item = items.find(candidate => candidate.recurring.recurringId === link.recurringId
       && (link.period === null || candidate.period === link.period));
     if (!item) {
-      notifications.show({ message: 'That one is already taken care of.', autoClose: 5000 });
+      notifications.show({ message: 'That one is already taken care of.', autoClose: undoAutoClose(undoDuration) });
       return;
     }
     if (link.action === 'add') latest.current.add(item);
     else latest.current.skip(item);
-  }, [params, ready, items, setParams]);
+  }, [params, ready, items, setParams, undoDuration]);
 }

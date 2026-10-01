@@ -21,7 +21,7 @@ export const Profile = () => {
     isAuthenticated && user ? (
         <Menu withArrow>
           <Menu.Target>
-            <UnstyledButton>
+            <UnstyledButton style={{ minWidth: 44, minHeight: 44, display: 'flex', alignItems: 'center' }}>
               <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '0.5rem', margin: '0rem' }}>
                 {user.picture ? (
                   <img

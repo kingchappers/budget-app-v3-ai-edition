@@ -135,7 +135,7 @@ describe('useUndoableDelete', () => {
       expect(autoCloseOfDeletedMessage()).toBe(milliseconds);
     });
 
-    it('leaves the Restored confirmation on its short timer', async () => {
+    it('keeps the Restored confirmation for as long as the person chose, like the Deleted message', async () => {
       const show = vi.spyOn(notifications, 'show');
       mockRestore.mutateAsync.mockResolvedValue({});
       const user = userEvent.setup();
@@ -144,7 +144,7 @@ describe('useUndoableDelete', () => {
       await user.click(await screen.findByRole('button', { name: 'Undo' }));
 
       await waitFor(() => expect(show.mock.calls.some(call => call[0].message === 'Restored £3.50 · Coffee')).toBe(true));
-      expect(show.mock.calls.find(call => call[0].message === 'Restored £3.50 · Coffee')?.[0].autoClose).toBe(5000);
+      expect(show.mock.calls.find(call => call[0].message === 'Restored £3.50 · Coffee')?.[0].autoClose).toBe(false);
     });
   });
 });

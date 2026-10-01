@@ -94,11 +94,12 @@ export function TransactionRow({
         </UnstyledButton>
       ) : summary}
       <Group gap="xs" wrap="nowrap">
-        <Text fw={500}>{sign}{formatPence(transaction.amount)}</Text>
+        <Text fw={500} style={{ whiteSpace: 'nowrap' }}>{sign}{formatPence(transaction.amount)}</Text>
         {onDuplicate && !pending && (
           <Button
             variant="subtle"
             size="compact-sm"
+            mih={44}
             leftSection={<IconCopy size={14} />}
             aria-label={`Duplicate ${label}`}
             onClick={() => onDuplicate(transaction)}
@@ -138,7 +139,7 @@ export function TransactionRow({
               }}
             >
               <Menu.Target>
-                <ActionIcon ref={actionsRef} variant="subtle" aria-label={`Actions for ${label}`}><IconDots size={16} /></ActionIcon>
+                <ActionIcon ref={actionsRef} variant="subtle" size={44} aria-label={`Actions for ${label}`}><IconDots size={16} /></ActionIcon>
               </Menu.Target>
               <Menu.Dropdown>
                 {onEdit && <Menu.Item leftSection={<IconPencil size={14} />} onClick={() => { opensSheetRef.current = true; onEdit(transaction); }}>Edit</Menu.Item>}

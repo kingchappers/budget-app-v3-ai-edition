@@ -8,11 +8,11 @@ export function MonthHeader({ yearMonth, onChange, pageTitle }: { yearMonth: str
   return (
     <Stack gap={4} mb="md" align="stretch">
       {pageTitle && <VisuallyHidden><Title order={1}>{pageTitle}</Title></VisuallyHidden>}
-      <Group justify="space-between">
+      <Group justify="space-between" wrap="nowrap">
         <ActionIcon variant="subtle" aria-label="Previous month" onClick={() => onChange(shiftMonth(yearMonth, -1))}>
           <IconChevronLeft size={20} />
         </ActionIcon>
-        <Title order={2} size="h3">{formatMonthLabel(yearMonth)}</Title>
+        <Title order={2} size="h3" ta="center" style={{ minWidth: 0 }}>{formatMonthLabel(yearMonth)}</Title>
         <ActionIcon variant="subtle" aria-label="Next month" onClick={() => onChange(shiftMonth(yearMonth, 1))}>
           <IconChevronRight size={20} />
         </ActionIcon>

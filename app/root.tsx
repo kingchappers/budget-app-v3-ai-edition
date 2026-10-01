@@ -86,11 +86,17 @@ export const theme = createTheme({
 // text. Override just the CSS variable rather than redefining the whole dark
 // palette, so borders/backgrounds/disabled colors keep Mantine's defaults.
 // #9a9a9a also clears 4.5:1 on a card (#2e2e2e), where #909090 only reached 4.25:1.
+// Mantine's default error red is 3.3:1 on white at 12px, under the 4.5:1 that small text needs,
+// and the one message a stressed person must read is the one that is smallest. The error text is
+// darker in light mode, lighter in dark mode, and 14px.
 export const cssVariablesResolver: CSSVariablesResolver = () => ({
   variables: {},
-  light: {},
+  light: {
+    '--mantine-color-error': '#b91c1c',
+  },
   dark: {
     '--mantine-color-dimmed': '#9a9a9a',
+    '--mantine-color-error': '#fca5a5',
   },
 });
 

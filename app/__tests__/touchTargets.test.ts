@@ -37,4 +37,20 @@ describe('touch targets', () => {
     const rule = block("html[data-text-size='large'] .tab-label");
     expect(rule).toMatch(/font-size:\s*12px/);
   });
+
+  it('shows error text at 14px, not Mantine\'s 12px', () => {
+    expect(block('.mantine-InputWrapper-error')).toMatch(/font-size:\s*0\.875rem/);
+  });
+
+  it('moves toasts to the top while a sheet is open, so they never cover its buttons', () => {
+    expect(css).toMatch(/body:has\(\[role='dialog'\]\) \.mantine-Notifications-root/);
+  });
+
+  it('hides only the app name from a phone header at larger text sizes', () => {
+    expect(block("html[data-text-size='largest'] .app-wordmark")).toMatch(/display:\s*none/);
+  });
+
+  it('lets the plan summary scroll with the page at larger text sizes', () => {
+    expect(block("html[data-text-size='largest'] .plan-footer")).toMatch(/position:\s*static/);
+  });
 });
