@@ -258,10 +258,10 @@ describe('Transactions route query parameters', () => {
     expect(screen.queryByText('Weekly Shop')).not.toBeInTheDocument();
   });
 
-  it('shows only spending without a target for spending=untargeted', () => {
+  it('shows only spending without a budget for spending=untargeted', () => {
     renderRoute('/transactions?month=2026-08&spending=untargeted');
 
-    expect(screen.getByRole('textbox', { name: 'Filter by category' })).toHaveValue('Other spending (no target)');
+    expect(screen.getByRole('textbox', { name: 'Filter by category' })).toHaveValue('Other spending (no budget)');
     expect(screen.getByText('Weekly Shop')).toBeInTheDocument();
     expect(screen.queryByText('Mortgage payment')).not.toBeInTheDocument();
   });

@@ -15,17 +15,12 @@ import { useSelectedMonth } from '~/hooks/useSelectedMonth';
 import { targetedExpenseCategoryIds } from '~/lib/summary';
 import { useCategories, useTargets, useTransactions, useTransactionsRange } from '~/lib/queries';
 import type { Transaction, TransactionType } from '~/lib/types';
+import { NAMES } from '~/lib/glossary';
 import { pageTitle } from '~/lib/pageTitle';
+import { TYPE_OPTIONS } from '~/lib/transactionTypes';
 import type { Route } from './+types/transactions';
 
-const TYPE_OPTIONS: { value: TransactionType; label: string }[] = [
-  { value: 'EXPENSE', label: 'Expense' },
-  { value: 'INCOME', label: 'Income' },
-  { value: 'SET_ASIDE', label: 'Set aside' },
-  { value: 'TAKE_OUT', label: 'Take out' },
-];
-
-const UNTARGETED_OPTION = { value: UNTARGETED_FILTER, label: 'Other spending (no target)' };
+const UNTARGETED_OPTION = { value: UNTARGETED_FILTER, label: NAMES.otherSpendingNoBudget };
 
 // Searching looks back this far, whichever month is on screen.
 const SEARCH_MONTHS = 24;

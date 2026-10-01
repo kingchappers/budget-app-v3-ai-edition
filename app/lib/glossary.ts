@@ -36,12 +36,12 @@ export const GLOSSARY: Record<GlossaryKey, GlossaryEntry> = {
     example: 'Your salary, or £20 a friend paid you back.',
   },
   setAside: {
-    term: 'Set aside',
+    term: 'Add to pot',
     definition: 'Money you move into a pot to keep for later, rather than spend.',
     example: '£50 into your Holidays pot.',
   },
   takeOut: {
-    term: 'Take out',
+    term: 'Take from pot',
     definition: 'Money you move back out of a pot into your everyday money.',
     example: '£50 back out of Holidays because you no longer need it.',
   },
@@ -51,7 +51,7 @@ export const GLOSSARY: Record<GlossaryKey, GlossaryEntry> = {
     example: 'A pot called Holidays, or one called Car repairs.',
   },
   target: {
-    term: 'Target',
+    term: 'Budget',
     definition: 'The most you plan to spend on a category, each month or each week.',
     example: '£300 a month for Food & Groceries.',
   },
@@ -108,3 +108,25 @@ export const GLOSSARY: Record<GlossaryKey, GlossaryEntry> = {
 };
 
 export const GLOSSARY_KEYS = Object.keys(GLOSSARY) as GlossaryKey[];
+
+// Display names that are not terms with a definition. Everything a person reads for one of these ideas
+// comes from here or from GLOSSARY, so a name is changed once. Stored values, API fields and the
+// route and tab keys keep their old names; only what is shown changes.
+export const NAMES = {
+  budget: GLOSSARY.target.term,
+  budgets: 'Budgets',
+  budgetsAreOptional: 'Budgets are optional.',
+  otherSpendingNoBudget: 'Other spending (no budget)',
+  addedToPots: 'Added to pots',
+  totalInPots: 'Total in pots',
+  potGoal: GLOSSARY.potGoal.term,
+  categoryTypeSpending: 'Spending',
+} as const;
+
+// The wording of the one-time "What's changed" notes. They have to name the old words, which is why they live
+// here with the names rather than in the page that shows them.
+export const RELEASE_NOTES = {
+  menu: 'The menu has changed. Budgets, Pots and Recurring are now together under Plan. Add is in the middle of the bottom bar. Categories and Accounts are in Settings.',
+  names: 'Some names have changed. Targets are now called Budgets. "Set aside" is now "Add to pot", and "Take out" is now "Take from pot". Nothing else has moved.',
+} as const;
+
