@@ -368,6 +368,29 @@ data "aws_iam_policy_document" "github_iam_policy_document" {
     ]
   }
 
+  # EventBridge rule that runs the bill reminder scheduler (INFRA-01)
+  # Scoped to rules named after the app. events:TagResource is needed because the rule is tagged.
+  statement {
+    sid    = "EventBridgeRuleManagement"
+    effect = "Allow"
+    actions = [
+      "events:PutRule",
+      "events:DeleteRule",
+      "events:DescribeRule",
+      "events:EnableRule",
+      "events:DisableRule",
+      "events:PutTargets",
+      "events:RemoveTargets",
+      "events:ListTargetsByRule",
+      "events:ListTagsForResource",
+      "events:TagResource",
+      "events:UntagResource",
+    ]
+    resources = [
+      "arn:aws:events:${var.aws_region}:${data.aws_caller_identity.current.account_id}:rule/${var.app_name}-*"
+    ]
+  }
+
   # S3 state bucket access (read state, write plan/apply results)
   statement {
     sid    = "TerraformStateAccess"
