@@ -283,7 +283,12 @@ data "aws_iam_policy_document" "github_iam_policy_document" {
       "arn:aws:apigateway:${var.aws_region}::/v2/apis",
       "arn:aws:apigateway:${var.aws_region}::/v2/apis/*",
       "arn:aws:apigateway:${var.aws_region}::/tags/*",
-      "arn:aws:apigateway:${var.aws_region}::/domainnames"
+      "arn:aws:apigateway:${var.aws_region}::/domainnames",
+      # Only the app's own custom domain, and what hangs beneath it (its API mappings)
+      "arn:aws:apigateway:${var.aws_region}::/domainnames/${var.custom_domain}",
+      "arn:aws:apigateway:${var.aws_region}::/domainnames/${var.custom_domain}/*",
+      "arn:aws:apigateway:${var.aws_region}::/v2/domainnames/${var.custom_domain}",
+      "arn:aws:apigateway:${var.aws_region}::/v2/domainnames/${var.custom_domain}/*"
     ]
   }
 

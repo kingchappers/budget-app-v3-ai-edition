@@ -18,3 +18,9 @@ variable "app_name" {
   description = "The name of the application."
   type        = string
 }
+
+variable "custom_domain" {
+  description = "The app's custom domain name in API Gateway. The deploy role may only manage this one (INFRA-01)."
+  type        = string
+  default     = "budget.scgrid.xyz"
+}
