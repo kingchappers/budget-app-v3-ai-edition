@@ -33,7 +33,7 @@ describe('pots', () => {
   it('shows goal progress and this month on the Pots page at a readable size', () => {
     renderIn(<PotRow pot={pot()} category={holidays} onSetAside={() => undefined} />);
     expectReadable(screen.getByText('£400.00 of £1,200.00'));
-    expectReadable(screen.getByText(/set aside/i, { selector: 'p' }));
+    expectReadable(screen.getByText(/added to pot/i, { selector: 'p' }));
   });
 
   it('shows the auto and below-zero badges at a readable size', () => {

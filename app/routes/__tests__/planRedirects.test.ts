@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { clientLoader as potsLoader } from '../pots';
 import { clientLoader as recurringLoader } from '../recurring';
+import { clientLoader as budgetsLoader } from '../budgets';
 import { clientLoader as targetsLoader } from '../targets';
 
 function redirectedTo(loader: (args: never) => unknown, url: string): string | null {
@@ -15,8 +16,12 @@ function redirectedTo(loader: (args: never) => unknown, url: string): string | n
 }
 
 describe('the old addresses lead to Plan', () => {
-  it('sends /targets to the Targets tab', () => {
-    expect(redirectedTo(targetsLoader, 'http://localhost/targets')).toBe('/plan?tab=targets');
+  it('sends /budgets to the Budgets tab', () => {
+    expect(redirectedTo(budgetsLoader, 'http://localhost/budgets')).toBe('/plan?tab=budgets');
+  });
+
+  it('sends the old /targets address to the Budgets tab too', () => {
+    expect(redirectedTo(targetsLoader, 'http://localhost/targets')).toBe('/plan?tab=budgets');
   });
 
   it('sends /pots to the Pots tab', () => {

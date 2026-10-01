@@ -62,17 +62,17 @@ beforeEach(() => {
 });
 
 describe('Pots page', () => {
-  it('groups pots under Sinking Funds and Saving & Investment in group order', () => {
+  it('groups pots under Saving for known costs and Saving & Investment in group order', () => {
     renderPage();
     const headings = screen.getAllByRole('heading', { level: 5 }).map(h => h.textContent);
-    expect(headings).toEqual(['Sinking Funds', 'Saving & Investment']);
+    expect(headings).toEqual(['Saving for known costs', 'Saving & Investment']);
   });
 
   it('shows the emoji label, balance and this month for a pot', () => {
     renderPage();
     expect(screen.getByText('✈️ Holidays')).toBeInTheDocument();
     expect(screen.getByText('£250.00')).toBeInTheDocument();
-    expect(screen.getByText('+£50.00 set aside · −£10.00 spent')).toBeInTheDocument();
+    expect(screen.getByText('+£50.00 added to pot · −£10.00 spent')).toBeInTheDocument();
   });
 
   it('shows goal progress and the auto-contribute badge', () => {
@@ -88,9 +88,9 @@ describe('Pots page', () => {
     expect(screen.getByText('−£30.00')).toBeInTheDocument();
   });
 
-  it('opens the Add sheet on Set aside with the pot preselected', async () => {
+  it('opens the Add sheet on Add to pot with the pot preselected', async () => {
     renderPage();
-    await userEvent.setup().click(screen.getByRole('button', { name: 'Set aside to Holidays' }));
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Add to Holidays pot' }));
     expect(screen.getByText('Add sheet: SET_ASIDE cat-holidays')).toBeInTheDocument();
   });
 

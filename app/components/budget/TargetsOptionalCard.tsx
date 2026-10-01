@@ -33,9 +33,9 @@ export function TargetsOptionalCard() {
 
   return (
     <Card withBorder>
-      <Text mb="sm">Targets are optional. Set one to see what's left in a category.</Text>
+      <Text mb="sm">Budgets are optional. Set one to see what's left in a category.</Text>
       <Group gap="sm">
-        <Button component={Link} to="/plan?tab=targets">Set targets</Button>
+        <Button component={Link} to="/plan?tab=budgets">Set budgets</Button>
         <Button variant="default" onClick={dismiss}>Just tracking for now</Button>
       </Group>
     </Card>

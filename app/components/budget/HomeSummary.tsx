@@ -28,7 +28,7 @@ export function OtherSpendingRow({ amount, yearMonth }: { amount: number; yearMo
       style={{ borderRadius: 'var(--mantine-radius-sm)' }}
     >
       <Group justify="space-between" wrap="nowrap">
-        <Text fw={500}>Other spending (no target)</Text>
+        <Text fw={500}>Other spending (no budget)</Text>
         <Group gap={4} wrap="nowrap">
           <Text fw={600}>{formatPence(amount)}</Text>
           <IconChevronRight size={16} aria-hidden color="var(--mantine-color-dimmed)" />

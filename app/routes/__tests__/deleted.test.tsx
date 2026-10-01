@@ -77,9 +77,9 @@ describe('Recently deleted page', () => {
     renderPage();
 
     const headings = screen.getAllByRole('heading', { level: 5 }).map(h => h.textContent);
-    expect(headings).toEqual(['Transactions', 'Targets', 'Accounts']);
+    expect(headings).toEqual(['Transactions', 'Budgets', 'Accounts']);
     expect(screen.getByText('£3.50 · Coffee')).toBeInTheDocument();
-    expect(screen.getByText('£300.00 target · Groceries')).toBeInTheDocument();
+    expect(screen.getByText('£300.00 budget · Groceries')).toBeInTheDocument();
     expect(screen.getByText('Lloyds and its 1 balance entry')).toBeInTheDocument();
     expect(screen.getAllByText(/^Deleted 29 Sept?, \d{2}:\d{2}$/)).toHaveLength(3);
     screen.getAllByText(/^Deleted 29 Sept?, \d{2}:\d{2}$/).forEach(expectReadable);

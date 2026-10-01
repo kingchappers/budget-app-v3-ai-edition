@@ -78,12 +78,12 @@ describe('Categories page', () => {
     expect(state.create).toHaveBeenCalledWith({ name: 'Bonus', type: 'INCOME', icon: 'tag' }, expect.anything());
   });
 
-  it('switches Group to Sinking Funds when the type is Pot', async () => {
+  it('switches Group to Saving for known costs when the type is Pot', async () => {
     const user = userEvent.setup();
     renderPage();
     await user.click(screen.getByLabelText('Type', { selector: 'input' }));
     await user.click(await screen.findByRole('option', { name: 'Pot', hidden: true }));
-    expect(screen.getByLabelText('Group', { selector: 'input' })).toHaveValue('Sinking Funds');
+    expect(screen.getByLabelText('Group', { selector: 'input' })).toHaveValue('Saving for known costs');
   });
 
   it('does not offer Saving & Investment when the type is Spending', async () => {
@@ -92,15 +92,15 @@ describe('Categories page', () => {
     await user.click(screen.getByLabelText('Group', { selector: 'input' }));
     expect(await screen.findByRole('option', { name: 'Bills', hidden: true })).toBeInTheDocument();
     expect(screen.queryByRole('option', { name: 'Saving & Investment', hidden: true })).not.toBeInTheDocument();
-    expect(screen.queryByRole('option', { name: 'Sinking Funds', hidden: true })).not.toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'Saving for known costs', hidden: true })).not.toBeInTheDocument();
   });
 
-  it('offers Sinking Funds and Saving & Investment for a Pot and sends the chosen group', async () => {
+  it('offers Saving for known costs and Saving & Investment for a Pot and sends the chosen group', async () => {
     const user = userEvent.setup();
     renderPage();
     await user.click(screen.getByLabelText('Type', { selector: 'input' }));
     await user.click(await screen.findByRole('option', { name: 'Pot', hidden: true }));
-    expect(screen.getByLabelText('Group', { selector: 'input' })).toHaveValue('Sinking Funds');
+    expect(screen.getByLabelText('Group', { selector: 'input' })).toHaveValue('Saving for known costs');
 
     await user.type(screen.getByLabelText('New category'), 'Boiler');
     await user.click(screen.getByRole('button', { name: 'Add' }));

@@ -1,3 +1,5 @@
+import { GLOSSARY, NAMES } from '~/lib/glossary';
+import { TermHelp } from '~/components/layout/TermHelp';
 import { useState } from 'react';
 import { ActionIcon, Alert, Badge, Button, Card, Group, Loader, Select, Stack, Text, TextInput, Title, UnstyledButton } from '@mantine/core';
 import { IconPencil } from '@tabler/icons-react';
@@ -13,9 +15,9 @@ import { pageTitle } from '~/lib/pageTitle';
 import type { Route } from './+types/categories';
 
 const TYPES: { value: CategoryType; label: string }[] = [
-  { value: 'EXPENSE', label: 'Spending' },
-  { value: 'INCOME', label: 'Income' },
-  { value: 'POT', label: 'Pot' },
+  { value: 'EXPENSE', label: NAMES.categoryTypeSpending },
+  { value: 'INCOME', label: GLOSSARY.income.term },
+  { value: 'POT', label: GLOSSARY.pot.term },
 ];
 
 function CategoryRow({ category, onDelete, onError }: {
@@ -165,6 +167,7 @@ function CategoriesContent() {
           <Select label="Group" data={groupsForType(type)} value={type === 'INCOME' ? null : group}
             onChange={v => { if (v) setGroup(v as CategoryGroup); }}
             disabled={type === 'INCOME'} allowDeselect={false} />
+          <TermHelp terms={['groupBills', 'groupKnownCosts', 'groupEveryday', 'groupSaving']} />
           <Button disabled={name.trim() === ''} loading={createState === 'saving'} onClick={addCategory}>
             Add
           </Button>

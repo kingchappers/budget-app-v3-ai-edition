@@ -1010,7 +1010,7 @@ describe('TransactionSheet', () => {
     it('opens on the preset type and category', () => {
       mockPotCategories = [holidays];
       renderSheet({ preset: { type: 'SET_ASIDE', categoryId: 'cat-holidays' } });
-      expect(screen.getByRole('button', { name: 'Type: Set aside' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Type: Add to pot' })).toBeInTheDocument();
       expect(screen.getByRole('radio', { name: 'Holidays' })).toBeChecked();
     });
 
@@ -1021,23 +1021,23 @@ describe('TransactionSheet', () => {
       expect(screen.getByRole('radio', { name: 'Dining' })).toBeChecked();
     });
 
-    it('offers only pots for Set aside and Take out, and both kinds for Spend', async () => {
+    it('offers only pots for Add to pot and Take from pot, and both kinds for Spend', async () => {
       mockPotCategories = [holidays];
       const user = userEvent.setup();
       renderSheet();
       expect(chipNames()).toEqual(expect.arrayContaining(['Dining', 'Holidays']));
-      await pickType(user, 'Set aside');
+      await pickType(user, 'Add to pot');
       expect(chipNames()).toEqual(['Holidays']);
-      await pickType(user, 'Take out');
+      await pickType(user, 'Take from pot');
       expect(chipNames()).toEqual(['Holidays']);
     });
 
-    it('keeps an expense category when switching to Set aside, says it does not fit, and refuses to save', async () => {
+    it('keeps an expense category when switching to Add to pot, says it does not fit, and refuses to save', async () => {
       mockPotCategories = [holidays];
       const user = userEvent.setup();
       renderSheet();
       await user.click(screen.getByRole('radio', { name: 'Dining' }));
-      await pickType(user, 'Set aside');
+      await pickType(user, 'Add to pot');
 
       expect(screen.getByText("Dining isn't a pot. Choose another.")).toBeInTheDocument();
       const group = screen.getByRole('radiogroup', { name: 'Category' });

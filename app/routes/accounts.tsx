@@ -1,3 +1,4 @@
+import { TermHelp } from '~/components/layout/TermHelp';
 import { useState } from 'react';
 import { Alert, Button, Group, Loader, Modal, Select, SimpleGrid, Stack, Text, TextInput, Title } from '@mantine/core';
 import { DefaultLayout } from '~/components/layout/DefaultLayout';
@@ -90,6 +91,7 @@ function AccountsContent() {
         <Group gap={4}>
           <Text fw={700}>Net worth:</Text>
           <Text fw={700}>{formatPence(netWorth)}</Text>
+          <TermHelp terms={['netWorth']} />
         </Group>
       </SimpleGrid>
 
@@ -107,8 +109,10 @@ function AccountsContent() {
           }}
           allowDeselect={false}
         />
+        <TermHelp terms={['accountKind']} />
         <Select label="Type" data={typeOptionsForKind(kind)} value={type}
           onChange={v => { if (v) setType(v as AccountType); }} allowDeselect={false} />
+        <TermHelp terms={['accountType']} />
         <Button disabled={name.trim() === ''} loading={createState === 'saving'} onClick={addAccount}>
           Add
         </Button>

@@ -7,7 +7,7 @@ import { MemoryRouter, useLocation } from 'react-router';
 vi.mock('~/components/layout/DefaultLayout', () => ({
   DefaultLayout: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
-vi.mock('../targets', () => ({ TargetsContent: () => <div>Targets content</div> }));
+vi.mock('../budgets', () => ({ BudgetsContent: () => <div>Budgets content</div> }));
 vi.mock('../pots', () => ({ PotsContent: () => <div>Pots content</div> }));
 vi.mock('../recurring', () => ({ RecurringContent: () => <div>Recurring content</div> }));
 
@@ -30,26 +30,26 @@ function renderPlan(url = '/plan') {
 }
 
 describe('Plan page', () => {
-  it('has Targets, Pots and Recurring as tabs, opening on Targets', () => {
+  it('has Budgets, Pots and Recurring as tabs, opening on Budgets', () => {
     renderPlan();
-    expect(screen.getAllByRole('tab').map(tab => tab.textContent)).toEqual(['Targets', 'Pots', 'Recurring']);
-    expect(screen.getByRole('tab', { name: 'Targets' })).toHaveAttribute('aria-selected', 'true');
-    expect(screen.getByText('Targets content')).toBeInTheDocument();
+    expect(screen.getAllByRole('tab').map(tab => tab.textContent)).toEqual(['Budgets', 'Pots', 'Recurring']);
+    expect(screen.getByRole('tab', { name: 'Budgets' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByText('Budgets content')).toBeInTheDocument();
     expect(screen.queryByText('Pots content')).not.toBeInTheDocument();
   });
 
   it.each([
     ['pots', 'Pots content'],
     ['recurring', 'Recurring content'],
-    ['targets', 'Targets content'],
+    ['budgets', 'Budgets content'],
   ])('opens the %s tab from the address', (tab, content) => {
     renderPlan(`/plan?tab=${tab}`);
     expect(screen.getByText(content)).toBeInTheDocument();
   });
 
-  it('falls back to Targets for a tab it does not know', () => {
+  it('falls back to Budgets for a tab it does not know', () => {
     renderPlan('/plan?tab=nonsense');
-    expect(screen.getByText('Targets content')).toBeInTheDocument();
+    expect(screen.getByText('Budgets content')).toBeInTheDocument();
   });
 
   it('changes tab and the address together', async () => {
@@ -59,7 +59,7 @@ describe('Plan page', () => {
     await user.click(screen.getByRole('tab', { name: 'Recurring' }));
 
     expect(screen.getByText('Recurring content')).toBeInTheDocument();
-    expect(screen.queryByText('Targets content')).not.toBeInTheDocument();
+    expect(screen.queryByText('Budgets content')).not.toBeInTheDocument();
     expect(screen.getByTestId('url')).toHaveTextContent('/plan?tab=recurring');
   });
 
@@ -67,9 +67,9 @@ describe('Plan page', () => {
     const user = userEvent.setup();
     renderPlan('/plan?tab=pots&pot=holidays&monthly=3000');
 
-    await user.click(screen.getByRole('tab', { name: 'Targets' }));
+    await user.click(screen.getByRole('tab', { name: 'Budgets' }));
 
-    expect(screen.getByTestId('url')).toHaveTextContent('/plan?tab=targets');
+    expect(screen.getByTestId('url')).toHaveTextContent('/plan?tab=budgets');
   });
 
   it('keeps the parameters while staying on the tab they are for', () => {
@@ -80,7 +80,7 @@ describe('Plan page', () => {
   it('moves between tabs with the arrow keys', async () => {
     const user = userEvent.setup();
     renderPlan();
-    screen.getByRole('tab', { name: 'Targets' }).focus();
+    screen.getByRole('tab', { name: 'Budgets' }).focus();
     await user.keyboard('{ArrowRight}');
     expect(screen.getByRole('tab', { name: 'Pots' })).toHaveFocus();
   });
@@ -93,5 +93,10 @@ describe('Plan page', () => {
   it('names the page and the tab in the document title', () => {
     renderPlan('/plan?tab=pots');
     expect(document.title).toBe('Plan – Pots – Budget');
+  });
+
+  it('still opens Budgets from an old ?tab=targets link', () => {
+    renderPlan('/plan?tab=targets');
+    expect(screen.getByText('Budgets content')).toBeInTheDocument();
   });
 });

@@ -9,6 +9,7 @@ vi.mock('~/components/layout/DefaultLayout', () => ({
 }));
 vi.mock('~/components/budget/WelcomeBackCard', () => ({ WelcomeBackCard: () => null }));
 vi.mock('~/components/layout/WhatsChanged', () => ({ WhatsChanged: () => null }));
+vi.mock('~/components/layout/GuidedTour', () => ({ GuidedTour: () => null }));
 vi.mock('~/components/recurring/DueRecurringCard', () => ({ DueRecurringCard: () => <div>Due card</div> }));
 vi.mock('~/hooks/useOfflineQueue', () => ({ useOfflineQueue: () => ({ pendingMap: {}, flushNow: vi.fn(), discard: vi.fn() }) }));
 vi.mock('~/components/transactions/TransactionSheet', () => ({
@@ -206,9 +207,9 @@ describe('Home left to spend', () => {
       .toHaveAttribute('href', `/transactions?month=${thisMonth}&category=g`);
   });
 
-  it('links spending without a target to the filtered list', () => {
+  it('links spending without a budget to the filtered list', () => {
     renderHome();
-    const link = screen.getByRole('link', { name: /Other spending \(no target\)/ });
+    const link = screen.getByRole('link', { name: /Other spending \(no budget\)/ });
     expect(link).toHaveTextContent('£30.00');
     expect(link).toHaveAttribute('href', `/transactions?month=${thisMonth}&spending=untargeted`);
   });
@@ -252,24 +253,24 @@ describe('Home without targets', () => {
     renderHome();
     expect(screen.getByText('Spent this month').parentElement).toHaveTextContent('£45.00');
     expect(screen.queryByText(/left to spend|over so far/)).not.toBeInTheDocument();
-    expect(screen.queryByText('Other spending (no target)')).not.toBeInTheDocument();
+    expect(screen.queryByText('Other spending (no budget)')).not.toBeInTheDocument();
   });
 
-  it('explains that targets are optional', () => {
+  it('explains that budgets are optional', () => {
     renderHome();
-    expect(screen.getByText("Targets are optional. Set one to see what's left in a category.")).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Set targets' })).toHaveAttribute('href', '/plan?tab=targets');
+    expect(screen.getByText("Budgets are optional. Set one to see what's left in a category.")).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Set budgets' })).toHaveAttribute('href', '/plan?tab=budgets');
   });
 
-  it('hides the targets card for good after "Just tracking for now"', async () => {
+  it('hides the budgets card for good after "Just tracking for now"', async () => {
     const user = userEvent.setup();
     const { unmount } = renderHome();
     await user.click(screen.getByRole('button', { name: 'Just tracking for now' }));
-    expect(screen.queryByText(/Targets are optional/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Budgets are optional/)).not.toBeInTheDocument();
 
     unmount();
     renderHome();
-    expect(screen.queryByText(/Targets are optional/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Budgets are optional/)).not.toBeInTheDocument();
     expect(screen.getByText('Spent this month')).toBeInTheDocument();
   });
 
@@ -277,7 +278,7 @@ describe('Home without targets', () => {
     const getItem = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('blocked'); });
     const error = vi.spyOn(console, 'error').mockImplementation(() => {});
     renderHome();
-    expect(screen.getByText(/Targets are optional/)).toBeInTheDocument();
+    expect(screen.getByText(/Budgets are optional/)).toBeInTheDocument();
     getItem.mockRestore();
     error.mockRestore();
   });
