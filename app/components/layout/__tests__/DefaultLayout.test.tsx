@@ -229,8 +229,9 @@ describe('DefaultLayout N shortcut setting', () => {
     const user = userEvent.setup();
     renderLayout();
     await user.hover(within(screen.getByRole('banner')).getByRole('button', { name: 'Add transaction' }));
-    expect(await screen.findByText('Add transaction')).toBeInTheDocument();
-    expect(screen.queryByText('Add transaction (N)')).not.toBeInTheDocument();
+    const tooltip = await screen.findByRole('tooltip');
+    expect(tooltip).toHaveTextContent('Add transaction');
+    expect(tooltip).not.toHaveTextContent('(N)');
   });
 });
 

@@ -166,7 +166,7 @@ describe('Categories page delete outcome', () => {
     renderPage();
     await user.click(screen.getByRole('button', { name: 'Delete' }));
     const dialog = await screen.findByRole('dialog');
-    await user.click(within(dialog).getByLabelText('Move transactions to'));
+    await user.click(within(dialog).getByRole('textbox', { name: 'Move transactions to' }));
     await user.click(await screen.findByRole('option', { name: targetName, hidden: true }));
     await user.click(within(dialog).getByRole('button', { name: 'Move and delete' }));
   }
