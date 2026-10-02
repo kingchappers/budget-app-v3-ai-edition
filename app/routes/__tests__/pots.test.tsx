@@ -123,6 +123,56 @@ describe('Pots page', () => {
     expect(screen.getByText(/No pots yet/)).toBeInTheDocument();
   });
 
+  describe('archived pots', () => {
+    beforeEach(() => {
+      state.categories = [
+        cat('cat-holidays', 'Holidays', 'SINKING_FUNDS', '✈️'),
+        cat('cat-garden', 'Garden', 'SINKING_FUNDS', '🌱'),
+      ];
+      state.pots = [
+        pot('cat-holidays', { balance: 25000 }),
+        pot('cat-garden', { archivedAt: '2026-10-02T09:00:00.000Z', months: [] }),
+      ];
+    });
+
+    it('keeps an archived pot out of the main list', () => {
+      renderPage();
+      expect(screen.getByText('✈️ Holidays')).toBeInTheDocument();
+      expect(screen.queryByText('🌱 Garden')).not.toBeInTheDocument();
+    });
+
+    it('reveals archived pots, without an Add to pot button, when the section is opened', async () => {
+      renderPage();
+      const toggle = screen.getByRole('button', { name: 'Archived pots (1)' });
+      expect(toggle).toHaveAttribute('aria-expanded', 'false');
+      await userEvent.setup().click(toggle);
+      expect(toggle).toHaveAttribute('aria-expanded', 'true');
+      expect(screen.getByText('🌱 Garden')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Add to Garden pot' })).not.toBeInTheDocument();
+    });
+
+    it('opens the history of an archived pot', async () => {
+      renderPage();
+      const user = userEvent.setup();
+      await user.click(screen.getByRole('button', { name: 'Archived pots (1)' }));
+      await user.click(screen.getByRole('button', { name: /Open Garden history/ }));
+      expect(screen.getByText('History: cat-garden no suggestion')).toBeInTheDocument();
+    });
+
+    it('has no archived section when nothing is archived', () => {
+      state.pots = [pot('cat-holidays'), pot('cat-garden')];
+      renderPage();
+      expect(screen.queryByRole('button', { name: /Archived pots/ })).not.toBeInTheDocument();
+    });
+
+    it('says there are no active pots when every pot is archived', () => {
+      state.pots = [pot('cat-holidays', { archivedAt: '2026-10-01T00:00:00.000Z' }), pot('cat-garden', { archivedAt: '2026-10-02T00:00:00.000Z' })];
+      renderPage();
+      expect(screen.getByText(/No active pots/)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Archived pots (2)' })).toBeInTheDocument();
+    });
+  });
+
   it('shows an error with a retry when the pots fail to load', () => {
     state.potsError = true;
     renderPage();

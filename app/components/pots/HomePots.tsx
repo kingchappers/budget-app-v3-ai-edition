@@ -16,6 +16,7 @@ function isShown(pot: PotSummary): boolean {
 export function HomePots({ pots, categories }: { pots: PotSummary[]; categories: Category[] }) {
   const categoryById = new Map(categories.map(c => [c.categoryId, c]));
   const rows = pots
+    .filter(pot => !pot.archivedAt)
     .filter(isShown)
     .map(pot => ({ pot, category: categoryById.get(pot.categoryId) }))
     .filter((row): row is { pot: PotSummary; category: Category } => row.category !== undefined);

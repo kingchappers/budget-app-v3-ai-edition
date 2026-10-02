@@ -12,6 +12,7 @@ import { formatPence, formatPencePlain, parsePounds } from '~/lib/money';
 import { currentYearMonth, formatMonthLabel } from '~/lib/months';
 import { useSavePot } from '~/lib/queries';
 import type { Category, PotSummary } from '~/lib/types';
+import { ArchivePotSection } from './ArchivePotSection';
 import { PotTrend } from './PotTrend';
 
 export function parseOptionalPounds(
@@ -192,7 +193,10 @@ export function PotHistorySheet({ pot, category, suggestedMonthly, onClose }: Po
               </Table>
             </Table.ScrollContainer>
           )}
-          <PotSettingsForm key={pot.categoryId} pot={pot} category={category} suggestedMonthly={suggestedMonthly} />
+          {!pot.archivedAt && (
+            <PotSettingsForm key={pot.categoryId} pot={pot} category={category} suggestedMonthly={suggestedMonthly} />
+          )}
+          <ArchivePotSection key={`archive-${pot.categoryId}`} pot={pot} category={category} onDone={onClose} />
         </Stack>
       )}
     </ResponsiveSheet>

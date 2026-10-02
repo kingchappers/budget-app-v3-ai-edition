@@ -13,6 +13,7 @@ export interface Category {
   group?: CategoryGroup;
   isDefault: boolean;
   createdAt: string;
+  archived?: boolean;
 }
 
 export interface Transaction {
@@ -65,6 +66,7 @@ export interface PotSettings {
   monthlyAmount: number | null;
   goalAmount: number | null;
   autoContribute: PotAutoEntry[];
+  archivedAt?: string | null;
   updatedAt: string;
 }
 export interface PotMonth {
@@ -76,6 +78,7 @@ export interface PotSummary {
   monthlyAmount: number | null;
   goalAmount: number | null;
   autoAmountNow: number;
+  archivedAt: string | null;
   balance: number;
   thisMonth: { setAside: number; autoAdded: number; takeOut: number; spent: number };
   months: PotMonth[];

@@ -8,7 +8,7 @@ const request = vi.fn();
 vi.mock('~/hooks/useProtectedApi', () => ({ useProtectedApi: () => ({ request }) }));
 vi.mock('@auth0/auth0-react', () => ({ useAuth0: () => ({ isAuthenticated: true }) }));
 
-import { queryKeys, usePots, useSavePot } from '../queries';
+import { queryKeys, useArchivePot, usePots, useSavePot, useUnarchivePot } from '../queries';
 
 const pot: PotSummary = {
   categoryId: 'cat-holidays', monthlyAmount: 5000, goalAmount: null, autoAmountNow: 0, balance: 1000,
@@ -54,5 +54,42 @@ describe('useSavePot', () => {
     expect(request).toHaveBeenCalledWith('/api/pots/cat-holidays', { method: 'PUT', body: JSON.stringify(input) });
     expect(client.getQueryState(queryKeys.pots('2026-09'))?.isInvalidated).toBe(true);
     expect(client.getQueryState(queryKeys.pots('2026-08'))?.isInvalidated).toBe(true);
+  });
+});
+
+describe('useArchivePot', () => {
+  it('POSTs the month and refreshes pots, categories, recurring and trash', async () => {
+    request.mockResolvedValue({ settings: {}, cancelledRecurring: 2 });
+    client.setQueryData(queryKeys.pots('2026-09'), [pot]);
+    client.setQueryData(queryKeys.categories, []);
+    client.setQueryData(queryKeys.recurring, []);
+    client.setQueryData(queryKeys.trash, []);
+    const { result } = renderHook(() => useArchivePot(), { wrapper });
+
+    let cancelled = 0;
+    await act(async () => {
+      cancelled = (await result.current.mutateAsync({ categoryId: 'cat-holidays', month: '2026-09' })).cancelledRecurring;
+    });
+
+    expect(cancelled).toBe(2);
+    expect(request).toHaveBeenCalledWith('/api/pots/cat-holidays/archive', { method: 'POST', body: JSON.stringify({ month: '2026-09' }) });
+    for (const key of [queryKeys.pots('2026-09'), queryKeys.categories, queryKeys.recurring, queryKeys.trash]) {
+      expect(client.getQueryState(key)?.isInvalidated).toBe(true);
+    }
+  });
+});
+
+describe('useUnarchivePot', () => {
+  it('POSTs to unarchive and refreshes pots and categories', async () => {
+    request.mockResolvedValue({ settings: {} });
+    client.setQueryData(queryKeys.pots('2026-09'), [pot]);
+    client.setQueryData(queryKeys.categories, []);
+    const { result } = renderHook(() => useUnarchivePot(), { wrapper });
+
+    await act(async () => { await result.current.mutateAsync('cat-holidays'); });
+
+    expect(request).toHaveBeenCalledWith('/api/pots/cat-holidays/unarchive', { method: 'POST' });
+    expect(client.getQueryState(queryKeys.pots('2026-09'))?.isInvalidated).toBe(true);
+    expect(client.getQueryState(queryKeys.categories)?.isInvalidated).toBe(true);
   });
 });

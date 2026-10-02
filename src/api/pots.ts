@@ -10,16 +10,16 @@ import { ok, err } from './http';
 export const MAX_AUTO_ENTRIES = 120;
 const MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
 
-function isValidMonth(value: unknown): value is string {
+export function isValidMonth(value: unknown): value is string {
   return typeof value === 'string' && MONTH_PATTERN.test(value);
 }
 
-function monthIndex(yearMonth: string): number {
+export function monthIndex(yearMonth: string): number {
   const [year, month] = yearMonth.split('-').map(Number);
   return year * 12 + (month - 1);
 }
 
-function serverMonthIndex(): number {
+export function serverMonthIndex(): number {
   const now = new Date();
   return now.getUTCFullYear() * 12 + now.getUTCMonth();
 }
@@ -54,12 +54,13 @@ export async function queryOne(userId: string, sk: string): Promise<Record<strin
   return result.Items?.[0];
 }
 
-function toSettings(item: Record<string, unknown>): PotSettings {
+export function toSettings(item: Record<string, unknown>): PotSettings {
   return {
     categoryId: String(item.categoryId),
     monthlyAmount: typeof item.monthlyAmount === 'number' ? item.monthlyAmount : null,
     goalAmount: typeof item.goalAmount === 'number' ? item.goalAmount : null,
     autoContribute: Array.isArray(item.autoContribute) ? (item.autoContribute as PotAutoEntry[]) : [],
+    archivedAt: typeof item.archivedAt === 'string' ? item.archivedAt : null,
     updatedAt: typeof item.updatedAt === 'string' ? item.updatedAt : '',
   };
 }
@@ -102,7 +103,7 @@ export async function getPots(
   return ok({ pots });
 }
 
-async function findCategory(userId: string, categoryId: string): Promise<Category | undefined> {
+export async function findCategory(userId: string, categoryId: string): Promise<Category | undefined> {
   const builtIn = DEFAULT_CATEGORIES.find(c => c.categoryId === categoryId);
   if (builtIn) return builtIn;
   return (await queryOne(userId, catSk(categoryId))) as Category | undefined;
@@ -159,6 +160,7 @@ export async function putPot(
     monthlyAmount,
     goalAmount,
     autoContribute: entries,
+    archivedAt: existing?.archivedAt ?? null,
     updatedAt: new Date().toISOString(),
   };
   await docClient.send(new PutCommand({

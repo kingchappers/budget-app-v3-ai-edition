@@ -122,6 +122,16 @@ export function createApi(request: Request) {
         body: JSON.stringify(input),
       });
     },
+    archivePot: async (categoryId: string, month: string): Promise<{ cancelledRecurring: number }> => {
+      const res = await request(`/api/pots/${encodeURIComponent(categoryId)}/archive`, {
+        method: 'POST',
+        body: JSON.stringify({ month }),
+      }) as { cancelledRecurring: number };
+      return { cancelledRecurring: res.cancelledRecurring };
+    },
+    unarchivePot: async (categoryId: string): Promise<void> => {
+      await request(`/api/pots/${encodeURIComponent(categoryId)}/unarchive`, { method: 'POST' });
+    },
 
     getRecurring: async (): Promise<Recurring[]> => {
       const res = await request('/api/recurring') as { recurring: Recurring[] };

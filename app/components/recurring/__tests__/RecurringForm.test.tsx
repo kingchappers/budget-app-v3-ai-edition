@@ -114,6 +114,17 @@ describe('RecurringForm', () => {
     expect((await categoryOptions()).map(option => option.textContent)).toEqual(['Salary']);
   });
 
+  it('does not offer an archived pot as a category', async () => {
+    pots.value = [
+      { categoryId: 'cat-holidays', name: 'Holidays', type: 'POT', icon: 'x', isDefault: true, createdAt: '' },
+      { categoryId: 'cat-garden', name: 'Garden', type: 'POT', icon: 'x', isDefault: false, createdAt: '', archived: true },
+    ];
+    const user = userEvent.setup();
+    renderForm();
+    await user.click(screen.getByPlaceholderText('Choose'));
+    expect((await categoryOptions()).map(option => option.textContent)).toEqual(['Housing', 'Food', 'Holidays']);
+  });
+
   it('groups the category options by category group when more than one applies', async () => {
     const user = userEvent.setup();
     renderForm();

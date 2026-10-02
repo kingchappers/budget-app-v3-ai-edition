@@ -8,7 +8,7 @@ import type { Category, PotSummary } from '~/lib/types';
 export interface PotRowProps {
   pot: PotSummary;
   category: Category;
-  onSetAside: () => void;
+  onSetAside?: () => void;
   onOpen?: () => void;
 }
 
@@ -51,9 +51,11 @@ export function PotRow({ pot, category, onSetAside, onOpen }: PotRowProps) {
             </UnstyledButton>
           )
           : <div style={{ flex: 1, minWidth: 0 }}>{details}</div>}
-        <Button size="compact-sm" variant="light" onClick={onSetAside} aria-label={`Add to ${category.name} pot`}>
-          {GLOSSARY.setAside.term}
-        </Button>
+        {onSetAside && (
+          <Button size="compact-sm" variant="light" onClick={onSetAside} aria-label={`Add to ${category.name} pot`}>
+            {GLOSSARY.setAside.term}
+          </Button>
+        )}
       </Group>
     </Card>
   );

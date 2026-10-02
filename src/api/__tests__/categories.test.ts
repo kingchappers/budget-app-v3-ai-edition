@@ -35,6 +35,7 @@ describe('getCategories', () => {
     mockSend.mockResolvedValueOnce({
       Items: [{ categoryId: 'custom-1', name: 'My Cat', type: 'EXPENSE', icon: 'star', isDefault: false, createdAt: '2026-01-01T00:00:00.000Z' }],
     });
+    mockSend.mockResolvedValueOnce({ Items: [] });
     const res = await getCategories(makeEvent(), 'user-1', {});
     expect(res.statusCode).toBe(200);
     const body = JSON.parse(res.body);
@@ -46,9 +47,32 @@ describe('getCategories', () => {
     mockSend.mockResolvedValueOnce({
       Items: [{ categoryId: 'custom-1', name: 'My Cat', type: 'EXPENSE', isDefault: false, createdAt: '2026-01-01T00:00:00.000Z' }],
     });
+    mockSend.mockResolvedValueOnce({ Items: [] });
     const res = await getCategories(makeEvent(), 'user-1', {});
     const custom = JSON.parse(res.body).categories.find((c: any) => c.categoryId === 'custom-1');
     expect(custom.icon).toBe('default');
+  });
+
+  it('marks archived pots, built-in and custom, and leaves the rest unmarked', async () => {
+    mockSend.mockResolvedValueOnce({
+      Items: [
+        { categoryId: 'custom-pot', name: 'Garden', type: 'POT', icon: 'star', isDefault: false, createdAt: '2026-01-01T00:00:00.000Z' },
+        { categoryId: 'custom-live', name: 'Car', type: 'POT', icon: 'star', isDefault: false, createdAt: '2026-01-01T00:00:00.000Z' },
+      ],
+    });
+    mockSend.mockResolvedValueOnce({
+      Items: [
+        { categoryId: 'custom-pot', archivedAt: '2026-10-01T00:00:00.000Z' },
+        { categoryId: 'cat-holidays', archivedAt: '2026-10-02T00:00:00.000Z' },
+        { categoryId: 'custom-live', archivedAt: null },
+      ],
+    });
+    const res = await getCategories(makeEvent(), 'user-1', {});
+    const byId = new Map<string, any>(JSON.parse(res.body).categories.map((c: any) => [c.categoryId, c]));
+    expect(byId.get('custom-pot').archived).toBe(true);
+    expect(byId.get('cat-holidays').archived).toBe(true);
+    expect(byId.get('custom-live').archived).toBeUndefined();
+    expect(byId.get('cat-gifts').archived).toBeUndefined();
   });
 });
 

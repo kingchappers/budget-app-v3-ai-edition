@@ -215,7 +215,8 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, preset, 
     saveTransactionDraft(draftOwner, draftFields);
   }, [draftKey, opened, usesDraft, draftOwner]);
 
-  const eligible = categories.filter(c => categoryTypesFor(type).includes(c.type));
+  // An archived pot stays selectable only while it is the chosen one, so editing an old entry still works.
+  const eligible = categories.filter(c => categoryTypesFor(type).includes(c.type) && (!c.archived || c.categoryId === categoryId));
   const chips = topCategories(recent ?? [], categories, type, MAX_PINNED_CHIPS, preferences.pinnedCategoryIds);
 
   const chosen: Category | undefined = categories.find(c => c.categoryId === categoryId);
