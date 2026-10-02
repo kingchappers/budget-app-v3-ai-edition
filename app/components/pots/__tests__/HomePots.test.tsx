@@ -41,6 +41,15 @@ describe('HomePots', () => {
     expect(screen.queryByText('📄 Insurance')).not.toBeInTheDocument();
   });
 
+  it('leaves out an archived pot even if it kept a goal or monthly amount', () => {
+    renderPots([
+      pot('a', { balance: 25000 }),
+      pot('b', { goalAmount: 10000, monthlyAmount: 2000, archivedAt: '2026-10-02T09:00:00.000Z' }),
+    ]);
+    expect(screen.getByText('✈️ Holidays')).toBeInTheDocument();
+    expect(screen.queryByText('🎁 Gifts')).not.toBeInTheDocument();
+  });
+
   it('shows the balance and goal progress', () => {
     renderPots([pot('a', { balance: 80000, goalAmount: 300000 })]);
     expect(screen.getByText('£800.00')).toBeInTheDocument();

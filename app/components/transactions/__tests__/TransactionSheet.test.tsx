@@ -1014,6 +1014,13 @@ describe('TransactionSheet', () => {
       expect(screen.getByRole('radio', { name: 'Holidays' })).toBeChecked();
     });
 
+    it('does not offer an archived pot', () => {
+      mockPotCategories = [holidays, { ...holidays, categoryId: 'cat-garden', name: 'Garden', isDefault: false, archived: true }];
+      renderSheet();
+      expect(chipNames()).toContain('Holidays');
+      expect(chipNames()).not.toContain('Garden');
+    });
+
     it('ignores the preset when editing', () => {
       mockPotCategories = [holidays];
       renderSheet({ editing, preset: { type: 'SET_ASIDE', categoryId: 'cat-holidays' } });

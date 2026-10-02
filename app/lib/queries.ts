@@ -343,6 +343,32 @@ export function useSavePot() {
   });
 }
 
+export function useArchivePot() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation<{ cancelledRecurring: number }, Error, { categoryId: string; month: string }>({
+    mutationFn: (vars) => api.archivePot(vars.categoryId, vars.month),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ['pots'] });
+      qc.invalidateQueries({ queryKey: queryKeys.categories });
+      qc.invalidateQueries({ queryKey: queryKeys.recurring });
+      qc.invalidateQueries({ queryKey: queryKeys.trash });
+    },
+  });
+}
+
+export function useUnarchivePot() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation<void, Error, string>({
+    mutationFn: (categoryId) => api.unarchivePot(categoryId),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ['pots'] });
+      qc.invalidateQueries({ queryKey: queryKeys.categories });
+    },
+  });
+}
+
 export function useRecurring() {
   const api = useApi();
   const enabled = useAuthReady();

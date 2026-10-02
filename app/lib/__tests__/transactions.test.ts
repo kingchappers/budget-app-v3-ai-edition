@@ -89,6 +89,12 @@ describe('topCategories', () => {
     expect(result.map(c => c.categoryId)).toEqual(['a', 'b', 'c', 'holidays']);
   });
 
+  it('leaves out archived pots, even pinned ones', () => {
+    const withArchived = [...list, { ...cat('garden', 'POT'), archived: true }];
+    expect(topCategories([], withArchived, 'SET_ASIDE', 5).map(c => c.categoryId)).toEqual(['holidays']);
+    expect(topCategories([], withArchived, 'SET_ASIDE', 5, ['garden']).map(c => c.categoryId)).toEqual(['holidays']);
+  });
+
   it('only returns categories of the matching category type', () => {
     expect(topCategories([], list, 'INCOME', 5).map(c => c.categoryId)).toEqual(['salary']);
   });

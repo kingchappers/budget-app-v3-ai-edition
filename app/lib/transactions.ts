@@ -62,7 +62,7 @@ export function topCategories(
   pinnedIds: readonly string[] = [],
 ): Category[] {
   const categoryTypes = categoryTypesFor(type);
-  const eligible = categories.filter(c => categoryTypes.includes(c.type));
+  const eligible = categories.filter(c => categoryTypes.includes(c.type) && !c.archived);
   const byId = new Map(eligible.map(c => [c.categoryId, c]));
 
   const pinned = [...new Set(pinnedIds)].flatMap(id => byId.get(id) ?? []).slice(0, limit);

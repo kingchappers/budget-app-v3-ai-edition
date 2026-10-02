@@ -17,6 +17,12 @@ vi.mock('~/components/layout/ResponsiveSheet', () => ({
     (opened ? <div role="dialog" aria-label={title}>{children}</div> : null),
 }));
 
+vi.mock('../ArchivePotSection', () => ({
+  ArchivePotSection: ({ pot, onDone }: { pot: { archivedAt?: string | null }; onDone: () => void }) => (
+    <button type="button" onClick={onDone}>{pot.archivedAt ? 'archive-section (archived)' : 'archive-section'}</button>
+  ),
+}));
+
 import { PotHistorySheet, parseOptionalPounds } from '../PotHistorySheet';
 
 const category: Category = {
@@ -50,6 +56,27 @@ function renderSheet(pot: PotSummary | null, cat: Category = category, suggested
 beforeEach(() => {
   save.mutate.mockReset();
   rename.mutate.mockReset();
+});
+
+describe('PotHistorySheet archiving', () => {
+  it('offers archiving below the settings for a live pot', () => {
+    renderSheet(makePot());
+    expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'archive-section' })).toBeInTheDocument();
+  });
+
+  it('hides the settings form for an archived pot but keeps its history', () => {
+    renderSheet(makePot({ archivedAt: '2026-10-02T09:00:00.000Z' }));
+    expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'archive-section (archived)' })).toBeInTheDocument();
+    expect(screen.getByText('Opening')).toBeInTheDocument();
+  });
+
+  it('closes the sheet once archiving is done', async () => {
+    const onClose = renderSheet(makePot());
+    await userEvent.click(screen.getByRole('button', { name: 'archive-section' }));
+    expect(onClose).toHaveBeenCalled();
+  });
 });
 
 describe('parseOptionalPounds', () => {

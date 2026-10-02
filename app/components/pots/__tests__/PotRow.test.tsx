@@ -36,3 +36,15 @@ describe('PotRow below zero', () => {
     expect(screen.queryByText('Below zero')).not.toBeInTheDocument();
   });
 });
+
+describe('PotRow without an add action', () => {
+  it('leaves out the Add to pot button, for an archived pot', () => {
+    render(
+      <MantineProvider theme={theme}>
+        <PotRow pot={pot(0)} category={category} onOpen={vi.fn()} />
+      </MantineProvider>,
+    );
+    expect(screen.queryByRole('button', { name: /Add to Holidays pot/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Open Holidays history/ })).toBeInTheDocument();
+  });
+});

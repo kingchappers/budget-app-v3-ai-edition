@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router';
-import { Group, Loader, Stack, Text, Title } from '@mantine/core';
+import { Button, Group, Loader, Stack, Text, Title } from '@mantine/core';
 import { LoadError } from '~/components/layout/LoadError';
 import { DefaultLayout } from '~/components/layout/DefaultLayout';
 import { PotHistorySheet } from '~/components/pots/PotHistorySheet';
@@ -20,6 +20,7 @@ export function PotsContent() {
   const categories = useCategories();
   const pots = usePots(asOf);
   const [addingTo, setAddingTo] = useState<string | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
   const [params, setParams] = useSearchParams();
   // A link from a recurring bill: open this pot with a monthly amount filled in but not saved.
   const [openId, setOpenId] = useState<string | null>(() => params.get('pot'));
@@ -40,15 +41,19 @@ export function PotsContent() {
   if (categories.isLoading || pots.isLoading) return <Group justify="center" py="xl"><Loader /></Group>;
 
   const categoryById = new Map((categories.data ?? []).map(c => [c.categoryId, c]));
-  const rows = (pots.data ?? [])
+  const allRows = (pots.data ?? [])
     .map(pot => ({ pot, category: categoryById.get(pot.categoryId) }))
     .filter((row): row is { pot: PotSummary; category: Category } => row.category !== undefined);
+  const rows = allRows.filter(row => !row.pot.archivedAt);
+  const archivedRows = allRows.filter(row => row.pot.archivedAt);
 
   return (
     <Stack>
       <Title order={2} size="h4">Pots</Title>
       {rows.length === 0 && (
-        <Text c="dimmed">No pots yet. Add a category with the Pot type on the Categories page.</Text>
+        <Text c="dimmed">
+          {archivedRows.length > 0 ? 'No active pots.' : 'No pots yet.'} Add a category with the Pot type on the Categories page.
+        </Text>
       )}
       {groupItems(rows, row => bucketKeyFor(row.category), row => row.category.name).map(bucket => (
         <div key={bucket.key}>
@@ -64,6 +69,20 @@ export function PotsContent() {
           ))}
         </div>
       ))}
+      {archivedRows.length > 0 && (
+        <div>
+          <Button
+            variant="subtle"
+            aria-expanded={showArchived}
+            onClick={() => setShowArchived(open => !open)}
+          >
+            Archived pots ({archivedRows.length})
+          </Button>
+          {showArchived && archivedRows.map(({ pot, category }) => (
+            <PotRow key={pot.categoryId} pot={pot} category={category} onOpen={() => setOpenId(pot.categoryId)} />
+          ))}
+        </div>
+      )}
       <TransactionSheet
         opened={addingTo !== null}
         onClose={() => setAddingTo(null)}
@@ -71,8 +90,8 @@ export function PotsContent() {
         preset={preset}
       />
       <PotHistorySheet
-        pot={rows.find(row => row.pot.categoryId === openId)?.pot ?? null}
-        category={rows.find(row => row.pot.categoryId === openId)?.category}
+        pot={allRows.find(row => row.pot.categoryId === openId)?.pot ?? null}
+        category={allRows.find(row => row.pot.categoryId === openId)?.category}
         suggestedMonthly={suggestedMonthly}
         onClose={() => {
           setOpenId(null);

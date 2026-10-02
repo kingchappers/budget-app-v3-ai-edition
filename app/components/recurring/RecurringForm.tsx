@@ -83,10 +83,10 @@ export function RecurringForm({ opened, onClose, editing, draft }: RecurringForm
     setFormError(null);
   }, [opened, editing, draft]);
 
-  const filteredCategories = categories.filter(c => categoryTypesFor(type).includes(c.type));
+  const filteredCategories = categories.filter(c => categoryTypesFor(type).includes(c.type) && (!c.archived || c.categoryId === categoryId));
   const options = categorySelectData(filteredCategories);
   const pending = create.isPending || update.isPending;
-  const pots = categories.filter(c => c.type === 'POT');
+  const pots = categories.filter(c => c.type === 'POT' && !c.archived);
   const maxLead = MAX_LEAD_DAYS[frequency];
 
   function changeFrequency(next: RecurringFrequency): void {
