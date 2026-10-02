@@ -253,7 +253,7 @@ auth0_audience = "https://dev-xf4mizgda1uv0xvb.uk.auth0.com/api/v2/"
 ┌────────────────────────────────────────────────────────────────┐
 │ 4. React component calls useProtectedApi hook:                 │
 │    - Gets JWT from Auth0 using getAccessTokenSilently()        │
-│    - Makes fetch to /api/test with header:                     │
+│    - Makes fetch to /api/categories with header:               │
 │      Authorization: Bearer {JWT}                               │
 └────────────────────────────────────────────────────────────────┘
                               ↓
@@ -262,7 +262,7 @@ auth0_audience = "https://dev-xf4mizgda1uv0xvb.uk.auth0.com/api/v2/"
 └────────────────────────────────────────────────────────────────┘
                               ↓
 ┌────────────────────────────────────────────────────────────────┐
-│ 5. API Gateway matches route /api/test                         │
+│ 5. API Gateway matches route /api/categories                   │
 │    - Routes to API Lambda                                      │
 │    - Passes Authorization header through                       │
 └────────────────────────────────────────────────────────────────┘
@@ -454,11 +454,11 @@ ENDPOINT=$(aws apigatewayv2 get-apis --query 'Items[0].ApiEndpoint' --output tex
 # Test static file server
 curl $ENDPOINT/
 
-# Test API (will fail without JWT)
-curl -X POST $ENDPOINT/api/test
+# Test API (answers 401 without a JWT)
+curl $ENDPOINT/api/categories
 
 # Test API with valid JWT (get token from browser Auth0 session first)
-curl -X POST $ENDPOINT/api/test \
+curl $ENDPOINT/api/categories \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
 

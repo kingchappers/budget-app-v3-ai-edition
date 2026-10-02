@@ -32,8 +32,8 @@ This serves as a template for future projects requiring web apps with authentica
 ### 4. Protected API Lambda
 - **Handler:** `build/api/index.js` (compiled from `api-handler.ts`)
 - **Routes:**
-  - `GET/POST /api/test` → test endpoint (requires JWT)
-  - `GET/POST /api/user-info` → returns authenticated user info (requires JWT)
+  - Categories, transactions, targets, pots, recurring items, accounts, trash and push subscriptions, all under `/api/...` (requires JWT)
+  - The full route table is in `api-handler.ts`
 - **Authentication:** All requests must include a valid JWT in the Authorization header
 - **Validation:** 
   - Verifies JWT signature using Auth0's public keys (JWKS)
@@ -65,8 +65,8 @@ This serves as a template for future projects requiring web apps with authentica
 5. JWT is stored in browser memory by Auth0 SDK
 6. User sees their authenticated profile
 
-### User clicks "Test API" button:
-1. `ApiTest` component calls `useProtectedApi().request('/api/test')`
+### The app calls the API (for example, loading categories):
+1. A query hook such as `useCategories` calls `useProtectedApi().request('/api/categories')`
 2. `useProtectedApi` hook:
    - Calls `getAccessTokenSilently()` to retrieve JWT from Auth0
    - Makes fetch request with `Authorization: Bearer <JWT>`
@@ -94,7 +94,6 @@ This serves as a template for future projects requiring web apps with authentica
 | `build/client/index.js` | Compiled static file server (auto-generated) |
 | `build/api/index.js` | Compiled API handler (auto-generated) |
 | `app/hooks/useProtectedApi.ts` | React hook to make authenticated API requests |
-| `app/components/api/ApiTest.tsx` | UI component with test buttons for API endpoints |
 | `app/components/layout/DefaultLayout.tsx` | Auth0Provider wrapper - maintains auth state globally |
 | `infra/lambda.tf` | Terraform: Static File Server Lambda + API Gateway |
 | `infra/api-lambda.tf` | Terraform: Protected API Lambda + routes |
