@@ -162,6 +162,16 @@ describe('archivePot', () => {
     expect(res.statusCode).toBe(400);
   });
 
+  it('accepts the month before and the month after now, but nothing further away', async () => {
+    useStore({ customCategories: [gardenPot] });
+    for (const month of ['2026-09', '2026-11']) {
+      expect((await archivePot(event({ month }), 'user-1', { categoryId: 'cat-garden' })).statusCode).toBe(200);
+    }
+    for (const month of ['2026-08', '2026-12']) {
+      expect((await archivePot(event({ month }), 'user-1', { categoryId: 'cat-garden' })).statusCode).toBe(400);
+    }
+  });
+
   it('rejects a missing or malformed month', async () => {
     useStore({ customCategories: [gardenPot] });
     expect((await archivePot(event({}), 'user-1', { categoryId: 'cat-garden' })).statusCode).toBe(400);

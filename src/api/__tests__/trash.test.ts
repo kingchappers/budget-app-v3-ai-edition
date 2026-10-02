@@ -138,6 +138,12 @@ describe('moveToTrash', () => {
     await expect(moveToTrash('user-1', 'RECURRING', 'RECUR#r1')).resolves.toBeUndefined();
   });
 
+  it('rethrows a failure that is not an Error object, unchanged', async () => {
+    mockSend.mockResolvedValueOnce({ Item: { PK: 'USER#user-1', SK: 'RECUR#r1', recurringId: 'r1' } });
+    mockSend.mockRejectedValueOnce(null);
+    await expect(moveToTrash('user-1', 'RECURRING', 'RECUR#r1')).rejects.toBeNull();
+  });
+
   it('rethrows any other failure', async () => {
     mockSend.mockResolvedValueOnce({ Item: { PK: 'USER#user-1', SK: 'RECUR#r1', recurringId: 'r1' } });
     mockSend.mockRejectedValueOnce(new Error('boom'));
@@ -170,6 +176,30 @@ describe('getTrash', () => {
 
   it('leaves out items whose expiry has passed but TTL has not yet removed', async () => {
     mockSend.mockResolvedValueOnce({ Items: [trashRecord({ expiresAt: NOW_SECONDS - 1 })] });
+    const res = await getTrash(event(), 'user-1', {});
+    expect(JSON.parse(res.body).items).toEqual([]);
+  });
+
+  it('keeps an item that expires one second from now and drops one that expires exactly now', async () => {
+    mockSend.mockResolvedValueOnce({
+      Items: [
+        trashRecord({ SK: 'TRASH#ACCOUNT#acc-1', entityType: 'ACCOUNT', originalSk: 'ACCOUNT#acc-1', expiresAt: NOW_SECONDS + 1 }),
+        trashRecord({ SK: 'TRASH#ACCOUNT#acc-2', entityType: 'ACCOUNT', originalSk: 'ACCOUNT#acc-2', expiresAt: NOW_SECONDS }),
+      ],
+    });
+    const res = await getTrash(event(), 'user-1', {});
+    expect(JSON.parse(res.body).items.map((i: { id: string }) => i.id)).toEqual(['acc-1']);
+  });
+
+  it.each([
+    ['originalSk', { originalSk: undefined }],
+    ['deletedAt', { deletedAt: undefined }],
+    ['expiresAt', { expiresAt: '9999999999' }],
+    ['item, when it is missing', { item: undefined }],
+    ['item, when it is null', { item: null }],
+    ['item, when it is not an object', { item: 'text' }],
+  ])('leaves out a damaged record with a bad %s', async (_label, damage) => {
+    mockSend.mockResolvedValueOnce({ Items: [trashRecord(damage)] });
     const res = await getTrash(event(), 'user-1', {});
     expect(JSON.parse(res.body).items).toEqual([]);
   });
