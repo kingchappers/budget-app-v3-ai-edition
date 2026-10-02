@@ -85,6 +85,11 @@ describe('parseBalance', () => {
     expect(parseBalance('-10000000.01').ok).toBe(false);
   });
 
+  it('accepts a magnitude of exactly the cap, positive or negative', () => {
+    expect(parseBalance('10000000')).toEqual({ ok: true, pence: 1_000_000_000 });
+    expect(parseBalance('-10000000')).toEqual({ ok: true, pence: -1_000_000_000 });
+  });
+
   it('rejects non-numeric input', () => {
     expect(parseBalance('abc').ok).toBe(false);
     expect(parseBalance('').ok).toBe(false);

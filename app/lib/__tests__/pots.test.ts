@@ -32,6 +32,11 @@ describe('thisMonthSummary', () => {
       .toBe('+£50.00 added to pot · −£5.00 taken from pot · −£12.50 spent');
   });
 
+  it('mentions a month that only had auto-adding, or where auto-adding was the larger part', () => {
+    expect(thisMonthSummary(pot({ autoAdded: 2000 }))).toBe('+£20.00 added to pot');
+    expect(thisMonthSummary(pot({ setAside: 500, autoAdded: 2000 }))).toBe('+£25.00 added to pot');
+  });
+
   it('omits the parts that are zero', () => {
     expect(thisMonthSummary(pot({ spent: 2000 }))).toBe('−£20.00 spent');
   });
