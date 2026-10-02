@@ -103,6 +103,16 @@ describe('budget', () => {
     expectReadable(screen.getByText(/spent of/));
     expectReadable(screen.getByText(/a week/));
   });
+
+  it('explains the pace line at a readable size, and does not dim it', () => {
+    renderIn(
+      <CategoryProgressRow
+        progress={{ categoryId: 'g', name: 'Groceries', icon: 'x', spent: 5000, target: 30000, rawTarget: 30000, period: 'MONTHLY', percent: 17, isOver: false }}
+        pace={40}
+      />,
+    );
+    expectReadable(screen.getByText(/Line is today/));
+  });
 });
 
 describe('insights', () => {

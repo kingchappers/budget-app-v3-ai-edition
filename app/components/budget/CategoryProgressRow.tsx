@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router';
-import { Group, Progress, Stack, Text, UnstyledButton, VisuallyHidden } from '@mantine/core';
+import { Group, Progress, Stack, Text, UnstyledButton } from '@mantine/core';
 import { formatPence } from '~/lib/money';
 import type { CategoryProgress } from '~/lib/summary';
 
@@ -24,6 +24,8 @@ export function CategoryProgressRow({ progress, to, pace = null }: CategoryProgr
   const basisTarget = week ? week.target : target;
   const isOver = basisTarget > 0 && basisSpent > basisTarget;
   const percent = basisTarget > 0 ? Math.min(100, Math.round((basisSpent / basisTarget) * 100)) : 0;
+  // The bar stops at the end, but the words give the real share, so an overspend is not hidden.
+  const spentPercent = basisTarget > 0 ? Math.round((basisSpent / basisTarget) * 100) : 0;
   const showPace = pace !== null && !week;
 
   const content: ReactNode = (
@@ -47,7 +49,7 @@ export function CategoryProgressRow({ progress, to, pace = null }: CategoryProgr
           />
         )}
       </div>
-      {showPace && <VisuallyHidden>Today is {pace}% through the month.</VisuallyHidden>}
+      {showPace && <Text size="sm">Line is today: {pace}% through the month · {spentPercent}% spent</Text>}
       <Text size="sm">
         {week
           ? `${formatPence(week.spent)} of ${formatPence(week.target)} this week`
