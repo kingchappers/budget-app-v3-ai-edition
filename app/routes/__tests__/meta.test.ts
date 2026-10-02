@@ -10,7 +10,6 @@ import * as pots from '../pots';
 import * as recurring from '../recurring';
 import * as settings from '../settings';
 import * as budgets from '../budgets';
-import * as test from '../test';
 import * as transactions from '../transactions';
 import * as root from '../../root';
 
@@ -28,7 +27,6 @@ const cases: [string, RouteWithMeta, string][] = [
   ['Insights', insights, 'Insights – Budget'],
   ['Accounts', accounts, 'Accounts – Budget'],
   ['Settings', settings, 'Settings – Budget'],
-  ['API test', test, 'API test – Budget'],
   ['Any other page', root, 'Budget'],
 ];
 
