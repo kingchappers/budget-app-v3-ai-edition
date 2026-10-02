@@ -15,14 +15,22 @@ export async function getCategories(
   userId: string,
   _params: Record<string, string>,
 ): Promise<ApiResponse> {
-  const result = await docClient.send(new QueryCommand({
+  const [customResult, potResult] = await Promise.all(['CAT#', 'POT#'].map(prefix => docClient.send(new QueryCommand({
     TableName: TABLE,
     KeyConditionExpression: 'PK = :pk AND begins_with(SK, :prefix)',
-    ExpressionAttributeValues: { ':pk': pk(userId), ':prefix': 'CAT#' },
-  }));
+    ExpressionAttributeValues: { ':pk': pk(userId), ':prefix': prefix },
+  }))));
 
-  const custom = (result.Items || []).map(toCategory);
-  return ok({ categories: [...DEFAULT_CATEGORIES, ...custom] });
+  const archivedIds = new Set(
+    (potResult.Items || [])
+      .filter(item => typeof item.archivedAt === 'string')
+      .map(item => String(item.categoryId)),
+  );
+  const custom = (customResult.Items || []).map(toCategory);
+  const categories = [...DEFAULT_CATEGORIES, ...custom].map(category => (
+    archivedIds.has(category.categoryId) ? { ...category, archived: true } : category
+  ));
+  return ok({ categories });
 }
 
 function toCategory(item: Record<string, unknown>): Category {

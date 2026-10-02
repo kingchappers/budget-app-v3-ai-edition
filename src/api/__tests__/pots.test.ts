@@ -242,6 +242,13 @@ describe('putPot', () => {
     expect(JSON.parse(res.body).settings.autoContribute).toEqual([{ from: '2026-09', amount: 5000 }]);
   });
 
+  it('keeps an archived pot archived when its settings are saved', async () => {
+    useStore({ existingSettings: [{ categoryId: 'cat-holidays', monthlyAmount: null, goalAmount: null, autoContribute: [], archivedAt: '2026-09-20T10:00:00.000Z' }] });
+    await putPot(putEvent(valid), 'user-1', { categoryId: 'cat-holidays' });
+    const put = mockSend.mock.calls.map(([c]) => c).find(c => c.Item);
+    expect(put.Item.archivedAt).toBe('2026-09-20T10:00:00.000Z');
+  });
+
   it('allows clearing both amounts', async () => {
     useStore({});
     const res = await putPot(putEvent({ monthlyAmount: null, goalAmount: null, autoContribute: false, month: '2026-09' }), 'user-1', { categoryId: 'cat-holidays' });

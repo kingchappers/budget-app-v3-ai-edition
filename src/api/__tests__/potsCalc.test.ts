@@ -52,6 +52,15 @@ describe('computePots', () => {
     expect(pot.goalAmount).toBeNull();
   });
 
+  it('reports when a pot was archived, and null when it was not', () => {
+    expect(run([], '2026-08').archivedAt).toBeNull();
+    const archived = computePots({
+      transactions: [], potCategoryIds: ['cat-x'], asOfMonth: '2026-08',
+      settings: [{ categoryId: 'cat-x', monthlyAmount: null, goalAmount: null, autoContribute: [], archivedAt: '2026-08-02T00:00:00.000Z', updatedAt: '' }],
+    })[0];
+    expect(archived.archivedAt).toBe('2026-08-02T00:00:00.000Z');
+  });
+
   it('adds set asides and draws down on spends, carrying the balance forward', () => {
     const pot = run([txn('2026-07', 'SET_ASIDE', 10000), txn('2026-08', 'EXPENSE', 2500)], '2026-08');
     expect(pot.months.map(m => [m.yearMonth, m.opening, m.closing])).toEqual([

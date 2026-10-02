@@ -6,8 +6,8 @@ export function ok(body: object): ApiResponse {
   return { statusCode: 200, headers: SECURITY_HEADERS, body: JSON.stringify(body) };
 }
 
-export function err(status: number, message: string): ApiResponse {
-  return { statusCode: status, headers: SECURITY_HEADERS, body: JSON.stringify({ error: message }) };
+export function err(status: number, message: string, extra: object = {}): ApiResponse {
+  return { statusCode: status, headers: SECURITY_HEADERS, body: JSON.stringify({ error: message, ...extra }) };
 }
 
 export function parseJsonObject(event: APIGatewayProxyEventV2): Record<string, unknown> | null {

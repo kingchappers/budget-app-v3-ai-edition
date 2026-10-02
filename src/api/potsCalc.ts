@@ -75,6 +75,7 @@ function computePot(
     monthlyAmount: settings?.monthlyAmount ?? null,
     goalAmount: settings?.goalAmount ?? null,
     autoAmountNow: autoAmountFor(entries, asOfMonth),
+    archivedAt: settings?.archivedAt ?? null,
     balance,
     thisMonth: current
       ? { setAside: current.setAside, autoAdded: current.autoAdded, takeOut: current.takeOut, spent: current.spent }
