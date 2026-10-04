@@ -217,7 +217,8 @@ describe('Transactions route duplicate', () => {
     const user = userEvent.setup();
     renderRoute();
 
-    await user.click(screen.getByRole('button', { name: 'Duplicate Weekly Shop' }));
+    await user.click(screen.getByRole('button', { name: 'Actions for Weekly Shop' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Duplicate' }));
 
     expect(screen.getByText('Sheet template: Weekly Shop')).toBeInTheDocument();
   });
