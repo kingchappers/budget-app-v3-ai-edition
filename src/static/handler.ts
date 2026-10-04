@@ -64,8 +64,8 @@ export function buildCsp(indexHtml: string, auth0Domain: string | undefined): st
   return [
     "default-src 'self'",
     ["script-src 'self'", ...scriptHashes].join(' '),
-    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-    "font-src 'self' https://fonts.gstatic.com",
+    "style-src 'self' 'unsafe-inline'",
+    "font-src 'self'",
     ["connect-src 'self'", ...auth0].join(' '),
     ["frame-src 'self'", ...auth0].join(' '),
     ["img-src 'self' data:", ...PICTURE_HOSTS].join(' '),
