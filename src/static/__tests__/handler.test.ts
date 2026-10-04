@@ -326,6 +326,13 @@ describe('buildCsp', () => {
     expect(scripts).not.toContain(hash(''));
   });
 
+  it('allows fonts and styles from this site only, since nothing is loaded from other sites', () => {
+    const policy = buildCsp(html, undefined);
+
+    expect(directive(policy, 'font-src')).toBe("font-src 'self'");
+    expect(directive(policy, 'style-src')).toBe("style-src 'self' 'unsafe-inline'");
+  });
+
   it('never allows unsafe inline scripts or eval', () => {
     const policy = buildCsp(html, 'tenant.uk.auth0.com');
 
