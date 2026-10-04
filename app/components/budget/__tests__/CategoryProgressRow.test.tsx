@@ -13,11 +13,11 @@ function progress(over: Partial<CategoryProgress> = {}): CategoryProgress {
   };
 }
 
-function renderRow(p: CategoryProgress, pace?: number | null) {
+function renderRow(p: CategoryProgress, pace?: number | null, paceCaption = false) {
   return render(
     <MantineProvider theme={theme}>
       <MemoryRouter>
-        <CategoryProgressRow progress={p} to="/transactions" pace={pace} />
+        <CategoryProgressRow progress={p} to="/transactions" pace={pace} paceCaption={paceCaption} />
       </MemoryRouter>
     </MantineProvider>,
   );
@@ -78,35 +78,27 @@ describe('CategoryProgressRow pace', () => {
     expect(screen.getByTestId('pace-marker')).toHaveStyle({ left: '40%' });
   });
 
-  it('says in words what the line is, next to how much has been spent, so the two can be compared', () => {
+  it('has no per-row sentence about the line, so the rows stay quiet', () => {
     renderRow(progress(), 40);
-    expect(screen.getByText('Line is today: 40% through the month · 73% spent')).toBeInTheDocument();
+    expect(screen.queryByText(/Line is today|through the month|% spent/)).not.toBeInTheDocument();
+  });
+
+  it('names the line once, above the bar, only when asked', () => {
+    const { unmount } = renderRow(progress(), 40);
+    expect(screen.queryByText('Today · 40% through the month')).not.toBeInTheDocument();
+    unmount();
+    renderRow(progress(), 40, true);
+    expect(screen.getByText('Today · 40% through the month')).toBeInTheDocument();
   });
 
   it('keeps the line where today is while the fill moves with spending', () => {
     const { unmount } = renderRow(progress({ spent: 5000 }), 40);
-    expect(screen.getByText('Line is today: 40% through the month · 20% spent')).toBeInTheDocument();
     expect(screen.getByTestId('pace-marker')).toHaveStyle({ left: '40%' });
     expect(screen.getByRole('progressbar', { name: 'Groceries progress' })).toHaveAttribute('aria-valuenow', '20');
     unmount();
     renderRow(progress({ spent: 20000 }), 40);
-    expect(screen.getByText('Line is today: 40% through the month · 80% spent')).toBeInTheDocument();
     expect(screen.getByTestId('pace-marker')).toHaveStyle({ left: '40%' });
     expect(screen.getByRole('progressbar', { name: 'Groceries progress' })).toHaveAttribute('aria-valuenow', '80');
-  });
-
-  it('gives the real share once the target is passed, though the bar stops at the end', () => {
-    renderRow(progress({ spent: 30000, isOver: true }), 40);
-    expect(screen.getByText('Line is today: 40% through the month · 120% spent')).toBeInTheDocument();
-    expect(screen.getByRole('progressbar', { name: 'Groceries progress' })).toHaveAttribute('aria-valuenow', '100');
-  });
-
-  it('says 0% spent for nothing spent, and for a target of nothing', () => {
-    const { unmount } = renderRow(progress({ spent: 0 }), 40);
-    expect(screen.getByText('Line is today: 40% through the month · 0% spent')).toBeInTheDocument();
-    unmount();
-    renderRow(progress({ spent: 500, target: 0, rawTarget: 0 }), 40);
-    expect(screen.getByText('Line is today: 40% through the month · 0% spent')).toBeInTheDocument();
   });
 
   it('shows no marker for a month that is not the current one', () => {

@@ -104,14 +104,15 @@ describe('budget', () => {
     expectReadable(screen.getByText(/a week/));
   });
 
-  it('explains the pace line at a readable size, and does not dim it', () => {
+  it('names the pace line at a readable size, and does not dim it', () => {
     renderIn(
       <CategoryProgressRow
         progress={{ categoryId: 'g', name: 'Groceries', icon: 'x', spent: 5000, target: 30000, rawTarget: 30000, period: 'MONTHLY', percent: 17, isOver: false }}
         pace={40}
+        paceCaption
       />,
     );
-    expectReadable(screen.getByText(/Line is today/));
+    expectReadable(screen.getByText(/Today · 40%/));
   });
 });
 

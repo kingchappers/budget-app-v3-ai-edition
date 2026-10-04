@@ -11,7 +11,7 @@ export function HomeSummary({ summary, yearMonth }: { summary: MonthSummary; yea
     <Stack gap="xs">
       {sentence && <Text size="lg" fw={600}>{sentence}</Text>}
       {sentence && (
-        <Text size="sm">
+        <Text size="sm" mt={-4}>
           {summary.spentUnbudgeted > 0
             ? `This counts only categories with a budget. ${formatPence(summary.spentUnbudgeted)} of other spending is not included.`
             : 'This counts only categories with a budget.'}
