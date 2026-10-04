@@ -14,9 +14,23 @@ export interface CategoryProgressRowProps {
   to?: string;
   // How far through the month today is (0 to 100), for the current month only.
   pace?: number | null;
+  // Names the pace line above the bar. Shown once per section, not on every row.
+  paceCaption?: boolean;
 }
 
-export function CategoryProgressRow({ progress, to, pace = null }: CategoryProgressRowProps) {
+function PaceCaption({ pace }: { pace: number }) {
+  const align = pace < 20 ? 'left' : pace > 80 ? 'right' : 'centre';
+  const transform = { left: 'none', right: 'translateX(-100%)', centre: 'translateX(-50%)' }[align];
+  return (
+    <div aria-hidden style={{ position: 'relative', height: '1.25rem' }}>
+      <Text size="sm" style={{ position: 'absolute', left: `${pace}%`, transform, whiteSpace: 'nowrap' }}>
+        Today · {pace}% through the month
+      </Text>
+    </div>
+  );
+}
+
+export function CategoryProgressRow({ progress, to, pace = null, paceCaption = false }: CategoryProgressRowProps) {
   const { name, spent, target, period, rawTarget, week } = progress;
 
   // A weekly target is measured against this week, not the whole month.
@@ -24,9 +38,11 @@ export function CategoryProgressRow({ progress, to, pace = null }: CategoryProgr
   const basisTarget = week ? week.target : target;
   const isOver = basisTarget > 0 && basisSpent > basisTarget;
   const percent = basisTarget > 0 ? Math.min(100, Math.round((basisSpent / basisTarget) * 100)) : 0;
-  // The bar stops at the end, but the words give the real share, so an overspend is not hidden.
-  const spentPercent = basisTarget > 0 ? Math.round((basisSpent / basisTarget) * 100) : 0;
   const showPace = pace !== null && !week;
+  const rowStyle = {
+    paddingBlock: 'var(--mantine-spacing-sm)',
+    borderBottom: '1px solid var(--mantine-color-default-border)',
+  };
 
   const content: ReactNode = (
     <Stack gap={4}>
@@ -36,6 +52,7 @@ export function CategoryProgressRow({ progress, to, pace = null }: CategoryProgr
           {remainingLabel(basisSpent, basisTarget)}{week ? ' this week' : ''}
         </Text>
       </Group>
+      {showPace && paceCaption && <PaceCaption pace={pace} />}
       <div style={{ position: 'relative' }}>
         <Progress value={percent} color={isOver ? 'attention' : 'primary'} aria-label={`${name} progress`} />
         {showPace && (
@@ -49,7 +66,6 @@ export function CategoryProgressRow({ progress, to, pace = null }: CategoryProgr
           />
         )}
       </div>
-      {showPace && <Text size="sm">Line is today: {pace}% through the month · {spentPercent}% spent</Text>}
       <Text size="sm">
         {week
           ? `${formatPence(week.spent)} of ${formatPence(week.target)} this week`
@@ -58,15 +74,14 @@ export function CategoryProgressRow({ progress, to, pace = null }: CategoryProgr
     </Stack>
   );
 
-  if (!to) return <div style={{ marginBottom: 'var(--mantine-spacing-sm)' }}>{content}</div>;
+  if (!to) return <div style={rowStyle}>{content}</div>;
 
   return (
     <UnstyledButton
       component={Link}
       to={to}
       display="block"
-      mb="sm"
-      style={{ borderRadius: 'var(--mantine-radius-sm)' }}
+      style={{ ...rowStyle, width: '100%' }}
     >
       {content}
     </UnstyledButton>

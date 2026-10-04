@@ -154,6 +154,7 @@ function TransactionsContent() {
             {dayItems.map(t => (
               <TransactionRow
                 key={t.transactionId}
+                showDate={false}
                 transaction={t}
                 categoryName={nameFor(t.categoryId)}
                 categoryIcon={iconFor(t.categoryId)}

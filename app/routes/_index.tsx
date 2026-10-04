@@ -36,13 +36,20 @@ function categoryTransactionsUrl(yearMonth: string, categoryId: string): string 
 
 function GroupedProgress({ items, yearMonth }: { items: CategoryProgress[]; yearMonth: string }) {
   const pace = monthPacePercent(yearMonth);
+  const captionedId = items.find(p => !p.week)?.categoryId;
   return (
     <>
       {groupItems(items, p => bucketKeyFor({ group: p.group, type: 'EXPENSE' }), p => p.name).map(bucket => (
-        <div key={bucket.key}>
-          <Text size="sm" fw={600} mb={4}>{bucket.label}</Text>
+        <div key={bucket.key} style={{ marginTop: 'var(--mantine-spacing-lg)' }}>
+          <Text size="sm" fw={600} c="dimmed" tt="uppercase" mb={2}>{bucket.label}</Text>
           {bucket.items.map(p => (
-            <CategoryProgressRow key={p.categoryId} progress={p} pace={pace} to={categoryTransactionsUrl(yearMonth, p.categoryId)} />
+            <CategoryProgressRow
+              key={p.categoryId}
+              progress={p}
+              pace={pace}
+              paceCaption={p.categoryId === captionedId}
+              to={categoryTransactionsUrl(yearMonth, p.categoryId)}
+            />
           ))}
         </div>
       ))}
@@ -109,7 +116,7 @@ function HomeContent() {
   const phrase = monthPhrase(yearMonth);
 
   return (
-    <Stack>
+    <Stack gap="xl">
       <VisuallyHidden><Title order={1}>Home</Title></VisuallyHidden>
       <DueRecurringCard />
       <MonthHeader yearMonth={yearMonth} onChange={setYearMonth} />
@@ -129,9 +136,6 @@ function HomeContent() {
       {hasTargets && (
         <div>
           <Title order={2} size="h5" mb="xs">Spending vs budget</Title>
-          {viewingCurrentMonth && summary.spending.some(p => !p.week) && (
-            <Text size="sm" mb="xs">The thin line on a bar marks today.</Text>
-          )}
           <GroupedProgress items={summary.spending} yearMonth={yearMonth} />
           {summary.spentUnbudgeted > 0 && <OtherSpendingRow amount={summary.spentUnbudgeted} yearMonth={yearMonth} />}
         </div>

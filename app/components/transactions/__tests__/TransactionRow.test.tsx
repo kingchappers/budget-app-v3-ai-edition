@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { describe, it, expect, vi } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MantineProvider, TextInput } from '@mantine/core';
@@ -20,6 +20,14 @@ function renderRow(props: Partial<React.ComponentProps<typeof TransactionRow>> =
     </MantineProvider>,
   );
 }
+
+const originalMatchMedia = window.matchMedia;
+
+function setScreen(width: 'desktop' | 'mobile') {
+  window.matchMedia = ((query: string) => ({ ...originalMatchMedia(query), matches: width === 'desktop' })) as typeof window.matchMedia;
+}
+
+afterEach(() => { window.matchMedia = originalMatchMedia; });
 
 describe('TransactionRow menu', () => {
   it('offers Repeat monthly and reports the transaction', async () => {
@@ -43,7 +51,8 @@ describe('TransactionRow menu', () => {
     expect(screen.queryByRole('menuitem', { name: 'Repeat monthly' })).not.toBeInTheDocument();
   });
 
-  it('has no menu when Duplicate is the only action, because Duplicate is not in the menu', () => {
+  it('has no menu on desktop when Duplicate is the only action, because Duplicate is a button there', () => {
+    setScreen('desktop');
     renderRow({ onDuplicate: vi.fn() });
     expect(screen.queryByRole('button', { name: 'Actions for Weekly Shop' })).not.toBeInTheDocument();
   });
@@ -51,6 +60,7 @@ describe('TransactionRow menu', () => {
 
 describe('TransactionRow tap targets', () => {
   it('gives Duplicate and the actions menu a 44px target, with the amount kept on one line', () => {
+    setScreen('desktop');
     renderRow({ onEdit: vi.fn(), onDuplicate: vi.fn(), onDelete: vi.fn() });
     // 2.75rem is 44px at the standard size, and grows with the text size.
     expect(screen.getByRole('button', { name: 'Duplicate Weekly Shop' }).getAttribute('style')).toMatch(/2\.75rem/);
@@ -59,7 +69,8 @@ describe('TransactionRow tap targets', () => {
 });
 
 describe('TransactionRow Duplicate', () => {
-  it('is a visible, labelled button, not tucked in the menu, and reports the transaction', async () => {
+  it('is a visible, labelled button on desktop, and reports the transaction', async () => {
+    setScreen('desktop');
     const onDuplicate = vi.fn();
     renderRow({ onEdit: vi.fn(), onDuplicate });
 
@@ -71,11 +82,25 @@ describe('TransactionRow Duplicate', () => {
     expect(onDuplicate).toHaveBeenCalledWith(transaction);
   });
 
-  it('is not repeated inside the menu', async () => {
+  it('is not repeated inside the menu on desktop', async () => {
+    setScreen('desktop');
     renderRow({ onEdit: vi.fn(), onDuplicate: vi.fn() });
     await userEvent.setup().click(screen.getByRole('button', { name: 'Actions for Weekly Shop' }));
     await screen.findByRole('menuitem', { name: 'Edit' });
     expect(screen.queryByRole('menuitem', { name: 'Duplicate' })).not.toBeInTheDocument();
+  });
+
+  it('moves into the menu on a narrow screen, with no button beside the amount', async () => {
+    setScreen('mobile');
+    const onDuplicate = vi.fn();
+    renderRow({ onEdit: vi.fn(), onDuplicate });
+    expect(screen.queryByRole('button', { name: 'Duplicate Weekly Shop' })).not.toBeInTheDocument();
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Actions for Weekly Shop' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Duplicate' }));
+
+    expect(onDuplicate).toHaveBeenCalledWith(transaction);
   });
 
   it('is absent when no handler is given', () => {
@@ -86,6 +111,20 @@ describe('TransactionRow Duplicate', () => {
   it('is absent while the row is still waiting to sync', () => {
     renderRow({ onDuplicate: vi.fn(), onDiscard: vi.fn(), pending: true });
     expect(screen.queryByRole('button', { name: /^Duplicate/ })).not.toBeInTheDocument();
+  });
+});
+
+describe('TransactionRow detail line', () => {
+  it('does not repeat the category when the title is the category', () => {
+    renderRow({ transaction: { ...transaction, description: '', date: todayIso() } });
+    expect(screen.getByText('Today')).toBeInTheDocument();
+    expect(screen.getAllByText('Groceries')).toHaveLength(1);
+  });
+
+  it('leaves out the date under a day heading, and the line too if nothing is left', () => {
+    renderRow({ transaction: { ...transaction, description: '' }, showDate: false });
+    expect(screen.getAllByText('Groceries')).toHaveLength(1);
+    expect(screen.queryByText(/Sep/)).not.toBeInTheDocument();
   });
 });
 

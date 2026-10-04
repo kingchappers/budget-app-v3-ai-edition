@@ -1,5 +1,6 @@
 import { useRef } from 'react';
-import { ActionIcon, Button, Group, Loader, Menu, Text, ThemeIcon, UnstyledButton } from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
+import { ActionIcon, Button, Group, Loader, Menu, Text, ThemeIcon, UnstyledButton, useMantineTheme } from '@mantine/core';
 import { IconClock, IconCopy, IconDots, IconPencil, IconRepeat, IconTrash } from '@tabler/icons-react';
 import { formatPence } from '~/lib/money';
 import { formatDayLabel, todayIso } from '~/lib/months';
@@ -46,7 +47,7 @@ function SyncStatus({ label, saving, pending, pendingError, onRetry }: {
 }
 
 export function TransactionRow({
-  transaction, categoryName, categoryIcon, onEdit, onDelete, onDuplicate, onRepeat, saving, pending, pendingError, onRetry, onDiscard,
+  transaction, categoryName, categoryIcon, onEdit, onDelete, onDuplicate, onRepeat, saving, pending, pendingError, onRetry, onDiscard, showDate = true,
 }: {
   transaction: Transaction;
   categoryName: string;
@@ -63,11 +64,22 @@ export function TransactionRow({
   // Only meaningful while pending: removes it from the offline queue instead
   // of the normal online delete, which would just recreate it on the next sync.
   onDiscard?: (t: Transaction) => void;
+  // Turn off under a day heading, which already gives the date.
+  showDate?: boolean;
 }) {
   const label = transaction.description || categoryName;
   const sign = OUTGOING.has(transaction.type) ? '−' : '+';
   const actionsRef = useRef<HTMLButtonElement>(null);
   const opensSheetRef = useRef(false);
+  const theme = useMantineTheme();
+  // Duplicate is a button beside the amount on desktop, and a menu item on a narrow screen.
+  const isDesktop = useMediaQuery(`(min-width: ${theme.breakpoints.sm})`, false, { getInitialValueInEffect: false });
+  const duplicateInMenu = !isDesktop && !!onDuplicate;
+  // The title falls back to the category, so repeating it would just say the same thing twice.
+  const detail = [
+    label !== categoryName ? categoryName : null,
+    showDate ? formatDayLabel(transaction.date, todayIso()) : null,
+  ].filter(Boolean).join(' · ');
 
   const summary = (
     <Group gap="sm" wrap="nowrap" style={{ minWidth: 0 }}>
@@ -76,14 +88,19 @@ export function TransactionRow({
       </ThemeIcon>
       <div style={{ minWidth: 0 }}>
         <Text truncate>{label}</Text>
-        <Text size="sm">{categoryName} · {formatDayLabel(transaction.date, todayIso())}</Text>
+        {detail && <Text size="sm">{detail}</Text>}
         <SyncStatus label={label} saving={saving} pending={pending} pendingError={pendingError} onRetry={onRetry} />
       </div>
     </Group>
   );
 
   return (
-    <Group justify="space-between" wrap="wrap" py={4}>
+    <Group
+      justify="space-between"
+      wrap="wrap"
+      py="xs"
+      style={{ borderBottom: '1px solid var(--mantine-color-default-border)' }}
+    >
       {onEdit && !pending ? (
         <UnstyledButton
           aria-label={`Edit ${label}`}
@@ -95,7 +112,7 @@ export function TransactionRow({
       ) : summary}
       <Group gap="xs" wrap="nowrap">
         <Text fw={500} style={{ whiteSpace: 'nowrap' }}>{sign}{formatPence(transaction.amount)}</Text>
-        {onDuplicate && !pending && (
+        {onDuplicate && !pending && isDesktop && (
           <Button
             variant="subtle"
             size="compact-sm"
@@ -122,7 +139,7 @@ export function TransactionRow({
             </Menu>
           )
         ) : (
-          (onEdit || onDelete || onRepeat) && (
+          (onEdit || onDelete || onRepeat || duplicateInMenu) && (
             // Edit/Repeat monthly each open a ResponsiveSheet elsewhere in the tree
             // on the same render this menu closes. Mantine's default returnFocus schedules a
             // focus() back onto this Actions button 10ms after close (useFocusReturn), which
@@ -142,6 +159,7 @@ export function TransactionRow({
                 <ActionIcon ref={actionsRef} variant="subtle" size={44} aria-label={`Actions for ${label}`}><IconDots size={16} /></ActionIcon>
               </Menu.Target>
               <Menu.Dropdown>
+                {duplicateInMenu && onDuplicate && <Menu.Item leftSection={<IconCopy size={14} />} onClick={() => onDuplicate(transaction)}>Duplicate</Menu.Item>}
                 {onEdit && <Menu.Item leftSection={<IconPencil size={14} />} onClick={() => { opensSheetRef.current = true; onEdit(transaction); }}>Edit</Menu.Item>}
                 {onRepeat && <Menu.Item leftSection={<IconRepeat size={14} />} onClick={() => { opensSheetRef.current = true; onRepeat(transaction); }}>Repeat monthly</Menu.Item>}
                 {onDelete && <Menu.Item color="danger" leftSection={<IconTrash size={14} />} onClick={() => onDelete(transaction)}>Delete</Menu.Item>}
