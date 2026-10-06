@@ -193,6 +193,18 @@ Implemented on `feat/offline-queue`. Spec: `superpowers/specs/2026-09-27-offline
   - The "Sync now" button test only proves a flush happens, not that the click itself caused one (the automatic launch flush already would have) — worth strengthening later.
   - Task 8's browser-verification pass (Playwright, offline simulation) could not be completed in this environment — no headless Auth0 login stub exists in this repo yet — so the queue/banner/sync flow, including this fix wave, is unverified in a real browser. Remains outstanding, and is the check that would have caught the Critical finding above in the first place.
 
+## Self-hosting
+
+Runs the app as a single container alongside the AWS deployment, so people can host their own copy (SQLite on a volume, built-in login). Sub-projects have names rather than letters from here on. Each gets its own brainstorm → spec → plan → PR.
+
+| Sub-project | What it delivers | Status |
+|---|---|---|
+| Storage Interface | A backend-neutral `Store` interface with DynamoDB and SQLite implementations, a shared contract suite, every handler migrated, and per-user export/import. No user-visible change. | Spec written: `superpowers/specs/2026-10-06-storage-interface-design.md` |
+| Portable Auth | An auth-provider abstraction in the API and frontend, runtime config instead of build-time `VITE_AUTH0_*`, Auth0 kept, and a built-in single-account login (first-run setup, signed sessions, CLI password reset). | Not started |
+| Container Image | One Node server for the API and static files, an in-process push scheduler, a multi-arch Dockerfile, GHCR publishing, a compose example, a healthcheck, and docs for HTTPS, upgrades and backups. Needs both of the above. | Not started |
+
+Later, separate from the three above: Demo Mode (a public try-it instance with fake data) and Generic OIDC login.
+
 ## Deliberately excluded
 
 Receipt scanning/OCR (ongoing cost, slow to build), AI categorisation (B's category memory covers most of the benefit), and number-key chip shortcuts (collide with typing the amount).
