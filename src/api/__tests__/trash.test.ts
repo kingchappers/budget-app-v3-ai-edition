@@ -1,19 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-
-const { mockSend } = vi.hoisted(() => ({ mockSend: vi.fn() }));
-
-vi.mock('../db', () => ({
-  docClient: { send: mockSend },
-  TABLE: 'test-table',
-  pk: (userId: string) => `USER#${userId}`,
-}));
-
-vi.mock('@aws-sdk/lib-dynamodb', () => ({
-  QueryCommand: vi.fn(function (i: unknown) { return i; }),
-  GetCommand: vi.fn(function (i: unknown) { return i; }),
-  TransactWriteCommand: vi.fn(function (i: unknown) { return i; }),
-}));
-
+import type { SqliteStore } from '../../store/sqlite';
+import { ConditionFailedError } from '../../store';
+import { resetTestStore, seedUser, useTestStore } from '../../store/testing';
 import { getTrash, moveToTrash, restoreFromTrash, validateRestoreInput } from '../trash';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 
@@ -29,21 +17,13 @@ function event(body?: unknown): APIGatewayProxyEventV2 {
   } as unknown as APIGatewayProxyEventV2;
 }
 
-function cancelled(codes: string[]): Error {
-  const error = new Error('Transaction cancelled') as Error & { CancellationReasons: { Code: string }[] };
-  error.name = 'TransactionCanceledException';
-  error.CancellationReasons = codes.map(Code => ({ Code }));
-  return error;
-}
-
 const txn = {
   transactionId: 't1', yearMonth: '2026-09', amount: 350, type: 'EXPENSE',
   categoryId: 'cat-dining', description: 'Coffee', date: '2026-09-29', createdAt: '2026-09-29T08:00:00.000Z',
 };
 
-function trashRecord(over: Record<string, unknown> = {}): Record<string, unknown> {
+function trashRecord(over: Record<string, unknown> = {}): Record<string, unknown> & { SK: string } {
   return {
-    PK: 'USER#user-1',
     SK: 'TRASH#TRANSACTION#2026-09#t1',
     entityType: 'TRANSACTION',
     originalSk: 'TXN#2026-09#t1',
@@ -54,13 +34,18 @@ function trashRecord(over: Record<string, unknown> = {}): Record<string, unknown
   };
 }
 
+let store: SqliteStore;
+
 beforeEach(() => {
-  mockSend.mockReset();
   vi.useFakeTimers();
   vi.setSystemTime(NOW);
+  store = useTestStore();
 });
 
-afterEach(() => { vi.useRealTimers(); });
+afterEach(() => {
+  vi.useRealTimers();
+  resetTestStore();
+});
 
 describe('validateRestoreInput', () => {
   it('accepts each entity type with a well-formed id', () => {
@@ -97,73 +82,53 @@ describe('validateRestoreInput', () => {
 });
 
 describe('moveToTrash', () => {
-  it('deletes the original and writes the trash record in one transaction', async () => {
-    mockSend.mockResolvedValueOnce({ Item: { PK: 'USER#user-1', SK: 'TXN#2026-09#t1', ...txn } });
-    mockSend.mockResolvedValueOnce({});
-
+  it('moves the item into trash with the original key and a 30-day expiry', async () => {
+    await seedUser(store, 'user-1', [{ SK: 'TXN#2026-09#t1', ...txn }]);
     await moveToTrash('user-1', 'TRANSACTION', 'TXN#2026-09#t1');
-
-    expect(mockSend).toHaveBeenCalledTimes(2);
-    expect(mockSend.mock.calls[0][0].Key).toEqual({ PK: 'USER#user-1', SK: 'TXN#2026-09#t1' });
-    const { TransactItems } = mockSend.mock.calls[1][0];
-    expect(TransactItems).toHaveLength(2);
-    expect(TransactItems[0].Delete).toEqual({
-      TableName: 'test-table',
-      Key: { PK: 'USER#user-1', SK: 'TXN#2026-09#t1' },
-      ConditionExpression: 'attribute_exists(PK)',
-    });
-    expect(TransactItems[1].Put).toEqual({
-      TableName: 'test-table',
-      Item: {
-        PK: 'USER#user-1',
-        SK: 'TRASH#TRANSACTION#2026-09#t1',
-        entityType: 'TRANSACTION',
-        originalSk: 'TXN#2026-09#t1',
-        item: txn,
-        deletedAt: '2026-09-30T12:00:00.000Z',
-        expiresAt: NOW_SECONDS + THIRTY_DAYS,
-      },
+    expect(await store.get({ PK: 'USER#user-1', SK: 'TXN#2026-09#t1' })).toBeUndefined();
+    expect(await store.get({ PK: 'USER#user-1', SK: 'TRASH#TRANSACTION#2026-09#t1' })).toMatchObject({
+      entityType: 'TRANSACTION',
+      originalSk: 'TXN#2026-09#t1',
+      item: txn,
+      deletedAt: '2026-09-30T12:00:00.000Z',
+      expiresAt: NOW_SECONDS + THIRTY_DAYS,
     });
   });
 
-  it('writes nothing when the item does not exist', async () => {
-    mockSend.mockResolvedValueOnce({});
-    await moveToTrash('user-1', 'RECURRING', 'RECUR#r1');
-    expect(mockSend).toHaveBeenCalledOnce();
+  it('does nothing when the item is already gone', async () => {
+    await moveToTrash('user-1', 'TRANSACTION', 'TXN#2026-09#missing');
+    expect(await store.query('USER#user-1')).toEqual([]);
   });
 
   it('treats an item that vanished before the write as already deleted', async () => {
-    mockSend.mockResolvedValueOnce({ Item: { PK: 'USER#user-1', SK: 'RECUR#r1', recurringId: 'r1' } });
-    mockSend.mockRejectedValueOnce(cancelled(['ConditionalCheckFailed', 'None']));
+    await seedUser(store, 'user-1', [{ SK: 'RECUR#r1', recurringId: 'r1' }]);
+    vi.spyOn(store, 'transact').mockRejectedValueOnce(new ConditionFailedError(0));
     await expect(moveToTrash('user-1', 'RECURRING', 'RECUR#r1')).resolves.toBeUndefined();
   });
 
   it('rethrows a failure that is not an Error object, unchanged', async () => {
-    mockSend.mockResolvedValueOnce({ Item: { PK: 'USER#user-1', SK: 'RECUR#r1', recurringId: 'r1' } });
-    mockSend.mockRejectedValueOnce(null);
+    await seedUser(store, 'user-1', [{ SK: 'RECUR#r1', recurringId: 'r1' }]);
+    vi.spyOn(store, 'transact').mockRejectedValueOnce(null);
     await expect(moveToTrash('user-1', 'RECURRING', 'RECUR#r1')).rejects.toBeNull();
   });
 
   it('rethrows any other failure', async () => {
-    mockSend.mockResolvedValueOnce({ Item: { PK: 'USER#user-1', SK: 'RECUR#r1', recurringId: 'r1' } });
-    mockSend.mockRejectedValueOnce(new Error('boom'));
+    await seedUser(store, 'user-1', [{ SK: 'RECUR#r1', recurringId: 'r1' }]);
+    vi.spyOn(store, 'transact').mockRejectedValueOnce(new Error('boom'));
     await expect(moveToTrash('user-1', 'RECURRING', 'RECUR#r1')).rejects.toThrow('boom');
   });
 });
 
 describe('getTrash', () => {
   it('returns unexpired items newest first without keys', async () => {
-    mockSend.mockResolvedValueOnce({
-      Items: [
-        trashRecord({ SK: 'TRASH#TRANSACTION#2026-09#old', originalSk: 'TXN#2026-09#old', deletedAt: '2026-09-01T00:00:00.000Z' }),
-        trashRecord({ SK: 'TRASH#ACCOUNT#acc-1', entityType: 'ACCOUNT', originalSk: 'ACCOUNT#acc-1', item: { accountId: 'acc-1' }, deletedAt: '2026-09-29T00:00:00.000Z' }),
-      ],
-    });
+    await seedUser(store, 'user-1', [
+      trashRecord({ SK: 'TRASH#TRANSACTION#2026-09#old', originalSk: 'TXN#2026-09#old', deletedAt: '2026-09-01T00:00:00.000Z' }),
+      trashRecord({ SK: 'TRASH#ACCOUNT#acc-1', entityType: 'ACCOUNT', originalSk: 'ACCOUNT#acc-1', item: { accountId: 'acc-1' }, deletedAt: '2026-09-29T00:00:00.000Z' }),
+    ]);
 
     const res = await getTrash(event(), 'user-1', {});
 
     expect(res.statusCode).toBe(200);
-    expect(mockSend.mock.calls[0][0].ExpressionAttributeValues).toEqual({ ':pk': 'USER#user-1', ':prefix': 'TRASH#' });
     const { items } = JSON.parse(res.body);
     expect(items.map((i: { id: string }) => i.id)).toEqual(['acc-1', '2026-09#old']);
     expect(items[0]).toEqual({
@@ -175,18 +140,16 @@ describe('getTrash', () => {
   });
 
   it('leaves out items whose expiry has passed but TTL has not yet removed', async () => {
-    mockSend.mockResolvedValueOnce({ Items: [trashRecord({ expiresAt: NOW_SECONDS - 1 })] });
+    await seedUser(store, 'user-1', [trashRecord({ expiresAt: NOW_SECONDS - 1 })]);
     const res = await getTrash(event(), 'user-1', {});
     expect(JSON.parse(res.body).items).toEqual([]);
   });
 
   it('keeps an item that expires one second from now and drops one that expires exactly now', async () => {
-    mockSend.mockResolvedValueOnce({
-      Items: [
-        trashRecord({ SK: 'TRASH#ACCOUNT#acc-1', entityType: 'ACCOUNT', originalSk: 'ACCOUNT#acc-1', expiresAt: NOW_SECONDS + 1 }),
-        trashRecord({ SK: 'TRASH#ACCOUNT#acc-2', entityType: 'ACCOUNT', originalSk: 'ACCOUNT#acc-2', expiresAt: NOW_SECONDS }),
-      ],
-    });
+    await seedUser(store, 'user-1', [
+      trashRecord({ SK: 'TRASH#ACCOUNT#acc-1', entityType: 'ACCOUNT', originalSk: 'ACCOUNT#acc-1', expiresAt: NOW_SECONDS + 1 }),
+      trashRecord({ SK: 'TRASH#ACCOUNT#acc-2', entityType: 'ACCOUNT', originalSk: 'ACCOUNT#acc-2', expiresAt: NOW_SECONDS }),
+    ]);
     const res = await getTrash(event(), 'user-1', {});
     expect(JSON.parse(res.body).items.map((i: { id: string }) => i.id)).toEqual(['acc-1']);
   });
@@ -199,13 +162,13 @@ describe('getTrash', () => {
     ['item, when it is null', { item: null }],
     ['item, when it is not an object', { item: 'text' }],
   ])('leaves out a damaged record with a bad %s', async (_label, damage) => {
-    mockSend.mockResolvedValueOnce({ Items: [trashRecord(damage)] });
+    await seedUser(store, 'user-1', [trashRecord(damage)]);
     const res = await getTrash(event(), 'user-1', {});
     expect(JSON.parse(res.body).items).toEqual([]);
   });
 
   it('leaves out records of an unknown type', async () => {
-    mockSend.mockResolvedValueOnce({ Items: [trashRecord({ entityType: 'CATEGORY' })] });
+    await seedUser(store, 'user-1', [trashRecord({ entityType: 'CATEGORY' })]);
     const res = await getTrash(event(), 'user-1', {});
     expect(JSON.parse(res.body).items).toEqual([]);
   });
@@ -214,67 +177,96 @@ describe('getTrash', () => {
 describe('restoreFromTrash', () => {
   const body = { entityType: 'TRANSACTION', id: '2026-09#t1' };
 
-  it('puts the original back and deletes the trash record in one transaction', async () => {
-    mockSend.mockResolvedValueOnce({ Item: trashRecord() });
-    mockSend.mockResolvedValueOnce({});
+  it('puts the original back and deletes the trash record', async () => {
+    await seedUser(store, 'user-1', [trashRecord()]);
 
     const res = await restoreFromTrash(event(body), 'user-1', {});
 
     expect(res.statusCode).toBe(200);
     expect(JSON.parse(res.body)).toEqual({ entityType: 'TRANSACTION', id: '2026-09#t1', item: txn });
-    expect(mockSend.mock.calls[0][0].Key).toEqual({ PK: 'USER#user-1', SK: 'TRASH#TRANSACTION#2026-09#t1' });
-    const { TransactItems } = mockSend.mock.calls[1][0];
-    expect(TransactItems[0].Put).toEqual({
-      TableName: 'test-table',
-      Item: { ...txn, PK: 'USER#user-1', SK: 'TXN#2026-09#t1' },
-      ConditionExpression: 'attribute_not_exists(PK)',
-    });
-    expect(TransactItems[1].Delete).toEqual({
-      TableName: 'test-table',
-      Key: { PK: 'USER#user-1', SK: 'TRASH#TRANSACTION#2026-09#t1' },
-      ConditionExpression: 'attribute_exists(PK)',
-    });
+    expect(await store.get({ PK: 'USER#user-1', SK: 'TXN#2026-09#t1' })).toEqual({ ...txn, PK: 'USER#user-1', SK: 'TXN#2026-09#t1' });
+    expect(await store.get({ PK: 'USER#user-1', SK: 'TRASH#TRANSACTION#2026-09#t1' })).toBeUndefined();
   });
 
   it('returns 409 when the original already exists', async () => {
-    mockSend.mockResolvedValueOnce({ Item: trashRecord() });
-    mockSend.mockRejectedValueOnce(cancelled(['ConditionalCheckFailed', 'None']));
+    await seedUser(store, 'user-1', [trashRecord(), { SK: 'TXN#2026-09#t1', amount: 999 }]);
     const res = await restoreFromTrash(event(body), 'user-1', {});
     expect(res.statusCode).toBe(409);
     expect(JSON.parse(res.body).error).toMatch(/already/);
   });
 
   it('returns 404 when the trash record was removed in the meantime', async () => {
-    mockSend.mockResolvedValueOnce({ Item: trashRecord() });
-    mockSend.mockRejectedValueOnce(cancelled(['None', 'ConditionalCheckFailed']));
+    await seedUser(store, 'user-1', [trashRecord()]);
+    vi.spyOn(store, 'transact').mockRejectedValueOnce(new ConditionFailedError(1));
     const res = await restoreFromTrash(event(body), 'user-1', {});
     expect(res.statusCode).toBe(404);
   });
 
   it('returns 404 when there is no trash record', async () => {
-    mockSend.mockResolvedValueOnce({});
     const res = await restoreFromTrash(event(body), 'user-1', {});
     expect(res.statusCode).toBe(404);
-    expect(mockSend).toHaveBeenCalledOnce();
   });
 
   it('returns 404 when the trash record has expired', async () => {
-    mockSend.mockResolvedValueOnce({ Item: trashRecord({ expiresAt: NOW_SECONDS - 1 }) });
+    await seedUser(store, 'user-1', [trashRecord({ expiresAt: NOW_SECONDS - 1 })]);
+    const transact = vi.spyOn(store, 'transact');
     const res = await restoreFromTrash(event(body), 'user-1', {});
     expect(res.statusCode).toBe(404);
-    expect(mockSend).toHaveBeenCalledOnce();
+    expect(transact).not.toHaveBeenCalled();
   });
 
-  it('returns 400 for invalid JSON or input, without touching the table', async () => {
+  it('returns 400 for invalid JSON or input, without touching the store', async () => {
+    const get = vi.spyOn(store, 'get');
+    const transact = vi.spyOn(store, 'transact');
     expect((await restoreFromTrash(event('{not json'), 'user-1', {})).statusCode).toBe(400);
     expect((await restoreFromTrash(event([1]), 'user-1', {})).statusCode).toBe(400);
     expect((await restoreFromTrash(event({ entityType: 'NOPE', id: 'x' }), 'user-1', {})).statusCode).toBe(400);
-    expect(mockSend).not.toHaveBeenCalled();
+    expect(get).not.toHaveBeenCalled();
+    expect(transact).not.toHaveBeenCalled();
   });
 
   it('rethrows unexpected failures', async () => {
-    mockSend.mockResolvedValueOnce({ Item: trashRecord() });
-    mockSend.mockRejectedValueOnce(new Error('boom'));
+    await seedUser(store, 'user-1', [trashRecord()]);
+    vi.spyOn(store, 'transact').mockRejectedValueOnce(new Error('boom'));
     await expect(restoreFromTrash(event(body), 'user-1', {})).rejects.toThrow('boom');
+  });
+});
+
+describe('expired entries that have not been purged yet', () => {
+  it('hides them from getTrash even though they are still stored', async () => {
+    await seedUser(store, 'user-1', [
+      trashRecord({ SK: 'TRASH#TRANSACTION#2026-09#live', originalSk: 'TXN#2026-09#live', expiresAt: NOW_SECONDS + 1000 }),
+      trashRecord({ SK: 'TRASH#TRANSACTION#2026-09#old', originalSk: 'TXN#2026-09#old', expiresAt: NOW_SECONDS - 1 }),
+    ]);
+    const res = await getTrash(event(), 'user-1', {});
+    const ids = JSON.parse(res.body).items.map((entry: { id: string }) => entry.id);
+    expect(ids).toEqual(['2026-09#live']);
+    expect(await store.get({ PK: 'USER#user-1', SK: 'TRASH#TRANSACTION#2026-09#old' })).toBeDefined();
+  });
+
+  it('refuses to restore one', async () => {
+    await seedUser(store, 'user-1', [trashRecord({ expiresAt: NOW_SECONDS - 1 })]);
+    const res = await restoreFromTrash(event({ entityType: 'TRANSACTION', id: '2026-09#t1' }), 'user-1', {});
+    expect(res.statusCode).toBe(404);
+  });
+});
+
+describe('restore races', () => {
+  const body = { entityType: 'TRANSACTION', id: '2026-09#t1' };
+
+  it('restores once and answers 404 the second time without duplicating anything', async () => {
+    await seedUser(store, 'user-1', [trashRecord()]);
+    expect((await restoreFromTrash(event(body), 'user-1', {})).statusCode).toBe(200);
+    expect((await restoreFromTrash(event(body), 'user-1', {})).statusCode).toBe(404);
+    expect(await store.query('USER#user-1', { skPrefix: 'TXN#' })).toHaveLength(1);
+    expect(await store.query('USER#user-1', { skPrefix: 'TRASH#' })).toHaveLength(0);
+  });
+
+  it('answers 409 and keeps the trash entry when the item has been re-created', async () => {
+    await seedUser(store, 'user-1', [trashRecord(), { SK: 'TXN#2026-09#t1', amount: 999 }]);
+    const res = await restoreFromTrash(event(body), 'user-1', {});
+    expect(res.statusCode).toBe(409);
+    expect(await store.get({ PK: 'USER#user-1', SK: 'TXN#2026-09#t1' })).toMatchObject({ amount: 999 });
+    expect(await store.get({ PK: 'USER#user-1', SK: 'TRASH#TRANSACTION#2026-09#t1' })).toBeDefined();
   });
 });
