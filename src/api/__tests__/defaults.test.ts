@@ -28,6 +28,11 @@ describe('DEFAULT_CATEGORIES', () => {
     expect(namesIn('SAVING_INVESTMENT')).toEqual(['Emergency fund', 'Investment']);
   });
 
+  it('gives Investment a chart-going-up emoji instead of the placeholder icon', () => {
+    const investment = DEFAULT_CATEGORIES.find(c => c.categoryId === 'cat-investment');
+    expect(investment?.icon).toBe('📈');
+  });
+
   it('makes Sinking Funds and Saving & Investment categories POT type and Bills and Everyday EXPENSE', () => {
     for (const c of DEFAULT_CATEGORIES.filter(c => c.group)) {
       const isPotGroup = c.group === 'SAVING_INVESTMENT' || c.group === 'SINKING_FUNDS';
