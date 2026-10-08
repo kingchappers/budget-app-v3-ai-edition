@@ -18,7 +18,7 @@ This serves the self-hosting and hosting-partner plan: each user holds their own
 |----------|----------|
 | Databases supported in the container | SQLite only. Postgres can be added later behind the same interface. |
 | Interface vocabulary | Keep the `PK`/`SK` single-table keys and the existing `pk()`, `txnSk()` etc. helpers. No per-entity repositories. This keeps the migration mechanical and behaviour-preserving. |
-| Handler access | A module-level store chosen by the `STORE` env var (`dynamodb` default, `sqlite`), with a `setStore()` override for tests, mirroring how `docClient` is used today. The store is not threaded through handler signatures. |
+| Handler access | A module-level store, chosen once at startup by `await initStore()`, which reads the `STORE` env var (`dynamodb` default, `sqlite`) and loads only that backend with a dynamic `import()`, so the Lambda never needs `node:sqlite` and the container never needs the AWS SDK. `getStore()` is synchronous and `setStore()` overrides it for tests, mirroring how `docClient` is used today. The store is not threaded through handler signatures. |
 | Paging | `query` returns every matching item. No cursor. |
 | Failures | A backend-neutral `ConditionFailedError`, with `failedIndex` for `transact`, replaces the `error.name` string checks and the cancellation-code-by-position logic. |
 | SQLite driver | `node:sqlite`, built into Node 24. The Dockerfile pins the Node version, and only `sqlite.ts` touches the driver, so swapping to `better-sqlite3` is a one-file change. |
@@ -49,17 +49,17 @@ interface Store {
 ```
 
 - **`patch` is an upsert**, matching DynamoDB `UpdateItem`: it creates the item when missing. `mustExist: true` throws `ConditionFailedError` instead, covering today's `attribute_exists(PK)` cases. `defaults` are applied only to attributes not already set, covering `createdAt = if_not_exists(createdAt, :now)` in `push.ts`. It returns the updated item.
-- **`query`** takes exactly one of `skPrefix`, `skEquals` or neither (the whole partition). `attributes` returns only the named attributes, covering the two projection sites (`SK`, `categoryId`).
+- **`query`** takes exactly one of `skPrefix`, `skEquals` or neither (the whole partition). `attributes` returns only the named attributes, covering the two projection sites (`SK`, `categoryId`). Results are ordered by `SK` ascending, as DynamoDB returns them, and an empty `skPrefix` means the whole partition.
 - **`transact`** is all-or-nothing. On a failed condition it throws `ConditionFailedError` whose `failedIndex` is the position of the operation that failed. `trash.ts` branches on this for "already in place" versus "no longer in Recently deleted".
 - **Item shape is unchanged:** flat objects with `PK` and `SK` alongside attributes, so responses such as `getTransactions` stay byte-identical.
-- **Layout:** `src/store/index.ts` (interface, error, `getStore`/`setStore`), `dynamo.ts`, `sqlite.ts`.
+- **Layout:** `src/store/types.ts` (interface and error, split out so the backends and the registry never import each other), `index.ts` (re-exports them, plus `getStore`/`setStore`/`initStore`), `patch.ts` (shared `patch` validation), `dynamo.ts`, `sqlite.ts`.
 
 ## 2. `SqliteStore`
 
 - **Schema:** `items(pk TEXT NOT NULL, sk TEXT NOT NULL, data TEXT NOT NULL, expires_at INTEGER, PRIMARY KEY (pk, sk)) WITHOUT ROWID`, plus a partial index on `expires_at` where it is not null. Key attributes are columns; everything else is JSON in `data`.
 - **Prefix queries use a range, never `LIKE`:** `sk >= :prefix AND sk < :prefixUpperBound` under the default binary collation. IDs match `[A-Za-z0-9_-]`, and `_` is a `LIKE` wildcard, so `LIKE` would match unrelated keys. Binary ordering also matches DynamoDB's byte ordering.
 - **Atomicity:** `node:sqlite` is synchronous, so `patch` is a read-modify-write inside one `BEGIN IMMEDIATE` transaction. `transact` runs each operation in order inside the same kind of transaction and, on a failed condition, rolls back and throws `ConditionFailedError` with `failedIndex`.
-- **Values:** `null` and numbers must round-trip exactly (for example `quietStart: null` in push subscriptions), as the contract suite asserts. `undefined` attributes are dropped, as the DynamoDB document client does.
+- **Values:** `null` and numbers must round-trip exactly (for example `quietStart: null` in push subscriptions), as the contract suite asserts. `undefined` attributes are dropped by both backends. `DynamoStore` configures the document client with `removeUndefinedValues: true`, because by default the client throws on `undefined`.
 - **TTL:** `purgeExpired(now?)` deletes rows whose `expires_at` has passed. Reads do not filter expired rows, matching DynamoDB's lazy TTL, so the existing `isLive()` check in `trash.ts` keeps working.
 - **Operation:** WAL mode and a busy timeout. `PRAGMA user_version` with a numbered migration list, starting at 1, so later releases can change the schema safely.
 - **Configuration:** `STORE=sqlite` and `SQLITE_PATH` (default `/data/budget.sqlite` is for the container spec to set; this spec only requires the variable).
@@ -94,12 +94,12 @@ Small PRs, as with the earlier sub-projects:
 - `import --as-user <id>` rewrites the partition key. DynamoDB ids are Auth0 subs, while the built-in login in Portable Auth will issue its own id. Import refuses to write into a non-empty partition unless `--replace` is passed.
 - The export file contains financial data. It is written with owner-only permissions, and the docs say never to commit it (SEC-01).
 
-## 7. Open items to confirm while writing the plan
+## 7. Open items, resolved while writing the plan
 
-- Whether the `UpdateCommand` in `recurring.ts` returns `ALL_NEW`, so `patch`'s returned item can replace it.
-- The third `ExclusiveStartKey` site (two were read: `pots.ts` and `src/push/store.ts`), to confirm every caller pages to the end.
-- Whether `node:sqlite` still carries an experimental warning on Node 24 and, if so, how the container silences or accepts it.
-- Where the export/import command lives and how it is built (alongside the existing esbuild scripts).
+- **`patch` return value:** `categories.ts` and both `UpdateCommand`s in `recurring.ts` use `ReturnValues: 'ALL_NEW'`, so `patch` returning the updated item replaces them.
+- **Paging:** the third `ExclusiveStartKey` site is `reassign.ts`, which also pages to the end, so `query` needs no cursor.
+- **`node:sqlite`:** it prints no experimental warning on Node 24.18, resolves under Vitest 4, and is typed by the installed `@types/node` 22.19 (all checked).
+- **Export/import location:** a root-level `store-cli.ts`, compiled by `scripts/build-store-cli.cjs` in the same way as `api-handler.ts` and `push-handler.ts`. It reads and writes files given by `--out` and `--in`, with `--out` created owner-only and refusing to overwrite.
 
 ## Rollout
 
