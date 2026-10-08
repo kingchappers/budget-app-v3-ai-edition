@@ -1,25 +1,15 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-const { mockSend, mockMoveToTrash } = vi.hoisted(() => ({ mockSend: vi.fn(), mockMoveToTrash: vi.fn() }));
-
-vi.mock('../db', () => ({
-  docClient: { send: mockSend },
-  TABLE: 'test-table',
-  pk: (userId: string) => `USER#${userId}`,
-  catSk: (categoryId: string) => `CAT#${categoryId}`,
-  potSk: (categoryId: string) => `POT#${categoryId}`,
-  recurringSk: (recurringId: string) => `RECUR#${recurringId}`,
-}));
-
-vi.mock('@aws-sdk/lib-dynamodb', () => ({
-  QueryCommand: vi.fn(function (i: unknown) { return i; }),
-  PutCommand: vi.fn(function (i: unknown) { return i; }),
-}));
+const { mockMoveToTrash } = vi.hoisted(() => ({ mockMoveToTrash: vi.fn() }));
 
 vi.mock('../trash', () => ({ moveToTrash: mockMoveToTrash }));
 
 import { archivePot, unarchivePot } from '../potArchive';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
+import type { SqliteStore } from '../../store/sqlite';
+import { resetTestStore, seedUser, useTestStore } from '../../store/testing';
+
+let store: SqliteStore;
 
 function event(body: unknown): APIGatewayProxyEventV2 {
   return {
@@ -28,31 +18,21 @@ function event(body: unknown): APIGatewayProxyEventV2 {
   } as unknown as APIGatewayProxyEventV2;
 }
 
-interface Store {
-  customCategories?: unknown[];
-  settings?: unknown[];
-  transactions?: unknown[];
-  recurring?: unknown[];
+interface Seed {
+  customCategories?: Record<string, unknown>[];
+  settings?: Record<string, unknown>[];
+  transactions?: Record<string, unknown>[];
+  recurring?: Record<string, unknown>[];
 }
 
-function useStore(store: Store): void {
-  mockSend.mockImplementation(async (command: Record<string, any>) => {
-    if (command.Item) return {};
-    const values = command.ExpressionAttributeValues as Record<string, string>;
-    if (values[':sk']?.startsWith('CAT#')) {
-      const id = values[':sk'].slice(4);
-      return { Items: (store.customCategories ?? []).filter((c: any) => c.categoryId === id) };
-    }
-    if (values[':sk']?.startsWith('POT#')) {
-      const id = values[':sk'].slice(4);
-      return { Items: (store.settings ?? []).filter((s: any) => s.categoryId === id) };
-    }
-    if (values[':prefix'] === 'CAT#') return { Items: store.customCategories ?? [] };
-    if (values[':prefix'] === 'POT#') return { Items: store.settings ?? [] };
-    if (values[':prefix'] === 'TXN#') return { Items: store.transactions ?? [] };
-    if (values[':prefix'] === 'RECUR#') return { Items: store.recurring ?? [] };
-    return { Items: [] };
-  });
+async function seed(data: Seed): Promise<void> {
+  const items = [
+    ...(data.customCategories ?? []).map(c => ({ ...c, SK: `CAT#${c.categoryId}` })),
+    ...(data.settings ?? []).map(s => ({ ...s, SK: `POT#${s.categoryId}` })),
+    ...(data.transactions ?? []).map(t => ({ ...t, SK: `TXN#${t.yearMonth}#${t.transactionId}` })),
+    ...(data.recurring ?? []).map(r => ({ ...r, SK: `RECUR#${r.recurringId}` })),
+  ];
+  await seedUser(store, 'user-1', items);
 }
 
 function txn(type: string, amount: number, yearMonth = '2026-10', categoryId = 'cat-garden') {
@@ -61,64 +41,66 @@ function txn(type: string, amount: number, yearMonth = '2026-10', categoryId = '
 
 const gardenPot = { categoryId: 'cat-garden', name: 'Garden', type: 'POT', icon: 'tag', isDefault: false };
 
-function puts(): Record<string, any>[] {
-  return mockSend.mock.calls.map(call => call[0]).filter((c: any) => c.Item);
+async function storedPot(categoryId: string): Promise<Record<string, any> | undefined> {
+  return store.get({ PK: 'USER#user-1', SK: `POT#${categoryId}` });
 }
 
 describe('archivePot', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-10-15T12:00:00Z'));
-    mockSend.mockReset();
+    store = useTestStore();
     mockMoveToTrash.mockReset();
   });
-  afterEach(() => { vi.useRealTimers(); });
+  afterEach(() => {
+    vi.useRealTimers();
+    resetTestStore();
+  });
 
   it('archives an empty pot and stamps archivedAt', async () => {
-    useStore({ customCategories: [gardenPot], transactions: [txn('SET_ASIDE', 5000), txn('TAKE_OUT', 5000)] });
+    await seed({ customCategories: [gardenPot], transactions: [txn('SET_ASIDE', 5000), txn('TAKE_OUT', 5000)] });
     const res = await archivePot(event({ month: '2026-10' }), 'user-1', { categoryId: 'cat-garden' });
     expect(res.statusCode).toBe(200);
-    expect(puts()[0].Item).toMatchObject({
+    expect(await storedPot('cat-garden')).toMatchObject({
       PK: 'USER#user-1', SK: 'POT#cat-garden', categoryId: 'cat-garden', archivedAt: '2026-10-15T12:00:00.000Z',
     });
   });
 
   it('refuses with 409 and the balance while the pot still holds money', async () => {
-    useStore({ customCategories: [gardenPot], transactions: [txn('SET_ASIDE', 5000), txn('TAKE_OUT', 1500)] });
+    await seed({ customCategories: [gardenPot], transactions: [txn('SET_ASIDE', 5000), txn('TAKE_OUT', 1500)] });
     const res = await archivePot(event({ month: '2026-10' }), 'user-1', { categoryId: 'cat-garden' });
     expect(res.statusCode).toBe(409);
     expect(JSON.parse(res.body)).toMatchObject({ balance: 3500 });
-    expect(puts()).toHaveLength(0);
+    expect(await storedPot('cat-garden')).toBeUndefined();
     expect(mockMoveToTrash).not.toHaveBeenCalled();
   });
 
   it('reports a pot below zero as a negative balance', async () => {
-    useStore({ customCategories: [gardenPot], transactions: [txn('EXPENSE', 2000)] });
+    await seed({ customCategories: [gardenPot], transactions: [txn('EXPENSE', 2000)] });
     const res = await archivePot(event({ month: '2026-10' }), 'user-1', { categoryId: 'cat-garden' });
     expect(res.statusCode).toBe(409);
     expect(JSON.parse(res.body).balance).toBe(-2000);
   });
 
   it('does not count this month\'s auto-contribution, because archiving stops it', async () => {
-    useStore({
+    await seed({
       customCategories: [gardenPot],
       settings: [{ categoryId: 'cat-garden', monthlyAmount: 5000, goalAmount: null, autoContribute: [{ from: '2026-10', amount: 5000 }], updatedAt: 'u' }],
     });
     const res = await archivePot(event({ month: '2026-10' }), 'user-1', { categoryId: 'cat-garden' });
     expect(res.statusCode).toBe(200);
-    const saved = puts()[0].Item;
-    expect(saved.autoContribute).toEqual([]);
+    expect((await storedPot('cat-garden'))?.autoContribute).toEqual([]);
   });
 
   it('keeps earlier auto-contribution history and records the stop from this month', async () => {
-    useStore({
+    await seed({
       customCategories: [gardenPot],
       transactions: [txn('TAKE_OUT', 5000, '2026-09')],
       settings: [{ categoryId: 'cat-garden', monthlyAmount: 5000, goalAmount: 90000, autoContribute: [{ from: '2026-09', amount: 5000 }], updatedAt: 'u' }],
     });
     const res = await archivePot(event({ month: '2026-10' }), 'user-1', { categoryId: 'cat-garden' });
     expect(res.statusCode).toBe(200);
-    expect(puts()[0].Item).toMatchObject({
+    expect(await storedPot('cat-garden')).toMatchObject({
       goalAmount: 90000,
       monthlyAmount: 5000,
       autoContribute: [{ from: '2026-09', amount: 5000 }, { from: '2026-10', amount: 0 }],
@@ -126,7 +108,7 @@ describe('archivePot', () => {
   });
 
   it('moves only this pot\'s recurring items to the trash', async () => {
-    useStore({
+    await seed({
       customCategories: [gardenPot],
       recurring: [
         { recurringId: 'r1', categoryId: 'cat-garden' },
@@ -143,27 +125,24 @@ describe('archivePot', () => {
   });
 
   it('works for a built-in pot that has no stored category or settings', async () => {
-    useStore({});
-    const res = await archivePot(event({ month: '2026-10' }), 'user-1', { categoryId: 'cat-holidays' });
+        const res = await archivePot(event({ month: '2026-10' }), 'user-1', { categoryId: 'cat-holidays' });
     expect(res.statusCode).toBe(200);
-    expect(puts()[0].Item).toMatchObject({ SK: 'POT#cat-holidays', monthlyAmount: null, goalAmount: null });
+    expect(await storedPot('cat-holidays')).toMatchObject({ SK: 'POT#cat-holidays', monthlyAmount: null, goalAmount: null });
   });
 
   it('rejects a category that is not a pot', async () => {
-    useStore({});
-    const res = await archivePot(event({ month: '2026-10' }), 'user-1', { categoryId: 'cat-mortgage' });
+        const res = await archivePot(event({ month: '2026-10' }), 'user-1', { categoryId: 'cat-mortgage' });
     expect(res.statusCode).toBe(400);
-    expect(puts()).toHaveLength(0);
+    expect(await storedPot('cat-mortgage')).toBeUndefined();
   });
 
   it('rejects a category that does not exist', async () => {
-    useStore({});
-    const res = await archivePot(event({ month: '2026-10' }), 'user-1', { categoryId: 'nope' });
+        const res = await archivePot(event({ month: '2026-10' }), 'user-1', { categoryId: 'nope' });
     expect(res.statusCode).toBe(400);
   });
 
   it('accepts the month before and the month after now, but nothing further away', async () => {
-    useStore({ customCategories: [gardenPot] });
+    await seed({ customCategories: [gardenPot] });
     for (const month of ['2026-09', '2026-11']) {
       expect((await archivePot(event({ month }), 'user-1', { categoryId: 'cat-garden' })).statusCode).toBe(200);
     }
@@ -173,14 +152,14 @@ describe('archivePot', () => {
   });
 
   it('rejects a missing or malformed month', async () => {
-    useStore({ customCategories: [gardenPot] });
+    await seed({ customCategories: [gardenPot] });
     expect((await archivePot(event({}), 'user-1', { categoryId: 'cat-garden' })).statusCode).toBe(400);
     expect((await archivePot(event({ month: '2026-13' }), 'user-1', { categoryId: 'cat-garden' })).statusCode).toBe(400);
     expect((await archivePot(event({ month: '2024-01' }), 'user-1', { categoryId: 'cat-garden' })).statusCode).toBe(400);
   });
 
   it('rejects unexpected body fields', async () => {
-    useStore({ customCategories: [gardenPot] });
+    await seed({ customCategories: [gardenPot] });
     const res = await archivePot(event({ month: '2026-10', archivedAt: 'x' }), 'user-1', { categoryId: 'cat-garden' });
     expect(res.statusCode).toBe(400);
   });
@@ -192,44 +171,44 @@ describe('archivePot', () => {
   });
 
   it('is safe to run again on an already archived pot', async () => {
-    useStore({
+    await seed({
       customCategories: [gardenPot],
       settings: [{ categoryId: 'cat-garden', monthlyAmount: null, goalAmount: null, autoContribute: [], archivedAt: '2026-09-01T00:00:00.000Z', updatedAt: 'u' }],
     });
     const res = await archivePot(event({ month: '2026-10' }), 'user-1', { categoryId: 'cat-garden' });
     expect(res.statusCode).toBe(200);
-    expect(puts()[0].Item.archivedAt).toBe('2026-09-01T00:00:00.000Z');
+    expect((await storedPot('cat-garden'))?.archivedAt).toBe('2026-09-01T00:00:00.000Z');
   });
 });
 
 describe('unarchivePot', () => {
   beforeEach(() => {
-    mockSend.mockReset();
+    store = useTestStore();
     mockMoveToTrash.mockReset();
   });
+  afterEach(() => { resetTestStore(); });
 
   it('clears archivedAt and keeps the rest of the settings', async () => {
-    useStore({
+    await seed({
       customCategories: [gardenPot],
       settings: [{ categoryId: 'cat-garden', monthlyAmount: 5000, goalAmount: 90000, autoContribute: [{ from: '2026-09', amount: 0 }], archivedAt: '2026-10-01T00:00:00.000Z', updatedAt: 'u' }],
     });
     const res = await unarchivePot(event({}), 'user-1', { categoryId: 'cat-garden' });
     expect(res.statusCode).toBe(200);
-    expect(puts()[0].Item).toMatchObject({
+    expect(await storedPot('cat-garden')).toMatchObject({
       categoryId: 'cat-garden', monthlyAmount: 5000, goalAmount: 90000, archivedAt: null,
       autoContribute: [{ from: '2026-09', amount: 0 }],
     });
   });
 
   it('does not bring cancelled recurring items back', async () => {
-    useStore({ customCategories: [gardenPot] });
+    await seed({ customCategories: [gardenPot] });
     await unarchivePot(event({}), 'user-1', { categoryId: 'cat-garden' });
     expect(mockMoveToTrash).not.toHaveBeenCalled();
   });
 
   it('rejects a category that is not a pot', async () => {
-    useStore({});
-    const res = await unarchivePot(event({}), 'user-1', { categoryId: 'cat-mortgage' });
+        const res = await unarchivePot(event({}), 'user-1', { categoryId: 'cat-mortgage' });
     expect(res.statusCode).toBe(400);
   });
 });

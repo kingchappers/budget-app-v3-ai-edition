@@ -1,6 +1,6 @@
-import { PutCommand } from '@aws-sdk/lib-dynamodb';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
-import { docClient, TABLE, pk, potSk, recurringSk } from './db';
+import { getStore } from '../store';
+import { pk, potSk, recurringSk } from './db';
 import { DEFAULT_CATEGORIES } from './defaults';
 import { ok, err, parseJsonObject } from './http';
 import {
@@ -25,10 +25,7 @@ async function loadPotSettings(userId: string, categoryId: string): Promise<PotS
 }
 
 async function savePotSettings(userId: string, settings: PotSettings): Promise<void> {
-  await docClient.send(new PutCommand({
-    TableName: TABLE,
-    Item: { PK: pk(userId), SK: potSk(settings.categoryId), ...settings },
-  }));
+  await getStore().put({ PK: pk(userId), SK: potSk(settings.categoryId), ...settings });
 }
 
 async function balanceWithoutAuto(
