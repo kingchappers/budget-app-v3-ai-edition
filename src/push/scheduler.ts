@@ -3,6 +3,7 @@ import { isTimeToSend, localMoment, selectReminders, type Reminder } from './sel
 import {
   listSubscribedUsers, loadReminderData, loadSubscriptions, removeSubscription, type ReminderData, type StoredSubscription,
 } from './store';
+import { initStore } from '../store';
 import { loadVapid, type VapidDetails } from './vapid';
 
 // A reminder is about today, so it is worth nothing once the day is over.
@@ -96,6 +97,7 @@ export async function handler(): Promise<Summary | { skipped: string }> {
     return { skipped: 'not set up' };
   }
 
+  await initStore();
   const summary = await runScheduler({
     listUsers: listSubscribedUsers,
     loadSubscriptions,
