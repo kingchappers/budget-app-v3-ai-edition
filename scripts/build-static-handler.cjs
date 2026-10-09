@@ -20,6 +20,15 @@ fs.rmSync(tmpDir, { recursive: true, force: true });
 
 const auth0Domain = (process.env.VITE_AUTH0_DOMAIN || '').replace(/^https?:\/\//, '').replace(/\/+$/, '');
 fs.writeFileSync(path.join(root, 'build/client/csp.json'), JSON.stringify({ auth0Domain }) + '\n');
+
+// One frontend build serves both deployments, so the login mode and Auth0 values are read at runtime from /config.json.
+const runtimeConfig = {
+  auth: 'auth0',
+  domain: auth0Domain,
+  clientId: process.env.VITE_AUTH0_CLIENT_ID || '',
+  audience: process.env.VITE_AUTH0_AUDIENCE || '',
+};
+fs.writeFileSync(path.join(root, 'build/client/config.json'), JSON.stringify(runtimeConfig) + '\n');
 if (auth0Domain === '') {
   console.warn('VITE_AUTH0_DOMAIN is not set; the content security policy will not allow Auth0.');
 }
