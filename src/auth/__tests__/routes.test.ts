@@ -5,7 +5,7 @@ import type { SqliteStore } from '../../store/sqlite';
 import { handleAuthRoute } from '../routes';
 import type { AuthRouteContext } from '../routes';
 import { SetupCode } from '../setupCode';
-import { createAccount, hashToken, getAccount } from '../localData';
+import { createAccount, hashToken, getAccount, throttleRemaining } from '../localData';
 
 const PASSWORD = 'a perfectly fine password';
 let store: SqliteStore;
@@ -165,11 +165,44 @@ describe('POST /api/auth/login', () => {
     expect(recovered.statusCode).toBe(200);
   });
 
-  it('treats a stored record that cannot be verified as a failed login, not a 500', async () => {
+  it('treats a stored record that cannot be verified as a failed login, not a 500, and logs a fixed message', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
     await store.patch({ PK: 'AUTH#ACCOUNT', SK: 'PROFILE' }, { N: 3 }, { mustExist: true });
     const res = (await handleAuthRoute(post('/api/auth/login', { email: 'me@example.com', password: PASSWORD }), ctx))!;
     expect(res.statusCode).toBe(401);
     expect(res.cookies).toBeUndefined();
+    expect(error).toHaveBeenCalledWith('Stored account password record could not be verified:', expect.any(String));
+    const logged = JSON.stringify(error.mock.calls);
+    expect(logged).not.toContain(PASSWORD);
+    expect(logged).not.toContain('me@example.com');
+  });
+
+  it('does not deadlock later logins after the corrupt-record path', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const key = { PK: 'AUTH#ACCOUNT', SK: 'PROFILE' };
+    await store.patch(key, { N: 3 }, { mustExist: true });
+    await handleAuthRoute(post('/api/auth/login', { email: 'me@example.com', password: PASSWORD }), ctx);
+    await store.patch(key, { N: 2 ** 15 }, { mustExist: true });
+    const res = (await handleAuthRoute(post('/api/auth/login', { email: 'me@example.com', password: PASSWORD }), ctx))!;
+    expect(res.statusCode).toBe(200);
+  });
+
+  it('holds the throttle under a burst of simultaneous wrong passwords', async () => {
+    const burst = await Promise.all(
+      Array.from({ length: 8 }, () => handleAuthRoute(post('/api/auth/login', { email: 'me@example.com', password: 'wrong wrong wrong' }), ctx)),
+    );
+    const codes = burst.map(res => res!.statusCode);
+    expect(codes.filter(code => code === 429).length).toBeGreaterThanOrEqual(1);
+    expect(codes.filter(code => code === 401).length).toBeLessThanOrEqual(4);
+    expect(await throttleRemaining(store, now)).toBeGreaterThan(0);
+  });
+
+  it('refuses a 255-character email as a failed login', async () => {
+    const email = `${'a'.repeat(243)}@example.com`;
+    expect(email.length).toBe(255);
+    const res = (await handleAuthRoute(post('/api/auth/login', { email, password: PASSWORD }), ctx))!;
+    expect(res.statusCode).toBe(401);
+    expect(await store.get({ PK: 'AUTH#THROTTLE', SK: 'LOGIN' })).toMatchObject({ failures: 1 });
   });
 
   it('refuses a request from another origin', async () => {

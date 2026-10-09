@@ -60,7 +60,7 @@ async function setup(event: APIGatewayProxyEventV2, ctx: AuthRouteContext): Prom
   }
 }
 
-async function login(event: APIGatewayProxyEventV2, ctx: AuthRouteContext): Promise<ApiResponse> {
+async function attemptLogin(event: APIGatewayProxyEventV2, ctx: AuthRouteContext): Promise<ApiResponse> {
   const body = parseJsonObject(event);
   if (!body) return err(400, 'Request body must be a JSON object');
   const { email, password } = body;
@@ -78,16 +78,17 @@ async function login(event: APIGatewayProxyEventV2, ctx: AuthRouteContext): Prom
     return noStore(err(401, 'Invalid email or password'));
   };
 
-  // Bound the hashing cost before spending any of it.
-  if (password.length > MAX_PASSWORD_LENGTH) return invalid();
+  // Bound the hashing cost and the input size before spending any of it.
+  if (password.length > MAX_PASSWORD_LENGTH || email.length > MAX_EMAIL_LENGTH) return invalid();
 
   const account = await getAccount(ctx.store);
   // Always verify against some record, so an unknown email takes as long as a wrong password.
   let passwordMatches: boolean;
   try {
     passwordMatches = await verifyPassword(password, account ?? (await dummyRecord()));
-  } catch {
-    // A stored record with unusable parameters cannot be verified, so it is a failed login. Nothing about it is logged.
+  } catch (error) {
+    // A stored record with unusable parameters cannot be verified, so it is a failed login. Log only the error message, never request data.
+    console.error('Stored account password record could not be verified:', error instanceof Error ? error.message : String(error));
     return invalid();
   }
   if (!account || normaliseEmail(email) !== account.email || !passwordMatches) return invalid();
@@ -95,6 +96,16 @@ async function login(event: APIGatewayProxyEventV2, ctx: AuthRouteContext): Prom
   await clearThrottle(ctx.store);
   const token = await createSession(ctx.store, account.userId, now);
   return withCookie(ok({ userId: account.userId, email: account.email }), sessionCookie(token, ctx.secureCookie));
+}
+
+// Single-process deployment on SQLite: one login at a time makes the throttle's read-modify-write safe,
+// and queued attempts see the delay and are refused without hashing.
+let loginQueue: Promise<unknown> = Promise.resolve();
+
+function login(event: APIGatewayProxyEventV2, ctx: AuthRouteContext): Promise<ApiResponse> {
+  const result = loginQueue.then(() => attemptLogin(event, ctx));
+  loginQueue = result.catch(() => undefined);
+  return result;
 }
 
 async function logout(event: APIGatewayProxyEventV2, ctx: AuthRouteContext): Promise<ApiResponse> {
