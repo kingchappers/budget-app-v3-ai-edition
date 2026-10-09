@@ -23,7 +23,7 @@ describe('auth registry', () => {
   });
 
   it('rejects an unknown AUTH_MODE and recovers on the next call', async () => {
-    await expect(initAuth({ AUTH_MODE: 'ldap' })).rejects.toThrow(/Unknown AUTH_MODE "ldap"/);
+    await expect(initAuth({ AUTH_MODE: 'ldap' })).rejects.toThrow(/Unknown AUTH_MODE "ldap".*expected "auth0" or "local"/);
     await expect(initAuth({ AUTH0_DOMAIN: 'tenant.example.com' })).resolves.toBeDefined();
   });
 

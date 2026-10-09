@@ -23,7 +23,11 @@ async function createAuth(env: NodeJS.ProcessEnv): Promise<AuthProvider> {
     const { createAuth0Provider } = await import('./auth0');
     return createAuth0Provider(env);
   }
-  throw new Error(`Unknown AUTH_MODE "${mode}": expected "auth0"`);
+  if (mode === 'local') {
+    const { createLocalProvider } = await import('./local');
+    return createLocalProvider(env);
+  }
+  throw new Error(`Unknown AUTH_MODE "${mode}": expected "auth0" or "local"`);
 }
 
 // Loads only the chosen provider, so the Lambda never loads the local-login code.
