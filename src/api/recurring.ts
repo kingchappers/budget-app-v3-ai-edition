@@ -1,6 +1,6 @@
-import { QueryCommand, PutCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
-import { docClient, TABLE, pk, recurringSk } from './db';
+import { ConditionFailedError, getStore } from '../store';
+import { pk, recurringSk } from './db';
 import { MAX_AMOUNT_PENCE, SECURITY_HEADERS, VALID_TRANSACTION_TYPES } from './constants';
 import type { ApiResponse, Recurring, RecurringFrequency, TransactionType } from './types';
 import { ok, err, parseJsonObject } from './http';
@@ -32,10 +32,6 @@ function isRealDate(value: string): boolean {
 // A handled marker is a month for monthly items and an occurrence date for the others.
 function isOccurrenceKey(value: string): boolean {
   return PERIOD_PATTERN.test(value) || isRealDate(value);
-}
-
-function isConditionalFailure(error: unknown): boolean {
-  return error instanceof Error && error.name === 'ConditionalCheckFailedException';
 }
 
 export interface ValidRecurringInput {
@@ -134,13 +130,8 @@ export async function getRecurring(
   userId: string,
   _params: Record<string, string>,
 ): Promise<ApiResponse> {
-  const result = await docClient.send(new QueryCommand({
-    TableName: TABLE,
-    KeyConditionExpression: 'PK = :pk AND begins_with(SK, :prefix)',
-    ExpressionAttributeValues: { ':pk': pk(userId), ':prefix': 'RECUR#' },
-  }));
-
-  return ok({ recurring: (result.Items ?? []).map(toRecurring) });
+  const items = await getStore().query(pk(userId), { skPrefix: 'RECUR#' });
+  return ok({ recurring: items.map(toRecurring) });
 }
 
 export async function createRecurring(
@@ -163,10 +154,7 @@ export async function createRecurring(
     updatedAt: now,
   };
 
-  await docClient.send(new PutCommand({
-    TableName: TABLE,
-    Item: { PK: pk(userId), SK: recurringSk(recurring.recurringId), ...recurring },
-  }));
+  await getStore().put({ PK: pk(userId), SK: recurringSk(recurring.recurringId), ...recurring });
 
   return { statusCode: 201, headers: SECURITY_HEADERS, body: JSON.stringify({ recurring }) };
 }
@@ -187,31 +175,14 @@ export async function updateRecurring(
   const { type, categoryId, amount, description, dayOfMonth, frequency, anchorDate, leadDays } = validation.value;
 
   try {
-    const result = await docClient.send(new UpdateCommand({
-      TableName: TABLE,
-      Key: { PK: pk(userId), SK: recurringSk(recurringId) },
-      UpdateExpression:
-        'SET #type = :type, categoryId = :categoryId, amount = :amount, description = :description, '
-        + 'dayOfMonth = :dayOfMonth, frequency = :frequency, anchorDate = :anchorDate, '
-        + 'leadDays = :leadDays, updatedAt = :updatedAt',
-      ConditionExpression: 'attribute_exists(PK)',
-      ExpressionAttributeNames: { '#type': 'type' },
-      ExpressionAttributeValues: {
-        ':type': type,
-        ':categoryId': categoryId,
-        ':amount': amount,
-        ':description': description,
-        ':dayOfMonth': dayOfMonth,
-        ':frequency': frequency,
-        ':anchorDate': anchorDate,
-        ':leadDays': leadDays,
-        ':updatedAt': new Date().toISOString(),
-      },
-      ReturnValues: 'ALL_NEW',
-    }));
-    return ok({ recurring: toRecurring(result.Attributes ?? {}) });
+    const item = await getStore().patch(
+      { PK: pk(userId), SK: recurringSk(recurringId) },
+      { type, categoryId, amount, description, dayOfMonth, frequency, anchorDate, leadDays, updatedAt: new Date().toISOString() },
+      { mustExist: true },
+    );
+    return ok({ recurring: toRecurring(item) });
   } catch (error) {
-    if (isConditionalFailure(error)) return err(404, 'Recurring item not found');
+    if (error instanceof ConditionFailedError) return err(404, 'Recurring item not found');
     throw error;
   }
 }
@@ -246,17 +217,14 @@ export async function setRecurringHandled(
   }
 
   try {
-    const result = await docClient.send(new UpdateCommand({
-      TableName: TABLE,
-      Key: { PK: pk(userId), SK: recurringSk(recurringId) },
-      UpdateExpression: 'SET handledPeriod = :period, updatedAt = :updatedAt',
-      ConditionExpression: 'attribute_exists(PK)',
-      ExpressionAttributeValues: { ':period': period, ':updatedAt': new Date().toISOString() },
-      ReturnValues: 'ALL_NEW',
-    }));
-    return ok({ recurring: toRecurring(result.Attributes ?? {}) });
+    const item = await getStore().patch(
+      { PK: pk(userId), SK: recurringSk(recurringId) },
+      { handledPeriod: period, updatedAt: new Date().toISOString() },
+      { mustExist: true },
+    );
+    return ok({ recurring: toRecurring(item) });
   } catch (error) {
-    if (isConditionalFailure(error)) return err(404, 'Recurring item not found');
+    if (error instanceof ConditionFailedError) return err(404, 'Recurring item not found');
     throw error;
   }
 }
