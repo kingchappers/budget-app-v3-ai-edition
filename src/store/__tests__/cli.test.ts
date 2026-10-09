@@ -1,7 +1,7 @@
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { setStore } from '..';
 import { createAccount, createSession, getAccount, recordFailure, throttleRemaining } from '../../auth/localData';
 import { verifyPassword } from '../../auth/password';
@@ -109,7 +109,13 @@ describe('runCli', () => {
 
     it('never takes the password from argv or the environment', async () => {
       await seedAccount();
-      await expect(runCli(['reset-password', 'sneaky-password-123'], env, { readPassword: async () => 'short' })).rejects.toThrow();
+      const readPassword = vi.fn(async () => 'a valid password 99');
+      await expect(runCli(['reset-password', 'sneaky-password-123'], env, { readPassword })).rejects.toThrow(/Usage/);
+      expect(readPassword).not.toHaveBeenCalled();
+      const store = new SqliteStore(env.SQLITE_PATH as string);
+      expect(await verifyPassword('the old password 1', (await getAccount(store))!)).toBe(true);
+      expect((await store.query('AUTH#SESSIONS')).length).toBe(1);
+      store.close();
     });
   });
 });
