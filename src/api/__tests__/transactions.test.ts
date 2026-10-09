@@ -1,24 +1,14 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-
-const { mockSend } = vi.hoisted(() => ({ mockSend: vi.fn() }));
-
-vi.mock('../db', () => ({
-  docClient: { send: mockSend },
-  TABLE: 'test-table',
-  pk: (userId: string) => `USER#${userId}`,
-  txnSk: (ym: string, id: string) => `TXN#${ym}#${id}`,
-}));
-
-vi.mock('@aws-sdk/lib-dynamodb', () => ({
-  QueryCommand: vi.fn(function(i: unknown) { return i; }),
-  PutCommand: vi.fn(function(i: unknown) { return i; }),
-  GetCommand: vi.fn(function(i: unknown) { return i; }),
-  TransactWriteCommand: vi.fn(function(i: unknown) { return i; }),
-}));
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 import { getTransactions, createTransaction, deleteTransaction, updateTransaction, validateTransactionInput } from '../transactions';
 import { MAX_AMOUNT_PENCE } from '../constants';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
+import type { SqliteStore } from '../../store/sqlite';
+import { resetTestStore, seedUser, useTestStore } from '../../store/testing';
+
+let store: SqliteStore;
+beforeEach(() => { store = useTestStore(); });
+afterEach(() => { resetTestStore(); });
 
 function makeEvent(opts: {
   body?: object;
@@ -34,19 +24,18 @@ function makeEvent(opts: {
 }
 
 describe('getTransactions', () => {
-  beforeEach(() => { mockSend.mockReset(); });
-
   it('returns transactions for a valid year and month', async () => {
-    mockSend.mockResolvedValueOnce({ Items: [{ transactionId: 'txn-1' }] });
+    await seedUser(store, 'user-1', [{ SK: 'TXN#2025-01#txn-1', transactionId: 'txn-1' }]);
     const res = await getTransactions(makeEvent({ query: { year: '2025', month: '1' } }), 'user-1', {});
     expect(res.statusCode).toBe(200);
     expect(JSON.parse(res.body).transactions).toHaveLength(1);
   });
 
   it('returns 400 when year or month is missing', async () => {
+    const spy = vi.spyOn(store, 'query');
     const res = await getTransactions(makeEvent({ query: { year: '2025' } }), 'user-1', {});
     expect(res.statusCode).toBe(400);
-    expect(mockSend).not.toHaveBeenCalled();
+    expect(spy).not.toHaveBeenCalled();
   });
 
   it('returns 400 for an invalid month', async () => {
@@ -56,10 +45,7 @@ describe('getTransactions', () => {
 });
 
 describe('createTransaction', () => {
-  beforeEach(() => { mockSend.mockReset(); });
-
   it('creates a transaction and returns 201', async () => {
-    mockSend.mockResolvedValueOnce({});
     const res = await createTransaction(
       makeEvent({ body: { amount: 1500, type: 'EXPENSE', categoryId: 'cat-food', description: 'Tesco', date: '2025-01-15' } }),
       'user-1',
@@ -72,13 +58,14 @@ describe('createTransaction', () => {
   });
 
   it('returns 400 for non-integer amount', async () => {
+    const spy = vi.spyOn(store, 'put');
     const res = await createTransaction(
       makeEvent({ body: { amount: 15.50, type: 'EXPENSE', categoryId: 'cat-food', description: 'Tesco', date: '2025-01-15' } }),
       'user-1',
       {},
     );
     expect(res.statusCode).toBe(400);
-    expect(mockSend).not.toHaveBeenCalled();
+    expect(spy).not.toHaveBeenCalled();
   });
 
   it('returns 400 for invalid date format', async () => {
@@ -109,7 +96,6 @@ describe('createTransaction', () => {
   });
 
   it.each(['SET_ASIDE', 'TAKE_OUT'])('accepts %s as a transaction type', async (type) => {
-    mockSend.mockResolvedValueOnce({});
     const res = await createTransaction(makeEvent({
       body: { amount: 30000, type, categoryId: 'cat-holidays', description: 'Monthly contribution', date: '2026-07-15' },
     }), 'user-1', {});
@@ -117,23 +103,24 @@ describe('createTransaction', () => {
   });
 
   it.each(['INVESTMENT_IN', 'INVESTMENT_OUT'])('rejects the removed %s type', async (type) => {
+    const spy = vi.spyOn(store, 'put');
     const res = await createTransaction(makeEvent({
       body: { amount: 30000, type, categoryId: 'cat-holidays', description: 'Old type', date: '2026-07-15' },
     }), 'user-1', {});
     expect(res.statusCode).toBe(400);
-    expect(mockSend).not.toHaveBeenCalled();
+    expect(spy).not.toHaveBeenCalled();
   });
 
   it('rejects the old INVESTMENT_GAIN type', async () => {
+    const spy = vi.spyOn(store, 'put');
     const res = await createTransaction(makeEvent({
       body: { amount: 30000, type: 'INVESTMENT_GAIN', categoryId: 'cat-stocks', description: 'Old type', date: '2026-07-15' },
     }), 'user-1', {});
     expect(res.statusCode).toBe(400);
-    expect(mockSend).not.toHaveBeenCalled();
+    expect(spy).not.toHaveBeenCalled();
   });
 
   it('creates a transaction with no description', async () => {
-    mockSend.mockResolvedValueOnce({});
     const res = await createTransaction(makeEvent({
       body: { amount: 480, type: 'EXPENSE', categoryId: 'cat-dining', date: '2026-07-15' },
     }), 'user-1', {});
@@ -156,7 +143,6 @@ describe('createTransaction', () => {
         transactionId: clientId,
       },
     });
-    mockSend.mockResolvedValueOnce({});
     const res = await createTransaction(event, 'user-1', {});
     const body = JSON.parse(res.body);
     expect(res.statusCode).toBe(201);
@@ -176,7 +162,6 @@ describe('createTransaction', () => {
   });
 
   it('still generates its own id when transactionId is absent', async () => {
-    mockSend.mockResolvedValueOnce({});
     const event = makeEvent({ body: { amount: 500, type: 'EXPENSE', categoryId: 'cat-1', description: '', date: '2025-01-05' } });
     const res = await createTransaction(event, 'user-1', {});
     const body = JSON.parse(res.body);
@@ -223,32 +208,29 @@ describe('validateTransactionInput', () => {
 });
 
 describe('deleteTransaction', () => {
-  beforeEach(() => { mockSend.mockReset(); });
-
   it('moves the transaction to the trash in one transaction and returns 204', async () => {
-    mockSend.mockResolvedValueOnce({ Item: { PK: 'USER#user-1', SK: 'TXN#2025-01#some-uuid', transactionId: 'some-uuid' } });
-    mockSend.mockResolvedValueOnce({});
+    await seedUser(store, 'user-1', [{ SK: 'TXN#2025-01#some-uuid', transactionId: 'some-uuid' }]);
     const res = await deleteTransaction(makeEvent(), 'user-1', { yearMonth: '2025-01', transactionId: 'some-uuid' });
     expect(res.statusCode).toBe(204);
     expect(res.body).toBe('');
-    const { TransactItems } = mockSend.mock.calls[1][0];
-    expect(TransactItems[0].Delete.Key).toEqual({ PK: 'USER#user-1', SK: 'TXN#2025-01#some-uuid' });
-    expect(TransactItems[1].Put.Item).toMatchObject({
-      PK: 'USER#user-1', SK: 'TRASH#TRANSACTION#2025-01#some-uuid', entityType: 'TRANSACTION', item: { transactionId: 'some-uuid' },
+    expect(await store.get({ PK: 'USER#user-1', SK: 'TXN#2025-01#some-uuid' })).toBeUndefined();
+    expect(await store.get({ PK: 'USER#user-1', SK: 'TRASH#TRANSACTION#2025-01#some-uuid' })).toMatchObject({
+      entityType: 'TRANSACTION', item: { transactionId: 'some-uuid' },
     });
   });
 
   it('returns 204 without writing when the transaction is already gone', async () => {
-    mockSend.mockResolvedValueOnce({});
+    const spy = vi.spyOn(store, 'transact');
     const res = await deleteTransaction(makeEvent(), 'user-1', { yearMonth: '2025-01', transactionId: 'some-uuid' });
     expect(res.statusCode).toBe(204);
-    expect(mockSend).toHaveBeenCalledOnce();
+    expect(spy).not.toHaveBeenCalled();
   });
 
   it('returns 400 for invalid yearMonth format', async () => {
+    const spy = vi.spyOn(store, 'get');
     const res = await deleteTransaction(makeEvent(), 'user-1', { yearMonth: '01-2025', transactionId: 'uuid' });
     expect(res.statusCode).toBe(400);
-    expect(mockSend).not.toHaveBeenCalled();
+    expect(spy).not.toHaveBeenCalled();
   });
 
   it('returns 400 when transactionId is missing', async () => {
@@ -258,8 +240,6 @@ describe('deleteTransaction', () => {
 });
 
 describe('updateTransaction', () => {
-  beforeEach(() => { mockSend.mockReset(); });
-
   const existing = {
     transactionId: 'txn-1', yearMonth: '2026-07', amount: 480, type: 'EXPENSE',
     categoryId: 'cat-dining', description: 'Pret', date: '2026-07-15',
@@ -268,8 +248,7 @@ describe('updateTransaction', () => {
   const params = { yearMonth: '2026-07', transactionId: 'txn-1' };
 
   it('updates a transaction within the same month', async () => {
-    mockSend.mockResolvedValueOnce({ Item: existing });
-    mockSend.mockResolvedValueOnce({});
+    await seedUser(store, 'user-1', [{ SK: 'TXN#2026-07#txn-1', ...existing }]);
     const res = await updateTransaction(makeEvent({
       body: { amount: 520, type: 'EXPENSE', categoryId: 'cat-dining', description: 'Pret coffee', date: '2026-07-16' },
     }), 'user-1', params);
@@ -278,10 +257,10 @@ describe('updateTransaction', () => {
     expect(body.transaction.amount).toBe(520);
     expect(body.transaction.transactionId).toBe('txn-1');
     expect(body.transaction.createdAt).toBe('2026-07-15T09:00:00.000Z');
+    expect(await store.get({ PK: 'USER#user-1', SK: 'TXN#2026-07#txn-1' })).toMatchObject({ amount: 520 });
   });
 
   it('returns 404 when the transaction does not exist', async () => {
-    mockSend.mockResolvedValueOnce({});
     const res = await updateTransaction(makeEvent({
       body: { amount: 520, type: 'EXPENSE', categoryId: 'cat-dining', description: 'x', date: '2026-07-16' },
     }), 'user-1', params);
@@ -289,26 +268,24 @@ describe('updateTransaction', () => {
   });
 
   it('moves the item transactionally when the month changes', async () => {
-    mockSend.mockResolvedValueOnce({ Item: existing });
-    mockSend.mockResolvedValueOnce({});
+    await seedUser(store, 'user-1', [{ SK: 'TXN#2026-07#txn-1', ...existing }]);
     const res = await updateTransaction(makeEvent({
       body: { amount: 480, type: 'EXPENSE', categoryId: 'cat-dining', description: 'Pret', date: '2026-08-02' },
     }), 'user-1', params);
     expect(res.statusCode).toBe(200);
     expect(JSON.parse(res.body).transaction.yearMonth).toBe('2026-08');
 
-    const writeArg = mockSend.mock.calls[1][0];
-    expect(writeArg.TransactItems).toHaveLength(2);
-    expect(writeArg.TransactItems[0].Delete.Key.SK).toBe('TXN#2026-07#txn-1');
-    expect(writeArg.TransactItems[1].Put.Item.SK).toBe('TXN#2026-08#txn-1');
+    expect(await store.get({ PK: 'USER#user-1', SK: 'TXN#2026-07#txn-1' })).toBeUndefined();
+    expect(await store.get({ PK: 'USER#user-1', SK: 'TXN#2026-08#txn-1' })).toMatchObject({ yearMonth: '2026-08' });
   });
 
   it('returns 400 for an invalid amount', async () => {
+    const spy = vi.spyOn(store, 'get');
     const res = await updateTransaction(makeEvent({
       body: { amount: -5, type: 'EXPENSE', categoryId: 'cat-dining', description: 'x', date: '2026-07-16' },
     }), 'user-1', params);
     expect(res.statusCode).toBe(400);
-    expect(mockSend).not.toHaveBeenCalled();
+    expect(spy).not.toHaveBeenCalled();
   });
 
   it('returns 400 for a malformed yearMonth param', async () => {
@@ -333,8 +310,6 @@ describe('validateTransactionInput amount cap', () => {
 });
 
 describe('recurringId on transactions', () => {
-  beforeEach(() => { mockSend.mockReset(); });
-
   const recurringId = '3f2b8c1e-9a4d-4e7f-b1c2-0d9e8f7a6b5c';
   const base = { amount: 1500, type: 'EXPENSE', categoryId: 'cat-food', description: 'Rent', date: '2026-09-01' };
   const existing = {
@@ -343,17 +318,18 @@ describe('recurringId on transactions', () => {
   const params = { yearMonth: '2026-09', transactionId: 'txn-1' };
 
   it('stores the recurringId a transaction was added from', async () => {
-    mockSend.mockResolvedValueOnce({});
     const res = await createTransaction(makeEvent({ body: { ...base, recurringId } }), 'user-1', {});
     expect(res.statusCode).toBe(201);
     expect(JSON.parse(res.body).transaction.recurringId).toBe(recurringId);
-    expect(mockSend.mock.calls[0][0].Item.recurringId).toBe(recurringId);
+    const [stored] = await store.query('USER#user-1', { skPrefix: 'TXN#2026-09' });
+    expect(stored.recurringId).toBe(recurringId);
   });
 
   it('leaves the attribute out when no recurringId is sent', async () => {
-    mockSend.mockResolvedValueOnce({});
     await createTransaction(makeEvent({ body: base }), 'user-1', {});
-    expect(mockSend.mock.calls[0][0].Item).not.toHaveProperty('recurringId');
+    const [stored] = await store.query('USER#user-1', { skPrefix: 'TXN#2026-09' });
+    expect(stored).toBeDefined();
+    expect(stored).not.toHaveProperty('recurringId');
   });
 
   it.each([
@@ -362,31 +338,57 @@ describe('recurringId on transactions', () => {
     ['a non-UUID string', 'rent-bill'],
     ['a string over 100 characters', `${recurringId}${'a'.repeat(70)}`],
   ])('rejects %s', async (_label, value) => {
+    const spy = vi.spyOn(store, 'put');
     const res = await createTransaction(makeEvent({ body: { ...base, recurringId: value } }), 'user-1', {});
     expect(res.statusCode).toBe(400);
-    expect(mockSend).not.toHaveBeenCalled();
+    expect(spy).not.toHaveBeenCalled();
   });
 
   it('keeps the stored recurringId when an update omits it', async () => {
-    mockSend.mockResolvedValueOnce({ Item: existing });
-    mockSend.mockResolvedValueOnce({});
+    await seedUser(store, 'user-1', [{ SK: 'TXN#2026-09#txn-1', ...existing }]);
     const res = await updateTransaction(makeEvent({ body: { ...base, amount: 1600 } }), 'user-1', params);
     expect(res.statusCode).toBe(200);
     expect(JSON.parse(res.body).transaction.recurringId).toBe(recurringId);
-    expect(mockSend.mock.calls[1][0].Item.recurringId).toBe(recurringId);
+    expect(await store.get({ PK: 'USER#user-1', SK: 'TXN#2026-09#txn-1' })).toMatchObject({ recurringId, amount: 1600 });
   });
 
   it('links a manual transaction when an update sends a recurringId', async () => {
     const { recurringId: _omit, ...manual } = existing;
-    mockSend.mockResolvedValueOnce({ Item: manual });
-    mockSend.mockResolvedValueOnce({});
+    await seedUser(store, 'user-1', [{ SK: 'TXN#2026-09#txn-1', ...manual }]);
     const res = await updateTransaction(makeEvent({ body: { ...base, recurringId } }), 'user-1', params);
     expect(JSON.parse(res.body).transaction.recurringId).toBe(recurringId);
   });
 
   it('rejects an invalid recurringId on update without reading the item', async () => {
+    const spy = vi.spyOn(store, 'get');
     const res = await updateTransaction(makeEvent({ body: { ...base, recurringId: 'nope' } }), 'user-1', params);
     expect(res.statusCode).toBe(400);
-    expect(mockSend).not.toHaveBeenCalled();
+    expect(spy).not.toHaveBeenCalled();
+  });
+});
+
+describe('createTransaction without a recurring link', () => {
+  it('stores no recurringId attribute at all', async () => {
+    const res = await createTransaction(
+      makeEvent({ body: { amount: 350, type: 'EXPENSE', categoryId: 'cat-dining', description: 'Coffee', date: '2026-10-02' } }),
+      'user-1',
+      {},
+    );
+    expect(res.statusCode).toBe(201);
+    const [stored] = await store.query('USER#user-1', { skPrefix: 'TXN#2026-10' });
+    expect(stored).toBeDefined();
+    expect('recurringId' in stored).toBe(false);
+  });
+
+  it('moves a transaction to the new month in one step when its date changes month', async () => {
+    await seedUser(store, 'user-1', [{ SK: 'TXN#2026-09#t1', transactionId: 't1', yearMonth: '2026-09', amount: 100, type: 'EXPENSE', categoryId: 'cat-dining', description: '', date: '2026-09-30', createdAt: '2026-09-30T00:00:00.000Z' }]);
+    const res = await updateTransaction(
+      makeEvent({ body: { amount: 100, type: 'EXPENSE', categoryId: 'cat-dining', description: '', date: '2026-10-01' } }),
+      'user-1',
+      { yearMonth: '2026-09', transactionId: 't1' },
+    );
+    expect(res.statusCode).toBe(200);
+    expect(await store.get({ PK: 'USER#user-1', SK: 'TXN#2026-09#t1' })).toBeUndefined();
+    expect(await store.get({ PK: 'USER#user-1', SK: 'TXN#2026-10#t1' })).toMatchObject({ yearMonth: '2026-10', createdAt: '2026-09-30T00:00:00.000Z' });
   });
 });
