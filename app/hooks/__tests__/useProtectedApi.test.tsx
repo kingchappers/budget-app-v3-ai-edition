@@ -41,6 +41,37 @@ describe('useProtectedApi', () => {
   });
 });
 
+describe('useProtectedApi in Auth0 mode', () => {
+  afterEach(() => { vi.unstubAllGlobals(); });
+
+  it('sends the access token as a Bearer header', async () => {
+    getAccessTokenSilently.mockResolvedValue('tok');
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, text: async () => '{"a":1}' });
+    vi.stubGlobal('fetch', fetchMock);
+    const { result } = renderHook(() => useProtectedApi());
+
+    await expect(result.current.request('/api/categories')).resolves.toEqual({ a: 1 });
+
+    expect(fetchMock.mock.calls[0][1].headers).toMatchObject({ Authorization: 'Bearer tok' });
+  });
+
+  it('does not expire a local session or end the session on a 401', async () => {
+    const { ApiError } = await import('~/lib/apiError');
+    const { getLocalAuthState, resetLocalAuthForTests } = await import('~/lib/localAuth');
+    resetLocalAuthForTests();
+    const before = getLocalAuthState();
+    getAccessTokenSilently.mockResolvedValue('tok');
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 401, statusText: 'Unauthorized' }));
+    const { result } = renderHook(() => useProtectedApi());
+
+    await expect(result.current.request('/api/categories')).rejects.toBeInstanceOf(ApiError);
+
+    expect(getLocalAuthState()).toEqual(before);
+    expect(markSessionEnded).not.toHaveBeenCalled();
+    resetLocalAuthForTests();
+  });
+});
+
 describe('useProtectedApi in local mode', () => {
   it('sends no Authorization header and reports an ended session on a 401', async () => {
     // Re-mock useAuth for this block only.

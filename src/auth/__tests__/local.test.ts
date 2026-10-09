@@ -18,7 +18,10 @@ function event(over: { method?: string; cookie?: string; origin?: string } = {})
   } as unknown as APIGatewayProxyEventV2;
 }
 
-beforeEach(() => { store = useTestStore(); });
+beforeEach(() => {
+  store = useTestStore();
+  vi.spyOn(console, 'log').mockImplementation(() => {});
+});
 afterEach(() => {
   resetTestStore();
   setAuth(undefined);
@@ -27,7 +30,7 @@ afterEach(() => {
 
 describe('createLocalProvider', () => {
   it('logs the setup code exactly once when there is no account, and never when there is', async () => {
-    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const log = vi.mocked(console.log);
     await createLocalProvider({ STORE: 'sqlite', SQLITE_PATH: ':memory:' });
     expect(log).toHaveBeenCalledTimes(1);
     expect(String(log.mock.calls[0][0])).toMatch(/setup code/i);

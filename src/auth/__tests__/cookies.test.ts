@@ -65,6 +65,12 @@ describe('originAllowed', () => {
     expect(originAllowed(event({ method: 'POST', headers: { ...host, origin: 'https://budget.example.com' } }))).toBe(true);
   });
 
+  it('compares the host case-insensitively', () => {
+    const headers = { host: 'Budget.Example.COM', origin: 'https://budget.example.com' };
+    expect(originAllowed(event({ method: 'POST', headers }))).toBe(true);
+    expect(originAllowed(event({ method: 'POST', headers: { ...headers, origin: 'https://evil.example.com' } }))).toBe(false);
+  });
+
   it.each([
     ['no Origin', {}],
     ['a null Origin', { origin: 'null' }],

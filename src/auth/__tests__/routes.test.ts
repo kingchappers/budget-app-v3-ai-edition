@@ -256,13 +256,16 @@ describe('what reaches the logs and the database', () => {
   it('never logs the password, the cookie or the setup code', async () => {
     const spies = (['log', 'info', 'warn', 'error', 'debug'] as const).map(name => vi.spyOn(console, name).mockImplementation(() => {}));
     const secretPassword = 'the-secret-password-123';
+    const code = setupCode.reveal();
     const setup = (await handleAuthRoute(post('/api/auth/setup', setupBody({ password: secretPassword })), ctx))!;
     await handleAuthRoute(post('/api/auth/login', { email: 'me@example.com', password: 'wrong wrong wrong' }), ctx);
     await handleAuthRoute(post('/api/auth/login', { email: 'me@example.com', password: secretPassword }), ctx);
 
     const logged = JSON.stringify(spies.flatMap(spy => spy.mock.calls));
     expect(logged).not.toContain(secretPassword);
+    expect(logged).not.toContain(code);
     expect(logged).not.toContain(cookieValue(setup).split('=')[1]);
+    expect(logged).not.toContain(cookieValue(setup));
   });
 
   it('stores only the hash of the cookie value', async () => {

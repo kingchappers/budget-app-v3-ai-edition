@@ -37,7 +37,8 @@ export function originAllowed(event: APIGatewayProxyEventV2): boolean {
   if (SAFE_METHODS.has(event.requestContext.http.method.toUpperCase())) return true;
 
   const origin = event.headers?.origin;
-  const host = (event.headers?.['x-forwarded-host'] ?? event.headers?.host)?.split(',')[0].trim();
+  // x-forwarded-host is trusted only because this is a defence-in-depth check beside SameSite=Strict.
+  const host = (event.headers?.['x-forwarded-host'] ?? event.headers?.host)?.split(',')[0].trim().toLowerCase();
   if (!origin || !host) return false;
   try {
     return new URL(origin).host === host;
