@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { SqliteStore } from '../sqlite';
 import { exportUser, importUser, parseJsonl, toJsonl } from '../transfer';
 
@@ -87,5 +87,56 @@ describe('importUser', () => {
     );
     expect(count).toBe(1);
     expect(await target.query('USER#z', { skPrefix: 'PUSHSUB#' })).toEqual([]);
+  });
+
+  it('refuses an empty or push-only file and leaves existing data intact, even with replace', async () => {
+    const target = new SqliteStore(':memory:');
+    await target.put({ PK: 'USER#local-1', SK: 'CAT#keep', name: 'Keep' });
+    const pushOnly = [{ PK: 'USER#a', SK: 'PUSHSUB#h', endpoint: 'e' }];
+
+    await expect(importUser(target, [], { asUser: 'local-1', replace: true })).rejects.toThrow('no importable items');
+    await expect(importUser(target, pushOnly, { asUser: 'local-1', replace: true })).rejects.toThrow('no importable items');
+
+    expect((await target.query('USER#local-1')).map(item => item.SK)).toEqual(['CAT#keep']);
+  });
+
+  it('keeps the original data when a put fails part-way through a replace', async () => {
+    const target = new SqliteStore(':memory:');
+    await target.put({ PK: 'USER#local-1', SK: 'CAT#old1', name: 'Old 1' });
+    await target.put({ PK: 'USER#local-1', SK: 'CAT#old2', name: 'Old 2' });
+    const realPut = target.put.bind(target);
+    let calls = 0;
+    vi.spyOn(target, 'put').mockImplementation(async item => {
+      calls += 1;
+      if (calls === 2) throw new Error('boom');
+      return realPut(item);
+    });
+    const items = [
+      { PK: 'USER#a', SK: 'CAT#new1', name: 'New 1' },
+      { PK: 'USER#a', SK: 'CAT#new2', name: 'New 2' },
+    ];
+
+    await expect(importUser(target, items, { asUser: 'local-1', replace: true })).rejects.toThrow('boom');
+
+    const remaining = (await target.query('USER#local-1')).map(item => item.SK);
+    expect(remaining).toEqual(expect.arrayContaining(['CAT#old1', 'CAT#old2']));
+  });
+
+  it('ends with exactly the file items on replace, including shared keys', async () => {
+    const target = new SqliteStore(':memory:');
+    await target.put({ PK: 'USER#local-1', SK: 'CAT#shared', name: 'Old' });
+    await target.put({ PK: 'USER#local-1', SK: 'CAT#stale', name: 'Stale' });
+    const items = [
+      { PK: 'USER#a', SK: 'CAT#shared', name: 'New' },
+      { PK: 'USER#a', SK: 'CAT#fresh', name: 'Fresh' },
+    ];
+
+    const count = await importUser(target, items, { asUser: 'local-1', replace: true });
+
+    expect(count).toBe(2);
+    expect(await target.query('USER#local-1')).toEqual([
+      { PK: 'USER#local-1', SK: 'CAT#fresh', name: 'Fresh' },
+      { PK: 'USER#local-1', SK: 'CAT#shared', name: 'New' },
+    ]);
   });
 });

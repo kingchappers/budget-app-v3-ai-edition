@@ -54,18 +54,24 @@ export async function importUser(store: Store, items: Item[], options: ImportOpt
     throw new Error('Only USER# partitions can be imported');
   }
 
+  const transferable = items.filter(isTransferable);
+  if (transferable.length === 0) {
+    throw new Error('The file holds no importable items');
+  }
+
   const target = pk(options.asUser);
   const existing = await store.query(target, { attributes: ['SK'] });
   if (existing.length > 0 && !options.replace) {
     throw new Error(`User "${options.asUser}" already has data; pass --replace to overwrite it`);
   }
 
-  for (const item of existing) {
-    await store.delete({ PK: target, SK: item.SK });
-  }
-  const transferable = items.filter(isTransferable);
   for (const item of transferable) {
     await store.put({ ...item, PK: target });
+  }
+  const imported = new Set(transferable.map(item => item.SK));
+  for (const item of existing) {
+    if (imported.has(item.SK)) continue;
+    await store.delete({ PK: target, SK: item.SK });
   }
   return transferable.length;
 }
