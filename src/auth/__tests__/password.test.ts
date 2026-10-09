@@ -24,8 +24,11 @@ describe('hashPassword / verifyPassword', () => {
   });
 
   it('treats canonically equivalent Unicode passwords as the same', async () => {
-    const record = await hashPassword('café au lait 123', FAST);
-    expect(await verifyPassword('café au lait 123', record)).toBe(true);
+    const precomposed = 'caf\u00e9 au lait 123';
+    const decomposed = 'cafe\u0301 au lait 123';
+    expect(precomposed).not.toBe(decomposed);
+    const record = await hashPassword(precomposed, FAST);
+    expect(await verifyPassword(decomposed, record)).toBe(true);
   });
 
   it('uses the memory-conscious defaults when none are given', async () => {
