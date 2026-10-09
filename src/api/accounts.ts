@@ -1,6 +1,6 @@
-import { PutCommand } from '@aws-sdk/lib-dynamodb';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
-import { docClient, TABLE, pk, accountSk } from './db';
+import { getStore } from '../store';
+import { pk, accountSk } from './db';
 import { queryAll, queryOne } from './pots';
 import { ASSET_TYPES, LIABILITY_TYPES, MAX_AMOUNT_PENCE, MAX_BALANCE_ENTRIES, SECURITY_HEADERS } from './constants';
 import type { Account, AccountKind, AccountType, ApiResponse, BalanceEntry } from './types';
@@ -105,10 +105,7 @@ export async function createAccount(
     createdAt: new Date().toISOString(),
   };
 
-  await docClient.send(new PutCommand({
-    TableName: TABLE,
-    Item: { PK: pk(userId), SK: accountSk(accountId), ...account },
-  }));
+  await getStore().put({ PK: pk(userId), SK: accountSk(accountId), ...account });
 
   return { statusCode: 201, headers: SECURITY_HEADERS, body: JSON.stringify({ account }) };
 }
@@ -146,10 +143,7 @@ export async function updateAccount(
 
   const account: Account = { ...existing, name: name.trim(), type: type as AccountType };
 
-  await docClient.send(new PutCommand({
-    TableName: TABLE,
-    Item: { PK: pk(userId), SK: accountSk(accountId), ...account },
-  }));
+  await getStore().put({ PK: pk(userId), SK: accountSk(accountId), ...account });
 
   return ok({ account });
 }
@@ -207,10 +201,7 @@ export async function addBalance(
 
   const account: Account = { ...existing, balances };
 
-  await docClient.send(new PutCommand({
-    TableName: TABLE,
-    Item: { PK: pk(userId), SK: accountSk(accountId), ...account },
-  }));
+  await getStore().put({ PK: pk(userId), SK: accountSk(accountId), ...account });
 
   return ok({ account });
 }
