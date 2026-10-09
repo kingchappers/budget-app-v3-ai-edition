@@ -2,7 +2,7 @@ const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
-// Throwaway verification tool: compiles the API handler so server.cjs can drive it. Run with `yarn node` so tsc is on PATH.
+// Throwaway verification tool: compiles the API handler so server.cjs can drive it. Needs `tsc` on PATH: run with node_modules/.bin on PATH (`PATH=$PWD/node_modules/.bin:$PATH node scripts/local-auth-check/build.cjs`); `yarn node` failed here.
 const root = path.join(__dirname, '..', '..');
 const out = path.join(root, 'build/local-auth-check');
 fs.rmSync(out, { recursive: true, force: true });

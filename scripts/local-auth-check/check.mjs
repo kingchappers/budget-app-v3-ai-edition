@@ -1,5 +1,5 @@
 // Throwaway browser check for the built-in login (AUTH_MODE=local). Not a CI test.
-// Run: yarn build (dummy VITE_AUTH0_* values), yarn node scripts/local-auth-check/build.cjs, node scripts/local-auth-check/check.mjs
+// Run: yarn build (dummy VITE_AUTH0_* values), then PATH=$PWD/node_modules/.bin:$PATH node scripts/local-auth-check/build.cjs, then node scripts/local-auth-check/check.mjs
 import { spawn } from 'node:child_process';
 import { mkdtempSync } from 'node:fs';
 import { createServer } from 'node:net';
@@ -128,11 +128,20 @@ async function main(server, url) {
       assert(response.status() === 409, `expected 409, got ${response.status()}`);
     });
 
+    let oldCookie;
     await step('logout returns to the signed-out state', async () => {
+      const stored = (await context.cookies()).find(cookie => cookie.name === 'budget_session');
+      assert(stored, 'no session cookie before logout');
+      oldCookie = stored.value;
       await profileEmail.click();
       await page.getByRole('menuitem', { name: 'Logout' }).click();
       await signIn.waitFor({ timeout: 20000 });
       assert(await profileEmail.count() === 0, 'profile still visible after logout');
+    });
+
+    await step('the old session cookie is rejected server-side after logout', async () => {
+      const response = await fetch(`${url}/api/auth/me`, { headers: { Cookie: `budget_session=${oldCookie}` } });
+      assert(response.status === 401, `expected 401, got ${response.status}`);
     });
 
     await step('a wrong password shows an error', async () => {
@@ -141,7 +150,9 @@ async function main(server, url) {
       await dialog.getByLabel('Email').fill(EMAIL);
       await dialog.getByLabel('Password', { exact: true }).fill('not the right password');
       await dialog.getByRole('button', { name: 'Sign in' }).click();
-      await dialog.getByRole('alert').waitFor({ timeout: 20000 });
+      const alert = dialog.getByRole('alert');
+      await alert.waitFor({ timeout: 20000 });
+      assert((await alert.textContent()).includes('Invalid email or password'), `unexpected alert: ${await alert.textContent()}`);
       assert(await profileEmail.count() === 0, 'signed in with a wrong password');
     });
 
