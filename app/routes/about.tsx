@@ -1,5 +1,6 @@
 import { Button, Card, Stack, Text, Title } from '@mantine/core';
 import { useAuth0 } from '@auth0/auth0-react';
+import { Link } from 'react-router';
 import { DefaultLayout } from '~/components/layout/DefaultLayout';
 import { SHOTS, SIZES, shotUrl, type Shot } from '~/lib/aboutShots';
 import { GLOSSARY } from '~/lib/glossary';
@@ -26,8 +27,9 @@ const FAQ = [
   },
 ];
 
+// The page is also the help page, so someone already signed in is taken back to the app, not sent to sign in again.
 function SignInButton() {
-  const { loginWithRedirect } = useAuth0();
+  const { isAuthenticated, loginWithRedirect } = useAuth0();
 
   async function signIn(): Promise<void> {
     try {
@@ -37,6 +39,7 @@ function SignInButton() {
     }
   }
 
+  if (isAuthenticated) return <Button size="lg" component={Link} to="/">Open the app</Button>;
   return <Button size="lg" onClick={() => void signIn()}>Sign in</Button>;
 }
 
@@ -44,9 +47,11 @@ function ShotImage({ shot, first }: { shot: Shot; first: boolean }) {
   const { phone, desktop } = SIZES;
   return (
     <picture>
-      <source media="(max-width: 767px) and (prefers-color-scheme: dark)" srcSet={shotUrl(shot.id, 'phone', 'dark')} />
-      <source media="(max-width: 767px)" srcSet={shotUrl(shot.id, 'phone', 'light')} />
-      <source media="(prefers-color-scheme: dark)" srcSet={shotUrl(shot.id, 'desktop', 'dark')} />
+      {/* Each source carries its own size: the img's attributes describe the desktop picture, and a phone
+          picks a portrait one, so without these the box is the wrong shape until the image arrives. */}
+      <source media="(max-width: 767px) and (prefers-color-scheme: dark)" srcSet={shotUrl(shot.id, 'phone', 'dark')} width={phone.width} height={phone.height} />
+      <source media="(max-width: 767px)" srcSet={shotUrl(shot.id, 'phone', 'light')} width={phone.width} height={phone.height} />
+      <source media="(prefers-color-scheme: dark)" srcSet={shotUrl(shot.id, 'desktop', 'dark')} width={desktop.width} height={desktop.height} />
       <img
         src={shotUrl(shot.id, 'desktop', 'light')}
         alt={shot.alt}
@@ -60,6 +65,7 @@ function ShotImage({ shot, first }: { shot: Shot; first: boolean }) {
 }
 
 function AboutContent() {
+  const { isAuthenticated } = useAuth0();
   return (
     <Stack maw={820} mx="auto" gap="xl">
       <Stack gap="sm">
@@ -93,7 +99,7 @@ function AboutContent() {
       </Stack>
 
       <Stack align="center" gap="sm" py="lg">
-        <Text fw={600}>Ready to try it?</Text>
+        {!isAuthenticated && <Text fw={600}>Ready to try it?</Text>}
         <SignInButton />
       </Stack>
     </Stack>

@@ -28,6 +28,7 @@ function renderAbout() {
 }
 
 beforeEach(() => {
+  auth.isAuthenticated = false;
   auth.loginWithRedirect.mockReset();
 });
 
@@ -66,6 +67,28 @@ describe('About page', () => {
     const dark = container.querySelectorAll('picture source[media*="prefers-color-scheme: dark"]');
     expect(dark.length).toBeGreaterThanOrEqual(SHOTS.length);
     expect(dark[0].getAttribute('srcset')).toMatch(/-dark\.webp$/);
+  });
+
+  it('gives every source its own width and height, so a phone reserves a portrait box before the image loads', () => {
+    const { container } = renderAbout();
+    const phoneSources = [...container.querySelectorAll('picture source[media*="max-width"]')];
+    const desktopSources = [...container.querySelectorAll('picture source:not([media*="max-width"])')];
+    expect(phoneSources.length).toBeGreaterThan(0);
+    expect(desktopSources.length).toBeGreaterThan(0);
+    for (const source of phoneSources) {
+      expect([source.getAttribute('width'), source.getAttribute('height')]).toEqual(['390', '844']);
+    }
+    for (const source of desktopSources) {
+      expect([source.getAttribute('width'), source.getAttribute('height')]).toEqual(['1280', '800']);
+    }
+  });
+
+  it('does not ask a signed-in person to sign in, and offers a way back to the app', () => {
+    auth.isAuthenticated = true;
+    renderAbout();
+    expect(screen.queryByRole('button', { name: 'Sign in' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Ready to try it?')).not.toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: 'Open the app' })[0]).toHaveAttribute('href', '/');
   });
 
   it('starts sign-in from the top button', async () => {

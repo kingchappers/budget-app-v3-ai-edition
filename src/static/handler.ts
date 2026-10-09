@@ -25,6 +25,7 @@ const BINARY_TYPES: Record<string, string> = {
   '.jpg': 'image/jpeg',
   '.jpeg': 'image/jpeg',
   '.gif': 'image/gif',
+  '.webp': 'image/webp',
   '.ico': 'image/x-icon',
   '.woff': 'font/woff',
   '.woff2': 'font/woff2',
@@ -95,7 +96,7 @@ const NO_CACHE = 'no-cache';
 
 function cacheControlFor(urlPath: string): string {
   if (urlPath.startsWith('/assets/')) return IMMUTABLE_CACHE;
-  if (urlPath.startsWith('/icons/')) return ICON_CACHE;
+  if (urlPath.startsWith('/icons/') || urlPath.startsWith('/about/')) return ICON_CACHE;
   return NO_CACHE;
 }
 

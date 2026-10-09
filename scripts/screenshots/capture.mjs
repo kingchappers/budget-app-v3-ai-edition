@@ -104,8 +104,9 @@ async function main() {
   const port = await freePort();
   const { child, url } = await startDevServer(port);
   const failures = [];
-  const browser = await chromium.launch();
+  let browser;
   try {
+    browser = await chromium.launch();
     const store = createStore();
     // The first load makes Vite re-optimise its dependencies, which reloads the page. Do it once up front.
     const warm = await browser.newPage();
@@ -122,7 +123,7 @@ async function main() {
       }
     }
   } finally {
-    await browser.close();
+    await browser?.close();
     child.kill();
   }
 
