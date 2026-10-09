@@ -1,24 +1,14 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-
-const { mockSend } = vi.hoisted(() => ({ mockSend: vi.fn() }));
-
-vi.mock('../db', () => ({
-  docClient: { send: mockSend },
-  TABLE: 'test-table',
-  pk: (userId: string) => `USER#${userId}`,
-  targetSk: (categoryId: string) => `TARGET#${categoryId}`,
-}));
-
-vi.mock('@aws-sdk/lib-dynamodb', () => ({
-  QueryCommand: vi.fn(function(i: unknown) { return i; }),
-  PutCommand: vi.fn(function(i: unknown) { return i; }),
-  GetCommand: vi.fn(function(i: unknown) { return i; }),
-  TransactWriteCommand: vi.fn(function(i: unknown) { return i; }),
-}));
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 import { getTargets, upsertTarget, deleteTarget } from '../targets';
 import { MAX_AMOUNT_PENCE } from '../constants';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
+import type { SqliteStore } from '../../store/sqlite';
+import { resetTestStore, seedUser, useTestStore } from '../../store/testing';
+
+let store: SqliteStore;
+beforeEach(() => { store = useTestStore(); });
+afterEach(() => { resetTestStore(); });
 
 function makeEvent(body?: object): APIGatewayProxyEventV2 {
   return {
@@ -29,10 +19,8 @@ function makeEvent(body?: object): APIGatewayProxyEventV2 {
 }
 
 describe('getTargets', () => {
-  beforeEach(() => { mockSend.mockReset(); });
-
   it('returns all targets for the user', async () => {
-    mockSend.mockResolvedValueOnce({ Items: [{ categoryId: 'cat-food', targetAmount: 30000, period: 'MONTHLY' }] });
+    await seedUser(store, 'user-1', [{ SK: 'TARGET#cat-food', categoryId: 'cat-food', targetAmount: 30000, period: 'MONTHLY' }]);
     const res = await getTargets(makeEvent(), 'user-1', {});
     expect(res.statusCode).toBe(200);
     expect(JSON.parse(res.body).targets).toHaveLength(1);
@@ -40,10 +28,7 @@ describe('getTargets', () => {
 });
 
 describe('upsertTarget', () => {
-  beforeEach(() => { mockSend.mockReset(); });
-
   it('creates or updates a target and returns 200', async () => {
-    mockSend.mockResolvedValueOnce({});
     const res = await upsertTarget(
       makeEvent({ targetAmount: 30000, period: 'MONTHLY' }),
       'user-1',
@@ -53,10 +38,10 @@ describe('upsertTarget', () => {
     const body = JSON.parse(res.body);
     expect(body.target.targetAmount).toBe(30000);
     expect(body.target.period).toBe('MONTHLY');
+    expect(await store.get({ PK: 'USER#user-1', SK: 'TARGET#cat-food' })).toMatchObject({ targetAmount: 30000, period: 'MONTHLY' });
   });
 
   it('accepts a targetAmount at the maximum cap', async () => {
-    mockSend.mockResolvedValueOnce({});
     const res = await upsertTarget(
       makeEvent({ targetAmount: MAX_AMOUNT_PENCE, period: 'MONTHLY' }),
       'user-1',
@@ -66,23 +51,25 @@ describe('upsertTarget', () => {
   });
 
   it('returns 400 for a targetAmount over the maximum cap', async () => {
+    const spy = vi.spyOn(store, 'put');
     const res = await upsertTarget(
       makeEvent({ targetAmount: MAX_AMOUNT_PENCE + 1, period: 'MONTHLY' }),
       'user-1',
       { categoryId: 'cat-food' },
     );
     expect(res.statusCode).toBe(400);
-    expect(mockSend).not.toHaveBeenCalled();
+    expect(spy).not.toHaveBeenCalled();
   });
 
   it('returns 400 for non-integer targetAmount', async () => {
+    const spy = vi.spyOn(store, 'put');
     const res = await upsertTarget(
       makeEvent({ targetAmount: 300.50, period: 'MONTHLY' }),
       'user-1',
       { categoryId: 'cat-food' },
     );
     expect(res.statusCode).toBe(400);
-    expect(mockSend).not.toHaveBeenCalled();
+    expect(spy).not.toHaveBeenCalled();
   });
 
   it('returns 400 for invalid period', async () => {
@@ -105,16 +92,12 @@ describe('upsertTarget', () => {
 });
 
 describe('deleteTarget', () => {
-  beforeEach(() => { mockSend.mockReset(); });
-
   it('moves the target to the trash and returns 204', async () => {
-    mockSend.mockResolvedValueOnce({ Item: { PK: 'USER#user-1', SK: 'TARGET#cat-food', categoryId: 'cat-food', targetAmount: 30000 } });
-    mockSend.mockResolvedValueOnce({});
+    await seedUser(store, 'user-1', [{ SK: 'TARGET#cat-food', categoryId: 'cat-food', targetAmount: 30000 }]);
     const res = await deleteTarget(makeEvent(), 'user-1', { categoryId: 'cat-food' });
     expect(res.statusCode).toBe(204);
-    const { TransactItems } = mockSend.mock.calls[1][0];
-    expect(TransactItems[0].Delete.Key).toEqual({ PK: 'USER#user-1', SK: 'TARGET#cat-food' });
-    expect(TransactItems[1].Put.Item).toMatchObject({ SK: 'TRASH#TARGET#cat-food', entityType: 'TARGET' });
+    expect(await store.get({ PK: 'USER#user-1', SK: 'TARGET#cat-food' })).toBeUndefined();
+    expect(await store.get({ PK: 'USER#user-1', SK: 'TRASH#TARGET#cat-food' })).toMatchObject({ entityType: 'TARGET' });
   });
 
   it('returns 400 when categoryId is missing', async () => {
