@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { useAuth0 } from '@auth0/auth0-react';
+import { useAuth } from '~/lib/auth';
 import { captureAddParam, consumeLaunchIntent, isStandalone, safeStorage } from '~/lib/launchIntent';
 
 export interface LaunchIntentProps {
@@ -7,7 +7,7 @@ export interface LaunchIntentProps {
 }
 
 export function LaunchIntent({ onOpenAdd }: LaunchIntentProps): null {
-  const { isAuthenticated, isLoading } = useAuth0();
+  const { isAuthenticated, isLoading } = useAuth();
   const evaluated = useRef(false);
 
   useEffect(() => {

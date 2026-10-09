@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { useAuth0 } from '@auth0/auth0-react';
+import { useAuth } from '~/lib/auth';
 import { notifications } from '@mantine/notifications';
 import { ToastAction } from '~/components/layout/ToastAction';
 import { ApiError } from '~/lib/apiError';
@@ -39,7 +39,7 @@ export function useSaveWithUndo(): (input: TransactionInput, options?: SaveOptio
   const create = useCreateTransaction();
   const remove = useDeleteTransaction();
   const qc = useQueryClient();
-  const userSub = useAuth0().user?.sub ?? '';
+  const userSub = useAuth().user?.sub ?? '';
   const [{ undoDuration, leftAfterSave }] = usePreferences();
 
   // What is left in the category's budget, if the person asked for that line on the Saved message.

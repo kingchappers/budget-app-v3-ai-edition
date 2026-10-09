@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useAuth0 } from '@auth0/auth0-react';
+import { useAuth } from '~/lib/auth';
 import { Alert, Button, Card, Group, Loader, Stack, Text, TextInput, Title, UnstyledButton } from '@mantine/core';
 import { DateInput } from '@mantine/dates';
 import { IconCheck } from '@tabler/icons-react';
@@ -177,7 +177,7 @@ function LumpSumCard({ categories, today, newestEntryDate, onSaved, onCovered }:
 
 function CatchUpContent() {
   const today = todayIso();
-  const userSub = useAuth0().user?.sub ?? '';
+  const userSub = useAuth().user?.sub ?? '';
   const categories = useCategories();
   const nothing = useNothingToLog(userSub);
   const current = currentYearMonth();

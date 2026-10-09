@@ -1,4 +1,4 @@
-import { useAuth0 } from "@auth0/auth0-react";
+import { useAuth } from '~/lib/auth';
 import { Box, Avatar, Menu, UnstyledButton } from '@mantine/core';
 import { IconLogout, IconUser } from '@tabler/icons-react';
 
@@ -11,7 +11,7 @@ function initialsFor(name?: string, email?: string): string {
 }
 
 export const Profile = () => {
-  const { user, isAuthenticated, isLoading, logout } = useAuth0();
+  const { user, isAuthenticated, isLoading, logout } = useAuth();
 
   if (isLoading) {
     return <div className="loading-text">Loading profile...</div>;
@@ -70,7 +70,7 @@ export const Profile = () => {
 
           <Menu.Dropdown>
             <Menu.Label hiddenFrom="sm">{user.email}</Menu.Label>
-            <Menu.Item onClick={() => logout({ logoutParams: { returnTo: window.location.origin } })} component="button" leftSection={<IconLogout size={14} />}>
+            <Menu.Item onClick={() => logout()} component="button" leftSection={<IconLogout size={14} />}>
               Logout
             </Menu.Item>
           </Menu.Dropdown>

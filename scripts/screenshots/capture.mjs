@@ -77,6 +77,11 @@ async function capture(browser, url, store, now, failures, shot, sizeName, schem
   await context.route('**/*', async route => {
     const request = route.request();
     const { pathname, searchParams } = new URL(request.url());
+    if (pathname === '/config.json') {
+      // The dev server has no build step to write this file, and a 404 would log a console error.
+      const config = { auth: 'auth0', domain: DUMMY_ENV.VITE_AUTH0_DOMAIN, clientId: DUMMY_ENV.VITE_AUTH0_CLIENT_ID, audience: DUMMY_ENV.VITE_AUTH0_AUDIENCE };
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(config) });
+    }
     if (!pathname.startsWith('/api/')) return route.fallback();
     const body = request.postData() ? JSON.parse(request.postData()) : null;
     const { status, json } = store.handle(request.method(), pathname, searchParams, body);

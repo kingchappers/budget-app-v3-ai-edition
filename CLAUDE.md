@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Budget tracking app: React SPA + Auth0 + AWS Lambda. Two Lambda functions serve the app — one for static files (public), one for protected API endpoints (JWT-validated). Infrastructure managed with OpenTofu.
+Budget tracking app: React SPA + Auth0 + AWS Lambda. Two Lambda functions serve the app — one for static files (public), one for protected API endpoints (JWT-validated in Auth0 mode, session-validated in local mode). Infrastructure managed with OpenTofu.
 
 ## Commands
 
@@ -36,7 +36,7 @@ Tests use **Vitest** (`src/api/__tests__/`), covering the API router and handler
 
 1. **Static File Server** (`build/client/index.js`) — serves React SPA assets, falls back to `index.html` for client-side routing. No auth. Compiled from `src/static/handler.ts` by `scripts/build-static-handler.cjs`; serves binary files as base64, sets `Cache-Control` per file type, and returns 404 for a missing file that has an extension. It also sends a Content-Security-Policy-Report-Only header built from the page's inline scripts and `build/client/csp.json` (written by the build script from `VITE_AUTH0_DOMAIN`), and returns 404 for its own `index.js`.
 
-2. **Protected API** (`build/api/index.js`) — compiled from `api-handler.ts`. Validates JWT via Auth0 JWKS. Routes are registered in `api-handler.ts` (categories, transactions, targets, pots, recurring, accounts, trash, push subscriptions). Dependencies bundled into `build/api/node_modules/` by `scripts/build-api-handler.cjs`.
+2. **Protected API** (`build/api/index.js`) — compiled from `api-handler.ts`. Validates JWT via Auth0 JWKS. Auth is chosen by `AUTH_MODE` (`auth0` default, `local` for the built-in login), and the frontend reads `/config.json` at runtime. Routes are registered in `api-handler.ts` (categories, transactions, targets, pots, recurring, accounts, trash, push subscriptions). Dependencies bundled into `build/api/node_modules/` by `scripts/build-api-handler.cjs`.
 
 ### Build Pipeline
 
@@ -51,7 +51,7 @@ Tests use **Vitest** (`src/api/__tests__/`), covering the API router and handler
 - **Mantine 8** UI library + **Tailwind CSS** for styling
 - File-based routing in `app/routes/` (e.g., `_index.tsx` → `/`, `test.tsx` → `/test`)
 - Path alias: `~/*` → `./app/*`
-- Auth state managed globally via `Auth0Provider` in `DefaultLayout.tsx`
+- Auth state managed globally: `DefaultLayout.tsx` wraps the app in `AuthProvider` (`app/components/authentication/AuthProvider.tsx`), which reads `/config.json` at runtime and renders `Auth0Provider` or the built-in login provider
 - `useProtectedApi` hook handles Bearer token injection for API calls
 
 ### Infrastructure (`infra/`)
@@ -64,7 +64,7 @@ Tests use **Vitest** (`src/api/__tests__/`), covering the API router and handler
 ## Security
 
 All code changes must follow security controls in `SECURITY.md`. Key requirements:
-- Validate JWT on every API request (AUTH-01)
+- Validate the credential on every API request: JWT in Auth0 mode, session lookup in local mode (AUTH-01)
 - Never commit secrets to git (SEC-01)
 - Validate all input at API boundaries (IO-01)
 - Least privilege cloud permissions (INFRA-01)
@@ -77,9 +77,11 @@ Reference control IDs in commits (e.g., "addresses AUTH-02", "fixes IO-03").
 | File | Role |
 |------|------|
 | `SECURITY.md` | Security controls for all code/infrastructure changes |
-| `api-handler.ts` | Protected API Lambda source (JWT validation, routing) |
+| `api-handler.ts` | Protected API Lambda source (auth, routing) |
+| `src/auth/` | Auth providers: Auth0 JWT and the built-in login |
+| `app/lib/auth.tsx` | `useAuth`, the app's auth hook |
 | `app/hooks/useProtectedApi.ts` | React hook for authenticated fetch |
-| `app/components/layout/DefaultLayout.tsx` | App shell with Auth0Provider |
+| `app/components/layout/DefaultLayout.tsx` | App shell; wraps the app in `AuthProvider` |
 | `src/static/handler.ts` | Static file server Lambda source (tested) |
 | `scripts/build-static-handler.cjs` | Compiles the static handler to `build/client/index.js` |
 | `scripts/build-api-handler.cjs` | Compiles API handler + bundles deps |

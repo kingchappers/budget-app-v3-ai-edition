@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
-import { useAuth0 } from '@auth0/auth0-react';
+import { useAuth } from '~/lib/auth';
 import { flushQueue } from '~/lib/flushQueue';
 import { discardQueuedEntry, OFFLINE_QUEUE_KEY, type PendingMap } from '~/lib/pendingEntries';
 import { useApi } from '~/lib/queries';
@@ -44,7 +44,7 @@ function runFlush(api: Api, qc: QueryClient, userSub: string): Promise<void> {
 export function useOfflineQueue(): OfflineQueueState {
   const api = useApi();
   const qc = useQueryClient();
-  const userSub = useAuth0().user?.sub ?? '';
+  const userSub = useAuth().user?.sub ?? '';
   const { data: pendingMap = {} } = useQuery<PendingMap>({
     queryKey: OFFLINE_QUEUE_KEY,
     queryFn: () => ({}),

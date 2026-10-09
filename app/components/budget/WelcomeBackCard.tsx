@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useAuth0 } from '@auth0/auth0-react';
+import { useAuth } from '~/lib/auth';
 import { Link } from 'react-router';
 import { Button, Card, Group, Text } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
@@ -16,7 +16,7 @@ import { undoAutoClose } from '~/lib/undoDuration';
 // Three ways back, from least effort: add one thing now, start again from today, or fill in the gap.
 export function WelcomeBackCard() {
   const [preferences, setPreferences] = usePreferences();
-  const userSub = useAuth0().user?.sub ?? '';
+  const userSub = useAuth().user?.sub ?? '';
   const nothing = useNothingToLog(userSub);
   const recent = useRecentTransactions(true);
   const [adding, setAdding] = useState(false);

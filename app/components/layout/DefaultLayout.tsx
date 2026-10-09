@@ -1,8 +1,9 @@
 import { useCallback, useState } from 'react';
 import { ActionIcon, AppShell, Button, Flex, Text, NavLink, Group, Loader, Paper, Tooltip, UnstyledButton } from '@mantine/core';
 import { useHotkeys } from '@mantine/hooks';
-import { Auth0Provider, useAuth0 } from '@auth0/auth0-react';
+import { useAuth } from '~/lib/auth';
 import Authentication from "../authentication/Authentication";
+import { AuthProvider } from "../authentication/AuthProvider";
 import { ColorSchemeToggle } from './ColorSchemeToggle';
 import { QuickEntryTips } from './QuickEntryTips';
 import { IconChartBar, IconHome, IconList, IconPlus, IconSettings, IconTarget } from '@tabler/icons-react';
@@ -126,7 +127,7 @@ function SidebarNav() {
 type SessionState = 'loading' | 'signedIn' | 'signedOut' | 'sessionEnded';
 
 function useSessionState(): SessionState {
-  const { isAuthenticated, isLoading, error } = useAuth0();
+  const { isAuthenticated, isLoading, error } = useAuth();
   const tokenRenewalFailed = useSessionEnded();
   const [hadSession, setHadSession] = useState(false);
   if (isAuthenticated && !hadSession) setHadSession(true);
@@ -229,22 +230,8 @@ function LayoutShell({ children }: { children: React.ReactNode }) {
 
 export function DefaultLayout({ children }: { children: React.ReactNode }) {
   return (
-    <Auth0Provider
-      domain={import.meta.env.VITE_AUTH0_DOMAIN}
-      clientId={import.meta.env.VITE_AUTH0_CLIENT_ID}
-      // The default in-memory cache forces a silent-auth iframe on every reload,
-      // which browsers block as a third-party cookie. Persist instead and renew
-      // with a rotating refresh token.
-      cacheLocation="localstorage"
-      useRefreshTokens
-      useRefreshTokensFallback={false}
-      authorizationParams={{
-        redirect_uri: window.location.origin,
-        audience: import.meta.env.VITE_AUTH0_AUDIENCE,
-        scope: 'openid profile email offline_access',
-      }}
-    >
+    <AuthProvider>
       <LayoutShell>{children}</LayoutShell>
-    </Auth0Provider>
+    </AuthProvider>
   );
 }

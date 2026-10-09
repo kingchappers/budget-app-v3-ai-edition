@@ -1,6 +1,6 @@
 import { Anchor, Button, Stack, Text, Title } from '@mantine/core';
 import { IconLock } from '@tabler/icons-react';
-import { useAuth0 } from '@auth0/auth0-react';
+import { useAuth } from '~/lib/auth';
 import { Link } from 'react-router';
 import { SESSION_LIFETIME_TEXT } from '~/lib/sessionLifetime';
 
@@ -9,11 +9,11 @@ export interface SignedOutPanelProps {
 }
 
 export function SignedOutPanel({ sessionEnded }: SignedOutPanelProps) {
-  const { loginWithRedirect } = useAuth0();
+  const { login } = useAuth();
 
   async function signIn(): Promise<void> {
     try {
-      await loginWithRedirect();
+      await login();
     } catch (error) {
       console.error('SignedOutPanel: could not start sign-in', error);
     }

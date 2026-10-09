@@ -1,5 +1,5 @@
 import { Button, Card, Stack, Text, Title } from '@mantine/core';
-import { useAuth0 } from '@auth0/auth0-react';
+import { useAuth } from '~/lib/auth';
 import { Link } from 'react-router';
 import { DefaultLayout } from '~/components/layout/DefaultLayout';
 import { SHOTS, SIZES, shotUrl, type Shot } from '~/lib/aboutShots';
@@ -29,11 +29,11 @@ const FAQ = [
 
 // The page is also the help page, so someone already signed in is taken back to the app, not sent to sign in again.
 function SignInButton() {
-  const { isAuthenticated, loginWithRedirect } = useAuth0();
+  const { isAuthenticated, login } = useAuth();
 
   async function signIn(): Promise<void> {
     try {
-      await loginWithRedirect();
+      await login();
     } catch (error) {
       console.error('About: could not start sign-in', error);
     }
@@ -65,7 +65,7 @@ function ShotImage({ shot, first }: { shot: Shot; first: boolean }) {
 }
 
 function AboutContent() {
-  const { isAuthenticated } = useAuth0();
+  const { isAuthenticated } = useAuth();
   return (
     <Stack maw={820} mx="auto" gap="xl">
       <Stack gap="sm">

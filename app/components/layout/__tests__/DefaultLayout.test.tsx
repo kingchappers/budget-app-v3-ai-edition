@@ -23,6 +23,7 @@ vi.mock('../../transactions/TransactionSheet', () => ({
   TransactionSheet: ({ opened }: { opened: boolean }) => (opened ? <div>Add sheet open</div> : null),
 }));
 vi.mock('../OfflineQueueBanner', () => ({ OfflineQueueBanner: () => null }));
+vi.mock('../../authentication/AuthProvider', () => ({ AuthProvider: ({ children }: { children: React.ReactNode }) => <>{children}</> }));
 
 import { DefaultLayout } from '../DefaultLayout';
 

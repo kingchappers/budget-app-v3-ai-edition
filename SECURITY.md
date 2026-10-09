@@ -16,19 +16,28 @@ Security requirements for this React + Auth0 + Lambda project. Reference control
 
 | ID | Framework Ref | Control |
 |----|---------------|---------|
-| AUTH-01 | WEB-A01, WEB-A07 | Validate JWT on every API request: signature, `aud`, `iss`, `exp`, `sub` |
-| AUTH-02 | WEB-A07 | Never implement custom auth — delegate to identity provider (Auth0, Okta, etc.) |
-| AUTH-03 | FE-02 | Use identity provider's in-memory token storage, not `localStorage` |
+| AUTH-01 | WEB-A01, WEB-A07 | Validate the credential on every API request: a JWT's signature, `aud`, `iss`, `exp` and `sub` (Auth0 mode), or a server-side session lookup that checks expiry (local mode) |
+| AUTH-02 | WEB-A07 | Never implement custom auth — delegate to an identity provider (Auth0, Okta, etc.). **Exception:** the built-in single-account login (`AUTH_MODE=local`, self-hosted only), which must satisfy AUTH-07 to AUTH-10 |
+| AUTH-03 | FE-02 | Auth0 mode persists tokens in `localStorage` with refresh tokens (rotation is configured on the Auth0 tenant; a documented trade-off: the default in-memory cache needs a silent-auth iframe that browsers block as a third-party cookie). Local mode keeps no token in JavaScript-readable storage: session cookies must be `HttpOnly`, `SameSite=Strict` and `Secure` (unless `COOKIE_SECURE=false` on a trusted LAN) |
 | AUTH-04 | WEB-A01 | Server-side access control required — hiding UI elements is not access control |
-| AUTH-05 | WEB-A01 | Deny by default — explicit authorization required for all routes except public static files |
-| AUTH-06 | WEB-A02, WEB-A07, WEB-A09 | Never log tokens, session IDs, or credentials |
+| AUTH-05 | WEB-A01 | Deny by default — explicit authorization required for all routes except public static files and, in local mode only, `/api/auth/status`, `/api/auth/me`, `/api/auth/setup`, `/api/auth/login` and `/api/auth/logout` (`me` answers 401 without a session; `setup`, `login` and `logout` require a same-host `Origin`, and `setup` also requires the setup code) |
+| AUTH-06 | WEB-A02, WEB-A07, WEB-A09 | Never log tokens, session IDs, or credentials. **Exception:** the one-time first-run setup code (AUTH-09), logged once, when the server first handles a request (the first page load, if the container has not been called before), and only while no account exists |
+| AUTH-07 | WEB-A07 | Passwords are hashed with a memory-hard KDF (scrypt), salted per hash, with parameters stored alongside; the 12–128 character policy is enforced server-side |
+| AUTH-08 | WEB-A07 | Login attempts are throttled with exponential backoff; a wrong password and an unknown account are indistinguishable (body and timing) |
+| AUTH-09 | WEB-A01 | The setup route is protected by a one-time code printed to the server log, and closes permanently once an account exists; the setup code is the only credential permitted in the log |
+| AUTH-10 | WEB-A01, WEB-A07 | Session IDs are random, stored only as hashes, revocable (logout, password reset) and rejected once expired; state-changing requests must carry a same-host `Origin` |
 
 **Framework mapping:** WEB-A01 (Broken Access Control), WEB-A07 (Auth Failures), FE-02 (Auth State)
 
 **Key points:**
-- Maintain separation between public function (static files) and protected function (API with JWT validation)
+- Maintain separation between public function (static files) and protected function (API with JWT or session validation)
 - Rate limit auth endpoints (WEB-A04)
 - Handle token expiration gracefully in UI
+
+**Built-in login (`AUTH_MODE=local`) notes:**
+- The login throttle is global, not per client: anyone who can reach the instance can lock the owner out for up to 15 minutes by failing repeatedly. `store-cli reset-password` clears the throttle and revokes every session.
+- Login attempts are serialised in-process to keep the throttle's read-modify-write safe, so the built-in login assumes a single-container deployment.
+- The account, throttle and sessions live under `AUTH#` partitions. Export/import only handles a user's own `USER#` partition, so credentials and sessions are never exported.
 
 ---
 
@@ -195,7 +204,7 @@ Run before creating a PR:
 - [ ] Package audit passes (no critical/high vulnerabilities) — **DEP-01**
 - [ ] No secrets in code, logs, or environment variable references — **SEC-01, SEC-06**
 - [ ] User input validated at API boundaries — **IO-01**
-- [ ] JWT validation on all protected endpoints — **AUTH-01**
+- [ ] Credential validation (JWT or session) on all protected endpoints — **AUTH-01**
 - [ ] Server-side access control enforced — **AUTH-04**
 - [ ] Error messages generic to clients, detailed server-side — **API-02**
 - [ ] `.gitignore` updated if new sensitive files added — **SEC-01**

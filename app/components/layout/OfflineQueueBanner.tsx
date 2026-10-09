@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Button, Group, Paper, Text } from '@mantine/core';
-import { useAuth0 } from '@auth0/auth0-react';
+import { useAuth } from '~/lib/auth';
 import { useQueryClient } from '@tanstack/react-query';
 import { useOfflineQueue } from '~/hooks/useOfflineQueue';
 import { clearPendingEntriesForLogout, hydrateOnce } from '~/lib/pendingEntries';
@@ -8,7 +8,7 @@ import { clearPendingEntriesForLogout, hydrateOnce } from '~/lib/pendingEntries'
 export function OfflineQueueBanner() {
   const { pendingMap, flushNow } = useOfflineQueue();
   const qc = useQueryClient();
-  const { isAuthenticated, user } = useAuth0();
+  const { isAuthenticated, user } = useAuth();
   const userSub = user?.sub;
   const wasAuthenticated = useRef(isAuthenticated);
 

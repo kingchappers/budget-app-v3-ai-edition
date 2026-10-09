@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useAuth0 } from '@auth0/auth0-react';
+import { useAuth } from '~/lib/auth';
 import { Button, Group, SegmentedControl, Stack, Text, TextInput } from '@mantine/core';
 import { DateInput } from '@mantine/dates';
 import { TermHelp } from '~/components/layout/TermHelp';
@@ -108,7 +108,7 @@ export function TransactionSheet({ opened, onClose, yearMonth, editing, preset, 
   preferencesRef.current = preferences;
   const update = useUpdateTransaction(yearMonth);
   const saveWithUndo = useSaveWithUndo();
-  const draftOwner = useAuth0().user?.sub ?? '';
+  const draftOwner = useAuth().user?.sub ?? '';
   const draftOwnerRef = useRef(draftOwner);
   draftOwnerRef.current = draftOwner;
   const isAddFlow = !editing && !template && !preset;

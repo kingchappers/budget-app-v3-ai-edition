@@ -58,6 +58,7 @@ export interface ApiResponse {
   statusCode: number;
   headers: Record<string, string>;
   body: string;
+  cookies?: string[];
 }
 
 export interface PotAutoEntry { from: string; amount: number }
