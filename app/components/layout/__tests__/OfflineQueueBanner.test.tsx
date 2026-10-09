@@ -67,6 +67,9 @@ describe('OfflineQueueBanner', () => {
     renderBanner();
 
     expect(await screen.findByText('1 waiting to sync')).toBeInTheDocument();
+    // The banner can appear before the flush has called the API; until it has,
+    // resolveCreate is still the no-op placeholder and resolving does nothing.
+    await vi.waitFor(() => expect(mockCreateTransaction).toHaveBeenCalled());
 
     resolveCreate({ transactionId: 'x', yearMonth: '2025-01', createdAt: '', amount: 500, type: 'EXPENSE', categoryId: 'cat-1', description: '', date: '2025-01-05' });
     await vi.waitFor(() => expect(screen.queryByText(/waiting to sync/)).not.toBeInTheDocument(), { timeout: 3000 });
