@@ -1,32 +1,27 @@
-import { QueryCommand, PutCommand, UpdateCommand, DeleteCommand } from '@aws-sdk/lib-dynamodb';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
-import { docClient, TABLE, pk, catSk } from './db';
+import { ConditionFailedError, getStore } from '../store';
+import { pk, catSk } from './db';
 import { DEFAULT_CATEGORIES, DEFAULT_CATEGORY_IDS } from './defaults';
 import { SECURITY_HEADERS, VALID_CATEGORY_TYPES, VALID_CATEGORY_GROUPS, POT_GROUPS } from './constants';
 import type { Category, CategoryGroup, CategoryType, ApiResponse } from './types';
 import { ok, err } from './http';
-
-function isConditionalFailure(error: unknown): boolean {
-  return error instanceof Error && error.name === 'ConditionalCheckFailedException';
-}
 
 export async function getCategories(
   _event: APIGatewayProxyEventV2,
   userId: string,
   _params: Record<string, string>,
 ): Promise<ApiResponse> {
-  const [customResult, potResult] = await Promise.all(['CAT#', 'POT#'].map(prefix => docClient.send(new QueryCommand({
-    TableName: TABLE,
-    KeyConditionExpression: 'PK = :pk AND begins_with(SK, :prefix)',
-    ExpressionAttributeValues: { ':pk': pk(userId), ':prefix': prefix },
-  }))));
+  const store = getStore();
+  const [customItems, potItems] = await Promise.all(
+    ['CAT#', 'POT#'].map(prefix => store.query(pk(userId), { skPrefix: prefix })),
+  );
 
   const archivedIds = new Set(
-    (potResult.Items || [])
+    potItems
       .filter(item => typeof item.archivedAt === 'string')
       .map(item => String(item.categoryId)),
   );
-  const custom = (customResult.Items || []).map(toCategory);
+  const custom = customItems.map(toCategory);
   const categories = [...DEFAULT_CATEGORIES, ...custom].map(category => (
     archivedIds.has(category.categoryId) ? { ...category, archived: true } : category
   ));
@@ -107,10 +102,7 @@ export async function createCategory(
   };
   if (resolvedGroup) category.group = resolvedGroup;
 
-  await docClient.send(new PutCommand({
-    TableName: TABLE,
-    Item: { PK: pk(userId), SK: catSk(categoryId), ...category },
-  }));
+  await getStore().put({ PK: pk(userId), SK: catSk(categoryId), ...category });
 
   return { statusCode: 201, headers: SECURITY_HEADERS, body: JSON.stringify({ category }) };
 }
@@ -129,10 +121,7 @@ export async function deleteCategory(
     return err(403, 'Cannot delete a default category');
   }
 
-  await docClient.send(new DeleteCommand({
-    TableName: TABLE,
-    Key: { PK: pk(userId), SK: catSk(categoryId) },
-  }));
+  await getStore().delete({ PK: pk(userId), SK: catSk(categoryId) });
 
   return { statusCode: 204, headers: SECURITY_HEADERS, body: '' };
 }
@@ -164,18 +153,14 @@ export async function updateCategory(
   }
 
   try {
-    const result = await docClient.send(new UpdateCommand({
-      TableName: TABLE,
-      Key: { PK: pk(userId), SK: catSk(categoryId) },
-      UpdateExpression: 'SET #name = :name',
-      ConditionExpression: 'attribute_exists(PK)',
-      ExpressionAttributeNames: { '#name': 'name' },
-      ExpressionAttributeValues: { ':name': validName.value },
-      ReturnValues: 'ALL_NEW',
-    }));
-    return ok({ category: toCategory(result.Attributes ?? {}) });
+    const item = await getStore().patch(
+      { PK: pk(userId), SK: catSk(categoryId) },
+      { name: validName.value },
+      { mustExist: true },
+    );
+    return ok({ category: toCategory(item) });
   } catch (error) {
-    if (isConditionalFailure(error)) return err(404, 'Category not found');
+    if (error instanceof ConditionFailedError) return err(404, 'Category not found');
     throw error;
   }
 }

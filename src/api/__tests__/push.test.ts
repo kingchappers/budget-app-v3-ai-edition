@@ -1,28 +1,15 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-
-const { mockSend } = vi.hoisted(() => ({ mockSend: vi.fn() }));
-
-vi.mock('../db', () => ({
-  docClient: { send: mockSend },
-  TABLE: 'test-table',
-  pk: (userId: string) => `USER#${userId}`,
-  PUSH_INDEX_PK: 'PUSHIDX',
-  pushSubscriptionSk: (hash: string) => `PUSHSUB#${hash}`,
-  pushIndexSk: (userId: string) => `USER#${userId}`,
-}));
-
-vi.mock('@aws-sdk/lib-dynamodb', () => ({
-  QueryCommand: vi.fn(function (input: unknown) { return { type: 'Query', ...(input as object) }; }),
-  PutCommand: vi.fn(function (input: unknown) { return { type: 'Put', ...(input as object) }; }),
-  UpdateCommand: vi.fn(function (input: unknown) { return { type: 'Update', ...(input as object) }; }),
-  DeleteCommand: vi.fn(function (input: unknown) { return { type: 'Delete', ...(input as object) }; }),
-}));
-
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { SqliteStore } from '../../store/sqlite';
+import { resetTestStore, seedUser, useTestStore } from '../../store/testing';
 import {
   MAX_ENDPOINT_LENGTH, MAX_PUSH_SUBSCRIPTIONS, createPushSubscription, deletePushSubscription, endpointHash,
   isAllowedEndpoint, isValidTimeZone, validatePushSubscription,
 } from '../push';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
+
+let store: SqliteStore;
+beforeEach(() => { store = useTestStore(); });
+afterEach(() => { resetTestStore(); });
 
 function makeEvent(body?: unknown, rawBody?: string): APIGatewayProxyEventV2 {
   return {
@@ -41,9 +28,6 @@ function valid(over: Record<string, unknown> = {}): Record<string, unknown> {
   };
 }
 
-function sent(type: string): Record<string, unknown>[] {
-  return mockSend.mock.calls.map(call => call[0] as Record<string, unknown>).filter(command => command.type === type);
-}
 
 describe('isAllowedEndpoint', () => {
   it.each([
@@ -142,62 +126,80 @@ describe('endpointHash', () => {
 });
 
 describe('createPushSubscription', () => {
-  beforeEach(() => {
-    mockSend.mockReset();
-    mockSend.mockResolvedValue({ Items: [] });
-  });
+  const ownKey = { PK: 'USER#user-1', SK: `PUSHSUB#${endpointHash(ENDPOINT)}` };
 
   it('stores the subscription in the caller\'s own partition under a hashed key', async () => {
     const res = await createPushSubscription(makeEvent(valid()), 'user-1', {});
 
     expect(res.statusCode).toBe(200);
-    const [update] = sent('Update');
-    expect(update.Key).toEqual({ PK: 'USER#user-1', SK: `PUSHSUB#${endpointHash(ENDPOINT)}` });
-    expect(update.ExpressionAttributeValues).toMatchObject({ ':endpoint': ENDPOINT, ':hour': 8, ':quietStart': 22, ':timeZone': 'Europe/London' });
+    expect(await store.get(ownKey)).toMatchObject({ endpoint: ENDPOINT, hour: 8, quietStart: 22, timeZone: 'Europe/London' });
   });
 
   it('keeps the original creation time when a device is registered again', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-01T08:00:00.000Z'));
     await createPushSubscription(makeEvent(valid()), 'user-1', {});
-    expect(String(sent('Update')[0].UpdateExpression)).toContain('createdAt = if_not_exists(createdAt, :now)');
+    vi.setSystemTime(new Date('2026-10-05T08:00:00.000Z'));
+    await createPushSubscription(makeEvent(valid()), 'user-1', {});
+    vi.useRealTimers();
+
+    expect(await store.get(ownKey)).toMatchObject({ createdAt: '2026-10-01T08:00:00.000Z', updatedAt: '2026-10-05T08:00:00.000Z' });
   });
 
   it('adds the user to the scheduler\'s index in its own partition', async () => {
     await createPushSubscription(makeEvent(valid()), 'user-1', {});
-    expect(sent('Put')[0].Item).toMatchObject({ PK: 'PUSHIDX', SK: 'USER#user-1' });
+    expect(await store.get({ PK: 'PUSHIDX', SK: 'USER#user-1' })).toBeDefined();
   });
 
   it('counts only the caller\'s own devices', async () => {
-    await createPushSubscription(makeEvent(valid()), 'user-2', {});
-    const [query] = sent('Query');
-    expect(query.ExpressionAttributeValues).toEqual({ ':pk': 'USER#user-2', ':prefix': 'PUSHSUB#' });
+    await seedUser(store, 'user-1', Array.from({ length: MAX_PUSH_SUBSCRIPTIONS }, (_, index) => ({ SK: `PUSHSUB#other-${index}` })));
+
+    const res = await createPushSubscription(makeEvent(valid()), 'user-2', {});
+
+    expect(res.statusCode).toBe(200);
   });
 
   it(`refuses a sixth device (${MAX_PUSH_SUBSCRIPTIONS} is the most) and writes nothing`, async () => {
-    mockSend.mockResolvedValueOnce({ Items: Array.from({ length: MAX_PUSH_SUBSCRIPTIONS }, (_, index) => ({ SK: `PUSHSUB#other-${index}` })) });
+    await seedUser(store, 'user-1', Array.from({ length: MAX_PUSH_SUBSCRIPTIONS }, (_, index) => ({ SK: `PUSHSUB#other-${index}` })));
 
     const res = await createPushSubscription(makeEvent(valid()), 'user-1', {});
 
     expect(res.statusCode).toBe(409);
-    expect(sent('Update')).toHaveLength(0);
-    expect(sent('Put')).toHaveLength(0);
+    expect(await store.get(ownKey)).toBeUndefined();
+    expect(await store.get({ PK: 'PUSHIDX', SK: 'USER#user-1' })).toBeUndefined();
   });
 
   it('lets a device that is already one of the five change its settings', async () => {
-    const own = `PUSHSUB#${endpointHash(ENDPOINT)}`;
-    mockSend.mockResolvedValueOnce({
-      Items: [{ SK: own }, ...Array.from({ length: MAX_PUSH_SUBSCRIPTIONS - 1 }, (_, index) => ({ SK: `PUSHSUB#other-${index}` }))],
-    });
+    await seedUser(store, 'user-1', [
+      { SK: ownKey.SK },
+      ...Array.from({ length: MAX_PUSH_SUBSCRIPTIONS - 1 }, (_, index) => ({ SK: `PUSHSUB#other-${index}` })),
+    ]);
 
     const res = await createPushSubscription(makeEvent(valid()), 'user-1', {});
 
     expect(res.statusCode).toBe(200);
-    expect(sent('Update')).toHaveLength(1);
+    expect(await store.get(ownKey)).toMatchObject({ endpoint: ENDPOINT });
+  });
+
+  it('keeps the original createdAt when the same device subscribes again', async () => {
+    const body = { subscription: { endpoint: 'https://fcm.googleapis.com/fcm/send/abc', keys: { p256dh: 'AAA', auth: 'BBB' } }, settings: { hour: 8, quietStart: null, quietEnd: null, timeZone: 'Europe/London' } };
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-01T08:00:00.000Z'));
+    await createPushSubscription(makeEvent(body), 'user-1', {});
+    vi.setSystemTime(new Date('2026-10-05T08:00:00.000Z'));
+    await createPushSubscription(makeEvent({ ...body, settings: { ...body.settings, hour: 9 } }), 'user-1', {});
+    vi.useRealTimers();
+
+    const [stored] = await store.query('USER#user-1', { skPrefix: 'PUSHSUB#' });
+    expect(stored).toMatchObject({ hour: 9, createdAt: '2026-10-01T08:00:00.000Z', updatedAt: '2026-10-05T08:00:00.000Z', quietStart: null });
+    expect(await store.get({ PK: 'PUSHIDX', SK: 'USER#user-1' })).toBeDefined();
   });
 
   it('rejects bad input with 400 and writes nothing', async () => {
+    const spies = [vi.spyOn(store, 'put'), vi.spyOn(store, 'patch'), vi.spyOn(store, 'query')];
     const res = await createPushSubscription(makeEvent(valid({ settings: { hour: 99, quietStart: null, quietEnd: null, timeZone: 'Europe/London' } })), 'user-1', {});
     expect(res.statusCode).toBe(400);
-    expect(mockSend).not.toHaveBeenCalled();
+    spies.forEach(spy => expect(spy).not.toHaveBeenCalled());
   });
 
   it('rejects malformed JSON with 400', async () => {
@@ -213,29 +215,42 @@ describe('createPushSubscription', () => {
 });
 
 describe('deletePushSubscription', () => {
-  beforeEach(() => {
-    mockSend.mockReset();
-    mockSend.mockResolvedValue({ Items: [] });
-  });
+  const ownKey = { PK: 'USER#user-1', SK: `PUSHSUB#${endpointHash(ENDPOINT)}` };
 
   it('removes that device from the caller\'s partition', async () => {
+    await seedUser(store, 'user-1', [{ SK: ownKey.SK, endpoint: ENDPOINT }]);
+
     const res = await deletePushSubscription(makeEvent({ endpoint: ENDPOINT }), 'user-1', {});
 
     expect(res.statusCode).toBe(204);
-    expect(sent('Delete')[0].Key).toEqual({ PK: 'USER#user-1', SK: `PUSHSUB#${endpointHash(ENDPOINT)}` });
+    expect(await store.get(ownKey)).toBeUndefined();
   });
 
   it('takes the user out of the index when no device is left', async () => {
+    await seedUser(store, 'user-1', [{ SK: ownKey.SK, endpoint: ENDPOINT }]);
+    await store.put({ PK: 'PUSHIDX', SK: 'USER#user-1', updatedAt: 'x' });
+
     await deletePushSubscription(makeEvent({ endpoint: ENDPOINT }), 'user-1', {});
-    expect(sent('Delete').map(command => command.Key)).toContainEqual({ PK: 'PUSHIDX', SK: 'USER#user-1' });
+
+    expect(await store.get({ PK: 'PUSHIDX', SK: 'USER#user-1' })).toBeUndefined();
   });
 
   it('keeps the user in the index while another device remains', async () => {
-    mockSend.mockResolvedValueOnce({}).mockResolvedValueOnce({ Items: [{ SK: 'PUSHSUB#other' }] });
+    await seedUser(store, 'user-1', [{ SK: ownKey.SK, endpoint: ENDPOINT }, { SK: 'PUSHSUB#other' }]);
+    await store.put({ PK: 'PUSHIDX', SK: 'USER#user-1', updatedAt: 'x' });
 
     await deletePushSubscription(makeEvent({ endpoint: ENDPOINT }), 'user-1', {});
 
-    expect(sent('Delete')).toHaveLength(1);
+    expect(await store.get({ PK: 'PUSHIDX', SK: 'USER#user-1' })).toBeDefined();
+  });
+
+  it('drops the user from the scheduler index once their last device unsubscribes', async () => {
+    const endpoint = 'https://fcm.googleapis.com/fcm/send/abc';
+    await createPushSubscription(makeEvent({ subscription: { endpoint, keys: { p256dh: 'AAA', auth: 'BBB' } }, settings: { hour: 8, quietStart: null, quietEnd: null, timeZone: 'Europe/London' } }), 'user-1', {});
+    const res = await deletePushSubscription(makeEvent({ endpoint }), 'user-1', {});
+    expect(res.statusCode).toBe(204);
+    expect(await store.query('USER#user-1', { skPrefix: 'PUSHSUB#' })).toEqual([]);
+    expect(await store.get({ PK: 'PUSHIDX', SK: 'USER#user-1' })).toBeUndefined();
   });
 
   it.each([
@@ -243,8 +258,9 @@ describe('deletePushSubscription', () => {
     ['an endpoint that is not allowed', { endpoint: 'https://example.com/x' }],
     ['an unexpected field', { endpoint: ENDPOINT, userId: 'someone-else' }],
   ])('rejects %s with 400 and deletes nothing', async (_name, body) => {
+    const spies = [vi.spyOn(store, 'delete'), vi.spyOn(store, 'query')];
     const res = await deletePushSubscription(makeEvent(body), 'user-1', {});
     expect(res.statusCode).toBe(400);
-    expect(mockSend).not.toHaveBeenCalled();
+    spies.forEach(spy => expect(spy).not.toHaveBeenCalled());
   });
 });

@@ -42,6 +42,8 @@ vi.mock('../accounts', () => ({
 }));
 vi.mock('../trash', () => ({ getTrash: h.getTrash, restoreFromTrash: h.restoreFromTrash }));
 vi.mock('../push', () => ({ createPushSubscription: h.createPushSubscription, deletePushSubscription: h.deletePushSubscription }));
+const { mockInitStore } = vi.hoisted(() => ({ mockInitStore: vi.fn() }));
+vi.mock('../../store', () => ({ initStore: mockInitStore }));
 
 import { handler } from '../../../api-handler';
 import { SECURITY_HEADERS } from '../constants';
@@ -83,6 +85,7 @@ beforeEach(() => {
     fn.mockReset().mockResolvedValue({ statusCode: 200, headers: {}, body: JSON.stringify({ handled: name }) });
   }
   allowToken();
+  mockInitStore.mockReset().mockResolvedValue(undefined);
   logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
   errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 });
@@ -98,6 +101,7 @@ describe('authentication', () => {
     expect(JSON.parse(res.body)).toEqual({ error: 'Missing authorization token' });
     expect(res.headers).toEqual(SECURITY_HEADERS);
     expect(mockVerify).not.toHaveBeenCalled();
+    expect(mockInitStore).not.toHaveBeenCalled();
     expect(handlerCalls()).toEqual([]);
   });
 
@@ -105,6 +109,7 @@ describe('authentication', () => {
     const res = await invoke(makeEvent({ authorization: 'Bearer ' }));
     expect(res.statusCode).toBe(401);
     expect(mockVerify).not.toHaveBeenCalled();
+    expect(mockInitStore).not.toHaveBeenCalled();
     expect(handlerCalls()).toEqual([]);
   });
 
@@ -115,6 +120,7 @@ describe('authentication', () => {
     expect(JSON.parse(res.body)).toEqual({ error: 'Unauthorized' });
     expect(res.body).not.toContain('expired');
     expect(res.headers).toEqual(SECURITY_HEADERS);
+    expect(mockInitStore).not.toHaveBeenCalled();
     expect(handlerCalls()).toEqual([]);
   });
 
@@ -278,5 +284,21 @@ describe('a handler that fails', () => {
     expect(logged).toContain('boom detail');
     expect(logged).toContain('GET /templated');
     expect(logged).not.toContain(TOKEN);
+  });
+});
+
+describe('store start-up', () => {
+  it('starts the store once for an authenticated request', async () => {
+    await invoke(makeEvent());
+    expect(mockInitStore).toHaveBeenCalledTimes(1);
+  });
+
+  it('answers 500 without leaking detail when the store cannot start, and reaches no handler', async () => {
+    mockInitStore.mockRejectedValueOnce(new Error('DYNAMODB_TABLE is required when STORE=dynamodb'));
+    const res = await invoke(makeEvent());
+    expect(res.statusCode).toBe(500);
+    expect(JSON.parse(res.body)).toEqual({ error: 'Internal server error' });
+    expect(res.body).not.toContain('DYNAMODB_TABLE');
+    expect(handlerCalls()).toEqual([]);
   });
 });

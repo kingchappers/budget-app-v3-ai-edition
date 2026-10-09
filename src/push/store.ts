@@ -1,9 +1,9 @@
-import { DeleteCommand, QueryCommand } from '@aws-sdk/lib-dynamodb';
 import { shiftMonth } from '../../app/lib/months';
 import { LOOK_BACK_MONTHS } from '../../app/lib/recurring';
 import type { Category, Recurring, Transaction } from '../../app/lib/types';
-import { docClient, PUSH_INDEX_PK, TABLE, pk, pushIndexSk } from '../api/db';
+import { PUSH_INDEX_PK, pk, pushIndexSk } from '../api/db';
 import { toRecurring } from '../api/recurring';
+import { getStore } from '../store';
 import type { DeliverySettings } from './select';
 
 export interface StoredSubscription {
@@ -20,33 +20,14 @@ export interface ReminderData {
   transactions: Transaction[];
 }
 
-type Item = Record<string, unknown>;
-
-async function queryAll(keyCondition: string, values: Record<string, unknown>, projection?: string): Promise<Item[]> {
-  const items: Item[] = [];
-  let startKey: Record<string, unknown> | undefined;
-  do {
-    const result = await docClient.send(new QueryCommand({
-      TableName: TABLE,
-      KeyConditionExpression: keyCondition,
-      ExpressionAttributeValues: values,
-      ...(projection ? { ProjectionExpression: projection } : {}),
-      ExclusiveStartKey: startKey,
-    }));
-    items.push(...((result.Items ?? []) as Item[]));
-    startKey = result.LastEvaluatedKey;
-  } while (startKey);
-  return items;
-}
-
-// Everyone who has turned reminders on, found with one Query on the index partition.
+// Everyone who has turned reminders on, found with one query on the index partition.
 export async function listSubscribedUsers(): Promise<string[]> {
-  const items = await queryAll('PK = :pk', { ':pk': PUSH_INDEX_PK }, 'SK');
+  const items = await getStore().query(PUSH_INDEX_PK, { attributes: ['SK'] });
   return items.map(item => String(item.SK).replace(/^USER#/, ''));
 }
 
 export async function loadSubscriptions(userId: string): Promise<StoredSubscription[]> {
-  const items = await queryAll('PK = :pk AND begins_with(SK, :prefix)', { ':pk': pk(userId), ':prefix': 'PUSHSUB#' });
+  const items = await getStore().query(pk(userId), { skPrefix: 'PUSHSUB#' });
   return items.map(item => ({
     sk: String(item.SK),
     endpoint: String(item.endpoint),
@@ -64,13 +45,14 @@ export async function loadSubscriptions(userId: string): Promise<StoredSubscript
 // What the app's own due list needs: bills, the categories they belong to, and recent entries
 // (three months back and the month ahead), so a bill already logged is not asked about again.
 export async function loadReminderData(userId: string, today: string): Promise<ReminderData> {
+  const store = getStore();
   const thisMonth = today.slice(0, 7);
   const months = Array.from({ length: LOOK_BACK_MONTHS + 2 }, (_, index) => shiftMonth(thisMonth, index - LOOK_BACK_MONTHS));
 
   const [recurring, categories, ...perMonth] = await Promise.all([
-    queryAll('PK = :pk AND begins_with(SK, :prefix)', { ':pk': pk(userId), ':prefix': 'RECUR#' }),
-    queryAll('PK = :pk AND begins_with(SK, :prefix)', { ':pk': pk(userId), ':prefix': 'CAT#' }, 'categoryId'),
-    ...months.map(month => queryAll('PK = :pk AND begins_with(SK, :prefix)', { ':pk': pk(userId), ':prefix': `TXN#${month}#` })),
+    store.query(pk(userId), { skPrefix: 'RECUR#' }),
+    store.query(pk(userId), { skPrefix: 'CAT#', attributes: ['categoryId'] }),
+    ...months.map(month => store.query(pk(userId), { skPrefix: `TXN#${month}#` })),
   ]);
 
   return {
@@ -82,9 +64,10 @@ export async function loadReminderData(userId: string, today: string): Promise<R
 
 // Drops a subscription the push service says is gone, and the user from the index once none is left.
 export async function removeSubscription(userId: string, sk: string): Promise<void> {
-  await docClient.send(new DeleteCommand({ TableName: TABLE, Key: { PK: pk(userId), SK: sk } }));
-  const remaining = await queryAll('PK = :pk AND begins_with(SK, :prefix)', { ':pk': pk(userId), ':prefix': 'PUSHSUB#' }, 'SK');
+  const store = getStore();
+  await store.delete({ PK: pk(userId), SK: sk });
+  const remaining = await store.query(pk(userId), { skPrefix: 'PUSHSUB#', attributes: ['SK'] });
   if (remaining.length === 0) {
-    await docClient.send(new DeleteCommand({ TableName: TABLE, Key: { PK: PUSH_INDEX_PK, SK: pushIndexSk(userId) } }));
+    await store.delete({ PK: PUSH_INDEX_PK, SK: pushIndexSk(userId) });
   }
 }

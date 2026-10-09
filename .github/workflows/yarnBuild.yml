@@ -26,6 +26,11 @@ jobs:
       TF_VAR_vapid_public_key: ${{ secrets.VAPID_PUBLIC_KEY }}
     name: Build Package
     runs-on: ubuntu-latest
+    services:
+      dynamodb-local:
+        image: amazon/dynamodb-local@sha256:ff89bd48ff32cd8d9be5fee8873b65b8854dc408f1afe881be6eb00247bc0dab
+        ports:
+          - 8000:8000
     strategy:
       matrix:
         node-version: [24.x]
@@ -56,6 +61,8 @@ jobs:
           exit 1
         fi
     - name: Run tests
+      env:
+        DYNAMODB_ENDPOINT: http://localhost:8000
       run: yarn test
 
     - name: Build app with Auth0 config

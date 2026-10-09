@@ -1,6 +1,6 @@
-import { QueryCommand, PutCommand, GetCommand, TransactWriteCommand } from '@aws-sdk/lib-dynamodb';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
-import { docClient, TABLE, pk, txnSk } from './db';
+import { getStore } from '../store';
+import { pk, txnSk } from './db';
 import { MAX_AMOUNT_PENCE, SECURITY_HEADERS, VALID_TRANSACTION_TYPES } from './constants';
 import type { Transaction, ApiResponse } from './types';
 import { ok, err } from './http';
@@ -28,13 +28,8 @@ export async function getTransactions(
 
   const yearMonth = `${year}-${month.padStart(2, '0')}`;
 
-  const result = await docClient.send(new QueryCommand({
-    TableName: TABLE,
-    KeyConditionExpression: 'PK = :pk AND begins_with(SK, :prefix)',
-    ExpressionAttributeValues: { ':pk': pk(userId), ':prefix': `TXN#${yearMonth}` },
-  }));
-
-  return ok({ transactions: result.Items || [] });
+  const transactions = await getStore().query(pk(userId), { skPrefix: `TXN#${yearMonth}` });
+  return ok({ transactions });
 }
 
 export interface ValidTransactionInput {
@@ -125,10 +120,7 @@ export async function createTransaction(
   };
   if (recurringId !== undefined) transaction.recurringId = recurringId;
 
-  await docClient.send(new PutCommand({
-    TableName: TABLE,
-    Item: { PK: pk(userId), SK: txnSk(yearMonth, transactionId), ...transaction },
-  }));
+  await getStore().put({ PK: pk(userId), SK: txnSk(yearMonth, transactionId), ...transaction });
 
   return { statusCode: 201, headers: SECURITY_HEADERS, body: JSON.stringify({ transaction }) };
 }
@@ -179,12 +171,8 @@ export async function updateTransaction(
   }
   const { amount, type, categoryId, description, date, recurringId } = validation.value;
 
-  const existingResult = await docClient.send(new GetCommand({
-    TableName: TABLE,
-    Key: { PK: pk(userId), SK: txnSk(yearMonth, transactionId) },
-  }));
-
-  const existing = existingResult.Item as Transaction | undefined;
+  const store = getStore();
+  const existing = (await store.get({ PK: pk(userId), SK: txnSk(yearMonth, transactionId) })) as unknown as Transaction | undefined;
   if (!existing) {
     return err(404, 'Transaction not found');
   }
@@ -204,17 +192,12 @@ export async function updateTransaction(
   if (linkedRecurringId !== undefined) transaction.recurringId = linkedRecurringId;
 
   if (newYearMonth === yearMonth) {
-    await docClient.send(new PutCommand({
-      TableName: TABLE,
-      Item: { PK: pk(userId), SK: txnSk(yearMonth, transactionId), ...transaction },
-    }));
+    await store.put({ PK: pk(userId), SK: txnSk(yearMonth, transactionId), ...transaction });
   } else {
-    await docClient.send(new TransactWriteCommand({
-      TransactItems: [
-        { Delete: { TableName: TABLE, Key: { PK: pk(userId), SK: txnSk(yearMonth, transactionId) } } },
-        { Put: { TableName: TABLE, Item: { PK: pk(userId), SK: txnSk(newYearMonth, transactionId), ...transaction } } },
-      ],
-    }));
+    await store.transact([
+      { delete: { PK: pk(userId), SK: txnSk(yearMonth, transactionId) } },
+      { put: { PK: pk(userId), SK: txnSk(newYearMonth, transactionId), ...transaction } },
+    ]);
   }
 
   return ok({ transaction });

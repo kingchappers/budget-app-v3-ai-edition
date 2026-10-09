@@ -1,6 +1,6 @@
-import { QueryCommand, PutCommand } from '@aws-sdk/lib-dynamodb';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
-import { docClient, TABLE, pk, targetSk } from './db';
+import { getStore } from '../store';
+import { pk, targetSk } from './db';
 import { MAX_AMOUNT_PENCE, SECURITY_HEADERS, VALID_PERIODS } from './constants';
 import type { CategoryTarget, ApiResponse } from './types';
 import { ok, err } from './http';
@@ -11,13 +11,8 @@ export async function getTargets(
   userId: string,
   _params: Record<string, string>,
 ): Promise<ApiResponse> {
-  const result = await docClient.send(new QueryCommand({
-    TableName: TABLE,
-    KeyConditionExpression: 'PK = :pk AND begins_with(SK, :prefix)',
-    ExpressionAttributeValues: { ':pk': pk(userId), ':prefix': 'TARGET#' },
-  }));
-
-  return ok({ targets: result.Items || [] });
+  const targets = await getStore().query(pk(userId), { skPrefix: 'TARGET#' });
+  return ok({ targets });
 }
 
 export async function upsertTarget(
@@ -54,10 +49,7 @@ export async function upsertTarget(
     updatedAt: new Date().toISOString(),
   };
 
-  await docClient.send(new PutCommand({
-    TableName: TABLE,
-    Item: { PK: pk(userId), SK: targetSk(categoryId), ...target },
-  }));
+  await getStore().put({ PK: pk(userId), SK: targetSk(categoryId), ...target });
 
   return ok({ target });
 }

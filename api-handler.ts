@@ -2,6 +2,7 @@ import { verify } from 'jsonwebtoken';
 import jwksClient from 'jwks-rsa';
 import type { APIGatewayProxyHandlerV2 } from 'aws-lambda';
 import { createRouter } from './src/api/router';
+import { initStore } from './src/store';
 import { SECURITY_HEADERS } from './src/api/constants';
 import type { ApiResponse } from './src/api/types';
 import { getCategories, createCategory, updateCategory, deleteCategory } from './src/api/categories';
@@ -111,6 +112,7 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
   // A failure inside a handler is the server's, not an authentication failure, so it is kept apart
   // from the 401s above and answered with a generic body; the detail goes to the logs only.
   try {
+    await initStore();
     return await router.dispatch(event, auth.userId);
   } catch (error) {
     console.error(`Unhandled error in ${event.requestContext.routeKey}:`, error instanceof Error ? error.message : String(error));

@@ -1,6 +1,6 @@
-import { QueryCommand, PutCommand } from '@aws-sdk/lib-dynamodb';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
-import { docClient, TABLE, pk, catSk, potSk } from './db';
+import { getStore } from '../store';
+import { pk, catSk, potSk } from './db';
 import { MAX_AMOUNT_PENCE } from './constants';
 import { DEFAULT_CATEGORIES } from './defaults';
 import { autoAmountFor, computePots } from './potsCalc';
@@ -30,28 +30,11 @@ function isOptionalAmount(value: unknown): value is number | null {
 }
 
 export async function queryAll(userId: string, prefix: string): Promise<Record<string, unknown>[]> {
-  const items: Record<string, unknown>[] = [];
-  let lastEvaluatedKey: Record<string, unknown> | undefined;
-  do {
-    const result = await docClient.send(new QueryCommand({
-      TableName: TABLE,
-      KeyConditionExpression: 'PK = :pk AND begins_with(SK, :prefix)',
-      ExpressionAttributeValues: { ':pk': pk(userId), ':prefix': prefix },
-      ExclusiveStartKey: lastEvaluatedKey,
-    }));
-    items.push(...(result.Items || []));
-    lastEvaluatedKey = result.LastEvaluatedKey as Record<string, unknown> | undefined;
-  } while (lastEvaluatedKey);
-  return items;
+  return getStore().query(pk(userId), { skPrefix: prefix });
 }
 
 export async function queryOne(userId: string, sk: string): Promise<Record<string, unknown> | undefined> {
-  const result = await docClient.send(new QueryCommand({
-    TableName: TABLE,
-    KeyConditionExpression: 'PK = :pk AND SK = :sk',
-    ExpressionAttributeValues: { ':pk': pk(userId), ':sk': sk },
-  }));
-  return result.Items?.[0];
+  return getStore().get({ PK: pk(userId), SK: sk });
 }
 
 export function toSettings(item: Record<string, unknown>): PotSettings {
@@ -163,9 +146,6 @@ export async function putPot(
     archivedAt: existing?.archivedAt ?? null,
     updatedAt: new Date().toISOString(),
   };
-  await docClient.send(new PutCommand({
-    TableName: TABLE,
-    Item: { PK: pk(userId), SK: potSk(categoryId), ...settings },
-  }));
+  await getStore().put({ PK: pk(userId), SK: potSk(categoryId), ...settings });
   return ok({ settings });
 }

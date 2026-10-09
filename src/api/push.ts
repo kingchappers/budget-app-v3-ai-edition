@@ -1,7 +1,7 @@
 import { createHash } from 'crypto';
-import { DeleteCommand, PutCommand, QueryCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
-import { docClient, TABLE, pk, PUSH_INDEX_PK, pushIndexSk, pushSubscriptionSk } from './db';
+import { getStore } from '../store';
+import { pk, PUSH_INDEX_PK, pushIndexSk, pushSubscriptionSk } from './db';
 import { SECURITY_HEADERS } from './constants';
 import { err, ok, parseJsonObject } from './http';
 import type { ApiResponse, PushSubscriptionRecord } from './types';
@@ -112,13 +112,8 @@ export function endpointHash(endpoint: string): string {
 }
 
 async function subscriptionKeys(userId: string): Promise<string[]> {
-  const result = await docClient.send(new QueryCommand({
-    TableName: TABLE,
-    KeyConditionExpression: 'PK = :pk AND begins_with(SK, :prefix)',
-    ExpressionAttributeValues: { ':pk': pk(userId), ':prefix': 'PUSHSUB#' },
-    ProjectionExpression: 'SK',
-  }));
-  return (result.Items ?? []).map(item => item.SK as string);
+  const items = await getStore().query(pk(userId), { skPrefix: 'PUSHSUB#', attributes: ['SK'] });
+  return items.map(item => item.SK);
 }
 
 export async function createPushSubscription(
@@ -140,28 +135,22 @@ export async function createPushSubscription(
   }
 
   const now = new Date().toISOString();
-  await docClient.send(new UpdateCommand({
-    TableName: TABLE,
-    Key: { PK: pk(userId), SK: sk },
-    UpdateExpression:
-      'SET endpoint = :endpoint, p256dh = :p256dh, #auth = :auth, #hour = :hour, quietStart = :quietStart, '
-      + 'quietEnd = :quietEnd, timeZone = :timeZone, updatedAt = :now, createdAt = if_not_exists(createdAt, :now)',
-    ExpressionAttributeNames: { '#auth': 'auth', '#hour': 'hour' },
-    ExpressionAttributeValues: {
-      ':endpoint': record.endpoint,
-      ':p256dh': record.p256dh,
-      ':auth': record.auth,
-      ':hour': record.hour,
-      ':quietStart': record.quietStart,
-      ':quietEnd': record.quietEnd,
-      ':timeZone': record.timeZone,
-      ':now': now,
+  const store = getStore();
+  await store.patch(
+    { PK: pk(userId), SK: sk },
+    {
+      endpoint: record.endpoint,
+      p256dh: record.p256dh,
+      auth: record.auth,
+      hour: record.hour,
+      quietStart: record.quietStart,
+      quietEnd: record.quietEnd,
+      timeZone: record.timeZone,
+      updatedAt: now,
     },
-  }));
-  await docClient.send(new PutCommand({
-    TableName: TABLE,
-    Item: { PK: PUSH_INDEX_PK, SK: pushIndexSk(userId), updatedAt: now },
-  }));
+    { defaults: { createdAt: now } },
+  );
+  await store.put({ PK: PUSH_INDEX_PK, SK: pushIndexSk(userId), updatedAt: now });
 
   return ok({ subscribed: true });
 }
@@ -175,15 +164,13 @@ export async function deletePushSubscription(
   if (!body || !hasOnly(body, ['endpoint'])) return err(400, 'Invalid JSON body');
   if (!isAllowedEndpoint(body.endpoint)) return err(400, 'endpoint must be an https address of a supported push service');
 
-  await docClient.send(new DeleteCommand({
-    TableName: TABLE,
-    Key: { PK: pk(userId), SK: pushSubscriptionSk(endpointHash(body.endpoint)) },
-  }));
+  const store = getStore();
+  await store.delete({ PK: pk(userId), SK: pushSubscriptionSk(endpointHash(body.endpoint)) });
 
   // With no device left, the user drops out of the scheduler's index.
   const remaining = await subscriptionKeys(userId);
   if (remaining.length === 0) {
-    await docClient.send(new DeleteCommand({ TableName: TABLE, Key: { PK: PUSH_INDEX_PK, SK: pushIndexSk(userId) } }));
+    await store.delete({ PK: PUSH_INDEX_PK, SK: pushIndexSk(userId) });
   }
 
   return { statusCode: 204, headers: SECURITY_HEADERS, body: '' };

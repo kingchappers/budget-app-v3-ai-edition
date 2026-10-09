@@ -1,6 +1,6 @@
-import { GetCommand, TransactWriteCommand } from '@aws-sdk/lib-dynamodb';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
-import { docClient, TABLE, pk } from './db';
+import { ConditionFailedError, getStore } from '../store';
+import { pk } from './db';
 import { queryAll } from './pots';
 import type { ApiResponse } from './types';
 import { ok, err, parseJsonObject } from './http';
@@ -53,12 +53,6 @@ function withoutKeys(item: Record<string, unknown>): Record<string, unknown> {
   return rest;
 }
 
-function cancellationCodes(error: unknown): string[] | null {
-  if (!(error instanceof Error) || error.name !== 'TransactionCanceledException') return null;
-  const reasons = (error as Error & { CancellationReasons?: { Code?: string }[] }).CancellationReasons ?? [];
-  return reasons.map(reason => reason.Code ?? 'None');
-}
-
 export function validateRestoreInput(body: Record<string, unknown>): RestoreValidation {
   const unexpected = Object.keys(body).filter(key => !RESTORE_FIELDS.has(key));
   if (unexpected.length > 0) {
@@ -76,34 +70,30 @@ export function validateRestoreInput(body: Record<string, unknown>): RestoreVali
 }
 
 export async function moveToTrash(userId: string, entityType: TrashEntityType, originalSk: string): Promise<void> {
+  const store = getStore();
   const key = { PK: pk(userId), SK: originalSk };
-  const existing = await docClient.send(new GetCommand({ TableName: TABLE, Key: key }));
-  if (!existing.Item) return;
+  const existing = await store.get(key);
+  if (!existing) return;
 
   const id = originalSk.slice(TRASH_ENTITIES[entityType].length);
   const deletedAtMs = Date.now();
   try {
-    await docClient.send(new TransactWriteCommand({
-      TransactItems: [
-        { Delete: { TableName: TABLE, Key: key, ConditionExpression: 'attribute_exists(PK)' } },
-        {
-          Put: {
-            TableName: TABLE,
-            Item: {
-              PK: pk(userId),
-              SK: trashSk(entityType, id),
-              entityType,
-              originalSk,
-              item: withoutKeys(existing.Item),
-              deletedAt: new Date(deletedAtMs).toISOString(),
-              expiresAt: Math.floor(deletedAtMs / 1000) + TRASH_RETENTION_SECONDS,
-            },
-          },
+    await store.transact([
+      { delete: key, ifPresent: true },
+      {
+        put: {
+          PK: pk(userId),
+          SK: trashSk(entityType, id),
+          entityType,
+          originalSk,
+          item: withoutKeys(existing),
+          deletedAt: new Date(deletedAtMs).toISOString(),
+          expiresAt: Math.floor(deletedAtMs / 1000) + TRASH_RETENTION_SECONDS,
         },
-      ],
-    }));
+      },
+    ]);
   } catch (error) {
-    if (cancellationCodes(error)?.[0] === 'ConditionalCheckFailed') return;
+    if (error instanceof ConditionFailedError && error.failedIndex === 0) return;
     throw error;
   }
 }
@@ -153,32 +143,23 @@ export async function restoreFromTrash(
   const { entityType, id } = validation.value;
 
   const trashKey = { PK: pk(userId), SK: trashSk(entityType, id) };
-  const result = await docClient.send(new GetCommand({ TableName: TABLE, Key: trashKey }));
-  const entry = result.Item ? toTrashEntry(result.Item) : null;
+  const stored = await getStore().get(trashKey);
+  const entry = stored ? toTrashEntry(stored) : null;
   if (!entry || !isLive(entry, nowSeconds())) {
     return err(404, 'This item is no longer in Recently deleted');
   }
 
   const originalSk = `${TRASH_ENTITIES[entityType]}${id}`;
   try {
-    await docClient.send(new TransactWriteCommand({
-      TransactItems: [
-        {
-          Put: {
-            TableName: TABLE,
-            Item: { ...entry.item, PK: pk(userId), SK: originalSk },
-            ConditionExpression: 'attribute_not_exists(PK)',
-          },
-        },
-        { Delete: { TableName: TABLE, Key: trashKey, ConditionExpression: 'attribute_exists(PK)' } },
-      ],
-    }));
+    await getStore().transact([
+      { put: { ...entry.item, PK: pk(userId), SK: originalSk }, ifAbsent: true },
+      { delete: trashKey, ifPresent: true },
+    ]);
   } catch (error) {
-    const codes = cancellationCodes(error);
-    if (codes?.[0] === 'ConditionalCheckFailed') {
+    if (error instanceof ConditionFailedError && error.failedIndex === 0) {
       return err(409, 'This item is already in place, so it was not restored');
     }
-    if (codes?.[1] === 'ConditionalCheckFailed') {
+    if (error instanceof ConditionFailedError && error.failedIndex === 1) {
       return err(404, 'This item is no longer in Recently deleted');
     }
     throw error;

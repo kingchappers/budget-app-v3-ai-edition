@@ -1,21 +1,12 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-
-const { mockSend } = vi.hoisted(() => ({ mockSend: vi.fn() }));
-
-vi.mock('../db', () => ({
-  docClient: { send: mockSend },
-  TABLE: 'test-table',
-  pk: (userId: string) => `USER#${userId}`,
-  catSk: (categoryId: string) => `CAT#${categoryId}`,
-}));
-
-vi.mock('@aws-sdk/lib-dynamodb', () => ({
-  QueryCommand: vi.fn(function(i: unknown) { return i; }),
-  UpdateCommand: vi.fn(function(i: unknown) { return i; }),
-}));
-
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import type { SqliteStore } from '../../store/sqlite';
+import { resetTestStore, seedUser, useTestStore } from '../../store/testing';
 import { reassignCategory } from '../reassign';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
+
+let store: SqliteStore;
+beforeEach(() => { store = useTestStore(); });
+afterEach(() => { resetTestStore(); });
 
 function makeEvent(body?: object): APIGatewayProxyEventV2 {
   return {
@@ -24,39 +15,44 @@ function makeEvent(body?: object): APIGatewayProxyEventV2 {
   } as unknown as APIGatewayProxyEventV2;
 }
 
-describe('reassignCategory', () => {
-  beforeEach(() => { mockSend.mockReset(); });
+async function categoryOf(sk: string, userId = 'user-1'): Promise<unknown> {
+  const item = await store.get({ PK: `USER#${userId}`, SK: sk });
+  return item?.categoryId;
+}
 
-  it('reassigns every matching transaction across months', async () => {
-    mockSend.mockResolvedValueOnce({ Items: [
+describe('reassignCategory', () => {
+  it('reassigns every matching transaction across months and leaves other categories alone', async () => {
+    await seedUser(store, 'user-1', [
       { SK: 'TXN#2026-06#a', categoryId: 'cat-custom' },
       { SK: 'TXN#2026-07#b', categoryId: 'cat-custom' },
       { SK: 'TXN#2026-07#c', categoryId: 'cat-food' },
-    ] });
-    mockSend.mockResolvedValue({});
+    ]);
 
     const res = await reassignCategory(makeEvent({ toCategoryId: 'cat-going-out' }), 'user-1', { categoryId: 'cat-custom' });
 
     expect(res.statusCode).toBe(200);
-    expect(JSON.parse(res.body).reassigned).toBe(2);
-    expect(mockSend).toHaveBeenCalledTimes(4);
-    expect(JSON.parse(res.body).recurringReassigned).toBe(0);
-    expect(mockSend.mock.calls[1][0].Key.SK).toBe('TXN#2026-06#a');
-    expect(mockSend.mock.calls[1][0].ExpressionAttributeValues[':c']).toBe('cat-going-out');
+    expect(JSON.parse(res.body)).toEqual({ reassigned: 2, recurringReassigned: 0 });
+    expect(await categoryOf('TXN#2026-06#a')).toBe('cat-going-out');
+    expect(await categoryOf('TXN#2026-07#b')).toBe('cat-going-out');
+    expect(await categoryOf('TXN#2026-07#c')).toBe('cat-food');
   });
 
   it('returns 200 with zero when nothing matches', async () => {
-    mockSend.mockResolvedValueOnce({ Items: [{ SK: 'TXN#2026-07#c', categoryId: 'cat-food' }] });
-    mockSend.mockResolvedValue({});
+    await seedUser(store, 'user-1', [{ SK: 'TXN#2026-07#c', categoryId: 'cat-food' }]);
     const res = await reassignCategory(makeEvent({ toCategoryId: 'cat-going-out' }), 'user-1', { categoryId: 'cat-custom' });
     expect(res.statusCode).toBe(200);
     expect(JSON.parse(res.body).reassigned).toBe(0);
+    expect(await categoryOf('TXN#2026-07#c')).toBe('cat-food');
   });
 
-  it('rejects reassigning a category to itself', async () => {
+  it('rejects reassigning a category to itself without touching the store', async () => {
+    await seedUser(store, 'user-1', [{ SK: 'TXN#2026-07#a', categoryId: 'cat-custom' }]);
+    const querySpy = vi.spyOn(store, 'query');
+    const patchSpy = vi.spyOn(store, 'patch');
     const res = await reassignCategory(makeEvent({ toCategoryId: 'cat-custom' }), 'user-1', { categoryId: 'cat-custom' });
     expect(res.statusCode).toBe(400);
-    expect(mockSend).not.toHaveBeenCalled();
+    expect(querySpy).not.toHaveBeenCalled();
+    expect(patchSpy).not.toHaveBeenCalled();
   });
 
   it('rejects a missing toCategoryId', async () => {
@@ -64,141 +60,90 @@ describe('reassignCategory', () => {
     expect(res.statusCode).toBe(400);
   });
 
-  it('rejects an unknown target category', async () => {
-    mockSend.mockResolvedValueOnce({ Items: [] });
+  it('rejects an unknown target category and changes nothing', async () => {
+    await seedUser(store, 'user-1', [{ SK: 'TXN#2026-07#a', categoryId: 'cat-custom' }]);
     const res = await reassignCategory(makeEvent({ toCategoryId: 'cat-nonexistent' }), 'user-1', { categoryId: 'cat-custom' });
     expect(res.statusCode).toBe(400);
+    expect(await categoryOf('TXN#2026-07#a')).toBe('cat-custom');
   });
 
-  it('reassigns to a non-default category that exists, running the existence check query', async () => {
-    mockSend.mockResolvedValueOnce({ Items: [{ SK: 'CAT#cat-side-hustle' }] }); // existence check
-    mockSend.mockResolvedValueOnce({ Items: [
+  it('rejects a target category that only exists for another user', async () => {
+    await seedUser(store, 'user-2', [{ SK: 'CAT#cat-side-hustle', categoryId: 'cat-side-hustle', name: 'Side', type: 'EXPENSE' }]);
+    await seedUser(store, 'user-1', [{ SK: 'TXN#2026-07#a', categoryId: 'cat-custom' }]);
+    const res = await reassignCategory(makeEvent({ toCategoryId: 'cat-side-hustle' }), 'user-1', { categoryId: 'cat-custom' });
+    expect(res.statusCode).toBe(400);
+    expect(await categoryOf('TXN#2026-07#a')).toBe('cat-custom');
+  });
+
+  it('reassigns to a non-default category that exists', async () => {
+    await seedUser(store, 'user-1', [
+      { SK: 'CAT#cat-side-hustle', categoryId: 'cat-side-hustle', name: 'Side', type: 'EXPENSE' },
       { SK: 'TXN#2026-07#a', categoryId: 'cat-custom' },
-    ] }); // transaction query
-    mockSend.mockResolvedValue({}); // update
+    ]);
 
     const res = await reassignCategory(makeEvent({ toCategoryId: 'cat-side-hustle' }), 'user-1', { categoryId: 'cat-custom' });
 
     expect(res.statusCode).toBe(200);
     expect(JSON.parse(res.body).reassigned).toBe(1);
-    expect(mockSend.mock.calls[0][0].ExpressionAttributeValues[':sk']).toBe('CAT#cat-side-hustle');
-    expect(mockSend.mock.calls[2][0].ExpressionAttributeValues[':c']).toBe('cat-side-hustle');
+    expect(await categoryOf('TXN#2026-07#a')).toBe('cat-side-hustle');
   });
 
-  it('paginates the transaction query across LastEvaluatedKey pages and reassigns items from both', async () => {
-    mockSend.mockResolvedValueOnce({
-      Items: [{ SK: 'TXN#2026-06#a', categoryId: 'cat-custom' }],
-      LastEvaluatedKey: { PK: 'USER#user-1', SK: 'TXN#2026-06#a' },
+  it('skips an item deleted between the read and the update, and counts only the ones it changed', async () => {
+    await seedUser(store, 'user-1', [
+      { SK: 'TXN#2026-10#a', categoryId: 'old' },
+      { SK: 'TXN#2026-10#b', categoryId: 'old' },
+      { SK: 'CAT#new', categoryId: 'new', name: 'New', type: 'EXPENSE' },
+    ]);
+    const realPatch = store.patch.bind(store);
+    vi.spyOn(store, 'patch').mockImplementation(async (key, fields, opts) => {
+      if (key.SK === 'TXN#2026-10#b') await store.delete(key);
+      return realPatch(key, fields, opts);
     });
-    mockSend.mockResolvedValueOnce({
-      Items: [{ SK: 'TXN#2026-07#b', categoryId: 'cat-custom' }],
-    });
-    mockSend.mockResolvedValue({});
-
-    const res = await reassignCategory(makeEvent({ toCategoryId: 'cat-going-out' }), 'user-1', { categoryId: 'cat-custom' });
-
+    const res = await reassignCategory(makeEvent({ toCategoryId: 'new' }), 'user-1', { categoryId: 'old' });
     expect(res.statusCode).toBe(200);
-    expect(JSON.parse(res.body).reassigned).toBe(2);
-
-    const updateCalls = mockSend.mock.calls.filter(call => call[0].Key);
-    const updatedSks = updateCalls.map(call => call[0].Key.SK);
-    expect(updatedSks).toEqual(expect.arrayContaining(['TXN#2026-06#a', 'TXN#2026-07#b']));
+    expect(JSON.parse(res.body)).toEqual({ reassigned: 1, recurringReassigned: 0 });
+    expect(await categoryOf('TXN#2026-10#a')).toBe('new');
+    expect(await store.get({ PK: 'USER#user-1', SK: 'TXN#2026-10#b' })).toBeUndefined();
   });
 
-  it('follows ExclusiveStartKey when requesting the second page', async () => {
-    mockSend.mockResolvedValueOnce({
-      Items: [{ SK: 'TXN#2026-06#a', categoryId: 'cat-custom' }],
-      LastEvaluatedKey: { PK: 'USER#user-1', SK: 'TXN#2026-06#a' },
-    });
-    mockSend.mockResolvedValueOnce({
-      Items: [{ SK: 'TXN#2026-07#b', categoryId: 'cat-custom' }],
-    });
-    mockSend.mockResolvedValue({});
-
-    await reassignCategory(makeEvent({ toCategoryId: 'cat-going-out' }), 'user-1', { categoryId: 'cat-custom' });
-
-    const queryCalls = mockSend.mock.calls.filter(call => call[0].KeyConditionExpression?.includes('begins_with'));
-    expect(queryCalls[0][0].ExclusiveStartKey).toBeUndefined();
-    expect(queryCalls[1][0].ExclusiveStartKey).toEqual({ PK: 'USER#user-1', SK: 'TXN#2026-06#a' });
-  });
-
-  it('skips items that fail the existence check (deleted/moved between query and update) without failing the request', async () => {
-    mockSend.mockResolvedValueOnce({ Items: [
-      { SK: 'TXN#2026-07#a', categoryId: 'cat-custom' },
-      { SK: 'TXN#2026-07#b', categoryId: 'cat-custom' },
-      { SK: 'TXN#2026-07#c', categoryId: 'cat-custom' },
-    ] });
-
-    mockSend.mockImplementation((cmd: { Key?: { SK: string } }) => {
-      if (cmd.Key?.SK === 'TXN#2026-07#b') {
-        const error = new Error('The conditional request failed');
-        error.name = 'ConditionalCheckFailedException';
-        return Promise.reject(error);
-      }
-      return Promise.resolve({});
-    });
-
-    const res = await reassignCategory(makeEvent({ toCategoryId: 'cat-going-out' }), 'user-1', { categoryId: 'cat-custom' });
-
-    expect(res.statusCode).toBe(200);
-    expect(JSON.parse(res.body).reassigned).toBe(2);
-  });
-
-  it('adds a ConditionExpression requiring the item to still exist on every update', async () => {
-    mockSend.mockResolvedValueOnce({ Items: [
-      { SK: 'TXN#2026-07#a', categoryId: 'cat-custom' },
-    ] });
-    mockSend.mockResolvedValue({});
-
-    await reassignCategory(makeEvent({ toCategoryId: 'cat-going-out' }), 'user-1', { categoryId: 'cat-custom' });
-
-    const updateCall = mockSend.mock.calls.find(call => call[0].Key);
-    expect(updateCall).toBeDefined();
-    expect(updateCall![0].ConditionExpression).toBe('attribute_exists(SK)');
+  it('rethrows an unexpected failure while updating an item', async () => {
+    await seedUser(store, 'user-1', [{ SK: 'TXN#2026-07#a', categoryId: 'cat-custom' }]);
+    vi.spyOn(store, 'patch').mockRejectedValueOnce(new Error('boom'));
+    await expect(
+      reassignCategory(makeEvent({ toCategoryId: 'cat-going-out' }), 'user-1', { categoryId: 'cat-custom' }),
+    ).rejects.toThrow('boom');
   });
 
   it('also moves recurring templates that use the category', async () => {
-    mockSend.mockImplementation(async (command: { ExpressionAttributeValues?: Record<string, unknown>; Key?: unknown }) => {
-      const prefix = command.ExpressionAttributeValues?.[':prefix'];
-      if (prefix === 'TXN#') return { Items: [{ SK: 'TXN#2026-07#a', categoryId: 'cat-custom' }] };
-      if (prefix === 'RECUR#') {
-        return { Items: [
-          { SK: 'RECUR#r1', categoryId: 'cat-custom' },
-          { SK: 'RECUR#r2', categoryId: 'cat-food' },
-        ] };
-      }
-      return {};
-    });
+    await seedUser(store, 'user-1', [
+      { SK: 'TXN#2026-07#a', categoryId: 'cat-custom' },
+      { SK: 'RECUR#r1', categoryId: 'cat-custom' },
+      { SK: 'RECUR#r2', categoryId: 'cat-food' },
+    ]);
 
     const res = await reassignCategory(makeEvent({ toCategoryId: 'cat-going-out' }), 'user-1', { categoryId: 'cat-custom' });
 
-    const body = JSON.parse(res.body);
-    expect(body.reassigned).toBe(1);
-    expect(body.recurringReassigned).toBe(1);
-    const updatedKeys = mockSend.mock.calls.filter(call => call[0].Key).map(call => call[0].Key.SK);
-    expect(updatedKeys).toEqual(['TXN#2026-07#a', 'RECUR#r1']);
+    expect(JSON.parse(res.body)).toEqual({ reassigned: 1, recurringReassigned: 1 });
+    expect(await categoryOf('TXN#2026-07#a')).toBe('cat-going-out');
+    expect(await categoryOf('RECUR#r1')).toBe('cat-going-out');
+    expect(await categoryOf('RECUR#r2')).toBe('cat-food');
   });
 
-  it('paginates the templates query and only touches the caller\'s items', async () => {
-    mockSend.mockImplementation(async (command: {
-      ExpressionAttributeValues?: Record<string, unknown>; ExclusiveStartKey?: unknown; Key?: unknown;
-    }) => {
-      if (command.ExpressionAttributeValues?.[':prefix'] === 'RECUR#') {
-        if (command.ExclusiveStartKey === undefined) {
-          return { Items: [{ SK: 'RECUR#r1', categoryId: 'cat-custom' }], LastEvaluatedKey: { PK: 'USER#user-1', SK: 'RECUR#r1' } };
-        }
-        return { Items: [{ SK: 'RECUR#r2', categoryId: 'cat-custom' }] };
-      }
-      return {};
-    });
+  it('only touches the caller\'s items', async () => {
+    await seedUser(store, 'user-1', [
+      { SK: 'RECUR#r1', categoryId: 'cat-custom' },
+      { SK: 'RECUR#r2', categoryId: 'cat-custom' },
+    ]);
+    await seedUser(store, 'user-2', [
+      { SK: 'TXN#2026-07#x', categoryId: 'cat-custom' },
+      { SK: 'RECUR#r1', categoryId: 'cat-custom' },
+    ]);
 
     const res = await reassignCategory(makeEvent({ toCategoryId: 'cat-going-out' }), 'user-1', { categoryId: 'cat-custom' });
 
     expect(JSON.parse(res.body).recurringReassigned).toBe(2);
-    const commands = mockSend.mock.calls.map(call => call[0]);
-    const queries = commands.filter(command => command.KeyConditionExpression);
-    expect(queries.every(command => command.ExpressionAttributeValues[':pk'] === 'USER#user-1')).toBe(true);
-    const updates = commands.filter(command => command.Key);
-    expect(updates.every(command => command.Key.PK === 'USER#user-1')).toBe(true);
+    expect(await categoryOf('RECUR#r1', 'user-1')).toBe('cat-going-out');
+    expect(await categoryOf('TXN#2026-07#x', 'user-2')).toBe('cat-custom');
+    expect(await categoryOf('RECUR#r1', 'user-2')).toBe('cat-custom');
   });
 });
