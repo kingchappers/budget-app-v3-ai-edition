@@ -1,10 +1,11 @@
 import { useAuth } from '~/lib/auth';
 import { useCallback } from 'react';
 import { ApiError } from '~/lib/apiError';
+import { expireLocalSession } from '~/lib/localAuth';
 import { isSessionEndedError, markSessionEnded } from '~/lib/session';
 
 export function useProtectedApi() {
-  const { getToken } = useAuth();
+  const { getToken, mode } = useAuth();
 
   const request = useCallback(
     async (endpoint: string, options: RequestInit = {}) => {
@@ -30,10 +31,15 @@ export function useProtectedApi() {
       } catch (error) {
         console.error('Protected API request failed:', error);
         if (isSessionEndedError(error)) markSessionEnded();
+        // In local mode a 401 means the server no longer knows this session (expired, or reset from the CLI).
+        if (mode === 'local' && error instanceof ApiError && error.status === 401) {
+          expireLocalSession();
+          markSessionEnded();
+        }
         throw error;
       }
     },
-    [getToken]
+    [getToken, mode]
   );
 
   return { request };
