@@ -160,6 +160,12 @@ export function runStoreContract(name: string, backend: ContractBackend, options
         expect(await store.query(PK, { skPrefix: 'POT#', attributes: ['categoryId'] })).toEqual([{ categoryId: 'a' }]);
       });
 
+      it('treats an empty attributes list as no projection', async () => {
+        const PK = newUser();
+        await store.put({ PK, SK: 'POT#a', categoryId: 'a' });
+        expect(await store.query(PK, { skPrefix: 'POT#', attributes: [] })).toEqual([{ PK, SK: 'POT#a', categoryId: 'a' }]);
+      });
+
       it('rejects skPrefix and skEquals together', async () => {
         await expect(store.query(newUser(), { skPrefix: 'A', skEquals: 'B' })).rejects.toThrow('not both');
       });

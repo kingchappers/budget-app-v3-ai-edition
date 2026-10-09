@@ -132,7 +132,7 @@ export class DynamoStore implements Store {
     }
 
     let projection: { ProjectionExpression: string } | Record<string, never> = {};
-    if (opts.attributes) {
+    if (opts.attributes?.length) {
       opts.attributes.forEach((name, index) => { names[`#p${index}`] = name; });
       projection = { ProjectionExpression: opts.attributes.map((_, index) => `#p${index}`).join(', ') };
     }

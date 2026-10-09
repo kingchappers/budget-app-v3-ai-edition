@@ -130,6 +130,13 @@ describe('query', () => {
     expect(sentInput().ExpressionAttributeNames).toMatchObject({ '#p0': 'SK', '#p1': 'categoryId' });
   });
 
+  it('sends no projection for an empty attributes list', async () => {
+    send.mockResolvedValueOnce({ Items: [] });
+    await store.query(PK, { skPrefix: 'POT#', attributes: [] });
+    expect(sentInput().ProjectionExpression).toBeUndefined();
+    expect(sentInput().ExpressionAttributeNames).not.toHaveProperty('#p0');
+  });
+
   it('follows LastEvaluatedKey until the last page', async () => {
     send
       .mockResolvedValueOnce({ Items: [{ PK, SK: 'A' }], LastEvaluatedKey: { PK, SK: 'A' } })

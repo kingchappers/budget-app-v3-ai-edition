@@ -25,7 +25,7 @@ interface Row {
 export function prefixUpperBound(prefix: string): string | null {
   const last = prefix.charCodeAt(prefix.length - 1);
   const isSurrogate = last >= 0xd800 && last <= 0xdfff;
-  if (isSurrogate || last === 0xffff) return null;
+  if (isSurrogate || last === 0xd7ff || last === 0xffff) return null;
   return prefix.slice(0, -1) + String.fromCharCode(last + 1);
 }
 
@@ -42,7 +42,7 @@ export class SqliteStore implements Store {
 
   constructor(path: string) {
     this.db = new DatabaseSync(path);
-    this.db.exec('PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 5000; PRAGMA synchronous = NORMAL;');
+    this.db.exec('PRAGMA busy_timeout = 5000; PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL;');
     this.migrate();
   }
 
@@ -98,7 +98,8 @@ export class SqliteStore implements Store {
       throw new Error('query takes skPrefix or skEquals, not both');
     }
     const items = this.selectRows(pk, opts).map(row => this.toItem(pk, row.sk, row.data));
-    return opts.attributes ? items.map(item => pick(item, opts.attributes as string[])) : items;
+    const attributes = opts.attributes;
+    return attributes?.length ? items.map(item => pick(item, attributes)) : items;
   }
 
   async transact(ops: TxOp[]): Promise<void> {
@@ -144,7 +145,7 @@ export class SqliteStore implements Store {
       this.db.exec('COMMIT');
       return result;
     } catch (error) {
-      this.db.exec('ROLLBACK');
+      if (this.db.isTransaction) this.db.exec('ROLLBACK');
       throw error;
     }
   }

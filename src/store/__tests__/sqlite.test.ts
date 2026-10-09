@@ -75,6 +75,17 @@ describe('prefix ranges', () => {
     expect(prefixUpperBound('a\ud83d')).toBeNull();
   });
 
+  it('gives up on U+D7FF, whose successor is a lone surrogate', () => {
+    expect(prefixUpperBound('a\ud7ff')).toBeNull();
+  });
+
+  it('still finds keys under a prefix that ends in U+D7FF', async () => {
+    const store = new SqliteStore(':memory:');
+    for (const SK of ['p\ud7ff', 'p\ud7ffx', 'p\ue000', 'q']) await store.put({ PK, SK, n: 1 });
+    const items = await store.query(PK, { skPrefix: 'p\ud7ff' });
+    expect(items.map(item => item.SK)).toEqual(['p\ud7ff', 'p\ud7ffx']);
+  });
+
   it('still finds keys under a prefix that ends in U+FFFF', async () => {
     const store = new SqliteStore(':memory:');
     for (const SK of ['p￿', 'p￿x', 'q', 'p']) await store.put({ PK, SK, n: 1 });
@@ -87,5 +98,20 @@ describe('prefix ranges', () => {
     for (const SK of ['a~', 'a~z', 'a\u007f', 'b']) await store.put({ PK, SK, n: 1 });
     const items = await store.query(PK, { skPrefix: 'a~' });
     expect(items.map(item => item.SK)).toEqual(['a~', 'a~z']);
+  });
+});
+
+describe('transaction failures', () => {
+  it('rejects with the original error when the transaction has already ended', async () => {
+    const store = new SqliteStore(':memory:');
+    const internals = store as unknown as {
+      db: DatabaseSync;
+      inTransaction: (work: () => void) => void;
+    };
+    const original = new Error('original failure');
+    expect(() => internals.inTransaction(() => {
+      internals.db.exec('ROLLBACK');
+      throw original;
+    })).toThrow(original);
   });
 });
