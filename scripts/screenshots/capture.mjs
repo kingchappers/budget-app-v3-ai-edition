@@ -9,7 +9,7 @@ import { chromium } from 'playwright';
 import sharp from 'sharp';
 import { SCHEMES, SHOTS, SIZES, shotFileName } from '../../app/lib/aboutShots.ts';
 import { DUMMY_ENV, authStorage } from './auth.mjs';
-import { createStore } from './fixtures.mjs';
+import { createStore, referenceNow } from './fixtures.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const OUT_DIR = path.join(ROOT, 'public', 'about');
@@ -64,14 +64,16 @@ async function openAddSheet(page) {
   await page.waitForTimeout(800);
 }
 
-async function capture(browser, url, store, failures, shot, sizeName, scheme) {
+async function capture(browser, url, store, now, failures, shot, sizeName, scheme) {
   const { width, height } = SIZES[sizeName];
   const context = await browser.newContext({ viewport: { width, height }, colorScheme: scheme, deviceScaleFactor: 2 });
   await context.addInitScript(({ entries, colorScheme }) => {
     for (const [key, value] of Object.entries(entries)) window.localStorage.setItem(key, value);
     // Mantine reads its colour scheme from here, so the dark shots do not depend on the OS setting.
     window.localStorage.setItem('mantine-color-scheme-value', colorScheme);
-  }, { entries: authStorage(), colorScheme: scheme });
+  }, { entries: authStorage(now), colorScheme: scheme });
+  // The app's idea of today must match the date the fixtures were built for.
+  await context.clock.setFixedTime(now);
   await context.route('**/*', async route => {
     const request = route.request();
     const { pathname, searchParams } = new URL(request.url());
@@ -107,7 +109,8 @@ async function main() {
   let browser;
   try {
     browser = await chromium.launch();
-    const store = createStore();
+    const now = referenceNow();
+    const store = createStore(now);
     // The first load makes Vite re-optimise its dependencies, which reloads the page. Do it once up front.
     const warm = await browser.newPage();
     await warm.goto(url, { waitUntil: 'networkidle' });
@@ -117,7 +120,7 @@ async function main() {
     for (const shot of SHOTS) {
       for (const sizeName of Object.keys(SIZES)) {
         for (const scheme of SCHEMES) {
-          await capture(browser, url, store, failures, shot, sizeName, scheme);
+          await capture(browser, url, store, now, failures, shot, sizeName, scheme);
           console.log(`saved ${shotFileName(shot.id, sizeName, scheme)}`);
         }
       }

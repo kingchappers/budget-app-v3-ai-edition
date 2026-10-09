@@ -15,7 +15,14 @@ function daysAgo(now, days) {
   return new Date(now.getTime() - days * DAY_MS);
 }
 
-// The day each month the streaming bill falls on: three days from now, kept inside every month.
+// The streaming bill falls three days ahead, which only stays inside this month up to the 25th. Later in the
+// month the run is dated the 15th instead, so Home always has a bill coming due.
+export function referenceNow(real = new Date()) {
+  if (real.getUTCDate() <= 25) return real;
+  return new Date(Date.UTC(real.getUTCFullYear(), real.getUTCMonth(), 15, 12));
+}
+
+// The day each month the streaming bill falls on: three days from now.
 function streamingDay(now) {
   return Math.min(28, new Date(now.getTime() + 3 * DAY_MS).getUTCDate());
 }

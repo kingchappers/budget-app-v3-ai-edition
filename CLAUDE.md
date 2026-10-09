@@ -15,6 +15,7 @@ yarn build            # Three-stage build: react-router build → inject static 
 yarn typecheck        # Generate route types + run tsc
 yarn test             # Run Vitest suite (API handlers)
 yarn test:watch       # Vitest in watch mode
+yarn screenshots      # Regenerate the About page images in public/about/ (first run: yarn playwright install chromium)
 ```
 
 **Build requires Auth0 env vars** (set in `.env` or exported):
@@ -24,6 +25,8 @@ yarn test:watch       # Vitest in watch mode
 ```bash
 cd infra && tofu apply
 ```
+
+Re-run `yarn screenshots` and commit the images whenever a page they show changes. It runs the app against invented data with dummy Auth0 values (`scripts/screenshots/`), never a real tenant.
 
 Tests use **Vitest** (`src/api/__tests__/`), covering the API router and handlers. CI runs `yarn test` before the build.
 

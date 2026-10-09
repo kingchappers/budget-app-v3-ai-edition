@@ -70,7 +70,7 @@ export const SHOTS: readonly Shot[] = [
     heading: 'Settings',
     caption: 'Text size, appearance, reminders and the shortcut keys, kept on your own device.',
     howTo: 'Open the cog in the top bar.',
-    alt: 'The Settings page with display options and links to categories and accounts',
+    alt: 'The Settings page with text size, appearance and reminder options',
   },
 ];
 
