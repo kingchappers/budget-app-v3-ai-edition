@@ -9,7 +9,8 @@
     "start": "react-router-serve ./build/server/index.js",
     "typecheck": "react-router typegen && tsc",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "store-cli": "node scripts/build-store-cli.cjs && node build/store-cli/store-cli.js"
   },
   "dependencies": {
     "@auth0/auth0-react": "^2.8.0",

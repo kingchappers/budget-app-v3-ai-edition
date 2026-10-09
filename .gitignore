@@ -49,3 +49,9 @@ terraform.rc
 
 # Subagent-driven development scratch
 .superpowers/
+
+# Exports and local databases hold personal financial data (SEC-01)
+budget-export*.jsonl
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
