@@ -139,6 +139,16 @@ describe('getTrash', () => {
     expect(res.body).not.toContain('TRASH#');
   });
 
+  it('reads only the trash prefix, not the user\'s other items', async () => {
+    await seedUser(store, 'user-1', [
+      trashRecord(),
+      { SK: 'TXN#2026-09#x', amount: 100, deletedAt: '2026-09-29T10:00:00.000Z', expiresAt: NOW_SECONDS + 1000 },
+      { SK: 'CAT#c1', name: 'Garden' },
+    ]);
+    const res = await getTrash(event(), 'user-1', {});
+    expect(JSON.parse(res.body).items.map((i: { id: string }) => i.id)).toEqual(['2026-09#t1']);
+  });
+
   it('leaves out items whose expiry has passed but TTL has not yet removed', async () => {
     await seedUser(store, 'user-1', [trashRecord({ expiresAt: NOW_SECONDS - 1 })]);
     const res = await getTrash(event(), 'user-1', {});

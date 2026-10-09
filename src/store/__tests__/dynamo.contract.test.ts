@@ -4,6 +4,9 @@ import { DynamoStore } from '../dynamo';
 import { runStoreContract } from './contract';
 
 const endpoint = process.env.DYNAMODB_ENDPOINT;
+if (process.env.CI && !endpoint) {
+  throw new Error('DYNAMODB_ENDPOINT must be set in CI so the DynamoDB parity tests run');
+}
 const table = `store-contract-${crypto.randomUUID()}`;
 const raw = new DynamoDBClient({
   endpoint,

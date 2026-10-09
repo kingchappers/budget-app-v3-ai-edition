@@ -101,6 +101,7 @@ describe('authentication', () => {
     expect(JSON.parse(res.body)).toEqual({ error: 'Missing authorization token' });
     expect(res.headers).toEqual(SECURITY_HEADERS);
     expect(mockVerify).not.toHaveBeenCalled();
+    expect(mockInitStore).not.toHaveBeenCalled();
     expect(handlerCalls()).toEqual([]);
   });
 
@@ -108,6 +109,7 @@ describe('authentication', () => {
     const res = await invoke(makeEvent({ authorization: 'Bearer ' }));
     expect(res.statusCode).toBe(401);
     expect(mockVerify).not.toHaveBeenCalled();
+    expect(mockInitStore).not.toHaveBeenCalled();
     expect(handlerCalls()).toEqual([]);
   });
 
@@ -118,6 +120,7 @@ describe('authentication', () => {
     expect(JSON.parse(res.body)).toEqual({ error: 'Unauthorized' });
     expect(res.body).not.toContain('expired');
     expect(res.headers).toEqual(SECURITY_HEADERS);
+    expect(mockInitStore).not.toHaveBeenCalled();
     expect(handlerCalls()).toEqual([]);
   });
 
@@ -285,6 +288,11 @@ describe('a handler that fails', () => {
 });
 
 describe('store start-up', () => {
+  it('starts the store once for an authenticated request', async () => {
+    await invoke(makeEvent());
+    expect(mockInitStore).toHaveBeenCalledTimes(1);
+  });
+
   it('answers 500 without leaking detail when the store cannot start, and reaches no handler', async () => {
     mockInitStore.mockRejectedValueOnce(new Error('DYNAMODB_TABLE is required when STORE=dynamodb'));
     const res = await invoke(makeEvent());
