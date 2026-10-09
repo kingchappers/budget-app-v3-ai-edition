@@ -26,10 +26,12 @@ beforeAll(() => {
   const site = path.join(base, 'site');
   fs.mkdirSync(path.join(site, 'assets'), { recursive: true });
   fs.mkdirSync(path.join(site, 'icons'));
+  fs.mkdirSync(path.join(site, 'about'));
   fs.mkdirSync(path.join(base, 'site-evil'));
   fs.writeFileSync(path.join(site, 'index.html'), INDEX_HTML);
   fs.writeFileSync(path.join(site, 'assets', 'index-abc12345.js'), 'console.log("app")');
   fs.writeFileSync(path.join(site, 'icons', 'icon-192.png'), BINARY_BYTES);
+  fs.writeFileSync(path.join(site, 'about', 'home-phone-light.webp'), BINARY_BYTES);
   fs.writeFileSync(path.join(site, 'manifest.webmanifest'), '{"name":"Budget"}');
   fs.writeFileSync(path.join(site, 'favicon.ico'), BINARY_BYTES);
   fs.writeFileSync(path.join(site, 'index.js'), 'handler source');
@@ -82,6 +84,16 @@ describe('serving files', () => {
 
     expect(res.statusCode).toBe(200);
     expect(res.headers?.['Content-Type']).toBe('image/png');
+    expect(res.headers?.['Cache-Control']).toBe('public, max-age=86400');
+    expect(res.isBase64Encoded).toBe(true);
+    expect(Buffer.from(res.body ?? '', 'base64').equals(BINARY_BYTES)).toBe(true);
+  });
+
+  it('serves About page screenshots as base64 WebP with a one-day cache', async () => {
+    const res = await handle({ rawPath: '/about/home-phone-light.webp' });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.headers?.['Content-Type']).toBe('image/webp');
     expect(res.headers?.['Cache-Control']).toBe('public, max-age=86400');
     expect(res.isBase64Encoded).toBe(true);
     expect(Buffer.from(res.body ?? '', 'base64').equals(BINARY_BYTES)).toBe(true);

@@ -35,6 +35,14 @@ function isSettingsActive(pathname: string): boolean {
   return SETTINGS_PATHS.some(path => pathname.startsWith(path));
 }
 
+// Pages anyone can read without signing in. Keep this short: everything else waits for a session.
+export const PUBLIC_PATHS: readonly string[] = ['/about'];
+
+export function isPublicPath(pathname: string): boolean {
+  const path = pathname.length > 1 && pathname.endsWith('/') ? pathname.slice(0, -1) : pathname;
+  return PUBLIC_PATHS.includes(path);
+}
+
 // An active tab is bold and has a bar above it, so it is not told apart by colour alone.
 function TabLink({ to, label, Icon, active }: { to: string; label: string; Icon: typeof IconHome; active: boolean }) {
   return (
@@ -131,6 +139,8 @@ function useSessionState(): SessionState {
 }
 
 function MainContent({ session, children }: { session: SessionState; children: React.ReactNode }) {
+  const { pathname } = useLocation();
+  if (isPublicPath(pathname)) return <>{children}</>;
   if (session === 'loading') {
     return (
       <Group justify="center" py="xl" role="status" aria-label="Checking your session">
