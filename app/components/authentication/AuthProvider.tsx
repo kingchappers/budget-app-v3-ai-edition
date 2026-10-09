@@ -1,16 +1,21 @@
 import { useEffect, useState } from 'react';
 import { Auth0Provider } from '@auth0/auth0-react';
 import { Center, Loader, Text } from '@mantine/core';
-import { getRuntimeConfig } from '~/lib/runtimeConfig';
+import { getRuntimeConfig, peekRuntimeConfig } from '~/lib/runtimeConfig';
 import type { RuntimeConfig } from '~/lib/runtimeConfig';
 import { LocalAuthProvider } from './LocalAuthProvider';
 
 type Loaded = { status: 'loading' } | { status: 'error' } | { status: 'ready'; config: RuntimeConfig };
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [loaded, setLoaded] = useState<Loaded>({ status: 'loading' });
+  const [loaded, setLoaded] = useState<Loaded>(() => {
+    // Every route mounts its own layout; once the config is known there is nothing to wait for.
+    const config = peekRuntimeConfig();
+    return config ? { status: 'ready', config } : { status: 'loading' };
+  });
 
   useEffect(() => {
+    if (loaded.status === 'ready') return;
     let cancelled = false;
     getRuntimeConfig().then(
       config => { if (!cancelled) setLoaded({ status: 'ready', config }); },
@@ -20,7 +25,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       },
     );
     return () => { cancelled = true; };
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (loaded.status === 'loading') {
     return <Center mih="100vh"><Loader aria-label="Starting the app" /></Center>;

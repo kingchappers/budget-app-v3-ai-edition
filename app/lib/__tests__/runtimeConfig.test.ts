@@ -58,3 +58,18 @@ describe('configFromViteEnv', () => {
     expect(configFromViteEnv({ VITE_AUTH0_DOMAIN: 't.example.com' })).toBeUndefined();
   });
 });
+
+describe('peekRuntimeConfig', () => {
+  it('is undefined until the config has loaded, then returns it', async () => {
+    vi.resetModules();
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ auth: 'local' }) }));
+    try {
+      const fresh = await import('../runtimeConfig');
+      expect(fresh.peekRuntimeConfig()).toBeUndefined();
+      await fresh.getRuntimeConfig();
+      expect(fresh.peekRuntimeConfig()).toEqual({ auth: 'local' });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+});

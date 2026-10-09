@@ -44,6 +44,7 @@ export function LocalAuthForm({ setupRequired, onLogin, onSetup }: Props) {
             <TextInput label="Setup code" value={code} onChange={e => setCode(e.currentTarget.value)} required withAsterisk={false} autoComplete="off" />
           </>
         )}
+        <Text size="sm" c="dimmed">All fields are required.</Text>
         <TextInput label="Email" type="email" value={email} onChange={e => setEmail(e.currentTarget.value)} required withAsterisk={false} autoComplete="username" />
         <PasswordInput
           label="Password"
@@ -52,7 +53,7 @@ export function LocalAuthForm({ setupRequired, onLogin, onSetup }: Props) {
           required
           withAsterisk={false}
           maxLength={MAX_PASSWORD_LENGTH}
-          description={setupRequired ? `Use at least ${MIN_PASSWORD_LENGTH} characters` : undefined}
+          description={setupRequired ? `At least ${MIN_PASSWORD_LENGTH} characters` : undefined}
           autoComplete={setupRequired ? 'new-password' : 'current-password'}
         />
         {error && <Alert color="red" role="alert">{error}</Alert>}

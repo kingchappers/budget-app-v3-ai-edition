@@ -77,4 +77,14 @@ describe('local auth store', () => {
     await logoutLocal();
     expect(fetchMock).toHaveBeenCalledWith('/api/auth/logout', expect.objectContaining({ method: 'POST' }));
   });
+
+  it('rejects when /logout fails, so the caller can tell the user', async () => {
+    fetchMock.mockResolvedValueOnce(reply(500, { error: 'Server error' }));
+    await expect(logoutLocal()).rejects.toThrow('Server error');
+  });
+
+  it('lets a network failure on /logout propagate', async () => {
+    fetchMock.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    await expect(logoutLocal()).rejects.toThrow('Failed to fetch');
+  });
 });

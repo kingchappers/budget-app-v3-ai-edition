@@ -56,12 +56,28 @@ describe('LocalAuthForm', () => {
     expect(screen.getByLabelText('Email')).toHaveValue('me@example.com');
   });
 
-  it('does not submit a password that is too short', () => {
-    const onLogin = vi.fn();
-    renderForm({ setupRequired: true, onSetup: onLogin });
+  it('says every field is required', () => {
+    renderForm({ setupRequired: false });
+    expect(screen.getByText('All fields are required.')).toBeInTheDocument();
+  });
+
+  it('does not create an account with a password that is too short', () => {
+    const onSetup = vi.fn();
+    renderForm({ setupRequired: true, onSetup });
+    fireEvent.change(screen.getByLabelText('Setup code'), { target: { value: 'abc123' } });
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'me@example.com' } });
     fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'short' } });
     fireEvent.click(screen.getByRole('button', { name: 'Create account' }));
-    expect(onLogin).not.toHaveBeenCalled();
-    expect(screen.getByText(/at least 12/)).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('Password must be at least 12 characters');
+    expect(onSetup).not.toHaveBeenCalled();
+  });
+
+  it('still submits a short password when signing in', async () => {
+    const onLogin = vi.fn().mockResolvedValue(undefined);
+    renderForm({ setupRequired: false, onLogin });
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'me@example.com' } });
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'short' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
+    await waitFor(() => expect(onLogin).toHaveBeenCalledWith('me@example.com', 'short'));
   });
 });

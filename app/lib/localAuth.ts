@@ -79,7 +79,8 @@ export function setupLocal(input: { code: string; email: string; password: strin
 }
 
 export async function logoutLocal(): Promise<void> {
-  await postJson('/api/auth/logout', {});
+  const response = await postJson('/api/auth/logout', {});
+  if (!response.ok) throw await readError(response, 'Sign out failed');
 }
 
 // The API said 401: the session ended on the server (expired, or reset from the CLI).

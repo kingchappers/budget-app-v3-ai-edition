@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { Modal } from '@mantine/core';
+import { notifications } from '@mantine/notifications';
 import { LocalAuthContext } from '~/lib/auth';
 import type { AuthState } from '~/lib/auth';
 import { clearSessionEnded } from '~/lib/session';
@@ -13,11 +14,21 @@ export function LocalAuthProvider({ children }: { children: React.ReactNode }) {
   const [formOpen, setFormOpen] = useState(false);
 
   useEffect(() => { void ensureLocalAuth(); }, []);
-  useEffect(() => { if (snapshot.status === 'signedIn') clearSessionEnded(); }, [snapshot.status]);
+  useEffect(() => {
+    if (snapshot.status !== 'signedIn') return;
+    clearSessionEnded();
+    setFormOpen(false); // a later session expiry must not pop the form open unprompted
+  }, [snapshot.status]);
 
   const login = useCallback(() => setFormOpen(true), []);
   const logout = useCallback(async () => {
-    await logoutLocal();
+    try {
+      await logoutLocal();
+    } catch (error) {
+      console.error('Sign out failed:', error);
+      notifications.show({ color: 'red', message: 'Could not sign out. Please try again.' });
+      return;
+    }
     window.location.assign('/'); // a fresh load drops every in-memory cache, as Auth0's redirect does
   }, []);
   const getToken = useCallback(async () => undefined, []);

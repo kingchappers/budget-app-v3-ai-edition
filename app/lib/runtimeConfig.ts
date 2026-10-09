@@ -53,14 +53,25 @@ export function configFromViteEnv(env: Record<string, unknown>): RuntimeConfig |
 }
 
 let loading: Promise<RuntimeConfig> | undefined;
+let resolved: RuntimeConfig | undefined;
+
+// The config once it has loaded, so a layout that mounts later can render without waiting.
+export function peekRuntimeConfig(): RuntimeConfig | undefined {
+  return resolved;
+}
 
 // Every route renders its own layout, so the config is fetched once and shared.
 export function getRuntimeConfig(): Promise<RuntimeConfig> {
-  loading ??= loadRuntimeConfig().catch((error: unknown) => {
-    const fallback = import.meta.env.DEV ? configFromViteEnv(import.meta.env) : undefined;
-    if (fallback) return fallback;
-    loading = undefined; // let a retry fetch again
-    throw error;
-  });
+  loading ??= loadRuntimeConfig()
+    .catch((error: unknown) => {
+      const fallback = import.meta.env.DEV ? configFromViteEnv(import.meta.env) : undefined;
+      if (fallback) return fallback;
+      loading = undefined; // let a retry fetch again
+      throw error;
+    })
+    .then(config => {
+      resolved = config;
+      return config;
+    });
   return loading;
 }

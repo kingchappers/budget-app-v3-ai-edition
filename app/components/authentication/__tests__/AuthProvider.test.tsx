@@ -3,7 +3,8 @@ import { render, screen } from '@testing-library/react';
 import { MantineProvider } from '@mantine/core';
 
 const mockGetRuntimeConfig = vi.hoisted(() => vi.fn());
-vi.mock('~/lib/runtimeConfig', () => ({ getRuntimeConfig: mockGetRuntimeConfig }));
+const mockPeekRuntimeConfig = vi.hoisted(() => vi.fn());
+vi.mock('~/lib/runtimeConfig', () => ({ getRuntimeConfig: mockGetRuntimeConfig, peekRuntimeConfig: mockPeekRuntimeConfig }));
 vi.mock('@auth0/auth0-react', () => ({
   Auth0Provider: ({ children, domain }: { children: React.ReactNode; domain: string }) => <div data-testid="auth0" data-domain={domain}>{children}</div>,
   useAuth0: () => ({}),
@@ -18,6 +19,7 @@ function renderProvider() {
 
 beforeEach(() => {
   mockGetRuntimeConfig.mockReset();
+  mockPeekRuntimeConfig.mockReset();
   vi.spyOn(console, 'error').mockImplementation(() => {});
 });
 
@@ -40,5 +42,12 @@ describe('AuthProvider', () => {
     renderProvider();
     expect(await screen.findByText(/could not start/i)).toBeInTheDocument();
     expect(screen.queryByText('app')).not.toBeInTheDocument();
+  });
+
+  it('renders the app at once when the config is already known', () => {
+    mockPeekRuntimeConfig.mockReturnValue({ auth: 'local' });
+    renderProvider();
+    expect(screen.getByText('app')).toBeInTheDocument();
+    expect(mockGetRuntimeConfig).not.toHaveBeenCalled();
   });
 });
