@@ -1,6 +1,7 @@
-import { Button, Stack, Text, Title } from '@mantine/core';
+import { Anchor, Button, Stack, Text, Title } from '@mantine/core';
 import { IconLock } from '@tabler/icons-react';
 import { useAuth0 } from '@auth0/auth0-react';
+import { Link } from 'react-router';
 import { SESSION_LIFETIME_TEXT } from '~/lib/sessionLifetime';
 
 export interface SignedOutPanelProps {
@@ -25,6 +26,7 @@ export function SignedOutPanel({ sessionEnded }: SignedOutPanelProps) {
       <Text>Your data is safe. Sign in to see it.</Text>
       <Button size="lg" onClick={() => void signIn()}>Sign in</Button>
       <Text size="sm">{SESSION_LIFETIME_TEXT}</Text>
+      <Anchor component={Link} to="/about" size="sm">See what it looks like</Anchor>
     </Stack>
   );
 }

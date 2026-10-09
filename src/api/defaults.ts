@@ -29,7 +29,7 @@ export const DEFAULT_CATEGORIES: Category[] = [
   def('cat-transport', 'Transport', 'EXPENSE', '🛞', 'EVERYDAY'),
   // SAVING & INVESTMENT
   def('cat-emergency-fund', 'Emergency fund', 'POT', '😌', 'SAVING_INVESTMENT'),
-  def('cat-investment', 'Investment', 'POT', 'tag', 'SAVING_INVESTMENT'),
+  def('cat-investment', 'Investment', 'POT', '📈', 'SAVING_INVESTMENT'),
   // INCOME (ungrouped)
   def('cat-salary', 'Salary', 'INCOME', 'briefcase'),
   def('cat-freelance', 'Freelance/Contract', 'INCOME', 'code'),

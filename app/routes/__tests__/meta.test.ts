@@ -3,6 +3,7 @@ import { describe, it, expect, vi } from 'vitest';
 vi.mock('~/components/layout/DefaultLayout', () => ({ DefaultLayout: () => null }));
 
 import * as home from '../_index';
+import * as about from '../about';
 import * as accounts from '../accounts';
 import * as categories from '../categories';
 import * as insights from '../insights';
@@ -27,6 +28,7 @@ const cases: [string, RouteWithMeta, string][] = [
   ['Insights', insights, 'Insights – Budget'],
   ['Accounts', accounts, 'Accounts – Budget'],
   ['Settings', settings, 'Settings – Budget'],
+  ['About', about, 'About – Budget'],
   ['Any other page', root, 'Budget'],
 ];
 

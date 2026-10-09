@@ -165,6 +165,23 @@ function SettingsContent() {
         <Text size="sm" mb="xs">Three short screens on budgets, pots and recurring bills.</Text>
         <Button variant="default" onClick={replayTour}>Take the tour again</Button>
       </Card>
+
+      <Card withBorder>
+        <Title order={2} size="h4" mb="sm">Help</Title>
+        <Link
+          to="/about"
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+            minHeight: 44, padding: '8px 0', textDecoration: 'none', color: 'inherit',
+          }}
+        >
+          <span>
+            <Text fw={500}>Help and about</Text>
+            <Text size="sm" c="dimmed">A short tour of every page, with pictures.</Text>
+          </span>
+          <IconChevronRight size={18} aria-hidden />
+        </Link>
+      </Card>
     </Stack>
   );
 }
