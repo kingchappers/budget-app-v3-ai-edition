@@ -1,6 +1,6 @@
-import { QueryCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
-import { docClient, TABLE, pk, catSk } from './db';
+import { ConditionFailedError, getStore } from '../store';
+import { pk, catSk } from './db';
 import { DEFAULT_CATEGORY_IDS } from './defaults';
 import { ok, err } from './http';
 import type { ApiResponse } from './types';
@@ -21,41 +21,18 @@ async function reassignItems(
   categoryId: string,
   toCategoryId: string,
 ): Promise<number> {
-  const matching: Record<string, unknown>[] = [];
-  let lastEvaluatedKey: Record<string, unknown> | undefined;
-  do {
-    const result = await docClient.send(new QueryCommand({
-      TableName: TABLE,
-      KeyConditionExpression: 'PK = :pk AND begins_with(SK, :prefix)',
-      ExpressionAttributeValues: { ':pk': pk(userId), ':prefix': prefix },
-      ExclusiveStartKey: lastEvaluatedKey,
-    }));
-
-    for (const item of result.Items || []) {
-      if (item.categoryId === categoryId) {
-        matching.push(item);
-      }
-    }
-
-    lastEvaluatedKey = result.LastEvaluatedKey as Record<string, unknown> | undefined;
-  } while (lastEvaluatedKey);
+  const store = getStore();
+  const items = await store.query(pk(userId), { skPrefix: prefix });
+  const matching = items.filter(item => item.categoryId === categoryId);
 
   let reassigned = 0;
   for (const batch of chunk(matching, UPDATE_BATCH_SIZE)) {
     const results = await Promise.all(batch.map(async (item) => {
       try {
-        await docClient.send(new UpdateCommand({
-          TableName: TABLE,
-          Key: { PK: pk(userId), SK: item.SK },
-          UpdateExpression: 'SET categoryId = :c',
-          ConditionExpression: 'attribute_exists(SK)',
-          ExpressionAttributeValues: { ':c': toCategoryId },
-        }));
+        await store.patch({ PK: pk(userId), SK: item.SK }, { categoryId: toCategoryId }, { mustExist: true });
         return true;
       } catch (error) {
-        if (error instanceof Error && error.name === 'ConditionalCheckFailedException') {
-          return false;
-        }
+        if (error instanceof ConditionFailedError) return false;
         throw error;
       }
     }));
@@ -92,12 +69,8 @@ export async function reassignCategory(
   }
 
   if (!DEFAULT_CATEGORY_IDS.has(toCategoryId)) {
-    const target = await docClient.send(new QueryCommand({
-      TableName: TABLE,
-      KeyConditionExpression: 'PK = :pk AND SK = :sk',
-      ExpressionAttributeValues: { ':pk': pk(userId), ':sk': catSk(toCategoryId) },
-    }));
-    if (!target.Items || target.Items.length === 0) {
+    const target = await getStore().get({ PK: pk(userId), SK: catSk(toCategoryId) });
+    if (!target) {
       return err(400, 'toCategoryId does not exist');
     }
   }
