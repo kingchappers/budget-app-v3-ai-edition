@@ -338,3 +338,53 @@ describe('DefaultLayout navigation keeps the month', () => {
     expect(hrefsFor('Transactions').every(href => href === '/transactions')).toBe(true);
   });
 });
+
+describe('DefaultLayout public pages', () => {
+  it('shows /about to someone who is signed out, not the sign-in panel', () => {
+    auth.isAuthenticated = false;
+    renderLayout(<p>about content</p>, '/about');
+    expect(screen.getByText('about content')).toBeInTheDocument();
+    expect(screen.queryByText("You're signed out")).not.toBeInTheDocument();
+  });
+
+  it('still gates other pages when signed out', () => {
+    auth.isAuthenticated = false;
+    renderLayout(<p>private content</p>, '/transactions');
+    expect(screen.queryByText('private content')).not.toBeInTheDocument();
+    expect(screen.getByText("You're signed out")).toBeInTheDocument();
+  });
+
+  it('matches /about with a trailing slash', () => {
+    auth.isAuthenticated = false;
+    renderLayout(<p>about content</p>, '/about/');
+    expect(screen.getByText('about content')).toBeInTheDocument();
+  });
+
+  it('does not treat a path that only starts with /about as public', () => {
+    auth.isAuthenticated = false;
+    renderLayout(<p>private content</p>, '/about-me');
+    expect(screen.queryByText('private content')).not.toBeInTheDocument();
+  });
+
+  it('shows /about straight away while Auth0 is still loading, with no spinner', () => {
+    auth.isAuthenticated = false;
+    auth.isLoading = true;
+    renderLayout(<p>about content</p>, '/about');
+    expect(screen.getByText('about content')).toBeInTheDocument();
+    expect(screen.queryByRole('status', { name: 'Checking your session' })).not.toBeInTheDocument();
+  });
+
+  it('shows /about, not "Your session has ended", after a session has ended', () => {
+    auth.isAuthenticated = false;
+    auth.error = authError('login_required');
+    renderLayout(<p>about content</p>, '/about');
+    expect(screen.getByText('about content')).toBeInTheDocument();
+    expect(screen.queryByText('Your session has ended')).not.toBeInTheDocument();
+  });
+
+  it('shows /about to a signed-in person too, and keeps the Add button for them', () => {
+    renderLayout(<p>about content</p>, '/about');
+    expect(screen.getByText('about content')).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Add transaction' }).length).toBeGreaterThan(0);
+  });
+});
