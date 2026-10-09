@@ -4,7 +4,7 @@ function digest(value: string): Buffer {
   return createHash('sha256').update(value).digest();
 }
 
-// Lives in memory only. It is logged once at start-up and discarded when the account is created.
+// Lives in memory only. It is logged once, when the provider is first built (the first API request), and discarded when the account is created.
 export class SetupCode {
   private code: string | undefined;
 

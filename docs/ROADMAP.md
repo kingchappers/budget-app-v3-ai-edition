@@ -200,8 +200,17 @@ Runs the app as a single container alongside the AWS deployment, so people can h
 | Sub-project | What it delivers | Status |
 |---|---|---|
 | Storage Interface | A backend-neutral `Store` interface with DynamoDB and SQLite implementations, a shared contract suite, every handler migrated, and per-user export/import. No user-visible change. | Merged (PR #85); the contract suite passes against DynamoDB Local in CI. Spec: `superpowers/specs/2026-10-06-storage-interface-design.md`, plan: `superpowers/plans/2026-10-06-storage-interface.md` |
-| Portable Auth | An auth-provider abstraction in the API and frontend, runtime config instead of build-time `VITE_AUTH0_*`, Auth0 kept, and a built-in single-account login (first-run setup, signed sessions, CLI password reset). | Implemented on `feat/portable-auth`, awaiting review. Spec: `superpowers/specs/2026-10-09-portable-auth-design.md`, plan: `superpowers/plans/2026-10-09-portable-auth.md` |
+| Portable Auth | An auth-provider abstraction in the API and frontend, runtime config instead of build-time `VITE_AUTH0_*`, Auth0 kept, and a built-in single-account login (first-run setup, random server-side session IDs, CLI password reset). | Implemented on `feat/portable-auth`, awaiting review. Spec: `superpowers/specs/2026-10-09-portable-auth-design.md`, plan: `superpowers/plans/2026-10-09-portable-auth.md` |
 | Container Image | One Node server for the API and static files, an in-process push scheduler, a multi-arch Dockerfile, GHCR publishing, a compose example, a healthcheck, and docs for HTTPS, upgrades and backups. Needs both of the above. | Not started |
+
+### Moving your data from AWS to a self-hosted instance
+
+Export and import only touch a user's own `USER#` data (never the `AUTH#` login records), so the steps are:
+
+1. With AWS credentials, run `STORE=dynamodb DYNAMODB_TABLE=<table> yarn store-cli export 'auth0|abc' --out budget-export.jsonl` (your Auth0 `sub`). The file is owner-only and holds financial data: keep it private and never commit it.
+2. Start the self-hosted instance and finish the first-run setup (create the account with the setup code from the server log).
+3. While signed in, read your local user id from `GET /api/auth/me` (the `userId` field, `local|<uuid>`), for example `fetch('/api/auth/me').then(r => r.json())` in the browser console on the app's own page.
+4. Run `STORE=sqlite SQLITE_PATH=<the instance's database file> yarn store-cli import --in budget-export.jsonl --as-user 'local|<uuid>'`. Add `--replace` only if the account already has data. Push subscriptions are not carried over; re-enable notifications on each device.
 
 Later, separate from the three above: Demo Mode (a public try-it instance with fake data) and Generic OIDC login.
 

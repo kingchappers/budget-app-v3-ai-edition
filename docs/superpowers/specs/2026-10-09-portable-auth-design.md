@@ -63,7 +63,7 @@ These are the only public routes (the AUTH-05 exceptions); everything else stays
 
 ### Setup code
 
-At startup, if no account exists, generate a random code, hold it in memory only, and log it once. A restart before setup generates a new code (the setup page says so). The code is compared in constant time. After setup it is discarded.
+When the auth provider is first built (lazily, on the first request that reaches the API, normally the SPA's `GET /api/auth/me`), if no account exists, generate a random code, hold it in memory only, and log it once. A restart before setup generates a new code (the setup page says so). The code is compared in constant time. After setup it is discarded.
 
 ### Passwords, sessions and throttling
 
@@ -73,7 +73,7 @@ At startup, if no account exists, generate a random code, hold it in memory only
 - Sessions last 30 days, sliding: `expiresAt` is extended when less than half the lifetime remains, to avoid a write on every request.
 - State-changing requests (anything but `GET`/`HEAD`) must carry an `Origin` that matches the request host, as CSRF defence in depth beside `SameSite=Strict`.
 - `store-cli reset-password` prompts for the password (never via argv or the environment), replaces the hash and deletes every session.
-- Passwords, cookies, session IDs and the setup code are never logged (AUTH-06), with one exception: the setup code logged once at startup.
+- Passwords, cookies, session IDs and the setup code are never logged (AUTH-06), with one exception: the setup code, logged once when the server first handles a request.
 
 ## 2. Frontend
 
@@ -96,7 +96,7 @@ All on the real in-memory `SqliteStore` via `useTestStore`.
   - The stored session key is a hash, never the raw cookie.
   - A non-GET request with a foreign `Origin` is refused.
   - Password length limits hold at both ends.
-  - Passwords, cookies and the setup code never reach `console`, except the one startup log of the setup code.
+  - Passwords, cookies and the setup code never reach `console`, except the one log of the setup code, made when the provider is first built.
 - **Frontend:** `useAuth()` for both providers across setup, login and error states. Existing component tests keep passing through a thin shim that keeps their Auth0 mocks working.
 - **Browser check:** a Playwright run of setup, login, reload, logout against a local-mode server, in this project's plan and not left as a follow-up (the offline-queue work never got this check).
 
@@ -113,4 +113,5 @@ All on the real in-memory `SqliteStore` via `useTestStore`.
 - `scrypt` at about 32 MB may be tight on very small hosts (256 MB containers). Parameters are stored per hash so they can be tuned without invalidating accounts.
 - The SQLite TTL purge runs hourly, so an expired session row can still be read. `readSession` therefore checks `expiresAt` itself and never relies on the purge.
 - The sliding-session write is skipped until half the lifetime has passed, so `expiresAt` is approximate to within that margin.
+- Container Image must call `await initAuth()` at boot so the code is logged at start-up and a bad AUTH_MODE fails fast instead of returning a 500 on every request.
 - The first-run setup window is protected by the log-printed code only; anyone with log access can set up the instance, which is the intended trust boundary.

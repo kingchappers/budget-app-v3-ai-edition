@@ -40,7 +40,7 @@ export function LocalAuthForm({ setupRequired, onLogin, onSetup }: Props) {
       <Stack>
         {setupRequired && (
           <>
-            <Text size="sm">Create the account for this instance. The setup code is printed once in the server log when it first starts; restarting before you finish makes a new one.</Text>
+            <Text size="sm">Create the account for this instance. The setup code is printed once in the server log when the server first handles a request; restarting before you finish makes a new one.</Text>
             <TextInput label="Setup code" value={code} onChange={e => setCode(e.currentTarget.value)} required withAsterisk={false} autoComplete="off" />
           </>
         )}

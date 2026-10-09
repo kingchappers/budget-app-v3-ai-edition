@@ -13,7 +13,11 @@ const USAGE = `Usage:
   reset-password                           set a new password for the built-in login, end every session and clear any lock-out (prompts; the password is never taken from arguments)
 
 The backend comes from the environment: STORE=dynamodb with DYNAMODB_TABLE (and your AWS credentials),
-or STORE=sqlite with SQLITE_PATH. The export holds financial data: keep it private and never commit it.`;
+or STORE=sqlite with SQLITE_PATH. The export holds financial data: keep it private and never commit it.
+
+Moving from AWS to a self-hosted instance: export your Auth0 user id (e.g. auth0|abc) from DynamoDB, finish the first-run
+setup on the new instance, read your local user id (local|<uuid>) from GET /api/auth/me, then import with --as-user <that id>
+against STORE=sqlite (add --replace only if the account already has data).`;
 
 export async function runCli(argv: string[], env: NodeJS.ProcessEnv = process.env, io: { readPassword?: (prompt: string) => Promise<string> } = {}): Promise<string> {
   const { positionals, values } = parseArgs({
