@@ -25,7 +25,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       },
     );
     return () => { cancelled = true; };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   if (loaded.status === 'loading') {
     return <Center mih="100vh"><Loader aria-label="Starting the app" /></Center>;
