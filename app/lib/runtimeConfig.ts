@@ -21,10 +21,26 @@ export function parseRuntimeConfig(value: unknown): RuntimeConfig {
   throw new Error('config.json: "auth" must be "auth0" or "local"');
 }
 
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 export async function loadRuntimeConfig(fetchImpl: typeof fetch = fetch): Promise<RuntimeConfig> {
-  const response = await fetchImpl('/config.json', { cache: 'no-cache' });
+  let response: Response;
+  try {
+    response = await fetchImpl('/config.json', { cache: 'no-cache' });
+  } catch (error: unknown) {
+    throw new Error(`config.json could not be loaded: ${errorMessage(error)}`, { cause: error });
+  }
   if (!response.ok) throw new Error(`config.json could not be loaded (${response.status})`);
-  return parseRuntimeConfig(await response.json());
+
+  let body: unknown;
+  try {
+    body = await response.json();
+  } catch (error: unknown) {
+    throw new Error('config.json is not valid JSON', { cause: error });
+  }
+  return parseRuntimeConfig(body);
 }
 
 // `yarn dev` has no build step to write config.json, so it may fall back to the Vite variables. A production build never does.

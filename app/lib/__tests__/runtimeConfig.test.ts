@@ -39,7 +39,12 @@ describe('loadRuntimeConfig', () => {
 
   it('fails on HTML served in place of JSON (a SPA fallback)', async () => {
     const fetchImpl = vi.fn().mockResolvedValue({ ok: true, json: async () => { throw new SyntaxError('Unexpected token <'); } });
-    await expect(loadRuntimeConfig(fetchImpl as unknown as typeof fetch)).rejects.toThrow();
+    await expect(loadRuntimeConfig(fetchImpl as unknown as typeof fetch)).rejects.toThrow(/config\.json/);
+  });
+
+  it('fails clearly when the request itself fails', async () => {
+    const fetchImpl = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'));
+    await expect(loadRuntimeConfig(fetchImpl as unknown as typeof fetch)).rejects.toThrow(/config\.json/);
   });
 });
 
