@@ -46,7 +46,7 @@ All under an `AUTH#` partition, not `USER#`. The export/import CLI works by `que
 | Item | PK / SK | Fields |
 |------|---------|--------|
 | Account | `AUTH#ACCOUNT` / `PROFILE` | `userId` (`local\|<uuid>`), `email`, `passwordHash`, `salt`, scrypt `N`/`r`/`p`, `createdAt` |
-| Session | `AUTH#SESSION#<sha256(cookie)>` / `SESSION` | `userId`, `createdAt`, `expiresAt` (numeric, so the SQLite TTL purge removes it) |
+| Session | `AUTH#SESSIONS` / `<sha256(cookie)>` | `userId`, `createdAt`, `expiresAt` (numeric epoch seconds, so the SQLite TTL purge removes it). One shared partition, because `Store.query` lists a single partition and a password reset must find every session. |
 | Throttle | `AUTH#THROTTLE` / `LOGIN` | `failures`, `nextAllowedAt` |
 
 ### Routes (local mode only)
@@ -111,5 +111,6 @@ All on the real in-memory `SqliteStore` via `useTestStore`.
 
 - `Secure` cookies over plain HTTP cannot be tested end to end here; `COOKIE_SECURE=false` exists for LAN installs and is unverified.
 - `scrypt` at about 32 MB may be tight on very small hosts (256 MB containers). Parameters are stored per hash so they can be tuned without invalidating accounts.
+- The SQLite TTL purge runs hourly, so an expired session row can still be read. `readSession` therefore checks `expiresAt` itself and never relies on the purge.
 - The sliding-session write is skipped until half the lifetime has passed, so `expiresAt` is approximate to within that margin.
 - The first-run setup window is protected by the log-printed code only; anyone with log access can set up the instance, which is the intended trust boundary.
