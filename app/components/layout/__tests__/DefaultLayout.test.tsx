@@ -388,3 +388,18 @@ describe('DefaultLayout public pages', () => {
     expect(screen.getAllByRole('button', { name: 'Add transaction' }).length).toBeGreaterThan(0);
   });
 });
+
+describe('DefaultLayout sign-in panel links', () => {
+  it('links from the signed-out panel to /about', () => {
+    auth.isAuthenticated = false;
+    renderLayout(<p>private content</p>, '/');
+    expect(screen.getByRole('link', { name: 'See what it looks like' })).toHaveAttribute('href', '/about');
+  });
+
+  it('links from the session-ended panel to /about as well', () => {
+    auth.isAuthenticated = false;
+    auth.error = authError('login_required');
+    renderLayout(<p>private content</p>, '/');
+    expect(screen.getByRole('link', { name: 'See what it looks like' })).toHaveAttribute('href', '/about');
+  });
+});

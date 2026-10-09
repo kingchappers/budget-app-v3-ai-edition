@@ -31,6 +31,11 @@ beforeEach(() => {
 });
 
 describe('Settings page', () => {
+  it('links to the help and about page', () => {
+    renderSettings();
+    expect(screen.getByRole('link', { name: /^Help and about/ })).toHaveAttribute('href', '/about');
+  });
+
   it('has a Settings heading', () => {
     renderSettings();
     expect(screen.getByRole('heading', { name: 'Settings' })).toBeInTheDocument();
@@ -133,10 +138,10 @@ describe('Settings page', () => {
   });
 
   describe('grouping', () => {
-    it('groups the controls under Signing in, Display, Messages, Money, Keyboard and launch, Reminders and Manage, in that order', () => {
+    it('groups the controls under Signing in, Display, Messages, Money, Keyboard and launch, Reminders, Manage and Help, in that order', () => {
       renderSettings();
       const headings = screen.getAllByRole('heading', { level: 2 }).map(heading => heading.textContent);
-      expect(headings).toEqual(['Signing in', 'Display', 'Messages', 'Money', 'Keyboard and launch', 'Reminders', 'Manage']);
+      expect(headings).toEqual(['Signing in', 'Display', 'Messages', 'Money', 'Keyboard and launch', 'Reminders', 'Manage', 'Help']);
     });
 
     it('keeps to a handful of controls, each with a line of plain help', () => {
