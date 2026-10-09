@@ -200,7 +200,7 @@ Runs the app as a single container alongside the AWS deployment, so people can h
 | Sub-project | What it delivers | Status |
 |---|---|---|
 | Storage Interface | A backend-neutral `Store` interface with DynamoDB and SQLite implementations, a shared contract suite, every handler migrated, and per-user export/import. No user-visible change. | Merged (PR #85); the contract suite passes against DynamoDB Local in CI. Spec: `superpowers/specs/2026-10-06-storage-interface-design.md`, plan: `superpowers/plans/2026-10-06-storage-interface.md` |
-| Portable Auth | An auth-provider abstraction in the API and frontend, runtime config instead of build-time `VITE_AUTH0_*`, Auth0 kept, and a built-in single-account login (first-run setup, signed sessions, CLI password reset). | Not started |
+| Portable Auth | An auth-provider abstraction in the API and frontend, runtime config instead of build-time `VITE_AUTH0_*`, Auth0 kept, and a built-in single-account login (first-run setup, signed sessions, CLI password reset). | Implemented on `feat/portable-auth`, awaiting review. Spec: `superpowers/specs/2026-10-09-portable-auth-design.md`, plan: `superpowers/plans/2026-10-09-portable-auth.md` |
 | Container Image | One Node server for the API and static files, an in-process push scheduler, a multi-arch Dockerfile, GHCR publishing, a compose example, a healthcheck, and docs for HTTPS, upgrades and backups. Needs both of the above. | Not started |
 
 Later, separate from the three above: Demo Mode (a public try-it instance with fake data) and Generic OIDC login.

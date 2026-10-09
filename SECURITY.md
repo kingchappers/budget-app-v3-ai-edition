@@ -16,12 +16,16 @@ Security requirements for this React + Auth0 + Lambda project. Reference control
 
 | ID | Framework Ref | Control |
 |----|---------------|---------|
-| AUTH-01 | WEB-A01, WEB-A07 | Validate JWT on every API request: signature, `aud`, `iss`, `exp`, `sub` |
-| AUTH-02 | WEB-A07 | Never implement custom auth — delegate to identity provider (Auth0, Okta, etc.) |
-| AUTH-03 | FE-02 | Use identity provider's in-memory token storage, not `localStorage` |
+| AUTH-01 | WEB-A01, WEB-A07 | Validate the credential on every API request: a JWT's signature, `aud`, `iss`, `exp` and `sub` (Auth0 mode), or a server-side session lookup that checks expiry (local mode) |
+| AUTH-02 | WEB-A07 | Never implement custom auth — delegate to an identity provider (Auth0, Okta, etc.). **Exception:** the built-in single-account login (`AUTH_MODE=local`, self-hosted only), which must satisfy AUTH-07 to AUTH-10 |
+| AUTH-03 | FE-02 | Use identity provider's in-memory token storage, not `localStorage`; session cookies must be `HttpOnly`, `SameSite=Strict` and `Secure` (unless `COOKIE_SECURE=false` on a trusted LAN) |
 | AUTH-04 | WEB-A01 | Server-side access control required — hiding UI elements is not access control |
 | AUTH-05 | WEB-A01 | Deny by default — explicit authorization required for all routes except public static files |
 | AUTH-06 | WEB-A02, WEB-A07, WEB-A09 | Never log tokens, session IDs, or credentials |
+| AUTH-07 | WEB-A07 | Passwords are hashed with a memory-hard KDF (scrypt), salted per hash, with parameters stored alongside; the 12–128 character policy is enforced server-side |
+| AUTH-08 | WEB-A07 | Login attempts are throttled with exponential backoff; a wrong password and an unknown account are indistinguishable (body and timing) |
+| AUTH-09 | WEB-A01 | The setup route is protected by a one-time code printed to the server log, and closes permanently once an account exists |
+| AUTH-10 | WEB-A01, WEB-A07 | Session IDs are random, stored only as hashes, revocable (logout, password reset) and rejected once expired; state-changing requests must carry a same-host `Origin` |
 
 **Framework mapping:** WEB-A01 (Broken Access Control), WEB-A07 (Auth Failures), FE-02 (Auth State)
 
@@ -29,6 +33,11 @@ Security requirements for this React + Auth0 + Lambda project. Reference control
 - Maintain separation between public function (static files) and protected function (API with JWT validation)
 - Rate limit auth endpoints (WEB-A04)
 - Handle token expiration gracefully in UI
+
+**Built-in login (`AUTH_MODE=local`) notes:**
+- The login throttle is global, not per client: anyone who can reach the instance can lock the owner out for up to 15 minutes by failing repeatedly. `store-cli reset-password` clears the throttle and revokes every session.
+- Login attempts are serialised in-process to keep the throttle's read-modify-write safe, so the built-in login assumes a single-container deployment.
+- The account, throttle and sessions live under `AUTH#` partitions. Export/import only handles a user's own `USER#` partition, so credentials and sessions are never exported.
 
 ---
 
@@ -195,7 +204,7 @@ Run before creating a PR:
 - [ ] Package audit passes (no critical/high vulnerabilities) — **DEP-01**
 - [ ] No secrets in code, logs, or environment variable references — **SEC-01, SEC-06**
 - [ ] User input validated at API boundaries — **IO-01**
-- [ ] JWT validation on all protected endpoints — **AUTH-01**
+- [ ] Credential validation (JWT or session) on all protected endpoints — **AUTH-01**
 - [ ] Server-side access control enforced — **AUTH-04**
 - [ ] Error messages generic to clients, detailed server-side — **API-02**
 - [ ] `.gitignore` updated if new sensitive files added — **SEC-01**
