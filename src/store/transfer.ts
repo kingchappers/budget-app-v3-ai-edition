@@ -60,7 +60,7 @@ export async function importUser(store: Store, items: Item[], options: ImportOpt
   }
 
   const target = pk(options.asUser);
-  const existing = await store.query(target, { attributes: ['SK'] });
+  const existing = (await store.query(target, { attributes: ['SK'] })).filter(isTransferable);
   if (existing.length > 0 && !options.replace) {
     throw new Error(`User "${options.asUser}" already has data; pass --replace to overwrite it`);
   }

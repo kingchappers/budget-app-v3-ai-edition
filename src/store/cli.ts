@@ -31,6 +31,7 @@ export async function runCli(argv: string[], env: NodeJS.ProcessEnv = process.en
     if (!userId || !values.out) throw new Error(USAGE);
     const store = await initStore(env);
     const items = await exportUser(store, userId);
+    if (items.length === 0) throw new Error(`No data found for user "${userId}"; nothing was exported`);
     writeFileSync(values.out, toJsonl(items), { mode: 0o600, flag: 'wx' });
     return `Exported ${items.length} items for ${userId} to ${values.out}`;
   }

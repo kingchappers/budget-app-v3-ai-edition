@@ -40,7 +40,7 @@ describe('JSONL', () => {
 });
 
 describe('importUser', () => {
-  it('moves the data to the new user id, including between backends', async () => {
+  it('moves the data to the new user id', async () => {
     const source = new SqliteStore(':memory:');
     await seed(source);
     const target = new SqliteStore(':memory:');
@@ -61,6 +61,21 @@ describe('importUser', () => {
     await expect(importUser(target, [{ PK: 'USER#a', SK: 'CAT#x' }], { asUser: 'local-1' }))
       .rejects.toThrow('already has data');
     expect(await target.get({ PK: 'USER#local-1', SK: 'CAT#existing' })).toBeDefined();
+  });
+
+  it('does not count push subscriptions as existing data', async () => {
+    const target = new SqliteStore(':memory:');
+    await target.put({ PK: 'USER#local-1', SK: 'PUSHSUB#hash', endpoint: 'https://example.test/x' });
+    await importUser(target, [{ PK: 'USER#a', SK: 'CAT#x' }], { asUser: 'local-1' });
+    expect(await target.get({ PK: 'USER#local-1', SK: 'PUSHSUB#hash' })).toBeDefined();
+  });
+
+  it('leaves existing push subscriptions alone when replacing', async () => {
+    const target = new SqliteStore(':memory:');
+    await target.put({ PK: 'USER#local-1', SK: 'PUSHSUB#hash', endpoint: 'https://example.test/x' });
+    await target.put({ PK: 'USER#local-1', SK: 'CAT#old', name: 'Old' });
+    await importUser(target, [{ PK: 'USER#a', SK: 'CAT#new' }], { asUser: 'local-1', replace: true });
+    expect((await target.query('USER#local-1')).map(item => item.SK)).toEqual(['CAT#new', 'PUSHSUB#hash']);
   });
 
   it('replaces the existing data when asked', async () => {

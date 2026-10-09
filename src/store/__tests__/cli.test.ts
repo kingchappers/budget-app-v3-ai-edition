@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -57,8 +57,17 @@ describe('runCli', () => {
     expect(await runCli(['--help'], env)).toContain('Usage');
   });
 
-  it('does not touch the file system when the output path is missing', async () => {
+  it('does not create any file when the output path is missing', async () => {
+    await seedDatabase();
+    const before = readdirSync(dir);
     await expect(runCli(['export', 'someone'], env)).rejects.toThrow('Usage');
-    expect(existsSync(join(dir, 'budget-export.jsonl'))).toBe(false);
+    expect(readdirSync(dir)).toEqual(before);
+  });
+
+  it('refuses to export a user with no data and writes no file', async () => {
+    await seedDatabase();
+    const out = join(dir, 'empty-export.jsonl');
+    await expect(runCli(['export', 'auth0|typo', '--out', out], env)).rejects.toThrow('No data found for user "auth0|typo"');
+    expect(existsSync(out)).toBe(false);
   });
 });
