@@ -249,6 +249,7 @@ describe('updateTransaction', () => {
 
   it('updates a transaction within the same month', async () => {
     await seedUser(store, 'user-1', [{ SK: 'TXN#2026-07#txn-1', ...existing }]);
+    const spy = vi.spyOn(store, 'transact');
     const res = await updateTransaction(makeEvent({
       body: { amount: 520, type: 'EXPENSE', categoryId: 'cat-dining', description: 'Pret coffee', date: '2026-07-16' },
     }), 'user-1', params);
@@ -258,6 +259,7 @@ describe('updateTransaction', () => {
     expect(body.transaction.transactionId).toBe('txn-1');
     expect(body.transaction.createdAt).toBe('2026-07-15T09:00:00.000Z');
     expect(await store.get({ PK: 'USER#user-1', SK: 'TXN#2026-07#txn-1' })).toMatchObject({ amount: 520 });
+    expect(spy).not.toHaveBeenCalled();
   });
 
   it('returns 404 when the transaction does not exist', async () => {
@@ -269,12 +271,14 @@ describe('updateTransaction', () => {
 
   it('moves the item transactionally when the month changes', async () => {
     await seedUser(store, 'user-1', [{ SK: 'TXN#2026-07#txn-1', ...existing }]);
+    const spy = vi.spyOn(store, 'transact');
     const res = await updateTransaction(makeEvent({
       body: { amount: 480, type: 'EXPENSE', categoryId: 'cat-dining', description: 'Pret', date: '2026-08-02' },
     }), 'user-1', params);
     expect(res.statusCode).toBe(200);
     expect(JSON.parse(res.body).transaction.yearMonth).toBe('2026-08');
 
+    expect(spy).toHaveBeenCalledOnce();
     expect(await store.get({ PK: 'USER#user-1', SK: 'TXN#2026-07#txn-1' })).toBeUndefined();
     expect(await store.get({ PK: 'USER#user-1', SK: 'TXN#2026-08#txn-1' })).toMatchObject({ yearMonth: '2026-08' });
   });
@@ -382,12 +386,14 @@ describe('createTransaction without a recurring link', () => {
 
   it('moves a transaction to the new month in one step when its date changes month', async () => {
     await seedUser(store, 'user-1', [{ SK: 'TXN#2026-09#t1', transactionId: 't1', yearMonth: '2026-09', amount: 100, type: 'EXPENSE', categoryId: 'cat-dining', description: '', date: '2026-09-30', createdAt: '2026-09-30T00:00:00.000Z' }]);
+    const spy = vi.spyOn(store, 'transact');
     const res = await updateTransaction(
       makeEvent({ body: { amount: 100, type: 'EXPENSE', categoryId: 'cat-dining', description: '', date: '2026-10-01' } }),
       'user-1',
       { yearMonth: '2026-09', transactionId: 't1' },
     );
     expect(res.statusCode).toBe(200);
+    expect(spy).toHaveBeenCalledOnce();
     expect(await store.get({ PK: 'USER#user-1', SK: 'TXN#2026-09#t1' })).toBeUndefined();
     expect(await store.get({ PK: 'USER#user-1', SK: 'TXN#2026-10#t1' })).toMatchObject({ yearMonth: '2026-10', createdAt: '2026-09-30T00:00:00.000Z' });
   });
