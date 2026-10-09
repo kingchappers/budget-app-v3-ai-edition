@@ -42,11 +42,11 @@ export const SHOTS: readonly Shot[] = [
   },
   {
     id: 'plan',
-    route: '/plan',
+    route: '/plan?tab=pots',
     heading: 'Plan: budgets and pots',
     caption: 'A budget is the most you plan to spend on a category. A pot is money kept apart for something.',
     howTo: 'Both are optional. Find them under Plan.',
-    alt: 'The Plan page showing category budgets with progress bars and two savings pots',
+    alt: 'The Plan page on its Pots tab, showing two savings pots with their balances and goals',
   },
   {
     id: 'insights',
@@ -54,15 +54,15 @@ export const SHOTS: readonly Shot[] = [
     heading: 'Insights',
     caption: 'Where your money went, how this month compares, and how your savings are growing.',
     howTo: 'Use the month arrows to look back, and open a section for the detail.',
-    alt: 'The Insights page with a spending breakdown chart and a monthly trend',
+    alt: 'The Insights page with spending broken down by group and a six-month trend chart',
   },
   {
     id: 'recurring',
-    route: '/recurring',
+    route: '/plan?tab=recurring',
     heading: 'Recurring bills',
     caption: 'Add a bill once and the app shows it on Home when it is due.',
     howTo: 'Nothing is added until you confirm it with one tap.',
-    alt: 'The Recurring page listing rent and a subscription with their due days',
+    alt: 'The Recurring tab listing a mortgage and a streaming subscription with their due days',
   },
   {
     id: 'settings',

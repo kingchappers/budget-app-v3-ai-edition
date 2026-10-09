@@ -15,6 +15,11 @@ function daysAgo(now, days) {
   return new Date(now.getTime() - days * DAY_MS);
 }
 
+// The day each month the streaming bill falls on: three days from now, kept inside every month.
+function streamingDay(now) {
+  return Math.min(28, new Date(now.getTime() + 3 * DAY_MS).getUTCDate());
+}
+
 function monthStart(now, delta) {
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + delta, 1));
 }
@@ -48,19 +53,29 @@ const tx = (date, type, categoryId, amount, description, extra = {}) => ({
   amount, type, categoryId, description, date: iso(date), createdAt: `${iso(date)}T09:00:00.000Z`, ...extra,
 });
 
+// Everyday spending drifts from month to month so the trend chart is not a straight line. Fixed bills
+// (mortgage, phone, streaming) and income stay the same.
+const MONTH_FACTOR = { '-5': 1.12, '-4': 0.93, '-3': 1.04, '-2': 1.18, '-1': 0.96, '0': 1 };
+const FIXED = new Set(['cat-mortgage', 'cat-phone-internet', 'cat-subscriptions', 'cat-salary', 'cat-holidays', 'cat-emergency-fund']);
+
 function buildTransactions(now) {
   const rows = [];
-  for (const delta of [-2, -1, 0]) {
+  for (const delta of [-5, -4, -3, -2, -1, 0]) {
     const start = monthStart(now, delta);
     const day = d => new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), d));
     const lastDay = delta === 0 ? now.getUTCDate() : 28;
     const on = d => (d <= lastDay ? day(d) : null);
-    const add = (d, ...args) => { const date = on(d); if (date) rows.push(tx(date, ...args)); };
+    const add = (d, type, categoryId, amount, ...rest) => {
+      const date = on(d);
+      if (!date) return;
+      const scaled = FIXED.has(categoryId) ? amount : Math.round(amount * MONTH_FACTOR[String(delta)]);
+      rows.push(tx(date, type, categoryId, scaled, ...rest));
+    };
     add(1, 'INCOME', 'cat-salary', 215000, 'Salary');
-    add(1, 'EXPENSE', 'cat-mortgage', 78000, 'Mortgage');
+    add(1, 'EXPENSE', 'cat-mortgage', 78000, 'Mortgage', { recurringId: 'rec-mortgage' });
     add(2, 'EXPENSE', 'cat-phone-internet', 3200, 'Phone and broadband');
     add(3, 'EXPENSE', 'cat-groceries', 6420, 'Weekly shop');
-    add(5, 'EXPENSE', 'cat-subscriptions', 1599, 'Streaming');
+    add(streamingDay(now), 'EXPENSE', 'cat-subscriptions', 1599, 'Streaming', { recurringId: 'rec-streaming' });
     add(6, 'EXPENSE', 'cat-transport', 4500, 'Train season top-up');
     add(8, 'EXPENSE', 'cat-going-out', 2850, 'Dinner out');
     add(10, 'EXPENSE', 'cat-groceries', 5870, 'Weekly shop');
@@ -91,11 +106,12 @@ function buildPots(now) {
 }
 
 function buildRecurring(now) {
-  const soon = new Date(now.getTime() + 3 * DAY_MS);
-  const base = { frequency: 'MONTHLY', anchorDate: null, leadDays: 5, handledPeriod: null, createdAt: CREATED_AT, updatedAt: CREATED_AT, type: 'EXPENSE' };
+  // Created six months ago with earlier months confirmed, so Home shows one bill coming up and nothing missed.
+  const created = `${iso(monthStart(now, -5))}T09:00:00.000Z`;
+  const base = { frequency: 'MONTHLY', anchorDate: null, leadDays: 5, createdAt: created, updatedAt: created, type: 'EXPENSE' };
   return [
-    { ...base, recurringId: 'rec-mortgage', categoryId: 'cat-mortgage', amount: 78000, description: 'Mortgage', dayOfMonth: 1 },
-    { ...base, recurringId: 'rec-streaming', categoryId: 'cat-subscriptions', amount: 1599, description: 'Streaming', dayOfMonth: soon.getUTCDate() },
+    { ...base, recurringId: 'rec-mortgage', categoryId: 'cat-mortgage', amount: 78000, description: 'Mortgage', dayOfMonth: 1, handledPeriod: ym(now) },
+    { ...base, recurringId: 'rec-streaming', categoryId: 'cat-subscriptions', amount: 1599, description: 'Streaming', dayOfMonth: streamingDay(now), handledPeriod: ym(monthStart(now, -1)) },
   ];
 }
 
