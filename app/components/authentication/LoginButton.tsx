@@ -1,12 +1,12 @@
-import { useAuth0 } from "@auth0/auth0-react";
+import { useAuth } from '~/lib/auth';
 import { Button } from '@mantine/core';
 import { IconUser } from "@tabler/icons-react";
 
 const LoginButton = () => {
-  const { loginWithRedirect } = useAuth0();
+  const { login } = useAuth();
   return (
     <Button
-      onClick={() => loginWithRedirect()}
+      onClick={() => login()}
       color="text"
       leftSection={<IconUser size={16} />}
       variant="transparent"

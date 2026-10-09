@@ -1,21 +1,21 @@
-import { useAuth0 } from '@auth0/auth0-react';
+import { useAuth } from '~/lib/auth';
 import { useCallback } from 'react';
 import { ApiError } from '~/lib/apiError';
 import { isSessionEndedError, markSessionEnded } from '~/lib/session';
 
 export function useProtectedApi() {
-  const { getAccessTokenSilently } = useAuth0();
+  const { getToken } = useAuth();
 
   const request = useCallback(
     async (endpoint: string, options: RequestInit = {}) => {
       try {
-        const token = await getAccessTokenSilently();
+        const token = await getToken();
 
         const response = await fetch(endpoint, {
           ...options,
           headers: {
             ...options.headers,
-            Authorization: `Bearer ${token}`,
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
             'Content-Type': 'application/json',
           },
         });
@@ -33,7 +33,7 @@ export function useProtectedApi() {
         throw error;
       }
     },
-    [getAccessTokenSilently]
+    [getToken]
   );
 
   return { request };

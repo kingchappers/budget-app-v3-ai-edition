@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient, type QueryKey } from '@tanstack/react-query';
 import { useMemo } from 'react';
-import { useAuth0 } from '@auth0/auth0-react';
+import { useAuth } from '~/lib/auth';
 import { useProtectedApi } from '~/hooks/useProtectedApi';
 import { createApi, type RecurringInput, type TransactionInput } from './api';
 import { clearPendingEntry, OFFLINE_QUEUE_KEY, pendingRowsForMonth, type PendingMap } from './pendingEntries';
@@ -36,7 +36,7 @@ export function useApi() {
 // Every endpoint needs a bearer token, so a query fired before Auth0 has finished
 // restoring the session rejects and parks in an error state that nothing retries.
 function useAuthReady() {
-  return useAuth0().isAuthenticated;
+  return useAuth().isAuthenticated;
 }
 
 export function useCategories() {

@@ -3,7 +3,7 @@ import { ActionIcon, Anchor, Button, Card, Divider, Group, Menu, Stack, Text, Th
 import { LoadError } from '~/components/layout/LoadError';
 import { notifications } from '@mantine/notifications';
 import { IconBellPause, IconDots, IconPencil, IconPlayerSkipForward } from '@tabler/icons-react';
-import { useAuth0 } from '@auth0/auth0-react';
+import { useAuth } from '~/lib/auth';
 import { Link } from 'react-router';
 import { ToastAction } from '~/components/layout/ToastAction';
 import { TransactionSheet } from '~/components/transactions/TransactionSheet';
@@ -113,7 +113,7 @@ function AddAllButton({ group, onConfirm }: { group: DueGroup; onConfirm: (group
 export function DueRecurringCard() {
   const { items, isLoading, error, refetch } = useDueRecurring();
   const { data: categories = [] } = useCategories();
-  const userSub = useAuth0().user?.sub ?? '';
+  const userSub = useAuth().user?.sub ?? '';
   const [{ undoDuration, billReminders }] = usePreferences();
   const saveWithUndo = useSaveWithUndo();
   const setHandled = useSetRecurringHandled();

@@ -1,11 +1,11 @@
 import { useEffect } from 'react';
-import { useAuth0 } from '@auth0/auth0-react';
+import { useAuth } from '~/lib/auth';
 import { Loader } from '@mantine/core';
 import LoginButton from './LoginButton';
 import { Profile } from './Profile';
 
 function Authentication() {
-  const { isAuthenticated, isLoading, error } = useAuth0();
+  const { isAuthenticated, isLoading, error } = useAuth();
 
   useEffect(() => {
     if (error) console.error('Authentication: Auth0 reported an error', error);
