@@ -135,7 +135,7 @@ describe('POST /api/auth/login', () => {
   it('signs in with the right credentials, whatever the email case or spacing', async () => {
     const res = (await handleAuthRoute(post('/api/auth/login', { email: '  ME@example.com ', password: PASSWORD }), ctx))!;
     expect(res.statusCode).toBe(200);
-    expect(cookieValue(res)).toMatch(/^budget_session=.+/);
+    expect(cookieValue(res)).toMatch(/^__Host-budget_session=.+/);
   });
 
   it('answers a wrong password and an unknown email identically', async () => {
@@ -228,7 +228,7 @@ describe('GET /api/auth/me and POST /api/auth/logout', () => {
   it('answers 401 with no cookie or an unknown one', async () => {
     await signIn();
     expect((await handleAuthRoute(get('/api/auth/me'), ctx))!.statusCode).toBe(401);
-    expect((await handleAuthRoute(get('/api/auth/me', 'budget_session=bogus'), ctx))!.statusCode).toBe(401);
+    expect((await handleAuthRoute(get('/api/auth/me', '__Host-budget_session=bogus'), ctx))!.statusCode).toBe(401);
   });
 
   it('ends the session on logout and clears the cookie', async () => {

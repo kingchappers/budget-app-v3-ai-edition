@@ -18,14 +18,16 @@ export async function createLocalProvider(env: NodeJS.ProcessEnv): Promise<AuthP
     console.log(`First-run setup: open the app and enter this setup code to create your account: ${setupCode.reveal()}`);
   }
 
-  const ctx: AuthRouteContext = { store, setupCode, secureCookie: env.COOKIE_SECURE !== 'false', nowSeconds };
+  const secureCookie = env.COOKIE_SECURE !== 'false';
+  const appOrigin = env.APP_ORIGIN || undefined;
+  const ctx: AuthRouteContext = { store, setupCode, secureCookie, appOrigin, nowSeconds };
 
   return {
     handlePublic: event => handleAuthRoute(event, ctx),
 
     async authenticate(event) {
-      if (!originAllowed(event)) return { rejection: err(403, 'Forbidden') };
-      const session = await readSession(store, readSessionCookie(event), nowSeconds());
+      if (!originAllowed(event, appOrigin)) return { rejection: err(403, 'Forbidden') };
+      const session = await readSession(store, readSessionCookie(event, secureCookie), nowSeconds());
       if (!session) return { rejection: err(401, 'Unauthorized') };
       return { userId: session.userId };
     },

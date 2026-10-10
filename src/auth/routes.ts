@@ -16,6 +16,7 @@ export interface AuthRouteContext {
   store: Store;
   setupCode: SetupCode | undefined;
   secureCookie: boolean;
+  appOrigin?: string;
   nowSeconds(): number;
 }
 
@@ -109,12 +110,12 @@ function login(event: APIGatewayProxyEventV2, ctx: AuthRouteContext): Promise<Ap
 }
 
 async function logout(event: APIGatewayProxyEventV2, ctx: AuthRouteContext): Promise<ApiResponse> {
-  await deleteSession(ctx.store, readSessionCookie(event));
+  await deleteSession(ctx.store, readSessionCookie(event, ctx.secureCookie));
   return withCookie(ok({}), clearedCookie(ctx.secureCookie));
 }
 
 async function me(event: APIGatewayProxyEventV2, ctx: AuthRouteContext): Promise<ApiResponse> {
-  const session = await readSession(ctx.store, readSessionCookie(event), ctx.nowSeconds());
+  const session = await readSession(ctx.store, readSessionCookie(event, ctx.secureCookie), ctx.nowSeconds());
   const account = session ? await getAccount(ctx.store) : undefined;
   if (!session || !account) return noStore(err(401, 'Unauthorized'));
   return noStore(ok({ userId: session.userId, email: account.email }));
@@ -140,6 +141,6 @@ export async function handleAuthRoute(event: APIGatewayProxyEventV2, ctx: AuthRo
   const handler = method === 'POST' ? POST_ROUTES.get(path) : undefined;
   if (!handler) return undefined;
 
-  if (!originAllowed(event)) return FORBIDDEN;
+  if (!originAllowed(event, ctx.appOrigin)) return FORBIDDEN;
   return handler(event, ctx);
 }
