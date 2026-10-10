@@ -65,7 +65,7 @@ Environment variables only.
 | `TLS_EMAIL` | unset | Optional ACME contact address |
 | `APP_ORIGIN` | `https://$TLS_DOMAIN` when set | The public URL. When set, the Origin check requires an exact match |
 | `TRUST_PROXY` | on with Caddy, off otherwise | Honour `x-forwarded-*` headers |
-| `COOKIE_SECURE` | derived | `Secure` exactly when the effective origin is `https`; one logged warning when there is no effective origin |
+| `COOKIE_SECURE` | derived | `Secure` exactly when the effective origin is `https`; one logged warning when there is no effective origin. An explicit `true` or `false` overrides the derivation (for a user behind their own HTTPS proxy who has not set `APP_ORIGIN`) |
 | `BACKUP_HOUR` / `BACKUP_KEEP` / `BACKUP_DIR` | `3` / `7` / `$DATA_DIR/backups` | `BACKUP_KEEP=0` turns backups off |
 | `TZ` | `UTC` | Timezone for the backup hour |
 
@@ -77,7 +77,7 @@ The server sets `AUTH_MODE=local`, `STORE=sqlite` and `SQLITE_PATH` itself; user
 
 Multi-stage, every base pinned by digest.
 
-- **Build stage:** `node:24-bookworm-slim`. `yarn install --frozen-lockfile`, build the SPA with dummy `VITE_AUTH0_*`, compile the static handler, the API handler and the container server, and the `store-cli`.
+- **Build stage:** `node:24-bookworm-slim`. `yarn install --frozen-lockfile`, build the SPA (dummy `VITE_AUTH0_*` only if the build needs them), compile the container server (which pulls in the API handler and the static handler) and the `store-cli`. The Lambda-only `build-static-handler.cjs` step is not run; the container uses `createStaticHandler` directly.
 - **Runtime stage:** the same slim image plus `tini`; the `caddy` binary copied from the official image (digest-pinned) with `cap_net_bind_service`; the non-root user; `VOLUME /data`; `EXPOSE 80 443`; OCI labels for source (the repo) and licence (AGPL-3.0); the `HEALTHCHECK`.
 - **Runtime dependencies:** expected to be near zero. Local mode uses only `node:sqlite` (built in); the AWS SDK and the Auth0 libraries are required lazily and never loaded here, so they are left out of the image. The plan verifies this by running the smoke test against an image without them.
 
@@ -122,7 +122,7 @@ On SIGTERM: stop accepting connections, let in-flight requests and a running bac
 
 1. `originAllowed` (`src/auth/cookies.ts`) compares against `APP_ORIGIN` exactly when it is set (closes the DNS-rebinding parked item).
 2. The session cookie is named `__Host-budget_session` whenever it is `Secure`, and `budget_session` otherwise. A sibling subdomain cannot set a `__Host-` cookie (closes the cookie-tossing parked item). Reading uses the name for the current mode.
-3. `SqliteStore.backup(path)` using SQLite's backup API, and the downgrade guard on `user_version`.
+3. `SqliteStore.backupTo(path)` using `VACUUM INTO` (a consistent snapshot under WAL that refuses to overwrite an existing file; chosen over `sqlite.backup()` because it is synchronous and never overwrites). The downgrade guard on `user_version` already exists in `SqliteStore.migrate()`; this project adds a test for it and a clear boot message.
 4. `store-cli backup --out <file>`: a consistent online copy, owner-only (`0o600`, `flag: 'wx'`), never overwrites.
 5. The About page "Source code" link.
 
