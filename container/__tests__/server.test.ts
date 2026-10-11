@@ -1,11 +1,14 @@
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
-import { createServer } from 'node:net';
+import { createConnection, createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { getAuth } from '../../src/auth';
+import { getStore } from '../../src/store';
 import { SqliteStore } from '../../src/store/sqlite';
+import type { HandlerResult } from '../adapter';
 import { ConfigError } from '../config';
-import { startServer, type RunningServer } from '../server';
+import { describeListenError, startServer, type RunningServer, type StartOptions } from '../server';
 
 let dir: string;
 let clientDir: string;
@@ -30,8 +33,8 @@ afterEach(async () => {
 });
 
 const env = (extra: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv => ({ DATA_DIR: join(dir, 'data'), PORT: '0', ...extra });
-const start = async (extra: NodeJS.ProcessEnv = {}) => {
-  running = await startServer(env(extra), { clientDir, log: () => undefined });
+const start = async (extra: NodeJS.ProcessEnv = {}, options: StartOptions = {}) => {
+  running = await startServer(env(extra), { clientDir, log: () => undefined, ...options });
   return `http://127.0.0.1:${running.port}`;
 };
 const setupCodeFromLogs = (): string => {
@@ -108,7 +111,10 @@ describe('boot', () => {
   });
 
   it('refuses an invalid environment with every problem listed', async () => {
-    await expect(startServer(env({ BACKUP_HOUR: '99', TLS_DOMAIN: 'bad host' }), { clientDir })).rejects.toBeInstanceOf(ConfigError);
+    const failure = await startServer(env({ BACKUP_HOUR: '99', TLS_DOMAIN: 'bad host' }), { clientDir }).catch((error: unknown) => error);
+    expect(failure).toBeInstanceOf(ConfigError);
+    expect((failure as ConfigError).message).toContain('BACKUP_HOUR');
+    expect((failure as ConfigError).message).toContain('TLS_DOMAIN');
   });
 
   it('refuses a database created by a newer version, with a clear message', async () => {
@@ -147,5 +153,113 @@ describe('shutdown', () => {
     running = undefined;
     expect(closeStore).toHaveBeenCalledTimes(1);
     await expect(fetch(`${base}/healthz`)).rejects.toThrow();
+  });
+});
+
+const ok = (body: string): HandlerResult => ({ statusCode: 200, headers: { 'Content-Type': 'text/plain' }, body });
+const sleep = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms));
+
+describe('shutdown under load', () => {
+  it('lets an in-flight request finish before close() resolves', async () => {
+    let entered!: () => void;
+    const inHandler = new Promise<void>(resolve => { entered = resolve; });
+    let finished = false;
+    const base = await start({}, { apiHandler: async () => { entered(); await sleep(150); finished = true; return ok('slow body'); } });
+    const response = fetch(`${base}/api/anything`);
+    await inHandler;
+
+    const answered = response.then(async r => ({ status: r.status, body: await r.text() }));
+    await running!.close();
+    running = undefined;
+    expect(finished).toBe(true);
+    expect(await Promise.race([answered, sleep(1000)])).toEqual({ status: 200, body: 'slow body' });
+  });
+
+  it('cuts off a handler that never finishes, within the caps, and leaves the registries empty', async () => {
+    let entered!: () => void;
+    const inHandler = new Promise<void>(resolve => { entered = resolve; });
+    const base = await start({}, {
+      shutdownGraceMs: 200, handlerGraceMs: 200,
+      apiHandler: () => { entered(); return new Promise<HandlerResult>(() => undefined); },
+    });
+    const response = fetch(`${base}/api/hang`).then(() => 'answered', () => 'failed');
+    await inHandler;
+
+    const started = Date.now();
+    await running!.close();
+    running = undefined;
+    expect(Date.now() - started).toBeLessThan(1500);
+    expect(await response).toBe('failed');
+    expect(() => getStore()).toThrow(/not initialised/);
+    expect(() => getAuth()).toThrow(/not initialised/);
+  });
+
+  it('answers 503 to work that arrives after close() has started, without calling the handler', async () => {
+    let calls = 0;
+    await start({}, { apiHandler: async () => { calls += 1; await sleep(200); return ok('first'); } });
+    const port = running!.port;
+    const socket = createConnection(port, '127.0.0.1');
+    let received = '';
+    socket.on('data', chunk => { received += chunk.toString(); });
+    const request = 'GET /api/x HTTP/1.1\r\nHost: x\r\n\r\n';
+    socket.write(request);
+    await sleep(50);
+    // The connection is busy with the first request, so close() leaves it open; the second arrives mid-shutdown.
+    const closed = running!.close();
+    await sleep(50);
+    socket.write(request);
+    await closed;
+    running = undefined;
+    socket.destroy();
+    expect(received).toContain('200 OK');
+    expect(received).toContain('503');
+    expect(received).toContain('Shutting down');
+    expect(calls).toBe(1);
+  });
+});
+
+describe('maintenance lifecycle', () => {
+  afterEach(() => { vi.useRealTimers(); });
+
+  it('stops its timer on close', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+    const purge = vi.spyOn(SqliteStore.prototype, 'purgeExpired');
+    await start();
+    await running!.close();
+    running = undefined;
+    purge.mockClear();
+    vi.advanceTimersByTime(3 * 60 * 60 * 1000);
+    expect(purge).not.toHaveBeenCalled();
+  });
+
+  it('stops its timer when the listen fails', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+    const purge = vi.spyOn(SqliteStore.prototype, 'purgeExpired');
+    const blocker = createServer();
+    await new Promise<void>(resolve => blocker.listen(0, '0.0.0.0', resolve));
+    try {
+      const port = (blocker.address() as { port: number }).port;
+      await expect(startServer(env({ PORT: String(port) }), { clientDir })).rejects.toThrow(/already in use/);
+      purge.mockClear();
+      vi.advanceTimersByTime(3 * 60 * 60 * 1000);
+      expect(purge).not.toHaveBeenCalled();
+    } finally {
+      blocker.close();
+    }
+  });
+});
+
+describe('describeListenError', () => {
+  const coded = (code: string): NodeJS.ErrnoException => Object.assign(new Error('raw'), { code });
+
+  it('explains a permission failure', () => {
+    expect(describeListenError(coded('EACCES'), 80).message).toMatch(/Cannot listen on port 80: permission denied/);
+  });
+  it('explains a port in use', () => {
+    expect(describeListenError(coded('EADDRINUSE'), 80).message).toBe('Port 80 is already in use');
+  });
+  it('passes other errors through', () => {
+    const error = coded('EOTHER');
+    expect(describeListenError(error, 80)).toBe(error);
   });
 });
