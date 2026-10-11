@@ -74,6 +74,47 @@ describe('routing', () => {
   });
 });
 
+describe('path normalisation', () => {
+  const rawGet = (path: string): Promise<{ status: number; body: string }> => new Promise((resolve, reject) => {
+    const req = httpRequest({ host: '127.0.0.1', port: (server.address() as AddressInfo).port, method: 'GET', path }, res => {
+      const chunks: Buffer[] = [];
+      res.on('data', (chunk: Buffer) => chunks.push(chunk));
+      res.on('end', () => resolve({ status: res.statusCode ?? 0, body: Buffer.concat(chunks).toString('utf8') }));
+    });
+    req.on('error', reject);
+    req.end();
+  });
+
+  for (const path of ['//config.json', '/%63onfig.json', '/./config.json', '/a/../config.json', '/config.json?x=1']) {
+    it(`serves the server's own config for ${path}`, async () => {
+      const staticHandler = vi.fn(async () => staticResult);
+      await start({ staticHandler });
+      const response = await rawGet(path);
+      expect(JSON.parse(response.body)).toEqual({ auth: 'local' });
+      expect(staticHandler).not.toHaveBeenCalled();
+    });
+  }
+
+  it('answers 400 to a malformed escape and to an encoded NUL', async () => {
+    await start();
+    expect((await rawGet('/%zz')).status).toBe(400);
+    expect((await rawGet('/a%00b')).status).toBe(400);
+  });
+
+  it('treats //healthz and /%68ealthz as /healthz', async () => {
+    await start();
+    healthy = false;
+    expect((await rawGet('//healthz')).status).toBe(503);
+    expect((await rawGet('/%68ealthz')).status).toBe(503);
+  });
+
+  it('keeps the raw path in rawPath for the API', async () => {
+    await start();
+    await rawGet('/api/a%2Fb');
+    expect(seen[0].rawPath).toBe('/api/a%2Fb');
+  });
+});
+
 describe('the API event', () => {
   it('lower-cases headers, splits cookies, keeps the query and never puts the path in routeKey', async () => {
     await start();
@@ -143,34 +184,113 @@ describe('forwarding headers', () => {
   });
 });
 
+describe('bodies that are not read', () => {
+  const sendWithBody = (path: string, method: string): Promise<{ connection: string | undefined }> => new Promise((resolve, reject) => {
+    const req = httpRequest({ host: '127.0.0.1', port: (server.address() as AddressInfo).port, method, path, headers: { 'Content-Length': '5' } }, res => {
+      res.resume();
+      resolve({ connection: res.headers.connection });
+    });
+    req.on('error', reject);
+    req.end('hello');
+  });
+
+  it('closes the connection after a GET that carries a body', async () => {
+    await start();
+    expect((await sendWithBody('/anything', 'GET')).connection).toBe('close');
+  });
+
+  it('closes the connection after a 405 that carries a body', async () => {
+    await start();
+    expect((await sendWithBody('/anything', 'POST')).connection).toBe('close');
+  });
+});
+
 describe('the body limit', () => {
-  it('answers 413 to a Content-Length above the limit without calling the handler', async () => {
+  type Outcome = { outcome: '413' | 'reset' | 'other'; status?: number };
+
+  function upload(options: { chunked: boolean; bytes: number }): Promise<Outcome> {
+    return new Promise(resolve => {
+      const headers: Record<string, string | number> = options.chunked ? { 'Transfer-Encoding': 'chunked' } : { 'Content-Length': options.bytes };
+      const req = httpRequest({ host: '127.0.0.1', port: (server.address() as AddressInfo).port, method: 'POST', path: '/api/x', headers }, res => {
+        res.resume();
+        resolve({ outcome: res.statusCode === 413 ? '413' : 'other', status: res.statusCode });
+      });
+      req.on('error', () => resolve({ outcome: 'reset' }));
+      const piece = Buffer.alloc(64 * 1024, 120);
+      let sent = 0;
+      const pump = (): void => {
+        while (sent < options.bytes) {
+          const slice = piece.subarray(0, Math.min(piece.length, options.bytes - sent));
+          sent += slice.length;
+          if (!req.write(slice)) {
+            req.once('drain', pump);
+            return;
+          }
+        }
+        req.end();
+      };
+      pump();
+    });
+  }
+
+  it('answers 413 to a small overshoot of a Content-Length', async () => {
     await start({ maxBodyBytes: 1024 });
     const response = await fetch(`${base}/api/x`, { method: 'POST', body: 'x'.repeat(2048) });
     expect(response.status).toBe(413);
     expect(seen).toHaveLength(0);
   });
 
-  it('answers 413 to a chunked upload that grows past the limit', async () => {
+  it('answers 413 to a small chunked overshoot, read from a real response', async () => {
     await start({ maxBodyBytes: 1024 });
-    const status = await new Promise<number>(resolve => {
-      const req = httpRequest({ host: '127.0.0.1', port: (server.address() as AddressInfo).port, method: 'POST', path: '/api/x', headers: { 'Transfer-Encoding': 'chunked' } }, res => {
-        resolve(res.statusCode ?? 0);
-        res.resume();
-      });
-      req.on('error', () => resolve(413));
-      req.write('x'.repeat(600));
-      req.write('x'.repeat(600));
-      req.end();
-    });
-    expect(status).toBe(413);
+    const result = await upload({ chunked: true, bytes: 2048 });
+    expect(result).toEqual({ outcome: '413', status: 413 });
     expect(seen).toHaveLength(0);
   });
+
+  it('answers 413 to an upload that finishes inside the grace window', async () => {
+    await start({ maxBodyBytes: 1024 * 1024 });
+    const result = await upload({ chunked: false, bytes: 1024 * 1024 + 4096 });
+    expect(result.outcome).toBe('413');
+    expect(seen).toHaveLength(0);
+  });
+
+  for (const chunked of [false, true]) {
+    it(`terminates a large ${chunked ? 'chunked' : 'Content-Length'} upload, never calls the handler and keeps serving`, async () => {
+      await start({ maxBodyBytes: 1024 * 1024 });
+      const result = await upload({ chunked, bytes: 8 * 1024 * 1024 });
+      expect(result.outcome === '413' || result.outcome === 'reset').toBe(true);
+      expect(seen).toHaveLength(0);
+      expect((await fetch(`${base}/healthz`)).status).toBe(200);
+    });
+  }
 
   it('accepts a body at exactly the limit', async () => {
     await start({ maxBodyBytes: 1024 });
     const response = await fetch(`${base}/api/x`, { method: 'POST', body: 'x'.repeat(1024) });
     expect(response.status).toBe(200);
     expect(seen[0].body).toHaveLength(1024);
+  });
+});
+
+describe('client aborts and logging', () => {
+  it('stays quiet when a client aborts mid-body and keeps serving', async () => {
+    const logs: string[] = [];
+    await start({ log: message => logs.push(message) });
+    await new Promise<void>(resolve => {
+      const req = httpRequest({ host: '127.0.0.1', port: (server.address() as AddressInfo).port, method: 'POST', path: '/api/x', headers: { 'Content-Length': '1000' } });
+      req.on('error', () => undefined);
+      req.write('partial', () => {
+        req.destroy();
+        setTimeout(resolve, 100);
+      });
+    });
+    expect(logs.filter(message => message.includes('Request failed'))).toEqual([]);
+    expect((await fetch(`${base}/healthz`)).status).toBe(200);
+  });
+
+  it('survives a logger that throws', async () => {
+    await start({ apiHandler: async () => { throw new Error('x'); }, log: () => { throw new Error('log down'); } });
+    expect((await fetch(`${base}/api/x`)).status).toBe(500);
+    expect((await fetch(`${base}/healthz`)).status).toBe(200);
   });
 });
