@@ -1,4 +1,4 @@
-import { Button, Card, Stack, Text, Title } from '@mantine/core';
+import { Anchor, Button, Card, Stack, Text, Title } from '@mantine/core';
 import { useAuth } from '~/lib/auth';
 import { Link } from 'react-router';
 import { DefaultLayout } from '~/components/layout/DefaultLayout';
@@ -102,6 +102,12 @@ function AboutContent() {
         {!isAuthenticated && <Text fw={600}>Ready to try it?</Text>}
         <SignInButton />
       </Stack>
+
+      <Text size="sm" ta="center">
+        <Anchor href="https://github.com/kingchappers/budget-app-v3-ai-edition" target="_blank" rel="noopener noreferrer">
+          Source code (AGPL-3.0)
+        </Anchor>
+      </Text>
     </Stack>
   );
 }
