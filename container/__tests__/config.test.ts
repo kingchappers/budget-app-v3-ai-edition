@@ -1,0 +1,114 @@
+import { describe, expect, it } from 'vitest';
+import { ConfigError, isValidEmail, isValidHostname, parseConfig } from '../config';
+
+const problemsOf = (env: NodeJS.ProcessEnv): string[] => {
+  try {
+    parseConfig(env);
+  } catch (error) {
+    if (error instanceof ConfigError) return error.problems;
+    throw error;
+  }
+  return [];
+};
+
+describe('defaults', () => {
+  it('runs plain HTTP on 8080 with a /data volume and a warning about the missing public URL', () => {
+    const config = parseConfig({});
+    expect(config).toMatchObject({
+      dataDir: '/data', sqlitePath: '/data/budget.sqlite', port: 8080, backupHour: 3, backupKeep: 7,
+      backupDir: '/data/backups', trustProxy: false, secureCookie: false,
+    });
+    expect(config.tlsDomain).toBeUndefined();
+    expect(config.appOrigin).toBeUndefined();
+    expect(config.warnings.join(' ')).toMatch(/APP_ORIGIN/);
+  });
+});
+
+describe('TLS_DOMAIN', () => {
+  it('turns on the proxy trust, a derived https origin and Secure cookies', () => {
+    const config = parseConfig({ TLS_DOMAIN: 'Budget.Example.com', TLS_EMAIL: 'me@example.com' });
+    expect(config).toMatchObject({
+      tlsDomain: 'budget.example.com', tlsEmail: 'me@example.com', appOrigin: 'https://budget.example.com',
+      trustProxy: true, secureCookie: true, warnings: [],
+    });
+  });
+
+  it.each([
+    'https://budget.example.com', 'budget.example.com:8443', 'budget.example.com/path', '*.example.com', 'bad host',
+    'a..b.com', '-bad.com', 'bad-.com', 'bad.com.', '10.0.0.1', 'evil.com {\nrespond "x"\n}', `${'a'.repeat(64)}.com`,
+  ])('rejects the hostname %j', value => {
+    expect(problemsOf({ TLS_DOMAIN: value }).join(' ')).toMatch(/TLS_DOMAIN/);
+  });
+
+  it('accepts localhost and single-label names', () => {
+    expect(isValidHostname('localhost')).toBe(true);
+    expect(isValidHostname('nas')).toBe(true);
+  });
+
+  it('needs a fixed port', () => {
+    expect(problemsOf({ TLS_DOMAIN: 'budget.example.com', PORT: '0' }).join(' ')).toMatch(/PORT/);
+  });
+});
+
+describe('TLS_EMAIL', () => {
+  it.each(['a b@example.com', 'a@b.com\nrespond', 'a{b}@example.com', 'x@y"z.com', 'no-at-sign'])('rejects %j', value => {
+    expect(isValidEmail(value)).toBe(false);
+  });
+
+  it('is an error without TLS_DOMAIN', () => {
+    expect(problemsOf({ TLS_EMAIL: 'me@example.com' }).join(' ')).toMatch(/TLS_EMAIL/);
+  });
+});
+
+describe('APP_ORIGIN', () => {
+  it('normalises a plain URL and derives Secure from the scheme', () => {
+    expect(parseConfig({ APP_ORIGIN: 'https://budget.example.com/' })).toMatchObject({ appOrigin: 'https://budget.example.com', secureCookie: true, warnings: [] });
+    expect(parseConfig({ APP_ORIGIN: 'http://nas.local:8080' })).toMatchObject({ appOrigin: 'http://nas.local:8080', secureCookie: false });
+  });
+
+  it.each(['budget.example.com', 'https://u:p@budget.example.com', 'https://budget.example.com/path', 'https://budget.example.com?x=1', 'ftp://x.com'])(
+    'rejects %j', value => {
+      expect(problemsOf({ APP_ORIGIN: value }).join(' ')).toMatch(/APP_ORIGIN/);
+    });
+
+  it('must match TLS_DOMAIN by host (any port) and be https', () => {
+    expect(parseConfig({ TLS_DOMAIN: 'localhost', APP_ORIGIN: 'https://localhost:8443' }).appOrigin).toBe('https://localhost:8443');
+    expect(problemsOf({ TLS_DOMAIN: 'budget.example.com', APP_ORIGIN: 'https://other.example.com' }).join(' ')).toMatch(/same host/);
+    expect(problemsOf({ TLS_DOMAIN: 'budget.example.com', APP_ORIGIN: 'http://budget.example.com' }).join(' ')).toMatch(/https/);
+  });
+});
+
+describe('COOKIE_SECURE and TRUST_PROXY', () => {
+  it('lets an explicit COOKIE_SECURE win and rejects other values', () => {
+    expect(parseConfig({ COOKIE_SECURE: 'true' }).secureCookie).toBe(true);
+    expect(parseConfig({ COOKIE_SECURE: 'true' }).warnings).toEqual([]);
+    expect(parseConfig({ APP_ORIGIN: 'https://x.example.com', COOKIE_SECURE: 'false' }).secureCookie).toBe(false);
+    expect(problemsOf({ COOKIE_SECURE: 'yes' }).join(' ')).toMatch(/COOKIE_SECURE/);
+  });
+
+  it('reads TRUST_PROXY explicitly and rejects other values', () => {
+    expect(parseConfig({ TRUST_PROXY: 'true' }).trustProxy).toBe(true);
+    expect(parseConfig({ TLS_DOMAIN: 'budget.example.com', TRUST_PROXY: 'false' }).trustProxy).toBe(false);
+    expect(problemsOf({ TRUST_PROXY: '1' }).join(' ')).toMatch(/TRUST_PROXY/);
+  });
+});
+
+describe('numbers and paths', () => {
+  it.each([
+    [{ PORT: '70000' }, /PORT/], [{ PORT: 'abc' }, /PORT/], [{ PORT: '-1' }, /PORT/],
+    [{ BACKUP_HOUR: '24' }, /BACKUP_HOUR/], [{ BACKUP_HOUR: '3.5' }, /BACKUP_HOUR/],
+    [{ BACKUP_KEEP: '-1' }, /BACKUP_KEEP/], [{ BACKUP_KEEP: '1000' }, /BACKUP_KEEP/],
+    [{ DATA_DIR: 'relative/path' }, /DATA_DIR/], [{ DATA_DIR: '/data with space' }, /DATA_DIR/], [{ BACKUP_DIR: 'backups' }, /BACKUP_DIR/],
+  ])('rejects %j', (env, pattern) => {
+    expect(problemsOf(env).join(' ')).toMatch(pattern);
+  });
+
+  it('accepts the boundaries and turns backups off with BACKUP_KEEP=0', () => {
+    expect(parseConfig({ BACKUP_HOUR: '0', BACKUP_KEEP: '0', PORT: '0' })).toMatchObject({ backupHour: 0, backupKeep: 0, port: 0 });
+    expect(parseConfig({ BACKUP_HOUR: '23', BACKUP_KEEP: '365', PORT: '65535' })).toMatchObject({ backupHour: 23, backupKeep: 365, port: 65535 });
+  });
+
+  it('reports every problem at once', () => {
+    expect(problemsOf({ PORT: 'x', BACKUP_HOUR: '99', TLS_DOMAIN: 'bad host' }).length).toBe(3);
+  });
+});
