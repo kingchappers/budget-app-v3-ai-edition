@@ -57,6 +57,11 @@ export class SqliteStore implements Store {
     return Number(result.changes);
   }
 
+  // VACUUM INTO writes a consistent snapshot even while the app is writing (WAL) and refuses to overwrite an existing file.
+  backupTo(path: string): void {
+    this.db.prepare('VACUUM INTO ?').run(path);
+  }
+
   async get(key: Key): Promise<Item | undefined> {
     const data = this.readData(key);
     return data === undefined ? undefined : this.toItem(key.PK, key.SK, data);

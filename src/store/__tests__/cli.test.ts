@@ -118,4 +118,22 @@ describe('runCli', () => {
       store.close();
     });
   });
+
+  describe('backup', () => {
+    it('writes a verified owner-only copy and refuses to overwrite', async () => {
+      await seedDatabase();
+      const out = join(dir, 'copy.sqlite');
+      const message = await runCli(['backup', '--out', out], env);
+      expect(message).toContain('Backed up');
+      expect(statSync(out).mode & 0o077).toBe(0);
+      setStore(undefined);
+      await expect(runCli(['backup', '--out', out], env)).rejects.toThrow(/already exists/);
+    });
+
+    it('needs --out and a SQLite store', async () => {
+      await expect(runCli(['backup'], env)).rejects.toThrow(/Usage/);
+      setStore(undefined);
+      await expect(runCli(['backup', '--out', join(dir, 'x.sqlite')], { STORE: 'dynamodb', DYNAMODB_TABLE: 't' })).rejects.toThrow(/sqlite/i);
+    });
+  });
 });
