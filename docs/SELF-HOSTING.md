@@ -6,13 +6,13 @@ One container that serves the app and its API, keeps your data in a SQLite datab
 
 The image is `ghcr.io/kingchappers/budget-app-v3-ai-edition`, tagged `latest`, `X.Y.Z`, `X.Y` and `edge` (the latest `main`). It is licensed AGPL-3.0; the source is at <https://github.com/kingchappers/budget-app-v3-ai-edition>.
 
-> The image is built by CI from the repository's Dockerfile. Nothing here has been verified against a published image yet; report anything that does not match.
+> The image is built by CI from the repository's Dockerfile. Nothing here has been verified against a published image yet; report anything that does not match. <!-- REMOVE when the Dockerfile and CI land and are verified -->
 
 ## Quick start
 
 1. Copy [`compose.example.yml`](../compose.example.yml) to `compose.yml` and set `TLS_DOMAIN` (and `TLS_EMAIL`). The domain's DNS must point at this machine, and ports 80 and 443 must be reachable from the internet. Without a domain, see [HTTPS](#https).
 2. `docker compose up -d`
-3. Find the one-time setup code in the log: `docker logs <container>`.
+3. Find the one-time setup code in the log: `docker compose logs budget`.
 4. Open the app in your browser and create your account with the setup code. The setup page closes for good once an account exists.
 
 ## Configuration
@@ -21,7 +21,7 @@ Environment variables only. The container sets `AUTH_MODE`, `STORE` and `SQLITE_
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `DATA_DIR` | `/data` | Volume holding the database (`budget.sqlite`), backups and the `caddy/` certificate storage. An absolute path using only letters, digits and `. _ / -` |
+| `DATA_DIR` | `/data` | Volume holding the database (`budget.sqlite`), backups and the `caddy/` certificate storage. An absolute path using only letters, digits and `. _ / -`, with no `..` segment and not `/` |
 | `PORT` | `8080` | Port the app listens on inside the container. Must be a fixed port (not 0) with `TLS_DOMAIN` |
 | `TLS_DOMAIN` | unset | A plain hostname such as `budget.example.com` for automatic HTTPS on ports 80 and 443. Unset means plain HTTP |
 | `TLS_EMAIL` | unset | Optional contact address for the certificate authority. Needs `TLS_DOMAIN` |
@@ -59,6 +59,7 @@ Platforms that run containers with `no-new-privileges` ignore the file capabilit
 Run the plain-HTTP variant and let your proxy terminate HTTPS:
 
 - Set `APP_ORIGIN` to the public URL, for example `https://budget.example.com`. Cookies are then `Secure` and `__Host-`-prefixed, and the `Origin` check requires an exact match with it.
+- **Publish the port on loopback only** (`127.0.0.1:8080:8080`, as in the compose file) when the proxy runs on the same host. If it runs elsewhere, use a private network or a firewall, and only then publish on a specific private address. Never publish this port to the internet: with `TRUST_PROXY` on, the app believes `X-Forwarded-*` headers from whoever can reach it.
 - Set `TRUST_PROXY=true` only if the proxy sets `X-Forwarded-*` itself and nothing else can reach the app's port.
 - Forward the original `Host` header.
 - The session cookie is named `__Host-budget_session` and is `Secure` only when the effective origin is https. With plain HTTP and no `APP_ORIGIN`, it is named `budget_session`, is not `Secure`, and the container logs a warning at start. If you are behind HTTPS but cannot set `APP_ORIGIN`, set `COOKIE_SECURE=true`.
@@ -75,27 +76,51 @@ Stopping: a clean shutdown stops taking new requests (they get a 503), lets open
 
 ## Backups and restore
 
-- A backup is taken automatically every day at `BACKUP_HOUR` (default 03:00 in `TZ`, default UTC) into `/data/backups`. The newest `BACKUP_KEEP` (default 7) are kept. Each is integrity-checked before it counts, so a corrupt copy never causes a good one to be pruned, and is owner-only. `BACKUP_KEEP=0` turns this off.
+- A backup is taken automatically every day at `BACKUP_HOUR` (during the 03:00 hour by default, in `TZ`, default UTC; the check runs hourly from when the container started) into `/data/backups`. The newest `BACKUP_KEEP` (default 7) are kept. Each is integrity-checked before it counts, so a corrupt copy never causes a good one to be pruned, and is owner-only. `BACKUP_KEEP=0` turns this off.
 - File names are `budget-YYYYMMDD-HHMMSS.sqlite` in local time (`TZ`).
 - At start, if the newest backup is more than a day old (or there is none), one is taken straight away.
 - For a backup on demand (the file is never overwritten, so use a new name):
 
   ```bash
-  docker exec <container> sh -c 'STORE=sqlite SQLITE_PATH=/data/budget.sqlite node build/store-cli/store-cli.js backup --out /data/manual-backup.sqlite'
+  docker compose exec budget sh -c 'STORE=sqlite SQLITE_PATH=/data/budget.sqlite node build/store-cli/store-cli.js backup --out /data/manual-backup.sqlite'
   ```
 
 - **Backups on the same volume do not protect you from losing the volume or the disk.** Copy them somewhere else regularly. The compose examples put backups on their own volume to make that easy, for example:
 
   ```bash
-  docker cp <container>:/data/backups ./budget-backups
+  docker compose cp budget:/data/backups ./budget-backups
   ```
 
-- **Restore:** stop the container, replace `/data/budget.sqlite` with the backup, delete `/data/budget.sqlite-wal` and `/data/budget.sqlite-shm` if present, and start it again.
+- **Restore** replaces ALL current data with the backup. Take a fresh backup first with the command above if there is anything you might want back. Then, with the app stopped, run the copy as the app user so ownership stays correct (replace the file name with one from `/data/backups`):
+
+  ```bash
+  docker compose stop
+  docker compose run --rm --no-deps --entrypoint sh budget -c 'rm -f /data/budget.sqlite-wal /data/budget.sqlite-shm && cp /data/backups/budget-YYYYMMDD-HHMMSS.sqlite /data/budget.sqlite'
+  docker compose up -d
+  ```
+
+  For a backup that is on the host (copied off earlier), stream it in as the app user. `-T` turns off the pseudo-terminal, which is needed because stdin is redirected from a file; `umask 077` keeps the copy owner-only:
+
+  ```bash
+  docker compose stop
+  docker compose run --rm --no-deps -T --entrypoint sh budget -c 'rm -f /data/budget.sqlite-wal /data/budget.sqlite-shm; umask 077; cat > /data/budget.sqlite' < ./budget-backup.sqlite
+  docker compose up -d
+  ```
+
+  A file brought in with `docker cp` is owned by root, which the app cannot write; if you used it, fix the owner with `docker compose run --rm --no-deps -u 0 --entrypoint chown budget 10001:10001 /data/budget.sqlite` (or `docker compose exec -u 0 budget chown 10001:10001 /data/budget.sqlite` while it is running).
+
+### Check your backups are working
+
+After the first start, run `docker compose exec budget ls -l /data/backups`. A file named `budget-YYYYMMDD-HHMMSS.sqlite` should exist, written at start-up. If the directory is empty or `docker compose logs budget` shows "Backup failed", the likely cause is volume ownership (the app runs as uid 10001 and cannot write a root-owned volume). Repair it with:
+
+```bash
+docker compose exec -u 0 budget chown -R 10001:10001 /data/backups
+```
 
 ## Forgot your password
 
 ```bash
-docker exec -it <container> sh -c 'STORE=sqlite SQLITE_PATH=/data/budget.sqlite node build/store-cli/store-cli.js reset-password'
+docker compose exec budget sh -c 'STORE=sqlite SQLITE_PATH=/data/budget.sqlite node build/store-cli/store-cli.js reset-password'
 ```
 
 It prompts for the new password (never taken from arguments), ends every session and clears any login lock-out.
@@ -104,17 +129,18 @@ It prompts for the new password (never taken from arguments), ends every session
 
 Export and import only touch your own data, never the login records, so the steps are:
 
-1. With AWS credentials, run `STORE=dynamodb DYNAMODB_TABLE=<table> yarn store-cli export 'auth0|abc' --out budget-export.jsonl` (your Auth0 `sub`). The file is owner-only and holds financial data: keep it private and never commit it.
-2. Start the self-hosted instance and finish the first-run setup (create the account with the setup code from the server log).
+1. On a machine with a checkout of the repository, dependencies installed (`yarn install`) and AWS credentials, run `STORE=dynamodb DYNAMODB_TABLE=<table> yarn store-cli export 'auth0|abc' --out budget-export.jsonl` (your Auth0 `sub`). The file is owner-only and holds financial data: keep it private and never commit it.
+2. Start the self-hosted instance and finish the first-run setup (create the account with the setup code from the server log). The import needs this, because you need the local user id.
 3. While signed in, read your local user id from `GET /api/auth/me` (the `userId` field, `local|<uuid>`), for example `fetch('/api/auth/me').then(r => r.json())` in the browser console on the app's own page.
-4. Copy the export into the container and import it (add `--replace` only if the account already has data):
+4. Stream the export into the container as the app user (the host file's permissions never change and the copy is owner-only), import it, then remove it. It goes in `/tmp`, not `/data`, so it is never left on the data volume or inside a backup. Add `--replace` to the import only if the account already has data:
 
    ```bash
-   docker cp budget-export.jsonl <container>:/data/budget-export.jsonl
-   docker exec <container> sh -c "STORE=sqlite SQLITE_PATH=/data/budget.sqlite node build/store-cli/store-cli.js import --in /data/budget-export.jsonl --as-user 'local|<uuid>'"
+   docker compose exec -T budget sh -c 'umask 077; cat > /tmp/budget-export.jsonl' < budget-export.jsonl
+   docker compose exec -e STORE=sqlite -e SQLITE_PATH=/data/budget.sqlite budget node build/store-cli/store-cli.js import --in /tmp/budget-export.jsonl --as-user 'local|<uuid>'
+   docker compose exec budget rm /tmp/budget-export.jsonl
    ```
 
-   `docker cp` keeps the file's owner and mode; if the import cannot read it, `chmod 644` it on the host first (and delete it from the container afterwards). Outside Docker the equivalent is `STORE=sqlite SQLITE_PATH=<database file> yarn store-cli import --in budget-export.jsonl --as-user 'local|<uuid>'`. Push subscriptions are not carried over.
+5. Delete the export file on the host too, and never commit it. Push subscriptions are not carried over.
 
 ## Security notes
 

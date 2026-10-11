@@ -1,6 +1,8 @@
 # Budget app over plain HTTP, for a hosting platform or your own reverse proxy that provides HTTPS.
 # Set APP_ORIGIN to the public https URL so cookies are Secure and the Origin check is exact.
-# On a home network with no HTTPS at all, leave APP_ORIGIN unset (cookies are then not Secure).
+# On a home network with NO HTTPS proxy, delete the APP_ORIGIN and TRUST_PROXY lines below (cookies are then not
+# Secure). If you keep them, every login and setup request is rejected with 403, because the browser's Origin will
+# not match https://budget.example.com.
 services:
   budget:
     image: ghcr.io/kingchappers/budget-app-v3-ai-edition:latest
@@ -9,7 +11,10 @@ services:
     # Docker's default of 10 s would kill the process before the database is closed cleanly.
     stop_grace_period: 20s
     ports:
-      - "8080:8080"
+      # Published on loopback only: this is for a reverse proxy on the SAME host. If the proxy is on another
+      # machine, put them on a private network or firewall the port, and only then publish on a specific private
+      # address. Never publish this port to the internet: with TRUST_PROXY on, the app believes X-Forwarded-* headers.
+      - "127.0.0.1:8080:8080"
     environment:
       APP_ORIGIN: https://budget.example.com
       TRUST_PROXY: "true"   # only when a proxy you control sets X-Forwarded-* and nothing else can reach this port
@@ -18,6 +23,9 @@ services:
       # TZ: Europe/London
     volumes:
       - budget-data:/data
+      # The image creates /data/backups owned by the app user (uid 10001), so a new named volume mounted here
+      # inherits that ownership and backups can be written. Check after the first start: see "Check your backups
+      # are working" in docs/SELF-HOSTING.md.
       - budget-backups:/data/backups
 
 volumes:

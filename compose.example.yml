@@ -20,6 +20,9 @@ services:
       - budget-data:/data
       # Backups on their own volume, so they can be copied somewhere else. A backup on the same disk
       # protects against a bad upgrade, not against losing the disk.
+      # The image creates /data/backups owned by the app user (uid 10001), so a new named volume mounted here
+      # inherits that ownership and backups can be written. Check after the first start: see "Check your backups
+      # are working" in docs/SELF-HOSTING.md.
       - budget-backups:/data/backups
 
 volumes:
