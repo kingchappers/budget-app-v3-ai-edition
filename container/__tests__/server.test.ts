@@ -1,4 +1,5 @@
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { EventEmitter } from 'node:events';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { createConnection, createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -261,5 +262,132 @@ describe('describeListenError', () => {
   it('passes other errors through', () => {
     const error = coded('EOTHER');
     expect(describeListenError(error, 80)).toBe(error);
+  });
+});
+
+class FakeChild extends EventEmitter {
+  killed: string | undefined;
+  signals: string[] = [];
+  ignoreTerm = false;
+  kill(signal: string): boolean {
+    this.signals.push(signal);
+    this.killed = signal;
+    if (this.ignoreTerm && signal === 'SIGTERM') return true;
+    queueMicrotask(() => this.emit('exit', 0, signal));
+    return true;
+  }
+}
+
+const freePort = (): Promise<number> => new Promise((resolve, reject) => {
+  const probe = createServer();
+  probe.once('error', reject);
+  probe.listen(0, '127.0.0.1', () => {
+    const { port } = probe.address() as { port: number };
+    probe.close(() => resolve(port));
+  });
+});
+
+describe('Caddy supervision', () => {
+  const tls = async (): Promise<NodeJS.ProcessEnv> => ({ TLS_DOMAIN: 'budget.example.com', TLS_EMAIL: 'me@example.com', PORT: String(await freePort()) });
+  const asSpawn = (child: FakeChild): StartOptions['spawnCaddy'] => (() => child) as never;
+
+  it('does not start Caddy without TLS_DOMAIN, and listens on all interfaces', async () => {
+    const spawnCaddy = vi.fn();
+    running = await startServer(env(), { clientDir, log: () => undefined, spawnCaddy: spawnCaddy as never });
+    expect(spawnCaddy).not.toHaveBeenCalled();
+    expect(running.host).toBe('0.0.0.0');
+  });
+
+  it('starts Caddy with a generated Caddyfile, binds loopback only and stops it on close', async () => {
+    const child = new FakeChild();
+    const spawnCaddy = vi.fn(() => child);
+    const settings = await tls();
+    running = await startServer(env(settings), { clientDir, log: () => undefined, spawnCaddy: spawnCaddy as never });
+    expect(running.host).toBe('127.0.0.1');
+    const [command, args, spawnOptions] = spawnCaddy.mock.calls[0] as unknown as [string, string[], { stdio: string; env: NodeJS.ProcessEnv }];
+    expect(command).toBe('caddy');
+    expect(args.slice(0, 2)).toEqual(['run', '--config']);
+    expect(args.slice(3)).toEqual(['--adapter', 'caddyfile']);
+    expect(spawnOptions.stdio).toBe('inherit');
+    expect(spawnOptions.env.XDG_DATA_HOME).toBe(join(dir, 'data', 'caddy-data'));
+    expect(spawnOptions.env.XDG_CONFIG_HOME).toBe(join(tmpdir(), 'caddy-config'));
+    const caddyfile = readFileSync(args[2], 'utf8');
+    expect(caddyfile).toContain('budget.example.com {');
+    expect(caddyfile).toContain(`reverse_proxy 127.0.0.1:${settings.PORT}`);
+    expect(caddyfile).toContain('email me@example.com');
+
+    await running.close();
+    running = undefined;
+    expect(child.killed).toBe('SIGTERM');
+  });
+
+  it('writes the Caddyfile readable by its owner only and removes it on close', async () => {
+    const child = new FakeChild();
+    const spawnCaddy = vi.fn(() => child);
+    running = await startServer(env(await tls()), { clientDir, log: () => undefined, spawnCaddy: spawnCaddy as never });
+    const file = (spawnCaddy.mock.calls[0] as unknown as [string, string[]])[1][2];
+    expect(statSync(file).mode & 0o777).toBe(0o600);
+    await running.close();
+    running = undefined;
+    expect(existsSync(file)).toBe(false);
+  });
+
+  it('reports Caddy dying as fatal', async () => {
+    const child = new FakeChild();
+    const onFatal = vi.fn();
+    running = await startServer(env(await tls()), { clientDir, log: () => undefined, spawnCaddy: asSpawn(child), onFatal });
+    child.emit('exit', 1, null);
+    expect(onFatal).toHaveBeenCalledWith(expect.stringMatching(/Caddy exited/));
+  });
+
+  it('does not report Caddy exiting as part of close() as fatal', async () => {
+    const child = new FakeChild();
+    const onFatal = vi.fn();
+    running = await startServer(env(await tls()), { clientDir, log: () => undefined, spawnCaddy: asSpawn(child), onFatal });
+    await running.close();
+    running = undefined;
+    expect(child.killed).toBe('SIGTERM');
+    expect(onFatal).not.toHaveBeenCalled();
+  });
+
+  it('does not stop a Caddy that already exited, and does not report it twice', async () => {
+    const child = new FakeChild();
+    const onFatal = vi.fn();
+    running = await startServer(env(await tls()), { clientDir, log: () => undefined, spawnCaddy: asSpawn(child), onFatal });
+    child.emit('exit', 1, null);
+    await running.close();
+    running = undefined;
+    expect(child.signals).toEqual([]);
+    expect(onFatal).toHaveBeenCalledTimes(1);
+  });
+
+  it('kills a Caddy that ignores SIGTERM once the grace period is over, and still closes the store', async () => {
+    const child = new FakeChild();
+    child.ignoreTerm = true;
+    const closeStore = vi.spyOn(SqliteStore.prototype, 'close');
+    running = await startServer(env(await tls()), { clientDir, log: () => undefined, spawnCaddy: asSpawn(child), shutdownGraceMs: 100 });
+    await running.close();
+    running = undefined;
+    expect(child.signals).toEqual(['SIGTERM', 'SIGKILL']);
+    expect(closeStore).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports a Caddy that cannot start', async () => {
+    const child = new FakeChild();
+    const onFatal = vi.fn();
+    running = await startServer(env(await tls()), { clientDir, log: () => undefined, spawnCaddy: asSpawn(child), onFatal });
+    child.emit('error', new Error('spawn caddy ENOENT'));
+    expect(onFatal).toHaveBeenCalledWith(expect.stringMatching(/Could not start Caddy/));
+  });
+
+  it('does not wait for a Caddy that failed to start when closing', async () => {
+    const child = new FakeChild();
+    child.ignoreTerm = true;
+    running = await startServer(env(await tls()), { clientDir, log: () => undefined, spawnCaddy: asSpawn(child), onFatal: () => undefined, shutdownGraceMs: 5000 });
+    child.emit('error', new Error('spawn caddy ENOENT'));
+    const started = Date.now();
+    await running.close();
+    running = undefined;
+    expect(Date.now() - started).toBeLessThan(1000);
   });
 });

@@ -1,6 +1,7 @@
-import type { spawn } from 'node:child_process';
-import { mkdirSync } from 'node:fs';
+import { spawn, type ChildProcess } from 'node:child_process';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
+import os from 'node:os';
 import path from 'node:path';
 import type { APIGatewayProxyEventV2, Context } from 'aws-lambda';
 import { handler as apiLambda } from '../api-handler';
@@ -9,6 +10,7 @@ import { initStore, setStore } from '../src/store';
 import { createBackup, newestBackupAgeSeconds, pruneBackups } from '../src/store/backup';
 import { SqliteStore } from '../src/store/sqlite';
 import { createStaticHandler } from '../src/static/handler';
+import { buildCaddyfile } from './caddy';
 import { createRequestListener, type HandlerResult } from './adapter';
 import { parseConfig, type ContainerConfig } from './config';
 import { startMaintenance } from './maintenance';
@@ -16,14 +18,16 @@ import { startMaintenance } from './maintenance';
 export interface RunningServer {
   config: ContainerConfig;
   port: number;
+  host: string;
   close(): Promise<void>;
 }
 
 export interface StartOptions {
   clientDir?: string;
   log?: (message: string) => void;
-  // Used by Task 8 (Caddy supervision).
+  // Called when Caddy dies or cannot start while the server is running.
   onFatal?: (reason: string) => void;
+  // Test seam: replaces child_process.spawn for Caddy.
   spawnCaddy?: typeof spawn;
   // Test seam: replaces the real API Lambda handler.
   apiHandler?: (event: APIGatewayProxyEventV2) => Promise<HandlerResult>;
@@ -35,6 +39,8 @@ export interface StartOptions {
 
 const SHUTDOWN_GRACE_MS = 10_000;
 const HANDLER_GRACE_MS = 2_000;
+// After SIGKILL, how long to wait for Caddy's exit event before carrying on.
+const KILL_WAIT_MS = 1_000;
 
 const SHUTTING_DOWN: HandlerResult = {
   statusCode: 503,
@@ -150,11 +156,81 @@ export async function startServer(env: NodeJS.ProcessEnv, options: StartOptions 
     const shutdownGraceMs = options.shutdownGraceMs ?? SHUTDOWN_GRACE_MS;
     const handlerGraceMs = options.handlerGraceMs ?? HANDLER_GRACE_MS;
     let closing: Promise<void> | undefined;
+
+    let caddy: ChildProcess | undefined;
+    let caddyExited = true;
+    let caddyDir: string | undefined;
+    const startCaddy = (tlsDomain: string): void => {
+      caddyDir = mkdtempSync(path.join(os.tmpdir(), 'budget-caddy-'));
+      const caddyfile = path.join(caddyDir, 'Caddyfile');
+      writeFileSync(
+        caddyfile,
+        buildCaddyfile({ tlsDomain, tlsEmail: config.tlsEmail, port, dataDir: config.dataDir }),
+        { mode: 0o600 },
+      );
+      const child = (options.spawnCaddy ?? spawn)('caddy', ['run', '--config', caddyfile, '--adapter', 'caddyfile'], {
+        stdio: 'inherit',
+        env: {
+          ...process.env,
+          // Caddy keeps its own state under the data volume, and its autosave config in a writable temporary directory.
+          XDG_CONFIG_HOME: path.join(os.tmpdir(), 'caddy-config'),
+          XDG_DATA_HOME: path.join(config.dataDir, 'caddy-data'),
+        },
+      });
+      caddy = child;
+      caddyExited = false;
+      child.once('exit', (code, signal) => {
+        caddyExited = true;
+        if (!shuttingDown) options.onFatal?.(`Caddy exited (${signal ?? code})`);
+      });
+      child.on('error', error => {
+        // A process that never started will never emit 'exit'.
+        caddyExited = true;
+        if (!shuttingDown) options.onFatal?.(`Could not start Caddy: ${error.message}`);
+      });
+    };
+
+    // SIGTERM, then SIGKILL after the same grace period as the connections. Never rejects.
+    const stopCaddy = async (): Promise<void> => {
+      const child = caddy;
+      if (!child || caddyExited) return;
+      await new Promise<void>(resolve => {
+        let timer: NodeJS.Timeout | undefined;
+        const done = (): void => {
+          if (timer) clearTimeout(timer);
+          resolve();
+        };
+        child.once('exit', done);
+        child.once('error', done);
+        timer = setTimeout(() => {
+          timer = setTimeout(done, KILL_WAIT_MS);
+          child.kill('SIGKILL');
+        }, shutdownGraceMs);
+        child.kill('SIGTERM');
+      });
+    };
+    const discardCaddyFiles = (): void => {
+      if (caddyDir) rmSync(caddyDir, { recursive: true, force: true });
+    };
+
+    if (config.tlsDomain) {
+      try {
+        startCaddy(config.tlsDomain);
+      } catch (error) {
+        shuttingDown = true;
+        caddy?.kill('SIGKILL');
+        discardCaddyFiles();
+        throw error;
+      }
+    }
+
     const close = (): Promise<void> => {
       closing ??= (async () => {
         shuttingDown = true;
         maintenance?.stop();
         try {
+          // Caddy stops taking public traffic while the connections drain.
+          const caddyStopped = stopCaddy();
           await new Promise<void>(resolve => {
             const force = setTimeout(() => server.closeAllConnections(), shutdownGraceMs);
             server.close(() => {
@@ -170,9 +246,11 @@ export async function startServer(env: NodeJS.ProcessEnv, options: StartOptions 
           });
           await Promise.race([Promise.allSettled([...inflight]), timeout]);
           clearTimeout(giveUp);
+          await caddyStopped;
         } catch (error) {
           log(`Shutdown error: ${errorName(error)}`);
         } finally {
+          discardCaddyFiles();
           try {
             store.close();
           } catch (error) {
@@ -185,7 +263,7 @@ export async function startServer(env: NodeJS.ProcessEnv, options: StartOptions 
       return closing;
     };
 
-    return { config, port, close };
+    return { config, port, host, close };
   } catch (error) {
     releaseInternals();
     throw error;
