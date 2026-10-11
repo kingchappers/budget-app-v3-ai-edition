@@ -1,0 +1,25 @@
+# Budget app over plain HTTP, for a hosting platform or your own reverse proxy that provides HTTPS.
+# Set APP_ORIGIN to the public https URL so cookies are Secure and the Origin check is exact.
+# On a home network with no HTTPS at all, leave APP_ORIGIN unset (cookies are then not Secure).
+services:
+  budget:
+    image: ghcr.io/kingchappers/budget-app-v3-ai-edition:latest
+    restart: unless-stopped
+    # A clean shutdown can take about 12 seconds (10 s for open connections, up to 2 s for running requests).
+    # Docker's default of 10 s would kill the process before the database is closed cleanly.
+    stop_grace_period: 20s
+    ports:
+      - "8080:8080"
+    environment:
+      APP_ORIGIN: https://budget.example.com
+      TRUST_PROXY: "true"   # only when a proxy you control sets X-Forwarded-* and nothing else can reach this port
+      # BACKUP_HOUR: "3"
+      # BACKUP_KEEP: "7"
+      # TZ: Europe/London
+    volumes:
+      - budget-data:/data
+      - budget-backups:/data/backups
+
+volumes:
+  budget-data:
+  budget-backups:

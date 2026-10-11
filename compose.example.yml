@@ -1,0 +1,27 @@
+# Budget app with built-in HTTPS. Point your domain's DNS at this machine and open ports 80 and 443.
+# Copy to compose.yml, change TLS_DOMAIN (and TLS_EMAIL), then: docker compose up -d
+services:
+  budget:
+    image: ghcr.io/kingchappers/budget-app-v3-ai-edition:latest
+    restart: unless-stopped
+    # A clean shutdown can take about 12 seconds (10 s for open connections, up to 2 s for running requests).
+    # Docker's default of 10 s would kill the process before the database is closed cleanly.
+    stop_grace_period: 20s
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      TLS_DOMAIN: budget.example.com
+      TLS_EMAIL: you@example.com
+      # BACKUP_HOUR: "3"   # daily backup at this hour, in TZ (default UTC)
+      # BACKUP_KEEP: "7"   # newest backups kept; 0 turns them off
+      # TZ: Europe/London
+    volumes:
+      - budget-data:/data
+      # Backups on their own volume, so they can be copied somewhere else. A backup on the same disk
+      # protects against a bad upgrade, not against losing the disk.
+      - budget-backups:/data/backups
+
+volumes:
+  budget-data:
+  budget-backups:

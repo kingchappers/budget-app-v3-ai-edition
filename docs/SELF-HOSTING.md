@@ -1,0 +1,127 @@
+# Self-hosting
+
+## What you get
+
+One container that serves the app and its API, keeps your data in a SQLite database on a volume, and signs you in with a built-in single-account login (no Auth0 or other account needed). It can obtain and renew an HTTPS certificate for your domain itself, and it takes a backup of the database every day. Push reminders are not in this release.
+
+The image is `ghcr.io/kingchappers/budget-app-v3-ai-edition`, tagged `latest`, `X.Y.Z`, `X.Y` and `edge` (the latest `main`). It is licensed AGPL-3.0; the source is at <https://github.com/kingchappers/budget-app-v3-ai-edition>.
+
+> The image is built by CI from the repository's Dockerfile. Nothing here has been verified against a published image yet; report anything that does not match.
+
+## Quick start
+
+1. Copy [`compose.example.yml`](../compose.example.yml) to `compose.yml` and set `TLS_DOMAIN` (and `TLS_EMAIL`). The domain's DNS must point at this machine, and ports 80 and 443 must be reachable from the internet. Without a domain, see [HTTPS](#https).
+2. `docker compose up -d`
+3. Find the one-time setup code in the log: `docker logs <container>`.
+4. Open the app in your browser and create your account with the setup code. The setup page closes for good once an account exists.
+
+## Configuration
+
+Environment variables only. The container sets `AUTH_MODE`, `STORE` and `SQLITE_PATH` itself; you do not.
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `DATA_DIR` | `/data` | Volume holding the database (`budget.sqlite`), backups and the `caddy/` certificate storage. An absolute path using only letters, digits and `. _ / -` |
+| `PORT` | `8080` | Port the app listens on inside the container. Must be a fixed port (not 0) with `TLS_DOMAIN` |
+| `TLS_DOMAIN` | unset | A plain hostname such as `budget.example.com` for automatic HTTPS on ports 80 and 443. Unset means plain HTTP |
+| `TLS_EMAIL` | unset | Optional contact address for the certificate authority. Needs `TLS_DOMAIN` |
+| `APP_ORIGIN` | `https://$TLS_DOMAIN` when that is set | The public URL (scheme, host, port; no path). When set, the `Origin` of every state-changing request must match it exactly. Must match `TLS_DOMAIN` and be `https` if that is set |
+| `TRUST_PROXY` | `true` with `TLS_DOMAIN`, otherwise `false` | Honour `X-Forwarded-*` headers. Turn it on only behind a proxy you control |
+| `COOKIE_SECURE` | derived | `true` exactly when the effective origin is `https`. An explicit `true` or `false` overrides this |
+| `BACKUP_HOUR` | `3` | Hour (0-23, in `TZ`) of the daily backup |
+| `BACKUP_KEEP` | `7` | Number of newest backups kept (0-365). `0` turns backups off |
+| `BACKUP_DIR` | `$DATA_DIR/backups` | Where backups are written |
+| `TZ` | `UTC` | Timezone for the backup hour |
+
+A bad value stops the container at start with a message naming it.
+
+Listening address: without `TLS_DOMAIN` the app listens on all IPv4 interfaces inside the container, on `PORT` (default 8080). With `TLS_DOMAIN` it listens on loopback only and Caddy, bundled in the image, serves ports 80 and 443.
+
+Limits: request bodies over 1 MiB are rejected before the app sees them. A client that is still uploading when the limit is hit may see a connection reset instead of a 413 response.
+
+If you mount the root filesystem read-only, keep `/tmp` writable (the generated Caddyfile and Caddy's config directory live there) as well as `/data`.
+
+## HTTPS
+
+Automatic HTTPS (`TLS_DOMAIN`) needs a public domain pointing at the machine and ports 80 and 443 reachable from the internet, so the certificate authority can verify the domain. Certificates are stored in `$DATA_DIR/caddy` and survive restarts and upgrades. Only automatic certificates are supported: no bring-your-own certificate files, DNS challenges or wildcards.
+
+On a home network without that, you have two options:
+
+- **Plain HTTP** (`TLS_DOMAIN` unset, see [`compose.plain.example.yml`](../compose.plain.example.yml)). Cookies are then not `Secure`, so only do this on a network you trust. With no `APP_ORIGIN` the container logs a warning at start, and the `Origin` check compares against the `Host` header instead.
+- **Your own proxy** in front (next section), with `APP_ORIGIN` set to the public https URL.
+
+Do not expose the app to the internet over plain HTTP.
+
+Platforms that run containers with `no-new-privileges` ignore the file capability that lets the bundled Caddy bind ports 80 and 443. There, leave `TLS_DOMAIN` unset and use plain HTTP behind the platform's own proxy.
+
+## Behind your own reverse proxy
+
+Run the plain-HTTP variant and let your proxy terminate HTTPS:
+
+- Set `APP_ORIGIN` to the public URL, for example `https://budget.example.com`. Cookies are then `Secure` and `__Host-`-prefixed, and the `Origin` check requires an exact match with it.
+- Set `TRUST_PROXY=true` only if the proxy sets `X-Forwarded-*` itself and nothing else can reach the app's port.
+- Forward the original `Host` header.
+- The session cookie is named `__Host-budget_session` and is `Secure` only when the effective origin is https. With plain HTTP and no `APP_ORIGIN`, it is named `budget_session`, is not `Secure`, and the container logs a warning at start. If you are behind HTTPS but cannot set `APP_ORIGIN`, set `COOKIE_SECURE=true`.
+
+## Upgrading
+
+```bash
+docker compose pull && docker compose up -d
+```
+
+The database schema migrates automatically at start. An older image refuses to open a database written by a newer one, with a clear message, so take a backup before upgrading and never downgrade across a schema change.
+
+Stopping: a clean shutdown stops taking new requests (they get a 503), lets open connections finish for up to 10 seconds, waits up to 2 more seconds for requests still running, then closes the database. That is about 12 seconds in the worst case, and Docker's default stop timeout is 10 seconds, after which `docker stop` kills the process before the database is closed cleanly. The write-ahead log recovers, so no data is lost, but a clean close is better. The compose examples therefore set `stop_grace_period: 20s`; keep it, and pass `--time 20` to a bare `docker stop`.
+
+## Backups and restore
+
+- A backup is taken automatically every day at `BACKUP_HOUR` (default 03:00 in `TZ`, default UTC) into `/data/backups`. The newest `BACKUP_KEEP` (default 7) are kept. Each is integrity-checked before it counts, so a corrupt copy never causes a good one to be pruned, and is owner-only. `BACKUP_KEEP=0` turns this off.
+- File names are `budget-YYYYMMDD-HHMMSS.sqlite` in local time (`TZ`).
+- At start, if the newest backup is more than a day old (or there is none), one is taken straight away.
+- For a backup on demand (the file is never overwritten, so use a new name):
+
+  ```bash
+  docker exec <container> sh -c 'STORE=sqlite SQLITE_PATH=/data/budget.sqlite node build/store-cli/store-cli.js backup --out /data/manual-backup.sqlite'
+  ```
+
+- **Backups on the same volume do not protect you from losing the volume or the disk.** Copy them somewhere else regularly. The compose examples put backups on their own volume to make that easy, for example:
+
+  ```bash
+  docker cp <container>:/data/backups ./budget-backups
+  ```
+
+- **Restore:** stop the container, replace `/data/budget.sqlite` with the backup, delete `/data/budget.sqlite-wal` and `/data/budget.sqlite-shm` if present, and start it again.
+
+## Forgot your password
+
+```bash
+docker exec -it <container> sh -c 'STORE=sqlite SQLITE_PATH=/data/budget.sqlite node build/store-cli/store-cli.js reset-password'
+```
+
+It prompts for the new password (never taken from arguments), ends every session and clears any login lock-out.
+
+## Moving your data from AWS
+
+Export and import only touch your own data, never the login records, so the steps are:
+
+1. With AWS credentials, run `STORE=dynamodb DYNAMODB_TABLE=<table> yarn store-cli export 'auth0|abc' --out budget-export.jsonl` (your Auth0 `sub`). The file is owner-only and holds financial data: keep it private and never commit it.
+2. Start the self-hosted instance and finish the first-run setup (create the account with the setup code from the server log).
+3. While signed in, read your local user id from `GET /api/auth/me` (the `userId` field, `local|<uuid>`), for example `fetch('/api/auth/me').then(r => r.json())` in the browser console on the app's own page.
+4. Copy the export into the container and import it (add `--replace` only if the account already has data):
+
+   ```bash
+   docker cp budget-export.jsonl <container>:/data/budget-export.jsonl
+   docker exec <container> sh -c "STORE=sqlite SQLITE_PATH=/data/budget.sqlite node build/store-cli/store-cli.js import --in /data/budget-export.jsonl --as-user 'local|<uuid>'"
+   ```
+
+   `docker cp` keeps the file's owner and mode; if the import cannot read it, `chmod 644` it on the host first (and delete it from the container afterwards). Outside Docker the equivalent is `STORE=sqlite SQLITE_PATH=<database file> yarn store-cli import --in budget-export.jsonl --as-user 'local|<uuid>'`. Push subscriptions are not carried over.
+
+## Security notes
+
+- The login throttle is global: anyone who can reach the login can lock you out for up to 15 minutes. `reset-password` clears it.
+- Backups on the same volume are not off-site; see above.
+- Run it behind HTTPS (or on a network you trust). See [HTTPS](#https) for what plain HTTP gives up.
+
+## For maintainers: releasing
+
+`git tag v1.2.3 && git push origin v1.2.3` publishes `1.2.3`, `1.2` and `latest`. A push to `main` publishes `edge`.

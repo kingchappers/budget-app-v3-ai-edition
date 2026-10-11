@@ -108,15 +108,15 @@ The image carries the OCI `source` label and the About page gets a small "Source
 
 ### Adapter hardening
 
-A 1 MiB body cap (413 above it); header, request and keep-alive timeouts; the handler's own generic 500 on an unhandled error, detail in the logs only. `x-forwarded-*` is honoured only when `TRUST_PROXY` is on; otherwise the source IP is the socket address.
+A 1 MiB body cap (413 above it); header, request and keep-alive timeouts; the handler's own generic 500 on an unhandled error, detail in the logs only. A client still uploading when the cap is hit may see a connection reset instead of the 413; the handler is never reached either way. The path is normalised for `/healthz` and `/config.json`, so alternate spellings (`//config.json`, `/%63onfig.json`) cannot reach the built Auth0 config. `x-forwarded-*` is honoured only when `TRUST_PROXY` is on; otherwise the source IP is the socket address.
 
 ### Caddy
 
-The Caddyfile is generated only from a validated hostname and email, so no user-typed text is interpolated into configuration. Certificates are stored at `$DATA_DIR/caddy` so they survive restarts and upgrades. The admin API is off; logging goes to stdout; `encode zstd gzip` is on; the HTTP-to-HTTPS redirect is Caddy's default.
+The Caddyfile is generated only from a validated hostname and email, so no user-typed text is interpolated into configuration. Certificates are stored at `$DATA_DIR/caddy` so they survive restarts and upgrades. The admin API is off; the global option `grace_period` is not set (deferred), and Caddy's default SIGTERM handling is a graceful stop; logging goes to stdout; `encode zstd gzip` is on; the HTTP-to-HTTPS redirect is Caddy's default.
 
 ### Shutdown
 
-On SIGTERM: stop accepting connections, let in-flight requests and a running backup finish (10-second cap), close SQLite, stop Caddy, exit 0. A failed scheduled backup is logged with the error name only and never crashes the server.
+On SIGTERM: stop accepting connections, let in-flight requests and a running backup finish (10-second cap for connections, then at most 2 more seconds for handlers still running; new requests during shutdown get 503), close SQLite, stop Caddy, exit 0. A failed scheduled backup is logged with the error name only and never crashes the server.
 
 ### Changes to existing code (each with tests)
 
