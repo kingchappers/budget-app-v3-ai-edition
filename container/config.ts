@@ -61,14 +61,19 @@ function flag(name: string, raw: string | undefined, problems: string[]): boolea
   return undefined;
 }
 
+function checkDirectory(name: string, value: string, problems: string[]): void {
+  const safe = SAFE_PATH.test(value) && value !== '/' && !value.split('/').includes('..');
+  if (!safe) problems.push(`${name} must be an absolute path using only letters, digits and . _ / -, with no .. segment and not /`);
+}
+
 export function parseConfig(env: NodeJS.ProcessEnv): ContainerConfig {
   const problems: string[] = [];
   const warnings: string[] = [];
 
   const dataDir = env.DATA_DIR || '/data';
-  if (!SAFE_PATH.test(dataDir)) problems.push('DATA_DIR must be an absolute path using only letters, digits and . _ / -');
+  checkDirectory('DATA_DIR', dataDir, problems);
   const backupDir = env.BACKUP_DIR || `${dataDir}/backups`;
-  if (!backupDir.startsWith('/')) problems.push('BACKUP_DIR must be an absolute path');
+  if (env.BACKUP_DIR) checkDirectory('BACKUP_DIR', backupDir, problems);
 
   const port = wholeNumber('PORT', env.PORT, 8080, 0, 65535, problems);
   const backupHour = wholeNumber('BACKUP_HOUR', env.BACKUP_HOUR, 3, 0, 23, problems);

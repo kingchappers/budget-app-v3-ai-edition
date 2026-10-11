@@ -109,6 +109,59 @@ describe('numbers and paths', () => {
   });
 
   it('reports every problem at once', () => {
-    expect(problemsOf({ PORT: 'x', BACKUP_HOUR: '99', TLS_DOMAIN: 'bad host' }).length).toBe(3);
+    const problems = problemsOf({ PORT: 'x', BACKUP_HOUR: '99', TLS_DOMAIN: 'bad host' });
+    expect(problems).toHaveLength(3);
+    expect(problems.some(problem => problem.startsWith('PORT '))).toBe(true);
+    expect(problems.some(problem => problem.startsWith('BACKUP_HOUR '))).toBe(true);
+    expect(problems.some(problem => problem.startsWith('TLS_DOMAIN '))).toBe(true);
+  });
+});
+
+describe('hostname injection and length', () => {
+  const hostnameWithLabels = (lengths: number[]): string => lengths.map(length => 'a'.repeat(length)).join('.');
+
+  it.each(['budget.example.com\n', 'budget.example.com\r', 'budget\texample.com', 'budget example.com', '::1', '[::1]'])(
+    'rejects %j', value => {
+      expect(isValidHostname(value)).toBe(false);
+    });
+
+  it('accepts a hostname of exactly 253 characters', () => {
+    const hostname = hostnameWithLabels([63, 63, 63, 61]);
+    expect(hostname.length).toBe(253);
+    expect(isValidHostname(hostname)).toBe(true);
+  });
+
+  it('rejects a hostname of 254 characters even when every label fits', () => {
+    const hostname = hostnameWithLabels([63, 63, 63, 62]);
+    expect(hostname.length).toBe(254);
+    expect(isValidHostname(hostname)).toBe(false);
+  });
+});
+
+describe('email injection', () => {
+  it('accepts a plain address', () => {
+    expect(isValidEmail('a@example.com')).toBe(true);
+  });
+
+  it.each(['a`b@example.com', 'a\\b@example.com', "a'b@example.com", 'a\tb@example.com', 'a@example.com\r', 'a@example.com\n'])(
+    'rejects the single bad character in %j', value => {
+      expect(isValidEmail(value)).toBe(false);
+    });
+});
+
+describe('directories', () => {
+  it.each([
+    [{ BACKUP_DIR: '/backups with space' }, /BACKUP_DIR/],
+    [{ BACKUP_DIR: '/back\nups' }, /BACKUP_DIR/],
+    [{ BACKUP_DIR: '/data/../x' }, /BACKUP_DIR/],
+    [{ BACKUP_DIR: '/' }, /BACKUP_DIR/],
+    [{ DATA_DIR: '/data/../x' }, /DATA_DIR/],
+    [{ DATA_DIR: '/' }, /DATA_DIR/],
+  ])('rejects %j', (env, pattern) => {
+    expect(problemsOf(env).join(' ')).toMatch(pattern);
+  });
+
+  it('accepts a backup directory of letters, digits, dots, dashes and underscores', () => {
+    expect(parseConfig({ BACKUP_DIR: '/var/backups-1/x_y.z' }).backupDir).toBe('/var/backups-1/x_y.z');
   });
 });
