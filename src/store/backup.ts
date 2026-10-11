@@ -1,4 +1,4 @@
-import { chmodSync, existsSync, mkdirSync, readdirSync, rmSync, statSync } from 'node:fs';
+import { closeSync, existsSync, mkdirSync, openSync, readdirSync, rmSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import type { SqliteStore } from './sqlite';
@@ -29,11 +29,16 @@ export function integrityCheck(path: string): boolean {
 }
 
 // Writes one verified, owner-only copy of the database. Never overwrites, and removes only the file it created.
+// The name is reserved exclusively (0600) first, so a file made by someone else can never reach the cleanup below.
 export function backupToFile(store: SqliteStore, path: string, verify: (path: string) => boolean = integrityCheck): void {
-  if (existsSync(path)) throw new Error(`Backup ${path} already exists`);
+  try {
+    closeSync(openSync(path, 'wx', 0o600));
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'EEXIST') throw new Error(`Backup ${path} already exists`);
+    throw error;
+  }
   try {
     store.backupTo(path);
-    chmodSync(path, 0o600);
     if (!verify(path)) throw new Error('The backup failed its integrity check');
   } catch (error) {
     rmSync(path, { force: true });

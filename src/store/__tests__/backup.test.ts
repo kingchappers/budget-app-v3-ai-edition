@@ -1,6 +1,6 @@
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
@@ -52,6 +52,14 @@ describe('createBackup', () => {
     expect(rows.n).toBe(1);
   });
 
+  it('creates owner-only files even when the directory already exists with looser permissions', () => {
+    const backups = join(dir, 'loose');
+    mkdirSync(backups);
+    chmodSync(backups, 0o755);
+    const path = createBackup(store, backups, new Date(2026, 9, 10, 3, 0, 0));
+    expect(statSync(path).mode & 0o077).toBe(0);
+  });
+
   it('never overwrites: a second backup in the same second leaves the first untouched', () => {
     const backups = join(dir, 'backups');
     const when = new Date(2026, 9, 10, 3, 0, 0);
@@ -66,16 +74,37 @@ describe('createBackup', () => {
     const backups = join(dir, 'backups');
     const kept = createBackup(store, backups, new Date(2026, 9, 9, 3, 0, 0));
     expect(() => createBackup(store, backups, new Date(2026, 9, 10, 3, 0, 0), () => false)).toThrow(/integrity/);
-    expect(listBackups(backups)).toEqual([kept.split('/').pop()]);
+    expect(listBackups(backups)).toEqual([basename(kept)]);
   });
 });
 
 describe('backupToFile', () => {
-  it('refuses an existing target and leaves it alone', () => {
+  it('refuses an existing target and leaves its content intact', () => {
     const target = join(dir, 'manual.sqlite');
     writeFileSync(target, 'keep me');
     expect(() => backupToFile(store, target)).toThrow(/already exists/);
-    expect(existsSync(target)).toBe(true);
+    expect(readFileSync(target, 'utf8')).toBe('keep me');
+  });
+
+  it('never lets a store failure delete a file it did not create', () => {
+    const target = join(dir, 'other.sqlite');
+    writeFileSync(target, 'someone else wrote this');
+    const failing = { backupTo: () => { throw new Error('disk exploded'); } } as unknown as SqliteStore;
+    expect(() => backupToFile(failing, target)).toThrow(/already exists/);
+    expect(readFileSync(target, 'utf8')).toBe('someone else wrote this');
+  });
+
+  it('removes the file it reserved when the store fails part way', () => {
+    const target = join(dir, 'partial.sqlite');
+    const failing = {
+      backupTo: (path: string) => { writeFileSync(path, 'partial'); throw new Error('disk exploded'); },
+    } as unknown as SqliteStore;
+    expect(() => backupToFile(failing, target)).toThrow(/disk exploded/);
+    expect(existsSync(target)).toBe(false);
+  });
+
+  it('reports a missing directory without touching anything', () => {
+    expect(() => backupToFile(store, join(dir, 'missing', 'x.sqlite'))).toThrow(/ENOENT/);
   });
 });
 
