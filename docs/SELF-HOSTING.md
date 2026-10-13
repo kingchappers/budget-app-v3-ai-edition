@@ -6,7 +6,7 @@ One container that serves the app and its API, keeps your data in a SQLite datab
 
 The image is `ghcr.io/kingchappers/budget-app-v3-ai-edition`, tagged `latest`, `X.Y.Z`, `X.Y` and `edge` (the latest `main`). It is licensed AGPL-3.0; the source is at <https://github.com/kingchappers/budget-app-v3-ai-edition>.
 
-> The image is built by CI from the repository's Dockerfile. Nothing here has been verified against a published image yet; report anything that does not match. <!-- REMOVE when the Dockerfile and CI land and are verified -->
+> The image is built by CI from the repository's Dockerfile. It has been built and smoke-tested locally on arm64 only. The CI workflow, the published GHCR image and the amd64 build are unverified until the first CI run; report anything that does not match. <!-- REMOVE when the first CI run has built, smoke-tested and published the image -->
 
 ## Quick start
 
