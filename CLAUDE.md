@@ -87,7 +87,7 @@ Reference control IDs in commits (e.g., "addresses AUTH-02", "fixes IO-03").
 | `scripts/build-static-handler.cjs` | Compiles the static handler to `build/client/index.js` |
 | `scripts/build-api-handler.cjs` | Compiles API handler + bundles deps |
 | `container/` | Self-hosting server: Node HTTP adapter over the same handlers, Caddy supervision, backups (Docker image; see `docs/SELF-HOSTING.md`) |
-| `Dockerfile` | Multi-stage image build for the self-hosting server (planned; not yet written) |
+| `Dockerfile` | Multi-stage image build for the self-hosting server; check it with `node scripts/container-smoke.mjs <image> [--tls]` |
 | `scripts/build-container.cjs` | Compiles `container/` (with the API and static handlers it imports) to `build/container/` |
 | `infra/lambda.tf` | Static Lambda + API Gateway + IAM |
 | `infra/api-lambda.tf` | API Lambda + routes |

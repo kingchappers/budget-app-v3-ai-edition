@@ -179,7 +179,7 @@ async function main() {
     // Caddy must replace a client-supplied X-Forwarded-For, so the app never sees the spoofed address.
     await get('/api/categories', { 'X-Forwarded-For': '6.6.6.6' });
     const logged = [...dockerLogs().matchAll(/sourceIp: '([^']*)'/g)].map(match => match[1]);
-    step('a spoofed X-Forwarded-For is not the client address the app logs',
+    step(`a spoofed X-Forwarded-For is not the client address the app logs (logged: ${[...new Set(logged)].join(', ')})`,
       logged.length > 0 && !logged.includes('6.6.6.6'), `sourceIp values: ${logged.join(', ')}`);
   }
 
