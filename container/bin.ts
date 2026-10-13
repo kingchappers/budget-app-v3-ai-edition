@@ -1,6 +1,9 @@
 import { runMain } from './main';
 import { startServer } from './server';
 
+// User data must be owner-only; Caddy's files also become owner-only, which is fine.
+process.umask(0o077);
+
 runMain({
   start: onFatal => startServer(process.env, { onFatal }),
   exit: code => process.exit(code),
