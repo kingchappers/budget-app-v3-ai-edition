@@ -51,6 +51,7 @@ const request = (base, path, { method = 'GET', headers = {}, body } = {}) => new
     res.on('data', chunk => chunks.push(chunk));
     res.on('end', () => resolve({ status: res.statusCode, headers: res.headers, body: Buffer.concat(chunks).toString('utf8') }));
   });
+  req.setTimeout(30_000, () => req.destroy(new Error('timeout')));
   req.on('error', reject);
   if (body) req.write(body);
   req.end();
@@ -81,6 +82,19 @@ const name = `budget-smoke-${suffix}`;
 const volume = `budget-smoke-data-${suffix}`;
 const backupVolume = `budget-smoke-backups-${suffix}`;
 
+function cleanup() {
+  spawnSync('docker', ['rm', '-f', name]);
+  spawnSync('docker', ['volume', 'rm', '-f', volume, backupVolume]);
+}
+
+for (const signal of ['SIGINT', 'SIGTERM']) {
+  process.on(signal, () => {
+    console.error(`Interrupted (${signal}): cleaning up`);
+    cleanup();
+    process.exit(130);
+  });
+}
+
 async function main() {
   docker('volume', 'create', volume);
   docker('volume', 'create', backupVolume);
@@ -94,7 +108,8 @@ async function main() {
     const https443 = await freePort();
     http80 = await freePort();
     publicOrigin = `https://localhost:${https443}`;
-    docker('run', '-d', '--name', name, ...mounts, '-p', `127.0.0.1:${https443}:443`, '-p', `127.0.0.1:${http80}:80`,
+    // Docker lets containers bind low ports by default; raising the limit makes Caddy depend on its setcap file capability.
+    docker('run', '-d', '--name', name, ...mounts, '--sysctl', 'net.ipv4.ip_unprivileged_port_start=1024', '-p', `127.0.0.1:${https443}:443`, '-p', `127.0.0.1:${http80}:80`,
       '-e', 'TLS_DOMAIN=localhost', '-e', `APP_ORIGIN=${publicOrigin}`, image);
     base = `https://127.0.0.1:${https443}`;
   } else {
@@ -133,7 +148,8 @@ async function main() {
   step('setup is required on a fresh volume', JSON.parse(status.body).setupRequired === true, status.body);
 
   const uid = docker('exec', name, 'id', '-u');
-  step('runs as the non-root user (uid 10001)', uid === '10001', uid);
+  const gid = docker('exec', name, 'id', '-g');
+  step('runs as uid 10001 and gid 10001', uid === '10001' && gid === '10001', `${uid}:${gid}`);
   const noModules = spawnSync('docker', ['exec', name, 'test', '-e', '/app/node_modules']);
   step('/app/node_modules does not exist in the image', noModules.status !== 0);
   const strayConfig = spawnSync('docker', ['exec', name, 'test', '-e', '/app/build/client/config.json']);
@@ -147,6 +163,15 @@ async function main() {
     return /^budget-\d{8}-\d{6}\.sqlite$/m.test(out) ? out : undefined;
   }, 'the start-up backup', 30_000);
   step('the start-up backup exists on the backups volume', true, listing);
+  const backupFile = `/data/backups/${listing.match(/^budget-\d{8}-\d{6}\.sqlite$/m)[0]}`;
+  const backupStat = docker('exec', name, 'stat', '-c', '%u %a', backupFile);
+  step('the start-up backup is owned by 10001 with mode 600', backupStat === '10001 600', backupStat);
+  const integrity = docker('exec', name, 'node', '--disable-warning=ExperimentalWarning', '-e',
+    "const { DatabaseSync } = require('node:sqlite'); const db = new DatabaseSync(process.argv[1], { readOnly: true }); console.log(db.prepare('PRAGMA integrity_check').get().integrity_check);",
+    backupFile);
+  step('the start-up backup passes an independent PRAGMA integrity_check', integrity === 'ok', integrity);
+  const dbMode = docker('exec', name, 'stat', '-c', '%a', '/data/budget.sqlite');
+  step('the database file is mode 600', dbMode === '600', dbMode);
 
   const health = await waitFor(() => {
     const value = docker('inspect', '--format', '{{.State.Health.Status}}', name);
@@ -175,12 +200,24 @@ async function main() {
   const anonymous = await get('/api/categories');
   step('the API refuses an anonymous request', anonymous.status === 401, String(anonymous.status));
 
+  // Sends a request with a forged X-Forwarded-For to an API route that answers 401, waits for the app to log exactly one
+  // new "Request:" line for it, and returns that line's sourceIp.
+  const countRequests = () => (dockerLogs().match(/sourceIp: '/g) ?? []).length;
+  const spoofedSourceIp = async forged => {
+    const before = countRequests();
+    const response = await get('/api/categories', { 'X-Forwarded-For': forged });
+    step(`the spoofed request is answered 401 (${forged})`, response.status === 401, String(response.status));
+    await waitFor(() => countRequests() === before + 1, 'one new Request: log line');
+    return [...dockerLogs().matchAll(/sourceIp: '([^']*)'/g)].map(match => match[1]).at(-1);
+  };
   if (tls) {
     // Caddy must replace a client-supplied X-Forwarded-For, so the app never sees the spoofed address.
-    await get('/api/categories', { 'X-Forwarded-For': '6.6.6.6' });
-    const logged = [...dockerLogs().matchAll(/sourceIp: '([^']*)'/g)].map(match => match[1]);
-    step(`a spoofed X-Forwarded-For is not the client address the app logs (logged: ${[...new Set(logged)].join(', ')})`,
-      logged.length > 0 && !logged.includes('6.6.6.6'), `sourceIp values: ${logged.join(', ')}`);
+    const seen = await spoofedSourceIp('6.6.6.6');
+    step(`through Caddy the logged client address is not the spoofed one (logged: ${seen})`, Boolean(seen) && seen !== '6.6.6.6' && seen !== '7.7.7.7');
+  } else {
+    // TRUST_PROXY is off by default without TLS_DOMAIN, so a forwarding header is ignored.
+    const seen = await spoofedSourceIp('6.6.6.6');
+    step(`with TRUST_PROXY off the logged client address is not the spoofed one (logged: ${seen})`, Boolean(seen) && seen !== '6.6.6.6');
   }
 
   docker('restart', name);
@@ -209,6 +246,5 @@ try {
   console.error(dockerLogs('--tail', '60'));
   process.exitCode = 1;
 } finally {
-  spawnSync('docker', ['rm', '-f', name]);
-  spawnSync('docker', ['volume', 'rm', '-f', volume, backupVolume]);
+  cleanup();
 }
