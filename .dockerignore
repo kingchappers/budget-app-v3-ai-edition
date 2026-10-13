@@ -1,0 +1,14 @@
+.git
+.github
+.worktrees
+.superpowers
+node_modules
+build
+infra
+docs
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+budget-export*.jsonl
+.env
+.env.*
