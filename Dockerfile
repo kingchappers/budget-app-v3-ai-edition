@@ -1,5 +1,3 @@
-# syntax=docker/dockerfile:1.7
-
 # Pinned by multi-arch index digest. node:24-bookworm-slim and caddy:2, resolved 2026-10-11; bump deliberately.
 FROM caddy:2@sha256:f2a1290d0463aad60660d4ec134943f183ee2a5f6c3eb7bf32dd984f2f020772 AS caddy
 
@@ -27,9 +25,10 @@ COPY --from=caddy /usr/bin/caddy /usr/bin/caddy
 # Lets the non-root user bind 80 and 443. Ignored by a platform that runs containers with no-new-privileges: use plain HTTP there.
 # /data and /data/backups are created here, owned by the app user, so a fresh named volume mounted at either inherits that ownership.
 RUN setcap cap_net_bind_service=+ep /usr/bin/caddy \
- && useradd --system --uid 10001 --home-dir /home/app --create-home app \
+ && groupadd --system --gid 10001 app \
+ && useradd --system --uid 10001 --gid 10001 --home-dir /home/app --create-home app \
  && mkdir -p /data/backups \
- && chown app:app /data /data/backups
+ && chown 10001:10001 /data /data/backups
 WORKDIR /app
 COPY --from=build /app/build/client ./build/client
 COPY --from=build /app/build/container ./build/container
@@ -41,7 +40,7 @@ LABEL org.opencontainers.image.source="https://github.com/kingchappers/budget-ap
       org.opencontainers.image.title="Budget app"
 USER app
 VOLUME /data
-EXPOSE 80 443 8080
+EXPOSE 80 443 443/udp 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
   CMD ["node", "-e", "fetch('http://127.0.0.1:'+(process.env.PORT||8080)+'/healthz').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
 ENTRYPOINT ["tini", "--"]

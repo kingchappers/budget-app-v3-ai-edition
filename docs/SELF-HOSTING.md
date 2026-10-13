@@ -21,7 +21,7 @@ Environment variables only. The container sets `AUTH_MODE`, `STORE` and `SQLITE_
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `DATA_DIR` | `/data` | Volume holding the database (`budget.sqlite`), backups and the `caddy/` certificate storage. An absolute path using only letters, digits and `. _ / -`, with no `..` segment and not `/` |
+| `DATA_DIR` | `/data` | Volume holding the database (`budget.sqlite`), backups the `caddy/` certificate storage and `caddy-data/` (Caddy's own data directory, such as its instance id). An absolute path using only letters, digits and `. _ / -`, with no `..` segment and not `/` |
 | `PORT` | `8080` | Port the app listens on inside the container. Must be a fixed port (not 0) with `TLS_DOMAIN` |
 | `TLS_DOMAIN` | unset | A plain hostname such as `budget.example.com` for automatic HTTPS on ports 80 and 443. Unset means plain HTTP |
 | `TLS_EMAIL` | unset | Optional contact address for the certificate authority. Needs `TLS_DOMAIN` |
@@ -43,7 +43,7 @@ If you mount the root filesystem read-only, keep `/tmp` writable (the generated 
 
 ## HTTPS
 
-Automatic HTTPS (`TLS_DOMAIN`) needs a public domain pointing at the machine and ports 80 and 443 reachable from the internet, so the certificate authority can verify the domain. Certificates are stored in `$DATA_DIR/caddy` and survive restarts and upgrades. Only automatic certificates are supported: no bring-your-own certificate files, DNS challenges or wildcards.
+Automatic HTTPS (`TLS_DOMAIN`) needs a public domain pointing at the machine and ports 80 and 443 reachable from the internet, so the certificate authority can verify the domain. Port 443/udp serves HTTP/3 and is optional (publish it as `443:443/udp`). Certificates are stored in `$DATA_DIR/caddy` and survive restarts and upgrades. Only automatic certificates are supported: no bring-your-own certificate files, DNS challenges or wildcards.
 
 On a home network without that, you have two options:
 
@@ -52,7 +52,7 @@ On a home network without that, you have two options:
 
 Do not expose the app to the internet over plain HTTP.
 
-Platforms that run containers with `no-new-privileges` ignore the file capability that lets the bundled Caddy bind ports 80 and 443. There, leave `TLS_DOMAIN` unset and use plain HTTP behind the platform's own proxy.
+The bundled Caddy binds ports 80 and 443 as a non-root user through a file capability, which `no-new-privileges` ignores. That only matters on hosts where `net.ipv4.ip_unprivileged_port_start` is above 80; Docker sets it to 0 inside containers by default, so plain Docker or compose with `no-new-privileges` still binds. If Caddy fails to bind 80/443, use plain HTTP behind your platform's own proxy, or set `net.ipv4.ip_unprivileged_port_start=0` for the container (`sysctls:` in compose).
 
 ## Behind your own reverse proxy
 

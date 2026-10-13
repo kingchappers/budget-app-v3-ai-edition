@@ -12,3 +12,7 @@ docs
 budget-export*.jsonl
 .env
 .env.*
+*.pem
+*.key
+.claude
+coverage

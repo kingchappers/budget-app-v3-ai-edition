@@ -10,6 +10,7 @@ services:
     ports:
       - "80:80"
       - "443:443"
+      - "443:443/udp"   # optional: enables HTTP/3
     environment:
       TLS_DOMAIN: budget.example.com
       TLS_EMAIL: you@example.com
