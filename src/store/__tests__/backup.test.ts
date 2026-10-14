@@ -112,7 +112,13 @@ describe('pruneBackups and listing', () => {
   function seed(names: string[]): string {
     const backups = join(dir, 'backups');
     mkdirSync(backups, { recursive: true });
-    for (const name of names) writeFileSync(join(backups, name), 'x');
+    // Listed oldest first: each file is a minute newer than the one before it.
+    names.forEach((name, index) => {
+      const file = join(backups, name);
+      writeFileSync(file, 'x');
+      const mtime = new Date(Date.UTC(2026, 9, 1, 3, index, 0));
+      utimesSync(file, mtime, mtime);
+    });
     return backups;
   }
 
@@ -127,6 +133,24 @@ describe('pruneBackups and listing', () => {
     expect(pruneBackups(backups, 0)).toBe(0);
     expect(pruneBackups(backups, -1)).toBe(0);
     expect(listBackups(backups)).toHaveLength(1);
+  });
+
+  it('orders by file time, not by name: a newer file with a smaller name survives pruning', () => {
+    const backups = seed(['budget-20261030-013000.sqlite', 'budget-20261030-010000.sqlite']);
+    expect(pruneBackups(backups, 1)).toBe(1);
+    expect(readdirSync(backups)).toEqual(['budget-20261030-010000.sqlite']);
+  });
+
+  it('ignores a zero-byte backup-named file everywhere and never deletes it', () => {
+    const backups = seed(['budget-20261001-030000.sqlite']);
+    const reserved = join(backups, 'budget-20261002-030000.sqlite');
+    writeFileSync(reserved, '');
+    const newer = new Date(Date.UTC(2026, 9, 5));
+    utimesSync(reserved, newer, newer);
+    expect(listBackups(backups)).toEqual(['budget-20261001-030000.sqlite']);
+    expect(pruneBackups(backups, 1)).toBe(0);
+    expect(existsSync(reserved)).toBe(true);
+    expect(newestBackupAgeSeconds(backups, at('2026-10-01T04:00:00Z'))).toBe(3600);
   });
 
   it('lists nothing for a missing directory', () => {

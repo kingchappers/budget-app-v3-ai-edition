@@ -58,9 +58,19 @@ export function createBackup(
   return path;
 }
 
+// Oldest first, by file mtime with the name as the tiebreak: a TZ change or a DST fall-back can make a newer
+// backup sort earlier by name. Zero-byte files (a name reserved by a crashed backup) are not backups.
 export function listBackups(dir: string): string[] {
   if (!existsSync(dir)) return [];
-  return readdirSync(dir).filter(name => BACKUP_PATTERN.test(name)).sort();
+  const found: Array<{ name: string; mtimeMs: number }> = [];
+  for (const name of readdirSync(dir)) {
+    if (!BACKUP_PATTERN.test(name)) continue;
+    const info = statSync(join(dir, name), { throwIfNoEntry: false });
+    if (!info || !info.isFile() || info.size === 0) continue;
+    found.push({ name, mtimeMs: info.mtimeMs });
+  }
+  found.sort((a, b) => a.mtimeMs - b.mtimeMs || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+  return found.map(entry => entry.name);
 }
 
 // Call only after a backup has been verified, so a corrupt backup can never push out a good one.
