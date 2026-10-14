@@ -5,8 +5,8 @@ import os from 'node:os';
 import path from 'node:path';
 import type { APIGatewayProxyEventV2, Context } from 'aws-lambda';
 import { handler as apiLambda } from '../api-handler';
-import { initAuth, setAuth } from '../src/auth';
-import { initStore, setStore } from '../src/store';
+import { getAuth, initAuth, setAuth } from '../src/auth';
+import { getStore, initStore, setStore } from '../src/store';
 import { createBackup, newestBackupAgeSeconds, pruneBackups } from '../src/store/backup';
 import { SqliteStore } from '../src/store/sqlite';
 import { createStaticHandler } from '../src/static/handler';
@@ -44,8 +44,17 @@ const KILL_WAIT_MS = 1_000;
 
 const SHUTTING_DOWN: HandlerResult = {
   statusCode: 503,
-  headers: { 'Content-Type': 'application/json', 'Retry-After': '1' },
+  headers: { 'Content-Type': 'application/json', 'Retry-After': '1', Connection: 'close' },
   body: '{"error":"Shutting down"}',
+};
+
+const isRegistered = (get: () => unknown): boolean => {
+  try {
+    get();
+    return true;
+  } catch {
+    return false;
+  }
 };
 
 const errorName = (error: unknown): string => (error instanceof Error ? error.name : 'Error');
@@ -62,6 +71,9 @@ export function describeListenError(error: NodeJS.ErrnoException, port: number):
 export async function startServer(env: NodeJS.ProcessEnv, options: StartOptions = {}): Promise<RunningServer> {
   const log = options.log ?? ((message: string) => console.log(message));
   const config = parseConfig(env);
+  if (isRegistered(getStore) || isRegistered(getAuth)) {
+    throw new Error('Another server instance is still running in this process');
+  }
   for (const warning of config.warnings) console.warn(warning);
 
   mkdirSync(config.dataDir, { recursive: true, mode: 0o700 });
@@ -233,8 +245,12 @@ export async function startServer(env: NodeJS.ProcessEnv, options: StartOptions 
           const caddyStopped = stopCaddy();
           await new Promise<void>(resolve => {
             const force = setTimeout(() => server.closeAllConnections(), shutdownGraceMs);
+            // Connections that go idle after this point (or never were) would otherwise sit out their keep-alive.
+            const sweep = setInterval(() => server.closeIdleConnections(), 100);
+            sweep.unref();
             server.close(() => {
               clearTimeout(force);
+              clearInterval(sweep);
               resolve();
             });
             server.closeIdleConnections();

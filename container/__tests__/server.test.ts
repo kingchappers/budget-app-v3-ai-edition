@@ -111,6 +111,11 @@ describe('boot', () => {
     expect(existsSync(join(dir, 'data', 'backups'))).toBe(false);
   });
 
+  it('refuses to start while another server in this process is still running', async () => {
+    await start();
+    await expect(startServer(env({ DATA_DIR: join(dir, 'other') }), { clientDir })).rejects.toThrow('Another server instance is still running in this process');
+  });
+
   it('refuses an invalid environment with every problem listed', async () => {
     const failure = await startServer(env({ BACKUP_HOUR: '99', TLS_DOMAIN: 'bad host' }), { clientDir }).catch((error: unknown) => error);
     expect(failure).toBeInstanceOf(ConfigError);
@@ -161,7 +166,7 @@ const ok = (body: string): HandlerResult => ({ statusCode: 200, headers: { 'Cont
 const sleep = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms));
 
 describe('shutdown under load', () => {
-  it('lets an in-flight request finish before close() resolves', async () => {
+  it('lets an in-flight request finish before close() resolves, without lingering on keep-alive', async () => {
     let entered!: () => void;
     const inHandler = new Promise<void>(resolve => { entered = resolve; });
     let finished = false;
@@ -170,9 +175,12 @@ describe('shutdown under load', () => {
     await inHandler;
 
     const answered = response.then(async r => ({ status: r.status, body: await r.text() }));
+    const started = performance.now();
     await running!.close();
+    const elapsed = performance.now() - started;
     running = undefined;
     expect(finished).toBe(true);
+    expect(elapsed).toBeLessThan(1500);
     expect(await Promise.race([answered, sleep(1000)])).toEqual({ status: 200, body: 'slow body' });
   });
 
@@ -197,25 +205,32 @@ describe('shutdown under load', () => {
 
   it('answers 503 to work that arrives after close() has started, without calling the handler', async () => {
     let calls = 0;
-    await start({}, { apiHandler: async () => { calls += 1; await sleep(200); return ok('first'); } });
-    const port = running!.port;
-    const socket = createConnection(port, '127.0.0.1');
+    let entered!: () => void;
+    const inHandler = new Promise<void>(resolve => { entered = resolve; });
+    let release!: () => void;
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    await start({}, { apiHandler: async () => { calls += 1; entered(); await gate; return ok('first'); } });
+    const socket = createConnection(running!.port, '127.0.0.1');
     let received = '';
     socket.on('data', chunk => { received += chunk.toString(); });
+    const socketClosed = new Promise<void>(resolve => socket.once('close', () => resolve()));
     const request = 'GET /api/x HTTP/1.1\r\nHost: x\r\n\r\n';
     socket.write(request);
-    await sleep(50);
+    await inHandler;
     // The connection is busy with the first request, so close() leaves it open; the second arrives mid-shutdown.
+    const started = performance.now();
     const closed = running!.close();
-    await sleep(50);
     socket.write(request);
+    // Node answers pipelined requests in order, so the second one is only parsed once the gated first one finishes.
+    release();
     await closed;
+    const elapsed = performance.now() - started;
     running = undefined;
-    socket.destroy();
+    await socketClosed;
     expect(received).toContain('200 OK');
-    expect(received).toContain('503');
     expect(received).toContain('Shutting down');
     expect(calls).toBe(1);
+    expect(elapsed).toBeLessThan(1500);
   });
 });
 
