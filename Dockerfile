@@ -21,8 +21,14 @@ FROM node:24-bookworm-slim@sha256:d6aa754f16b3197301076f047b5def2f02ea1dbbc2ca92
 RUN apt-get update \
  && apt-get install -y --no-install-recommends tini libcap2-bin ca-certificates \
  && rm -rf /var/lib/apt/lists/*
+# Nothing at runtime uses npm, corepack or yarn (the healthcheck and the CLI run plain node), so they are not shipped.
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack \
+    /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack \
+    /opt/yarn-* /usr/local/bin/yarn /usr/local/bin/yarnpkg
 COPY --from=caddy /usr/bin/caddy /usr/bin/caddy
-# Lets the non-root user bind 80 and 443. Ignored by a platform that runs containers with no-new-privileges: use plain HTTP there.
+# The official caddy image already carries cap_net_bind_service on its binary and COPY keeps it; this line is defence in depth.
+# File capabilities only matter where net.ipv4.ip_unprivileged_port_start is above 80 (Docker's default sets it to 0), and are
+# ignored under no-new-privileges.
 # /data and /data/backups are created here, owned by the app user, so a fresh named volume mounted at either inherits that ownership.
 RUN setcap cap_net_bind_service=+ep /usr/bin/caddy \
  && groupadd --system --gid 10001 app \
