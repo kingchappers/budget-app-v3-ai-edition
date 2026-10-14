@@ -112,7 +112,7 @@ A 1 MiB body cap (413 above it); header, request and keep-alive timeouts; the ha
 
 ### Caddy
 
-The Caddyfile is generated only from a validated hostname and email, so no user-typed text is interpolated into configuration. Certificates are stored at `$DATA_DIR/caddy` so they survive restarts and upgrades. The admin API is off; the global option `grace_period` is not set (deferred), and Caddy's default SIGTERM handling is a graceful stop; logging goes to stdout; `encode zstd gzip` is on; the HTTP-to-HTTPS redirect is Caddy's default.
+The Caddyfile is generated only from a validated hostname and email, so no user-typed text is interpolated into configuration. Certificates are stored at `$DATA_DIR/caddy` so they survive restarts and upgrades. The admin API is off; the global option `grace_period` is not set (deferred), and Caddy's default SIGTERM handling is a graceful stop; logging goes to stderr (`docker logs` shows both streams); `encode zstd gzip` is on; the HTTP-to-HTTPS redirect is Caddy's default.
 
 ### Shutdown
 
@@ -128,7 +128,7 @@ On SIGTERM: stop accepting connections, let in-flight requests and a running bac
 
 ### Backups
 
-Daily at `BACKUP_HOUR` in `TZ`, files named `budget-YYYYMMDD-HHMMSS.sqlite`, written owner-only into an owner-only directory. Each copy is verified with `PRAGMA integrity_check` before it counts, so a corrupt backup never causes a good one to be pruned. The newest `BACKUP_KEEP` verified files are kept. A missed run is caught up at the next start.
+On every hourly check, a backup is taken when `BACKUP_KEEP` is above 0, the local hour is at or after `BACKUP_HOUR` (in `TZ`) and the newest backup is over 20 hours old, so a skipped tick or a DST-skipped hour is made up at the next check and one day never gets two. Files are named `budget-YYYYMMDD-HHMMSS.sqlite`, written owner-only into an owner-only directory. Each copy is verified with `PRAGMA integrity_check` before it counts, so a corrupt backup never causes a good one to be pruned. The newest `BACKUP_KEEP` verified files are kept (newest by file time, name as the tiebreak; an empty file left by a crashed backup is ignored). A missed run is caught up at the next start.
 
 ## 4. Testing
 
@@ -143,7 +143,7 @@ Daily at `BACKUP_HOUR` in `TZ`, files named `budget-YYYYMMDD-HHMMSS.sqlite`, wri
 - The `arm64` image is built under QEMU but smoke-tested on `amd64` only.
 - No Docker daemon was available on the author's machine when this spec was written, so the image had never been built or run locally; CI is the first real build.
 - scrypt memory on a 256 MB host, and listing on a hosting partner, are untested.
-- Binding 80 and 443 as a non-root user relies on a file capability on the Caddy binary. A platform that runs containers with `no-new-privileges` ignores file capabilities, and Caddy then cannot bind; the docs say to use `TLS_DOMAIN`-less plain HTTP behind the platform's own proxy in that case.
+- Binding 80 and 443 as a non-root user relies on a file capability on the Caddy binary. File capabilities are ignored under `no-new-privileges`, but that only matters where `net.ipv4.ip_unprivileged_port_start` is above 80; Docker's default sets it to 0, so Caddy still binds there. The docs say what to do if it does not (set the sysctl for the container, or run plain HTTP behind the platform's own proxy).
 - A homelab user on plain HTTP relies on the derived `COOKIE_SECURE` behaviour and the documentation.
 - The login throttle is still global: anyone who can reach the login endpoint can lock the owner out for up to 15 minutes (`store-cli reset-password` clears it).
 - Same-volume backups do not protect against losing the volume.

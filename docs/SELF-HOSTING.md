@@ -10,6 +10,8 @@ The image is `ghcr.io/kingchappers/budget-app-v3-ai-edition`, tagged `latest`, `
 
 ## Quick start
 
+> Until the first release is tagged, use the `edge` tag (built from `main`) instead of `latest`: change the `image:` line in the compose file to `ghcr.io/kingchappers/budget-app-v3-ai-edition:edge`.
+
 1. Copy [`compose.example.yml`](../compose.example.yml) to `compose.yml` and set `TLS_DOMAIN` (and `TLS_EMAIL`). The domain's DNS must point at this machine, and ports 80 and 443 must be reachable from the internet. Without a domain, see [HTTPS](#https).
 2. `docker compose up -d`
 3. Find the one-time setup code in the log: `docker compose logs budget`.
@@ -21,14 +23,14 @@ Environment variables only. The container sets `AUTH_MODE`, `STORE` and `SQLITE_
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `DATA_DIR` | `/data` | Volume holding the database (`budget.sqlite`), backups the `caddy/` certificate storage and `caddy-data/` (Caddy's own data directory, such as its instance id). An absolute path using only letters, digits and `. _ / -`, with no `..` segment and not `/` |
+| `DATA_DIR` | `/data` | Volume holding the database (`budget.sqlite`), backups, the `caddy/` certificate storage and `caddy-data/` (Caddy's own data directory, such as its instance id). An absolute path using only letters, digits and `. _ / -`, with no `..` segment and not `/` |
 | `PORT` | `8080` | Port the app listens on inside the container. Must be a fixed port (not 0) with `TLS_DOMAIN` |
 | `TLS_DOMAIN` | unset | A plain hostname such as `budget.example.com` for automatic HTTPS on ports 80 and 443. Unset means plain HTTP |
 | `TLS_EMAIL` | unset | Optional contact address for the certificate authority. Needs `TLS_DOMAIN` |
 | `APP_ORIGIN` | `https://$TLS_DOMAIN` when that is set | The public URL (scheme, host, port; no path). When set, the `Origin` of every state-changing request must match it exactly. Must match `TLS_DOMAIN` and be `https` if that is set |
 | `TRUST_PROXY` | `true` with `TLS_DOMAIN`, otherwise `false` | Honour `X-Forwarded-*` headers. Turn it on only behind a proxy you control |
 | `COOKIE_SECURE` | derived | `true` exactly when the effective origin is `https`. An explicit `true` or `false` overrides this |
-| `BACKUP_HOUR` | `3` | Hour (0-23, in `TZ`) of the daily backup |
+| `BACKUP_HOUR` | `3` | Hour (0-23, in `TZ`) from which the daily backup is due |
 | `BACKUP_KEEP` | `7` | Number of newest backups kept (0-365). `0` turns backups off |
 | `BACKUP_DIR` | `$DATA_DIR/backups` | Where backups are written |
 | `TZ` | `UTC` | Timezone for the backup hour |
@@ -38,6 +40,8 @@ A bad value stops the container at start with a message naming it.
 Listening address: without `TLS_DOMAIN` the app listens on all IPv4 interfaces inside the container, on `PORT` (default 8080). With `TLS_DOMAIN` it listens on loopback only and Caddy, bundled in the image, serves ports 80 and 443.
 
 Limits: request bodies over 1 MiB are rejected before the app sees them. A client that is still uploading when the limit is hit may see a connection reset instead of a 413 response.
+
+A bind-mounted data directory (instead of a named volume) must be owned by the app user, uid and gid 10001: `chown -R 10001:10001 ./data`. A named volume is set up correctly by the image.
 
 If you mount the root filesystem read-only, keep `/tmp` writable (the generated Caddyfile and Caddy's config directory live there) as well as `/data`.
 
@@ -72,13 +76,13 @@ docker compose pull && docker compose up -d
 
 The database schema migrates automatically at start. An older image refuses to open a database written by a newer one, with a clear message, so take a backup before upgrading and never downgrade across a schema change.
 
-Stopping: a clean shutdown stops taking new requests (they get a 503), lets open connections finish for up to 10 seconds, waits up to 2 more seconds for requests still running, then closes the database. That is about 12 seconds in the worst case, and Docker's default stop timeout is 10 seconds, after which `docker stop` kills the process before the database is closed cleanly. The write-ahead log recovers, so no data is lost, but a clean close is better. The compose examples therefore set `stop_grace_period: 20s`; keep it, and pass `--time 20` to a bare `docker stop`.
+Stopping: a clean shutdown stops taking new requests (they get a 503), lets open connections finish for up to 10 seconds, waits up to 2 more seconds for requests still running, then closes the database. That is about 12 seconds in the worst case, and Docker's default stop timeout is 10 seconds, after which `docker stop` kills the process before the database is closed cleanly. The write-ahead log recovers, so no data is lost, but a clean close is better. The compose examples therefore set `stop_grace_period: 20s`; keep it, and pass `--time 20` to a bare `docker stop`. With a plain `docker run`, add `--stop-timeout 20` so the default 10 seconds does not cut the shutdown short.
 
 ## Backups and restore
 
-- A backup is taken automatically every day at `BACKUP_HOUR` (during the 03:00 hour by default, in `TZ`, default UTC; the check runs hourly from when the container started) into `/data/backups`. The newest `BACKUP_KEEP` (default 7) are kept. Each is integrity-checked before it counts, so a corrupt copy never causes a good one to be pruned, and is owner-only. `BACKUP_KEEP=0` turns this off.
+- A backup is taken automatically at the first hourly check at or after `BACKUP_HOUR` (03:00 by default, in `TZ`, default UTC; the check runs hourly from when the container started) once the newest backup is over 20 hours old, so a missed hour or a skipped day is made up at the next check. Backups go into `/data/backups`. The newest `BACKUP_KEEP` (default 7) are kept. Each is integrity-checked before it counts, so a corrupt copy never causes a good one to be pruned, and is owner-only. `BACKUP_KEEP=0` turns this off.
 - File names are `budget-YYYYMMDD-HHMMSS.sqlite` in local time (`TZ`).
-- At start, if the newest backup is more than a day old (or there is none), one is taken straight away.
+- At start, if there is no backup or the newest is more than a day old, one is taken straight away.
 - For a backup on demand (the file is never overwritten, so use a new name):
 
   ```bash
@@ -150,4 +154,6 @@ Export and import only touch your own data, never the login records, so the step
 
 ## For maintainers: releasing
 
-`git tag v1.2.3 && git push origin v1.2.3` publishes `1.2.3`, `1.2` and `latest`. A push to `main` publishes `edge`.
+`git tag v1.2.3 && git push origin v1.2.3` publishes `1.2.3`, `1.2` and `latest`. A push to `main` publishes `edge`. Tags must look like `v1.2.3` (or `v1.2.3-rc1`, which publishes only that tag); other `v*` tags such as `v1` or `v1.2` do not trigger a publish.
+
+`latest` does not exist until the first stable tag is pushed, so tag a release (for example `v0.1.0`) soon after merging. After the first publish, open the repository's Packages settings and check the package's visibility: a new GHCR package may default to private. Set it public so users can pull it without logging in.

@@ -5,6 +5,7 @@
 # not match https://budget.example.com.
 services:
   budget:
+    # Until the first release is tagged, use the `edge` tag (built from main) instead of `latest`.
     image: ghcr.io/kingchappers/budget-app-v3-ai-edition:latest
     restart: unless-stopped
     # A clean shutdown can take about 12 seconds (10 s for open connections, up to 2 s for running requests).
