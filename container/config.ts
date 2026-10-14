@@ -85,6 +85,7 @@ export function parseConfig(env: NodeJS.ProcessEnv): ContainerConfig {
     if (isValidHostname(rawDomain)) tlsDomain = rawDomain;
     else problems.push('TLS_DOMAIN must be a plain hostname such as budget.example.com (no scheme, port, path or wildcard)');
     if (port === 0) problems.push('PORT must be a fixed port (not 0) when TLS_DOMAIN is set');
+    if (port === 80 || port === 443) problems.push('PORT must not be 80 or 443 when TLS_DOMAIN is set (Caddy uses those ports)');
   }
 
   const rawEmail = env.TLS_EMAIL?.trim();

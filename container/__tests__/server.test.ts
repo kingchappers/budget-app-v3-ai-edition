@@ -405,4 +405,13 @@ describe('Caddy supervision', () => {
     running = undefined;
     expect(Date.now() - started).toBeLessThan(1000);
   });
+
+  it('frees the port when Caddy cannot be started after the server is listening', async () => {
+    const env1 = await tls();
+    const throwing = (() => { throw new Error('spawn exploded'); }) as never;
+    await expect(startServer(env(env1), { clientDir, log: () => undefined, spawnCaddy: throwing })).rejects.toThrow('spawn exploded');
+    // Nothing is left listening on the port, and the registries are free again.
+    running = await startServer(env(env1), { clientDir, log: () => undefined, spawnCaddy: asSpawn(new FakeChild()) });
+    expect(running.port).toBe(Number(env1.PORT));
+  });
 });

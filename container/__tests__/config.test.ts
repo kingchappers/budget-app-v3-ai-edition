@@ -45,6 +45,14 @@ describe('TLS_DOMAIN', () => {
     expect(isValidHostname('nas')).toBe(true);
   });
 
+  it('rejects the ports Caddy needs, but allows them without TLS_DOMAIN', () => {
+    for (const port of ['80', '443']) {
+      expect(problemsOf({ TLS_DOMAIN: 'budget.example.com', PORT: port }).join(' '))
+        .toContain('PORT must not be 80 or 443 when TLS_DOMAIN is set (Caddy uses those ports)');
+    }
+    expect(parseConfig({ PORT: '80' }).port).toBe(80);
+  });
+
   it('needs a fixed port', () => {
     expect(problemsOf({ TLS_DOMAIN: 'budget.example.com', PORT: '0' }).join(' ')).toMatch(/PORT/);
   });

@@ -232,6 +232,9 @@ export async function startServer(env: NodeJS.ProcessEnv, options: StartOptions 
         shuttingDown = true;
         caddy?.kill('SIGKILL');
         discardCaddyFiles();
+        // The outer catch releases the store and registries but does not know about the listening socket.
+        server.close();
+        server.closeAllConnections();
         throw error;
       }
     }
