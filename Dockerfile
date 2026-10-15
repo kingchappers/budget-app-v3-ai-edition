@@ -1,7 +1,7 @@
-# Pinned by multi-arch index digest. node:24-bookworm-slim and caddy:2, resolved 2026-10-11; bump deliberately.
-FROM caddy:2@sha256:f2a1290d0463aad60660d4ec134943f183ee2a5f6c3eb7bf32dd984f2f020772 AS caddy
+# Pinned by multi-arch index digest. node:24-bookworm-slim and caddy:2, resolved 2026-10-15; bump deliberately.
+FROM caddy:2@sha256:685ae3d7c34d9b5f8caeddc5d14051db7bbd88ff1f5a2fa0c16bd8ca328fb7af AS caddy
 
-FROM node:24-bookworm-slim@sha256:d6aa754f16b3197301076f047b5def2f02ea1dbbc2ca920407d46d7ec7f87b20 AS build
+FROM node:24-bookworm-slim@sha256:a5f4366e834695d5f363b920c104953a535d3a9864d1bdf74566a0ebe01daee5 AS build
 WORKDIR /app
 COPY package.json yarn.lock ./
 RUN yarn install --frozen-lockfile
@@ -17,9 +17,10 @@ RUN react-router build \
  && node scripts/build-container.cjs \
  && rm -f build/client/config.json
 
-FROM node:24-bookworm-slim@sha256:d6aa754f16b3197301076f047b5def2f02ea1dbbc2ca920407d46d7ec7f87b20 AS runtime
+FROM node:24-bookworm-slim@sha256:a5f4366e834695d5f363b920c104953a535d3a9864d1bdf74566a0ebe01daee5 AS runtime
 RUN apt-get update \
  && apt-get install -y --no-install-recommends tini libcap2-bin ca-certificates \
+ && apt-get upgrade -y --no-install-recommends \
  && rm -rf /var/lib/apt/lists/*
 # Nothing at runtime uses npm, corepack or yarn (the healthcheck and the CLI run plain node), so they are not shipped.
 RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack \

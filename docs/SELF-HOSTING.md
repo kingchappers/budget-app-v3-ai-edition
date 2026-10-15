@@ -158,3 +158,14 @@ Export and import only touch your own data, never the login records, so the step
 `git tag v1.2.3 && git push origin v1.2.3` publishes `1.2.3`, `1.2` and `latest`. A push to `main` publishes `edge`. Tags must look like `v1.2.3` (or `v1.2.3-rc1`, which publishes only that tag); other `v*` tags such as `v1` or `v1.2` do not trigger a publish.
 
 `latest` does not exist until the first stable tag is pushed, so tag a release (for example `v0.1.0`) soon after merging. After the first publish, open the repository's Packages settings and check the package's visibility: a new GHCR package may default to private. Set it public so users can pull it without logging in.
+
+### When the vulnerability scan fails
+
+The Trivy step fails the build on HIGH or CRITICAL findings that have a fix, in the base images or in the bundled Caddy binary. New advisories can turn a previously green `main` red without any code change. The fix is to bump the pinned base-image digests in the `Dockerfile` and rebuild. Current digests:
+
+```sh
+curl -s https://hub.docker.com/v2/repositories/library/caddy/tags/2 | jq -r .digest
+curl -s https://hub.docker.com/v2/repositories/library/node/tags/24-bookworm-slim | jq -r .digest
+```
+
+The runtime stage also runs `apt-get upgrade`, so Debian security updates already published are picked up at build time. For a finding that is genuinely not exploitable here, add a justified `.trivyignore` entry and have it reviewed in the PR. A weekly scheduled re-run of the workflow is a reasonable follow-up so this shows up before a release; it is not set up yet.
