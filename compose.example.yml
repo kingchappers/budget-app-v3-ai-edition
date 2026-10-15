@@ -15,7 +15,7 @@ services:
     environment:
       TLS_DOMAIN: budget.example.com
       TLS_EMAIL: you@example.com
-      # BACKUP_HOUR: "3"   # daily backup at this hour, in TZ (default UTC)
+      # BACKUP_HOUR: "3"   # first hourly check at or after this hour takes the daily backup, in TZ (default UTC)
       # BACKUP_KEEP: "7"   # newest backups kept; 0 turns them off
       # TZ: Europe/London
     volumes:

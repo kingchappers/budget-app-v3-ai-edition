@@ -30,7 +30,7 @@ Environment variables only. The container sets `AUTH_MODE`, `STORE` and `SQLITE_
 | `APP_ORIGIN` | `https://$TLS_DOMAIN` when that is set | The public URL (scheme, host, port; no path). When set, the `Origin` of every state-changing request must match it exactly. Must match `TLS_DOMAIN` and be `https` if that is set |
 | `TRUST_PROXY` | `true` with `TLS_DOMAIN`, otherwise `false` | Honour `X-Forwarded-*` headers. Turn it on only behind a proxy you control |
 | `COOKIE_SECURE` | derived | `true` exactly when the effective origin is `https`. An explicit `true` or `false` overrides this |
-| `BACKUP_HOUR` | `3` | Hour (0-23, in `TZ`) from which the daily backup is due |
+| `BACKUP_HOUR` | `3` | Hour (0-23, in `TZ`) from which the daily backup is due (taken at the first hourly check from then on) |
 | `BACKUP_KEEP` | `7` | Number of newest backups kept (0-365). `0` turns backups off |
 | `BACKUP_DIR` | `$DATA_DIR/backups` | Where backups are written |
 | `TZ` | `UTC` | Timezone for the backup hour |
@@ -80,9 +80,10 @@ Stopping: a clean shutdown stops taking new requests (they get a 503), lets open
 
 ## Backups and restore
 
-- A backup is taken automatically at the first hourly check at or after `BACKUP_HOUR` (03:00 by default, in `TZ`, default UTC; the check runs hourly from when the container started) once the newest backup is over 20 hours old, so a missed hour or a skipped day is made up at the next check. Backups go into `/data/backups`. The newest `BACKUP_KEEP` (default 7) are kept. Each is integrity-checked before it counts, so a corrupt copy never causes a good one to be pruned, and is owner-only. `BACKUP_KEEP=0` turns this off.
+- A backup is taken automatically at the first hourly check at or after `BACKUP_HOUR` (03:00 by default, in `TZ`, default UTC; the check runs hourly from when the container started) once the newest backup is older than that hour on the current day. That gives one backup per day, and a missed hour or a skipped day is made up at the next check. A backup taken before `BACKUP_HOUR` (a catch-up at start, say) counts as the previous day's, so the check at `BACKUP_HOUR` takes another. Backups go into `/data/backups`. The newest `BACKUP_KEEP` (default 7) are kept. Each is integrity-checked before it counts, so a corrupt copy never causes a good one to be pruned, and is owner-only. `BACKUP_KEEP=0` turns this off.
 - File names are `budget-YYYYMMDD-HHMMSS.sqlite` in local time (`TZ`).
 - At start, if there is no backup or the newest is more than a day old, one is taken straight away.
+- Backups are ordered by file modification time, so do not `touch` or re-copy old backup files in the backups directory.
 - For a backup on demand (the file is never overwritten, so use a new name):
 
   ```bash

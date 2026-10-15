@@ -21,7 +21,7 @@ This serves the self-hosting and hosting-partner plan: each user holds their own
 | HTTPS | Inside the image, optional. Caddy is bundled and started by the Node server only when `TLS_DOMAIN` is set. Without it the server speaks plain HTTP (hosting partners, localhost, homelab). |
 | Certificate sources | Automatic (ACME) only in v1. No bring-your-own certificate files, no DNS-challenge or wildcard certificates. |
 | Request path | A thin adapter over the existing handlers using `node:http` only: build an API Gateway v2 event, call the real `api-handler` and `src/static/handler.ts`, write the result back. No web framework. |
-| Publishing | New workflow `container.yml`. Version tag `v*` publishes `X.Y.Z`, `X.Y` and `latest`; a push to `main` publishes only `edge`; pull requests build without pushing. GHCR, `linux/amd64` + `linux/arm64`. |
+| Publishing | New workflow `container.yml`. A version tag such as `v1.2.3` (or `v1.2.3-rc1`, which publishes only itself) publishes `X.Y.Z`, `X.Y` and `latest`; a push to `main` publishes only `edge`; pull requests build without pushing. GHCR, `linux/amd64` + `linux/arm64`. |
 | Backups | A built-in `store-cli backup` command plus an automatic daily backup inside the container (default 03:00, newest 7 kept, integrity-checked). Same-volume backups are not off-site; the docs say so. |
 | Location of new code | `container/` (the existing `server/index.ts` is an unrelated old Lambda handler). |
 
@@ -93,7 +93,7 @@ The image carries the OCI `source` label and the About page gets a small "Source
 |---|---|
 | Pull request | Build `linux/amd64` without pushing; run the smoke tests |
 | Push to `main` | Build `amd64` + `arm64` (buildx + QEMU), scan, push `edge` to GHCR with provenance and an SBOM |
-| Tag `v*` | The same, pushing `X.Y.Z`, `X.Y` and `latest` |
+| Tag `vX.Y.Z` | The same, pushing `X.Y.Z`, `X.Y` and `latest` (a `vX.Y.Z-rc1` tag pushes only itself) |
 
 - **Smoke test** (`scripts/container-smoke.mjs`, no browser): run the container with a temporary volume; `/healthz` is 200; `/config.json` is `{"auth":"local"}`; `/api/auth/status` reports setup required; setup succeeds with the code scraped from `docker logs`; login works; after a container restart the data and session persist; `store-cli backup` writes a file that passes `PRAGMA integrity_check`.
 - **HTTPS smoke test:** a second run with `TLS_DOMAIN=localhost`. Caddy issues from its internal CA with no internet needed. It checks HTTP redirects to HTTPS and that the `Secure`, `__Host-` session cookie is set.
@@ -128,7 +128,7 @@ On SIGTERM: stop accepting connections, let in-flight requests and a running bac
 
 ### Backups
 
-On every hourly check, a backup is taken when `BACKUP_KEEP` is above 0, the local hour is at or after `BACKUP_HOUR` (in `TZ`) and the newest backup is over 20 hours old, so a skipped tick or a DST-skipped hour is made up at the next check and one day never gets two. Files are named `budget-YYYYMMDD-HHMMSS.sqlite`, written owner-only into an owner-only directory. Each copy is verified with `PRAGMA integrity_check` before it counts, so a corrupt backup never causes a good one to be pruned. The newest `BACKUP_KEEP` verified files are kept (newest by file time, name as the tiebreak; an empty file left by a crashed backup is ignored). A missed run is caught up at the next start.
+On every hourly check, a backup is taken when `BACKUP_KEEP` is above 0, the local hour is at or after `BACKUP_HOUR` (in `TZ`) and the newest backup predates today's backup hour. That is one backup per calendar day at the first check from the backup hour on; a skipped tick or a DST-skipped hour is made up at the next check, and a backup taken before the backup hour (a catch-up) counts as the previous day's. Files are named `budget-YYYYMMDD-HHMMSS.sqlite`, written owner-only into an owner-only directory. Each copy is verified with `PRAGMA integrity_check` before it counts, so a corrupt backup never causes a good one to be pruned. The newest `BACKUP_KEEP` verified files are kept (newest by file time, name as the tiebreak; an empty file left by a crashed backup is ignored). A missed run is caught up at the next start.
 
 ## 4. Testing
 
