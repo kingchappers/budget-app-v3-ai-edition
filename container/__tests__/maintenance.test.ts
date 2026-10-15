@@ -15,6 +15,15 @@ function deps(ageSeconds: number): MaintenanceDeps & { logs: string[]; backups: 
   });
 }
 
+// A fake store with a clock: backup() records the time and becomes the newest backup.
+function world(last?: Date): MaintenanceDeps & { logs: string[]; backups: Date[]; purges: number } {
+  let newest = last?.getTime();
+  const state = deps(0);
+  state.newestBackupAgeSeconds = now => (newest === undefined ? Infinity : (now.getTime() - newest) / 1000);
+  state.backup = now => { state.backups.push(now); newest = now.getTime(); };
+  return state;
+}
+
 describe('runTick', () => {
   it('purges every tick and backs up from the backup hour on, never before it', () => {
     const due = deps(25 * HOUR);
@@ -28,28 +37,66 @@ describe('runTick', () => {
     expect(beforeHour.backups).toHaveLength(0);
   });
 
-  it('does not skip the day after a catch-up taken mid-morning (17 h old at 03:00, 41 h old the next day)', () => {
-    const afterCatchUp = deps(17 * HOUR);
-    runTick(afterCatchUp, options, at(3));
-    expect(afterCatchUp.backups).toHaveLength(0);
-
-    const nextDay = deps(41 * HOUR);
-    runTick(nextDay, options, at(3));
-    expect(nextDay.backups).toHaveLength(1);
+  it('backs up on the next day\'s first tick after a mid-morning catch-up, and not on the ticks in between', () => {
+    const w = world(new Date(2026, 9, 10, 10, 0, 0));
+    for (const hour of [11, 12, 23]) runTick(w, options, at(hour));
+    expect(w.backups).toHaveLength(0);
+    // The next day's tick at 03:00 sees a backup 17 h old: it still predates that day's backup hour.
+    runTick(w, options, new Date(2026, 9, 11, 3, 0, 0));
+    expect(w.backups).toHaveLength(1);
   });
 
-  it('treats exactly 20 hours as not yet due and 20 hours and a second as due', () => {
-    const boundary = deps(20 * HOUR);
-    runTick(boundary, options, at(3));
-    expect(boundary.backups).toHaveLength(0);
+  it('is not due again 20 hours after a backup taken in the backup hour (hour 3: 23:00 tick; hour 0: 21:15 tick)', () => {
+    const three = world(new Date(2026, 9, 10, 3, 0, 0));
+    runTick(three, options, new Date(2026, 9, 10, 23, 0, 0, 50));
+    expect(three.backups).toHaveLength(0);
 
-    const over = deps(20 * HOUR + 1);
-    runTick(over, options, at(3));
-    expect(over.backups).toHaveLength(1);
+    const zero = world();
+    const midnight = { backupHour: 0, backupKeep: 7 };
+    runTick(zero, midnight, new Date(2026, 9, 10, 0, 15, 0));
+    runTick(zero, midnight, new Date(2026, 9, 10, 21, 15, 0));
+    expect(zero.backups).toHaveLength(1);
+  });
+
+  it('counts a backup taken at 02:30 as the previous day\'s: the 03:00 tick backs up again (accepted)', () => {
+    const w = world(new Date(2026, 9, 10, 2, 30, 0));
+    runTick(w, options, at(3));
+    expect(w.backups).toHaveLength(1);
+  });
+
+  it('retries a failed backup on the next tick and does not run again after it succeeds', () => {
+    const w = world(new Date(2026, 9, 9, 3, 0, 0));
+    let fail = true;
+    const backup = w.backup;
+    w.backup = now => { if (fail) throw new Error('disk full'); backup(now); };
+    runTick(w, options, at(3));
+    expect(w.backups).toHaveLength(0);
+    fail = false;
+    runTick(w, options, at(4));
+    runTick(w, options, at(5));
+    expect(w.backups).toEqual([at(4)]);
+  });
+
+  it.each([0, 1, 2, 3, 12, 23])('makes one backup per day, in the backup hour, over 14 hourly ticks with drift (BACKUP_HOUR %i)', backupHour => {
+    const opts = { backupHour, backupKeep: 7 };
+    const start = new Date(2026, 9, 10, 0, 0, 0).getTime();
+    const w = world();
+    runCatchUp(w, opts, new Date(start));
+    expect(w.backups).toHaveLength(1);
+    // Ticks at :15 plus 5 ms of drift per tick, from 01:15 on day 1 to 23:15 on day 14.
+    for (let tick = 1; tick < 14 * 24; tick += 1) {
+      runTick(w, opts, new Date(start + tick * HOUR * 1000 + 15 * 60 * 1000 + tick * 5));
+    }
+    const fromTicks = w.backups.slice(1);
+    const days = fromTicks.map(when => when.getDate());
+    expect(new Set(days).size).toBe(days.length);
+    expect(fromTicks.every(when => when.getHours() === backupHour)).toBe(true);
+    // The catch-up at 00:00 is day 1's backup only when the backup hour is 0.
+    expect(fromTicks).toHaveLength(backupHour === 0 ? 13 : 14);
   });
 
   it('makes up a missed backup hour at the next tick', () => {
-    const missed = deps(30 * HOUR);
+    const missed = world(new Date(2026, 9, 9, 3, 0, 0));
     runTick(missed, options, new Date(2026, 9, 10, 2, 59, 0));
     expect(missed.backups).toHaveLength(0);
     runTick(missed, options, new Date(2026, 9, 10, 4, 1, 0));
@@ -57,27 +104,17 @@ describe('runTick', () => {
   });
 
   it('still backs up when the backup hour does not exist that day (DST spring-forward)', () => {
-    const skippedHour = deps(30 * HOUR);
-    runTick(skippedHour, { backupHour: 2, backupKeep: 7 }, at(3));
-    expect(skippedHour.backups).toHaveLength(1);
+    // 2026-03-29 in Europe/London: 01:00 jumps to 02:00; in US zones 2026-03-08 02:00 jumps to 03:00.
+    const day = new Date(2026, 2, 8, 3, 0, 0);
+    const w = world(new Date(2026, 2, 7, 3, 0, 0));
+    runTick(w, { backupHour: 2, backupKeep: 7 }, day);
+    expect(w.backups).toHaveLength(1);
   });
 
-  it('runs once for two ticks in the same day', () => {
-    const start = at(3).getTime();
-    let lastBackup = start - 30 * HOUR * 1000;
-    const clocked = deps(0);
-    clocked.newestBackupAgeSeconds = now => (now.getTime() - lastBackup) / 1000;
-    clocked.backup = now => { clocked.backups.push(now); lastBackup = now.getTime(); };
-    runTick(clocked, options, at(3));
-    runTick(clocked, options, at(4));
-    runTick(clocked, options, at(23));
-    expect(clocked.backups).toHaveLength(1);
-  });
-
-  it('does not back up twice in a day', () => {
-    const recent = deps(1 * HOUR);
-    runTick(recent, options, at(3));
-    expect(recent.backups).toHaveLength(0);
+  it('does not back up again on later ticks the same day', () => {
+    const w = world(new Date(2026, 9, 10, 3, 0, 0));
+    for (const hour of [3, 4, 12, 23]) runTick(w, options, at(hour));
+    expect(w.backups).toHaveLength(0);
   });
 
   it('never backs up when BACKUP_KEEP is 0', () => {
