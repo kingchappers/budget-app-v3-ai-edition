@@ -28,7 +28,7 @@ describe('consumeResetMarker', () => {
     writeFileSync(marker(), 'TOP-SECRET-CONTENT');
     expect(consumeResetMarker(dir, warn)).toBe('consumed');
     expect(existsSync(marker())).toBe(false);
-    expect(JSON.stringify(warn.mock.calls)).not.toContain('TOP-SECRET');
+    expect(warn).not.toHaveBeenCalled();
   });
 
   it('refuses, and warns, when the marker cannot be deleted, so recovery is not opened', () => {
@@ -79,9 +79,38 @@ describe('createCodeHooks', () => {
     mkdirSync(`${codeFile()}.tmp`); // a directory where the temporary file should go
     createCodeHooks(dir, { print, warn }).announce('abc123XYZ', 'setup');
     expect(String(print.mock.calls[0][0])).toContain('abc123XYZ');
-    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledTimes(2);
     expect(String(warn.mock.calls[0][0])).toContain(SETUP_CODE_FILE);
     expect(String(warn.mock.calls[0][0])).not.toContain('abc123XYZ');
+    expect(String(warn.mock.calls[1][0])).toContain(`${SETUP_CODE_FILE}.tmp`);
+    expect(String(warn.mock.calls[1][0])).not.toContain('abc123XYZ');
+  });
+
+  it('warns once and leaves no temporary file when the rename fails', () => {
+    mkdirSync(codeFile());
+    writeFileSync(join(codeFile(), 'inner'), 'x'); // a non-empty directory cannot be replaced
+    createCodeHooks(dir, { print, warn }).announce('abc123XYZ', 'setup');
+    expect(String(print.mock.calls[0][0])).toContain('abc123XYZ');
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(existsSync(`${codeFile()}.tmp`)).toBe(false);
+  });
+
+  it('replaces a stale temporary file so the saved code is owner-only', () => {
+    writeFileSync(`${codeFile()}.tmp`, 'old', { mode: 0o644 });
+    createCodeHooks(dir, { print, warn }).announce('abc123XYZ', 'setup');
+    expect(readFileSync(codeFile(), 'utf8')).toBe('abc123XYZ\n');
+    expect(statSync(codeFile()).mode & 0o777).toBe(0o600);
+    expect(existsSync(`${codeFile()}.tmp`)).toBe(false);
+  });
+
+  it('does not write through a symlink at the temporary path', () => {
+    const target = join(dir, 'elsewhere');
+    writeFileSync(target, 'untouched');
+    symlinkSync(target, `${codeFile()}.tmp`);
+    createCodeHooks(dir, { print, warn }).announce('abc123XYZ', 'setup');
+    expect(readFileSync(target, 'utf8')).toBe('untouched');
+    expect(readFileSync(codeFile(), 'utf8')).toBe('abc123XYZ\n');
+    expect(statSync(codeFile()).mode & 0o777).toBe(0o600);
   });
 
   it('retire removes the file', () => {

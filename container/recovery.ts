@@ -83,12 +83,14 @@ export function createCodeHooks(dataDir: string, io: { print(text: string): void
     announce(code, kind) {
       io.print(formatBlock(code, kind));
       try {
-        writeFileSync(temporary, `${code}\n`, { mode: 0o600 });
+        // Exclusive create applies the mode and never follows a symlink, so any stale entry is cleared first.
+        rmSync(temporary, { force: true });
+        writeFileSync(temporary, `${code}\n`, { mode: 0o600, flag: 'wx' });
         renameSync(temporary, file);
       } catch (error) {
         io.warn(`Could not write ${SETUP_CODE_FILE}: ${describeFailure(error)}. The code is in this log.`);
-        // Already reported above, so a leftover temporary file is removed on a best-effort basis without a second warning.
-        removeFile(temporary, () => undefined);
+        // The temporary file may hold the code, so a failure to remove it is reported too.
+        removeFile(temporary, io.warn);
       }
     },
     retire() {
