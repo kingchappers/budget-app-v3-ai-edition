@@ -19,7 +19,9 @@ export async function startDemoOrShowError(): Promise<boolean> {
     console.error('Could not start the demo:', error instanceof Error ? error.name : 'Error');
     const message = document.createElement('p');
     message.setAttribute('role', 'alert');
-    message.textContent = 'The demo could not start. Reload the page to try again.';
+    message.textContent = window.isSecureContext
+      ? 'The demo could not start. Reload the page to try again.'
+      : 'The demo needs a secure connection (HTTPS). Open this page over HTTPS.';
     document.body.replaceChildren(message);
     return false;
   }
