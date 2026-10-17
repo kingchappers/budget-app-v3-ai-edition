@@ -14,7 +14,7 @@ export function installDemoFetch(api: Pick<DemoApi, 'handles' | 'handle'>, host:
     const target = new URL(raw, host.location.href);
     if (target.origin !== host.location.origin || !api.handles(target.pathname)) return original(input, init);
 
-    const request = new Request(target.href, init ?? (input instanceof Request ? input : undefined));
+    const request = input instanceof Request ? new Request(input, init) : new Request(target.href, init);
     const body = request.method === 'GET' || request.method === 'HEAD' ? undefined : await request.text();
     const response = await api.handle({
       method: request.method,

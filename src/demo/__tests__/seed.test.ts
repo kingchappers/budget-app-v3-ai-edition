@@ -59,6 +59,14 @@ describe('seedHousehold', () => {
     expect(pots.every(pot => pot.balance > 0)).toBe(true);
   });
 
+  it('leaves no pot overdrawn, and gives Gifts money to spend', async () => {
+    const api = await createDemoApi({ seed: send => seedHousehold(send) });
+    const pots = (await read(api, `/api/pots?asOf=${new Date().toISOString().slice(0, 7)}`)).pots as { categoryId: string; balance: number }[];
+    expect(pots.length).toBeGreaterThan(2);
+    for (const pot of pots) expect(pot.balance).toBeGreaterThanOrEqual(0);
+    expect(pots.find(pot => pot.categoryId === 'cat-gifts')?.balance).toBeGreaterThan(0);
+  });
+
   it('links the seeded transactions to the seeded bills and marks them handled', async () => {
     const api = await createDemoApi({ seed: send => seedHousehold(send) });
     const recurring = (await read(api, '/api/recurring')).recurring as { recurringId: string; handledPeriod: string | null }[];

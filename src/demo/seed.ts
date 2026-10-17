@@ -14,6 +14,17 @@ async function must(send: Send, method: string, path: string, body?: unknown): P
   return JSON.parse(response.body) as Record<string, unknown>;
 }
 
+// The fixtures spend on Gifts without ever setting money aside, which would show an overdrawn pot. These rows fund it.
+function giftsSetAsides(now: Date): Record<string, unknown>[] {
+  const rows: Record<string, unknown>[] = [];
+  for (let back = 5; back >= 0; back -= 1) {
+    const date = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - back, 15));
+    if (date.getTime() > now.getTime()) continue;
+    rows.push({ amount: 4000, type: 'SET_ASIDE', categoryId: 'cat-gifts', description: 'Gifts pot', date: date.toISOString().slice(0, 10) });
+  }
+  return rows;
+}
+
 // Replays the invented household that the About-page screenshots use (scripts/screenshots/fixtures.mjs) as ordinary API
 // requests, so the data is valid by construction whenever the data model changes. Nothing here is real.
 export async function seedHousehold(send: Send, real: Date = new Date()): Promise<void> {
@@ -57,7 +68,8 @@ export async function seedHousehold(send: Send, real: Date = new Date()): Promis
 
   const range = new URLSearchParams({ from, to: month });
   const transactions = read('/api/transactions/range', range).transactions as Record<string, unknown>[];
-  for (const item of transactions.slice().sort((a, b) => String(a.date).localeCompare(String(b.date)))) {
+  const rows = [...transactions, ...giftsSetAsides(now)];
+  for (const item of rows.slice().sort((a, b) => String(a.date).localeCompare(String(b.date)))) {
     const mapped = typeof item.recurringId === 'string' ? recurringIds.get(item.recurringId) : undefined;
     await must(send, 'POST', '/api/transactions', {
       amount: item.amount, type: item.type, categoryId: item.categoryId, description: item.description, date: item.date,
