@@ -81,4 +81,14 @@ describe('installDemoFetch', () => {
     await request.text();
     await expect(host.fetch(request)).rejects.toThrow();
   });
+
+  it.each([204, 304])('resolves a %i answer with an empty body instead of throwing', async (status: number) => {
+    const { host } = makeHost();
+    api.handle.mockResolvedValueOnce({ status, headers: {}, body: '' } as never);
+    installDemoFetch(api, host);
+    const res = await host.fetch('/api/transactions/2026-10/abc', { method: 'DELETE' });
+    expect(res.status).toBe(status);
+    expect(res.ok).toBe(status === 204);
+    expect(await res.text()).toBe('');
+  });
 });

@@ -1,5 +1,8 @@
 import type { DemoApi } from './api';
 
+// The Fetch spec forbids any body, even an empty string, on these statuses.
+const NULL_BODY_STATUSES: readonly number[] = [101, 103, 204, 205, 304];
+
 export interface FetchHost {
   fetch: typeof fetch;
   location: { origin: string; href: string };
@@ -15,13 +18,14 @@ export function installDemoFetch(api: Pick<DemoApi, 'handles' | 'handle'>, host:
     if (target.origin !== host.location.origin || !api.handles(target.pathname)) return original(input, init);
 
     const request = input instanceof Request ? new Request(input, init) : new Request(target.href, init);
-    const body = request.method === 'GET' || request.method === 'HEAD' ? undefined : await request.text();
+    const requestBody = request.method === 'GET' || request.method === 'HEAD' ? undefined : await request.text();
     const response = await api.handle({
       method: request.method,
       url: `${target.pathname}${target.search}`,
       headers: Object.fromEntries(request.headers.entries()),
-      body,
+      body: requestBody,
     });
-    return new Response(response.body, { status: response.status, headers: response.headers });
+    const body = NULL_BODY_STATUSES.includes(response.status) ? null : response.body;
+    return new Response(body, { status: response.status, headers: response.headers });
   };
 }

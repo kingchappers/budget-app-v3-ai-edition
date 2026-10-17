@@ -58,6 +58,15 @@ const apiCall = (page, method, url, body) => page.evaluate(async ({ method, url,
   return { status: response.status, demo: response.headers.get('X-Demo'), json: await response.json() };
 }, { method, url, body });
 
+const rawCall = (page, method, url) => page.evaluate(async ({ method, url }) => {
+  const response = await fetch(url, { method });
+  return { status: response.status, ok: response.ok, text: await response.text() };
+}, { method, url });
+
+const postSmokePurchase = (page, description) => apiCall(page, 'POST', '/api/transactions', {
+  type: 'EXPENSE', categoryId: 'cat-groceries', amount: 1234, description, date: new Date().toISOString().slice(0, 10),
+});
+
 async function main() {
   if (!existsSync(path.join(DIST, 'index.html'))) {
     console.error('build/demo/client/index.html is missing. Run `yarn build:demo` first.');
@@ -117,17 +126,38 @@ async function main() {
       assert(!JSON.stringify(after.json).includes('Smoke test purchase'), 'posted transaction survived reload');
     });
 
-    await check('Reset demo leaves the seeded household in place', async () => {
+    await check('DELETE answers 204 and the transaction is gone from a following GET', async () => {
+      await page.goto(`${origin}/transactions`);
+      await page.getByText('Weekly shop').first().waitFor({ timeout: 15000 });
+      const list = await apiCall(page, 'GET', LIST_URL);
+      const victim = list.json.transactions[0];
+      assert(victim, 'no seeded transaction to delete');
+      const yearMonth = new Date().toISOString().slice(0, 7);
+      const deleted = await rawCall(page, 'DELETE', `/api/transactions/${yearMonth}/${victim.transactionId}`);
+      assert(deleted.ok && deleted.status === 204 && deleted.text === '', `DELETE resolved ok=${deleted.ok} status=${deleted.status}`);
+      const after = await apiCall(page, 'GET', LIST_URL);
+      assert(!after.json.transactions.some(item => item.transactionId === victim.transactionId), 'deleted transaction still listed');
+    });
+
+    await check('Reset demo drops a fresh transaction and keeps the seeded household', async () => {
+      const created = await postSmokePurchase(page, 'Smoke reset purchase');
+      assert(created.status >= 200 && created.status < 300, `POST answered ${created.status}`);
+      const before = await apiCall(page, 'GET', LIST_URL);
+      assert(JSON.stringify(before.json).includes('Smoke reset purchase'), 'purchase missing before reset');
       await page.getByRole('button', { name: 'Reset demo' }).click();
       await page.getByText('Weekly shop').first().waitFor({ timeout: 15000 });
       const after = await apiCall(page, 'GET', LIST_URL);
-      assert(after.status === 200 && !JSON.stringify(after.json).includes('Smoke test purchase'), 'reset left the smoke purchase or failed');
+      assert(after.status === 200 && !JSON.stringify(after.json).includes('Smoke reset purchase'), 'reset left the smoke purchase or failed');
       const categories = await apiCall(page, 'GET', '/api/categories');
       assert(categories.json.categories.length > 0, 'no categories after reset');
     });
 
     await check('no request goes to another origin', async () => {
       assert(foreign.length === 0, `foreign requests: ${foreign.join(', ')}`);
+    });
+
+    await check('the server was asked for the page itself', async () => {
+      assert(requested.includes('/'), 'the page document / was never requested');
     });
 
     await check('the server saw no /api or /config.json request', async () => {
