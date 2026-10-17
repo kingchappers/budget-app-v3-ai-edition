@@ -12,7 +12,7 @@ The image is `ghcr.io/kingchappers/budget-app-v3-ai-edition`, tagged `latest`, `
 
 1. Copy [`compose.example.yml`](../compose.example.yml) to `compose.yml` and set `TLS_DOMAIN` (and `TLS_EMAIL`). The domain's DNS must point at this machine, and ports 80 and 443 must be reachable from the internet. Without a domain, see [HTTPS](#https).
 2. `docker compose up -d`
-3. Find the one-time setup code in the log: `docker compose logs budget`.
+3. Find the one-time setup code: in the log (`docker compose logs budget`, look for the line starting `Setup code:`), or in the file `SETUP_CODE.txt` in your data folder.
 4. Open the app in your browser and create your account with the setup code. The setup page closes for good once an account exists.
 
 ## Configuration
@@ -65,6 +65,18 @@ Run the plain-HTTP variant and let your proxy terminate HTTPS:
 - Set `TRUST_PROXY=true` only if the proxy sets `X-Forwarded-*` itself and nothing else can reach the app's port.
 - Forward the original `Host` header.
 - The session cookie is named `__Host-budget_session` and is `Secure` only when the effective origin is https. With plain HTTP and no `APP_ORIGIN`, it is named `budget_session`, is not `Secure`, and the container logs a warning at start. If you are behind HTTPS but cannot set `APP_ORIGIN`, set `COOKIE_SECURE=true`.
+
+## Running on a managed host
+
+Hosts such as PikaPods run the image for you and give you environment variables, a data folder and a log viewer, but no shell. Use plain HTTP (leave `TLS_DOMAIN` unset); the host's proxy terminates TLS.
+
+- **Image and port:** `ghcr.io/kingchappers/budget-app-v3-ai-edition:latest`, listening on port `8080`.
+- **Data folder:** mount a persistent volume at `/data`. Your database and backups live there.
+- **Variables:** set `TRUST_PROXY=true` (it defaults to `false` without `TLS_DOMAIN`, and only the strings `true` and `false` are accepted) and `APP_ORIGIN` to the public address of your app (for example `https://my-budget.example.com`). `APP_ORIGIN` makes cookies `Secure` and makes the app accept requests only from that exact origin.
+- **First run:** open the host's log viewer (on PikaPods: the pod's **More** menu, then **Show Logs**) and find the line `Setup code: ...`, or open `SETUP_CODE.txt` in the data folder with the host's file manager. Enter it on the sign-in page to create your account. The file disappears once you have.
+- **Forgot your password:** see [below](#forgot-your-password). You only need the host's file manager and log viewer.
+- **Not available:** push reminders. Everything else works.
+- **Backups:** the app writes a verified backup to `/data/backups` every day and keeps the newest seven (`BACKUP_KEEP`). Download them from the file manager and keep a copy somewhere else.
 
 ## Upgrading
 
@@ -122,6 +134,12 @@ docker compose exec -u 0 budget chown -R 10001:10001 /data/backups
 
 ## Forgot your password
 
+**Without a shell (works on any host).** In your data folder create an empty file named `RESET_PASSWORD` (the host's file manager, or `touch /data/RESET_PASSWORD`), then restart the app. On start-up the app deletes the file, signs everyone out, clears any login lock-out, and prints a `Recovery code: ...` line in the log (also saved as `SETUP_CODE.txt`). Open the app, enter the recovery code and choose a new password; this replaces only the password and signs you in. Your account, email and data are unchanged. There is no email-based reset. If you restart again before finishing, create the file again; the same applies if start-up fails after the file was deleted.
+
+If the app cannot delete `RESET_PASSWORD` (for example the folder is read-only) it says so in the log and does **not** open recovery. A directory or symlink with that name is ignored.
+
+**With a shell.** The same effect from the command line:
+
 ```bash
 docker compose exec budget sh -c 'STORE=sqlite SQLITE_PATH=/data/budget.sqlite node build/store-cli/store-cli.js reset-password'
 ```
@@ -148,6 +166,7 @@ Export and import only touch your own data, never the login records, so the step
 ## Security notes
 
 - The login throttle is global: anyone who can reach the login can lock you out for up to 15 minutes. `reset-password` clears it.
+- The recovery code and the first-run setup code are the only credentials ever written to the log or to disk; the file (`SETUP_CODE.txt`) is owner-only and removed when the code is used, at shutdown and at the next start.
 - Backups on the same volume are not off-site; see above.
 - Run it behind HTTPS (or on a network you trust). See [HTTPS](#https) for what plain HTTP gives up.
 
