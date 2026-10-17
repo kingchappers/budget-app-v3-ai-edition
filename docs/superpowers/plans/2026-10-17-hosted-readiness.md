@@ -89,7 +89,7 @@ describe('password recovery', () => {
 
   it('ends every earlier session and clears the login lock-out when it completes', async () => {
     const { oldToken } = await openRecovery();
-    for (let i = 0; i < 3; i += 1) await recordFailure(store, now);
+    for (let i = 0; i < 5; i += 1) await recordFailure(store, now); // the first 3 failures are free
     expect(await throttleRemaining(store, now)).toBeGreaterThan(0);
     await handleAuthRoute(post('/api/auth/setup', recoveryBody()), ctx);
     expect(await readSession(store, oldToken, now)).toBeUndefined();
@@ -111,7 +111,10 @@ describe('password recovery', () => {
       handleAuthRoute(post('/api/auth/setup', body), ctx),
       handleAuthRoute(post('/api/auth/setup', body), ctx),
     ]);
-    expect(results.map(result => result?.statusCode).sort()).toEqual([200, 403]);
+    const codes = results.map(result => result?.statusCode);
+    expect(codes.filter(code => code === 200)).toHaveLength(1);
+    // The loser is refused: 403 (code already spent) or 409 (recovery already closed), depending on interleaving.
+    expect(codes.filter(code => code === 403 || code === 409)).toHaveLength(1);
   });
 
   it('refuses a wrong code and leaves the password and the code alone', async () => {
@@ -292,7 +295,7 @@ describe('createLocalProvider code hooks', () => {
   it('opens recovery on an existing account: ends sessions, clears the lock-out, announces a recovery code', async () => {
     const account = await createAccount(store, 'me@example.com', 'a long enough password');
     const token = await createSession(store, account.userId, now());
-    for (let i = 0; i < 3; i += 1) await recordFailure(store, now());
+    for (let i = 0; i < 5; i += 1) await recordFailure(store, now()); // the first 3 failures are free
     const hooks = makeHooks();
     const provider = await createLocalProvider({}, { hooks, recovery: true });
     expect(hooks.announce).toHaveBeenCalledWith(expect.any(String), 'recovery');
