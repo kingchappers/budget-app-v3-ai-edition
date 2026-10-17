@@ -83,8 +83,29 @@ describe('local auth store', () => {
   it('goes signed out when the session expires mid-use', async () => {
     fetchMock.mockResolvedValueOnce(reply(200, { userId: 'local|1', email: 'me@example.com' }));
     await ensureLocalAuth();
+    fetchMock.mockResolvedValueOnce(reply(401, {})).mockResolvedValueOnce(reply(200, { setupRequired: false, recoveryOpen: false }));
     expireLocalSession();
+    expect(getLocalAuthState()).toMatchObject({ status: 'signedOut' });
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
     expect(getLocalAuthState()).toEqual({ status: 'signedOut', setupRequired: false, recoveryOpen: false });
+  });
+
+  it('refreshes the status when the session expires, so an open recovery shows', async () => {
+    fetchMock.mockResolvedValueOnce(reply(200, { userId: 'local|1', email: 'me@example.com' }));
+    await ensureLocalAuth();
+    fetchMock.mockResolvedValueOnce(reply(401, {})).mockResolvedValueOnce(reply(200, { setupRequired: false, recoveryOpen: true }));
+    expireLocalSession();
+    await vi.waitFor(() => expect(getLocalAuthState()).toEqual({ status: 'signedOut', setupRequired: false, recoveryOpen: true }));
+  });
+
+  it('refreshes the status on a 409 and still rejects with the server message', async () => {
+    fetchMock
+      .mockResolvedValueOnce(reply(409, { error: 'This instance is already set up' }))
+      .mockResolvedValueOnce(reply(401, {}))
+      .mockResolvedValueOnce(reply(200, { setupRequired: false, recoveryOpen: false }));
+    await expect(recoverLocal({ code: 'abc', password: 'a long enough password' })).rejects.toThrow('This instance is already set up');
+    await vi.waitFor(() => expect(getLocalAuthState()).toEqual({ status: 'signedOut', setupRequired: false, recoveryOpen: false }));
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
   it('posts to /logout', async () => {

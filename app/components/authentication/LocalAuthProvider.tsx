@@ -5,9 +5,23 @@ import { LocalAuthContext } from '~/lib/auth';
 import type { AuthState } from '~/lib/auth';
 import { clearSessionEnded } from '~/lib/session';
 import {
-  ensureLocalAuth, getLocalAuthState, loginLocal, logoutLocal, recoverLocal, setupLocal, subscribeLocalAuth,
+  ensureLocalAuth, getLocalAuthState, loginLocal, logoutLocal, recoverLocal, refreshLocalAuth, setupLocal, subscribeLocalAuth,
 } from '~/lib/localAuth';
 import { LocalAuthForm } from './LocalAuthForm';
+
+type FormMode = 'recovery' | 'setup' | 'login';
+
+function formMode(setupRequired: boolean, recoveryOpen: boolean): FormMode {
+  if (setupRequired) return 'setup';
+  if (recoveryOpen) return 'recovery';
+  return 'login';
+}
+
+const FORM_TITLES: Record<FormMode, string> = {
+  recovery: 'Set a new password',
+  setup: 'Create your account',
+  login: 'Sign in',
+};
 
 export function LocalAuthProvider({ children }: { children: React.ReactNode }) {
   const snapshot = useSyncExternalStore(subscribeLocalAuth, getLocalAuthState, getLocalAuthState);
@@ -20,7 +34,10 @@ export function LocalAuthProvider({ children }: { children: React.ReactNode }) {
     setFormOpen(false); // a later session expiry must not pop the form open unprompted
   }, [snapshot.status]);
 
-  const login = useCallback(() => setFormOpen(true), []);
+  const login = useCallback(() => {
+    setFormOpen(true);
+    void refreshLocalAuth(); // setup or recovery may have opened (or closed) since the page loaded
+  }, []);
   const logout = useCallback(async () => {
     try {
       await logoutLocal();
@@ -43,12 +60,15 @@ export function LocalAuthProvider({ children }: { children: React.ReactNode }) {
     getToken,
   }), [snapshot, login, logout, getToken]);
 
+  const mode = snapshot.status === 'signedOut' ? formMode(snapshot.setupRequired, snapshot.recoveryOpen) : 'login';
+
   return (
     <LocalAuthContext.Provider value={value}>
       {children}
-      <Modal opened={formOpen && snapshot.status === 'signedOut'} onClose={() => setFormOpen(false)} title="Sign in" centered>
+      <Modal opened={formOpen && snapshot.status === 'signedOut'} onClose={() => setFormOpen(false)} title={FORM_TITLES[mode]} centered>
         {snapshot.status === 'signedOut' && (
           <LocalAuthForm
+            key={mode}
             setupRequired={snapshot.setupRequired}
             recoveryOpen={snapshot.recoveryOpen}
             onLogin={loginLocal}
