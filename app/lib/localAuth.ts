@@ -7,7 +7,7 @@ export interface LocalUser {
 
 export type LocalAuthState =
   | { status: 'loading' }
-  | { status: 'signedOut'; setupRequired: boolean }
+  | { status: 'signedOut'; setupRequired: boolean; recoveryOpen: boolean }
   | { status: 'signedIn'; user: LocalUser };
 
 let state: LocalAuthState = { status: 'loading' };
@@ -50,11 +50,11 @@ export async function refreshLocalAuth(): Promise<void> {
       return;
     }
     const status = await fetch('/api/auth/status');
-    const body = (await status.json()) as { setupRequired?: unknown };
-    set({ status: 'signedOut', setupRequired: body.setupRequired === true });
+    const body = (await status.json()) as { setupRequired?: unknown; recoveryOpen?: unknown };
+    set({ status: 'signedOut', setupRequired: body.setupRequired === true, recoveryOpen: body.recoveryOpen === true });
   } catch (error) {
     console.error('Could not check the local session:', error);
-    set({ status: 'signedOut', setupRequired: false });
+    set({ status: 'signedOut', setupRequired: false, recoveryOpen: false });
   }
 }
 
@@ -65,7 +65,11 @@ export function ensureLocalAuth(): Promise<void> {
 
 async function signIn(path: string, body: unknown, fallback: string): Promise<void> {
   const response = await postJson(path, body);
-  if (!response.ok) throw await readError(response, fallback);
+  if (!response.ok) {
+    // 409: setup or recovery is no longer open, so the form may be showing the wrong mode.
+    if (response.status === 409) void refreshLocalAuth();
+    throw await readError(response, fallback);
+  }
   const user = (await response.json()) as { userId: string; email: string };
   set({ status: 'signedIn', user: { sub: user.userId, email: user.email } });
 }
@@ -78,14 +82,20 @@ export function setupLocal(input: { code: string; email: string; password: strin
   return signIn('/api/auth/setup', input, 'Setup failed');
 }
 
+export function recoverLocal(input: { code: string; password: string }): Promise<void> {
+  return signIn('/api/auth/setup', input, 'Recovery failed');
+}
+
 export async function logoutLocal(): Promise<void> {
   const response = await postJson('/api/auth/logout', {});
   if (!response.ok) throw await readError(response, 'Sign out failed');
 }
 
-// The API said 401: the session ended on the server (expired, or reset from the CLI).
+// The API said 401: the session ended on the server (expired, or reset from the CLI). Sign out at once,
+// then ask the server whether setup or recovery is open (refreshLocalAuth never calls this, so it cannot loop).
 export function expireLocalSession(): void {
-  set({ status: 'signedOut', setupRequired: false });
+  set({ status: 'signedOut', setupRequired: false, recoveryOpen: false });
+  void refreshLocalAuth();
 }
 
 export function resetLocalAuthForTests(): void {

@@ -49,10 +49,15 @@ describe('LocalAuthProvider', () => {
     fetchMock
       .mockResolvedValueOnce(reply(401, {}))
       .mockResolvedValueOnce(reply(200, { setupRequired: false }))
-      .mockResolvedValueOnce(reply(200, { userId: 'local|1', email: 'me@example.com' }));
+      .mockResolvedValueOnce(reply(401, {})) // opening the form re-checks the status
+      .mockResolvedValueOnce(reply(200, { setupRequired: false }))
+      .mockResolvedValueOnce(reply(200, { userId: 'local|1', email: 'me@example.com' }))
+      .mockResolvedValueOnce(reply(401, {})) // the expiry re-checks the status
+      .mockResolvedValueOnce(reply(200, { setupRequired: false }));
     renderProvider();
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
     fireEvent.click(await screen.findByText('open'));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(4));
     fireEvent.change(await screen.findByLabelText('Email'), { target: { value: 'me@example.com' } });
     fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'a long enough password' } });
     fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
@@ -60,8 +65,46 @@ describe('LocalAuthProvider', () => {
 
     act(() => expireLocalSession());
 
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(7));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('shows the recovery form when recovery opened after the page loaded', async () => {
+    fetchMock
+      .mockResolvedValueOnce(reply(401, {}))
+      .mockResolvedValueOnce(reply(200, { setupRequired: false, recoveryOpen: false }))
+      .mockResolvedValueOnce(reply(401, {}))
+      .mockResolvedValueOnce(reply(200, { setupRequired: false, recoveryOpen: true }));
+    renderProvider();
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    fireEvent.click(await screen.findByText('open'));
+    expect(await screen.findByLabelText('Recovery code')).toBeInTheDocument();
+    expect(screen.getByLabelText('New password')).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: 'Set a new password' })).toBeInTheDocument();
+  });
+
+  it('titles the dialog for first-run setup and for plain sign in', async () => {
+    fetchMock
+      .mockResolvedValueOnce(reply(401, {}))
+      .mockResolvedValueOnce(reply(200, { setupRequired: true, recoveryOpen: false }))
+      .mockResolvedValueOnce(reply(401, {}))
+      .mockResolvedValueOnce(reply(200, { setupRequired: true, recoveryOpen: false }));
+    renderProvider();
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    fireEvent.click(await screen.findByText('open'));
+    expect(await screen.findByRole('dialog', { name: 'Create your account' })).toBeInTheDocument();
+  });
+
+  it('titles the dialog Sign in when an account exists and recovery is closed', async () => {
+    fetchMock
+      .mockResolvedValueOnce(reply(401, {}))
+      .mockResolvedValueOnce(reply(200, { setupRequired: false, recoveryOpen: false }))
+      .mockResolvedValueOnce(reply(401, {}))
+      .mockResolvedValueOnce(reply(200, { setupRequired: false, recoveryOpen: false }));
+    renderProvider();
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    fireEvent.click(await screen.findByText('open'));
+    expect(await screen.findByRole('dialog', { name: 'Sign in' })).toBeInTheDocument();
   });
 
   it('stays put and tells the user when sign out fails', async () => {

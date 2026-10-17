@@ -42,6 +42,8 @@ jobs:
         run: node scripts/container-smoke.mjs budget-app:ci
       - name: Smoke test (built-in HTTPS on localhost)
         run: node scripts/container-smoke.mjs budget-app:ci --tls
+      - name: Smoke test (plain HTTP behind a TLS-terminating proxy)
+        run: node scripts/container-smoke.mjs budget-app:ci --proxy
       - name: Scan for high and critical vulnerabilities
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25  # v0.36.0
         with:

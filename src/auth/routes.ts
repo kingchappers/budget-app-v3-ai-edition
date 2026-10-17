@@ -6,8 +6,8 @@ import { ConditionFailedError } from '../store';
 import type { Store } from '../store';
 import { clearedCookie, originAllowed, readSessionCookie, sessionCookie } from './cookies';
 import {
-  clearThrottle, createAccount, createSession, deleteSession, getAccount, normaliseEmail,
-  readSession, recordFailure, throttleRemaining,
+  clearThrottle, createAccount, createSession, deleteAllSessions, deleteSession, getAccount, normaliseEmail,
+  readSession, recordFailure, replacePassword, throttleRemaining,
 } from './localData';
 import { MAX_PASSWORD_LENGTH, dummyRecord, validatePassword, verifyPassword } from './password';
 import type { SetupCode } from './setupCode';
@@ -15,6 +15,10 @@ import type { SetupCode } from './setupCode';
 export interface AuthRouteContext {
   store: Store;
   setupCode: SetupCode | undefined;
+  // True while a password recovery is open: an account exists and setupCode can replace its password.
+  recovery?: boolean;
+  // Called once when the code has been spent, so the host can remove any copy of it.
+  onCodeUsed?: () => void;
   secureCookie: boolean;
   appOrigin?: string;
   nowSeconds(): number;
@@ -33,14 +37,53 @@ function noStore(response: ApiResponse): ApiResponse {
 }
 
 async function status(ctx: AuthRouteContext): Promise<ApiResponse> {
-  return noStore(ok({ setupRequired: (await getAccount(ctx.store)) === undefined }));
+  return noStore(ok({ setupRequired: (await getAccount(ctx.store)) === undefined, recoveryOpen: ctx.recovery === true }));
+}
+
+// Single-process deployment on SQLite: one login or recovery at a time makes the throttle's read-modify-write safe,
+// queued attempts see the delay and are refused without hashing, and a login can never create a session
+// on the old password after a recovery has ended every session.
+let loginQueue: Promise<unknown> = Promise.resolve();
+
+function serialised(task: () => Promise<ApiResponse>): Promise<ApiResponse> {
+  const result = loginQueue.then(task);
+  loginQueue = result.catch(() => undefined);
+  return result;
+}
+
+type JsonBody = NonNullable<ReturnType<typeof parseJsonObject>>;
+
+// Replaces the password on the existing account. The account's id, email and data are untouched.
+function recover(body: JsonBody, ctx: AuthRouteContext, account: { userId: string; email: string }): Promise<ApiResponse> {
+  return serialised(() => attemptRecovery(body, ctx, account));
+}
+
+async function attemptRecovery(body: JsonBody, ctx: AuthRouteContext, account: { userId: string; email: string }): Promise<ApiResponse> {
+  const code = ctx.setupCode;
+  if (typeof body.code !== 'string' || !code?.matches(body.code)) return err(403, 'Invalid recovery code');
+  const passwordProblem = validatePassword(body.password);
+  if (passwordProblem) return err(400, passwordProblem);
+
+  // Spend the code before the first await, so two simultaneous requests cannot both use it.
+  code.clear();
+  ctx.recovery = false;
+  try {
+    await deleteAllSessions(ctx.store);
+    await replacePassword(ctx.store, body.password as string);
+    await clearThrottle(ctx.store);
+    const token = await createSession(ctx.store, account.userId, ctx.nowSeconds());
+    return withCookie(ok({ userId: account.userId, email: account.email }), sessionCookie(token, ctx.secureCookie));
+  } finally {
+    ctx.onCodeUsed?.();
+  }
 }
 
 async function setup(event: APIGatewayProxyEventV2, ctx: AuthRouteContext): Promise<ApiResponse> {
   const body = parseJsonObject(event);
   if (!body) return err(400, 'Request body must be a JSON object');
 
-  if (await getAccount(ctx.store)) return err(409, 'This instance is already set up');
+  const existing = await getAccount(ctx.store);
+  if (existing) return ctx.recovery ? recover(body, ctx, existing) : err(409, 'This instance is already set up');
   if (typeof body.code !== 'string' || !ctx.setupCode?.matches(body.code)) return err(403, 'Invalid setup code');
 
   const { email, password } = body;
@@ -53,6 +96,7 @@ async function setup(event: APIGatewayProxyEventV2, ctx: AuthRouteContext): Prom
   try {
     const account = await createAccount(ctx.store, email, password as string);
     ctx.setupCode.clear();
+    ctx.onCodeUsed?.();
     const token = await createSession(ctx.store, account.userId, ctx.nowSeconds());
     return withCookie(ok({ userId: account.userId, email: account.email }), sessionCookie(token, ctx.secureCookie));
   } catch (error) {
@@ -99,14 +143,8 @@ async function attemptLogin(event: APIGatewayProxyEventV2, ctx: AuthRouteContext
   return withCookie(ok({ userId: account.userId, email: account.email }), sessionCookie(token, ctx.secureCookie));
 }
 
-// Single-process deployment on SQLite: one login at a time makes the throttle's read-modify-write safe,
-// and queued attempts see the delay and are refused without hashing.
-let loginQueue: Promise<unknown> = Promise.resolve();
-
 function login(event: APIGatewayProxyEventV2, ctx: AuthRouteContext): Promise<ApiResponse> {
-  const result = loginQueue.then(() => attemptLogin(event, ctx));
-  loginQueue = result.catch(() => undefined);
-  return result;
+  return serialised(() => attemptLogin(event, ctx));
 }
 
 async function logout(event: APIGatewayProxyEventV2, ctx: AuthRouteContext): Promise<ApiResponse> {

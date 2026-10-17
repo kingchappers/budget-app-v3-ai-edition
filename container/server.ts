@@ -5,7 +5,8 @@ import os from 'node:os';
 import path from 'node:path';
 import type { APIGatewayProxyEventV2, Context } from 'aws-lambda';
 import { handler as apiLambda } from '../api-handler';
-import { getAuth, initAuth, setAuth } from '../src/auth';
+import { getAuth, setAuth } from '../src/auth';
+import { createLocalProvider } from '../src/auth/local';
 import { getStore, initStore, setStore } from '../src/store';
 import { createBackup, newestBackupAgeSeconds, pruneBackups } from '../src/store/backup';
 import { SqliteStore } from '../src/store/sqlite';
@@ -14,6 +15,7 @@ import { buildCaddyfile } from './caddy';
 import { createRequestListener, type HandlerResult } from './adapter';
 import { parseConfig, type ContainerConfig } from './config';
 import { startMaintenance } from './maintenance';
+import { consumeResetMarker, createCodeHooks, removeCodeFile } from './recovery';
 
 export interface RunningServer {
   config: ContainerConfig;
@@ -75,6 +77,7 @@ export async function startServer(env: NodeJS.ProcessEnv, options: StartOptions 
     throw new Error('Another server instance is still running in this process');
   }
   for (const warning of config.warnings) console.warn(warning);
+  const warn = (message: string): void => console.warn(message);
 
   mkdirSync(config.dataDir, { recursive: true, mode: 0o700 });
 
@@ -92,6 +95,7 @@ export async function startServer(env: NodeJS.ProcessEnv, options: StartOptions 
   let maintenance: { stop(): void } | undefined;
   const releaseInternals = (): void => {
     maintenance?.stop();
+    removeCodeFile(config.dataDir, warn);
     (opened as { close?: () => void }).close?.();
     setStore(undefined);
     setAuth(undefined);
@@ -100,8 +104,14 @@ export async function startServer(env: NodeJS.ProcessEnv, options: StartOptions 
   try {
     if (!(opened instanceof SqliteStore)) throw new Error('The container requires the SQLite store');
     const store: SqliteStore = opened;
-    // Logs the one-time setup code when there is no account yet.
-    await initAuth(runtimeEnv);
+    // A code file never outlives the process that made it; a fresh code is written below if one is needed.
+    removeCodeFile(config.dataDir, warn);
+    const reset = consumeResetMarker(config.dataDir, warn);
+    // Logs the one-time setup (or recovery) code and saves a copy in the data folder.
+    setAuth(await createLocalProvider(runtimeEnv, {
+      recovery: reset === 'consumed',
+      hooks: createCodeHooks(config.dataDir, { print: text => console.log(text), warn }),
+    }));
 
     maintenance = startMaintenance(
       {
@@ -270,6 +280,7 @@ export async function startServer(env: NodeJS.ProcessEnv, options: StartOptions 
           log(`Shutdown error: ${errorName(error)}`);
         } finally {
           discardCaddyFiles();
+          removeCodeFile(config.dataDir, warn);
           try {
             store.close();
           } catch (error) {
