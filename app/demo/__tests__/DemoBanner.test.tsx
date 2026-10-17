@@ -6,6 +6,7 @@ import { demoControls } from '../controls';
 
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 const renderBanner = () => render(<MantineProvider env="test"><DemoBanner /></MantineProvider>);
@@ -25,7 +26,6 @@ describe('DemoBanner', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Reset demo' }));
     await waitFor(() => expect(reload).toHaveBeenCalledTimes(1));
     expect(reset).toHaveBeenCalledTimes(1);
-    vi.unstubAllGlobals();
   });
 
   it('does not reload when the reset fails, and says so', async () => {
@@ -37,6 +37,5 @@ describe('DemoBanner', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Reset demo' }));
     expect(await screen.findByRole('alert')).toHaveTextContent(/could not reset/i);
     expect(reload).not.toHaveBeenCalled();
-    vi.unstubAllGlobals();
   });
 });
