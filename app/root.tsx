@@ -18,6 +18,7 @@ import { pageTitle } from "./lib/pageTitle";
 import { ReduceMotion } from "./components/layout/ReduceMotion";
 import { TextSize } from "./components/layout/TextSize";
 import { TEXT_SIZE_SCRIPT } from "./lib/textSize";
+import { isDemo } from "./demo/flag";
 
 import { Button, ColorSchemeScript, Group, MantineProvider, Stack, Text, Title, mantineHtmlProps, createTheme, useMantineTheme, type CSSVariablesResolver } from '@mantine/core';
 import { DatesProvider } from '@mantine/dates';
@@ -125,6 +126,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-title" content="Budget" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        {isDemo && <meta name="robots" content="noindex" />}
         <ColorSchemeScript defaultColorScheme="auto" />
         <script dangerouslySetInnerHTML={{ __html: TEXT_SIZE_SCRIPT }} />
         <Meta />

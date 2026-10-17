@@ -2,6 +2,7 @@ import { Link, useNavigate } from 'react-router';
 import { Button, Card, Input, Radio, SegmentedControl, Select, Stack, Switch, Text, Title, useMantineColorScheme } from '@mantine/core';
 import { IconChevronRight } from '@tabler/icons-react';
 import { DefaultLayout } from '~/components/layout/DefaultLayout';
+import { isDemo } from '~/demo/flag';
 import { BillReminders } from '~/components/settings/BillReminders';
 import { TOUR_PARAM } from '~/components/layout/GuidedTour';
 import { usePreferences, type TextSize, type UndoDuration } from '~/lib/preferences';
@@ -139,7 +140,7 @@ function SettingsContent() {
         />
       </Card>
 
-      <BillReminders />
+      {!isDemo && <BillReminders />}
 
       <Card withBorder>
         <Title order={2} size="h4" mb="sm">Manage</Title>

@@ -4,10 +4,10 @@ import tailwindcss from "@tailwindcss/vite";
 import { defineConfig, type Plugin } from "vite";
 import tsconfigPaths from "vite-tsconfig-paths";
 
-const demo = process.env.VITE_DEMO === "true";
-
-// Only in the demo build: src/store/index.ts lazily imports the DynamoDB and SQLite stores for the Lambda and the container.
-// The browser never needs them, so they are replaced by a stub and never reach the bundle.
+// src/store/index.ts lazily imports the DynamoDB and SQLite stores for the Lambda and the container. The browser never needs
+// them, so they are replaced by a stub and never reach the bundle. It applies to every browser build, not only the demo one:
+// the guarded demo import in app/entry.client.tsx is still resolved (then dropped) in the normal build, and would otherwise
+// fail on node:sqlite.
 function stubServerStores(): Plugin {
   const stub = path.resolve("src/demo/unavailableStore.ts");
   return {
@@ -23,7 +23,7 @@ function stubServerStores(): Plugin {
 }
 
 export default defineConfig({
-  plugins: [tailwindcss(), reactRouter(), tsconfigPaths(), ...(demo ? [stubServerStores()] : [])],
+  plugins: [tailwindcss(), reactRouter(), tsconfigPaths(), stubServerStores()],
   server: {
     fs: {
       // Allow serving files from one level up to the project root
