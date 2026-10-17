@@ -196,7 +196,7 @@ One-time setup (you need a Cloudflare account; nothing secret goes in this repos
 5. **Add the custom domain** in the project's settings (Custom domains): `demo.budget.scgrid.xyz`, and create the CNAME it shows at your DNS provider (automatic when the domain's DNS is on Cloudflare). Then replace the "planned" wording above with the live link.
 6. **Leave Cloudflare Web Analytics off** for this project. It injects a third-party script, which the policy blocks and which would break the demo's promise of making no outside requests.
 
-The publishing tool is pinned: `deploy/demo/package.json` and its lockfile fix the exact `wrangler` and every package under it, and the workflow installs them with `npm ci --ignore-scripts` in a step that holds no secret. That folder is separate from the app's Yarn dependencies, so the app's audit step does not cover it: to update, run `npm install wrangler@<version> --ignore-scripts` and then `npm audit` in `deploy/demo`, and commit both files.
+The publishing tool is pinned: `deploy/demo/package.json` and its lockfile fix the exact `wrangler` and every package under it, and the workflow installs them with `npm ci --ignore-scripts` in a step that holds no secret. That folder is separate from the app's Yarn dependencies, so the app's audit step does not cover it: to update, run `npm install --save-exact wrangler@<version> --ignore-scripts` and then `npm audit` in `deploy/demo`, and commit both files.
 
 ## Self-hosting
 
