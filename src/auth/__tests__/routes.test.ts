@@ -366,6 +366,37 @@ describe('password recovery', () => {
     expect(res?.statusCode).toBe(409);
   });
 
+  it('refuses a recovery request with no code', async () => {
+    await openRecovery();
+    const { code: _code, ...withoutCode } = recoveryBody();
+    expect((await handleAuthRoute(post('/api/auth/setup', withoutCode), ctx))?.statusCode).toBe(403);
+  });
+
+  it('refuses a recovery request when there is no setup code to match', async () => {
+    await openRecovery();
+    ctx.setupCode = undefined;
+    expect((await handleAuthRoute(post('/api/auth/setup', recoveryBody()), ctx))?.statusCode).toBe(403);
+  });
+
+  describe.each([['login first', true], ['recovery first', false]])('a login on the old password racing recovery (%s)', (_name, loginFirst) => {
+    it('leaves no valid session on the old password', async () => {
+      await openRecovery();
+      const startLogin = () => login(PASSWORD);
+      const startRecovery = () => handleAuthRoute(post('/api/auth/setup', recoveryBody()), ctx);
+      const [first, second] = await Promise.all(loginFirst ? [startLogin(), startRecovery()] : [startRecovery(), startLogin()]);
+      const loginRes = loginFirst ? first : second;
+      const recoveryRes = loginFirst ? second : first;
+
+      expect(recoveryRes?.statusCode).toBe(200);
+      if (loginRes?.statusCode === 200) {
+        const token = cookieValue(loginRes).split('=')[1];
+        expect(await readSession(store, token, now)).toBeUndefined();
+        return;
+      }
+      expect(loginRes?.statusCode).toBe(401);
+    });
+  });
+
   it('tells the host when the recovery code is spent', async () => {
     await openRecovery();
     const onCodeUsed = vi.fn();
