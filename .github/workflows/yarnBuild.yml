@@ -73,6 +73,12 @@ jobs:
         VITE_VAPID_PUBLIC_KEY: ${{ secrets.VAPID_PUBLIC_KEY }}
       run: yarn run build
 
+    - name: Check the production build has no demo code
+      run: node scripts/check-demo-build.mjs --production build/client
+
+    - name: Build and check the browser demo
+      run: yarn build:demo
+
     - name: Configure AWS Credentials
       uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7  # v6.0.0
       with:

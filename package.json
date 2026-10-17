@@ -8,6 +8,7 @@
     "dev": "react-router dev",
     "start": "react-router-serve ./build/server/index.js",
     "typecheck": "react-router typegen && tsc",
+    "build:demo": "node scripts/build-demo.cjs && node scripts/check-demo-build.mjs --demo build/demo/client",
     "build:container": "node scripts/build-container.cjs",
     "test": "vitest run",
     "test:watch": "vitest",
