@@ -5,7 +5,7 @@ import type { SqliteStore } from '../../store/sqlite';
 import { handleAuthRoute } from '../routes';
 import type { AuthRouteContext } from '../routes';
 import { SetupCode } from '../setupCode';
-import { createAccount, hashToken, getAccount, throttleRemaining } from '../localData';
+import { createAccount, createSession, hashToken, getAccount, readSession, recordFailure, throttleRemaining } from '../localData';
 
 const PASSWORD = 'a perfectly fine password';
 let store: SqliteStore;
@@ -60,9 +60,9 @@ describe('routes that do not belong to auth', () => {
 
 describe('GET /api/auth/status', () => {
   it('says setup is required until an account exists', async () => {
-    expect(JSON.parse((await handleAuthRoute(get('/api/auth/status'), ctx))!.body)).toEqual({ setupRequired: true });
+    expect(JSON.parse((await handleAuthRoute(get('/api/auth/status'), ctx))!.body)).toEqual({ setupRequired: true, recoveryOpen: false });
     await createAccount(store, 'me@example.com', PASSWORD);
-    expect(JSON.parse((await handleAuthRoute(get('/api/auth/status'), ctx))!.body)).toEqual({ setupRequired: false });
+    expect(JSON.parse((await handleAuthRoute(get('/api/auth/status'), ctx))!.body)).toEqual({ setupRequired: false, recoveryOpen: false });
   });
 });
 
@@ -274,5 +274,110 @@ describe('what reaches the logs and the database', () => {
     const rows = await store.query('AUTH#SESSIONS');
     expect(rows.map(row => row.SK)).toContain(hashToken(token));
     expect(JSON.stringify(rows)).not.toContain(token);
+  });
+});
+
+describe('password recovery', () => {
+  const NEW_PASSWORD = 'another perfectly fine password';
+  const recoveryBody = (over: Record<string, unknown> = {}) => ({ code: setupCode.reveal(), password: NEW_PASSWORD, ...over });
+  const login = (password: string) => handleAuthRoute(post('/api/auth/login', { email: 'me@example.com', password }), ctx);
+
+  async function openRecovery() {
+    const account = await createAccount(store, 'me@example.com', PASSWORD);
+    const oldToken = await createSession(store, account.userId, now);
+    ctx.recovery = true;
+    return { account, oldToken };
+  }
+
+  it('reports recoveryOpen in the status only while recovery is open', async () => {
+    await createAccount(store, 'me@example.com', PASSWORD);
+    expect(JSON.parse((await handleAuthRoute(get('/api/auth/status'), ctx))!.body)).toEqual({ setupRequired: false, recoveryOpen: false });
+    ctx.recovery = true;
+    expect(JSON.parse((await handleAuthRoute(get('/api/auth/status'), ctx))!.body)).toEqual({ setupRequired: false, recoveryOpen: true });
+  });
+
+  it('replaces the password on the existing account and signs the user in', async () => {
+    const { account } = await openRecovery();
+    const res = await handleAuthRoute(post('/api/auth/setup', recoveryBody()), ctx);
+    expect(res?.statusCode).toBe(200);
+    expect(JSON.parse(res!.body)).toEqual({ userId: account.userId, email: 'me@example.com' });
+    expect(cookieValue(res)).toMatch(/^__Host-budget_session=/);
+    expect((await login(NEW_PASSWORD))?.statusCode).toBe(200);
+    expect((await login(PASSWORD))?.statusCode).toBe(401);
+  });
+
+  it('keeps the same account: user id and email are unchanged', async () => {
+    const { account } = await openRecovery();
+    await handleAuthRoute(post('/api/auth/setup', recoveryBody()), ctx);
+    const after = await getAccount(store);
+    expect(after?.userId).toBe(account.userId);
+    expect(after?.email).toBe(account.email);
+  });
+
+  it('ends every earlier session and clears the login lock-out when it completes', async () => {
+    const { oldToken } = await openRecovery();
+    for (let i = 0; i < 5; i += 1) await recordFailure(store, now); // the first 3 failures are free
+    expect(await throttleRemaining(store, now)).toBeGreaterThan(0);
+    await handleAuthRoute(post('/api/auth/setup', recoveryBody()), ctx);
+    expect(await readSession(store, oldToken, now)).toBeUndefined();
+    expect(await throttleRemaining(store, now)).toBe(0);
+  });
+
+  it('closes recovery once used, and the code cannot be used twice', async () => {
+    await openRecovery();
+    const body = recoveryBody();
+    expect((await handleAuthRoute(post('/api/auth/setup', body), ctx))?.statusCode).toBe(200);
+    expect(ctx.recovery).toBe(false);
+    expect((await handleAuthRoute(post('/api/auth/setup', body), ctx))?.statusCode).toBe(409);
+  });
+
+  it('lets only one of two simultaneous requests use the code', async () => {
+    await openRecovery();
+    const body = recoveryBody();
+    const results = await Promise.all([
+      handleAuthRoute(post('/api/auth/setup', body), ctx),
+      handleAuthRoute(post('/api/auth/setup', body), ctx),
+    ]);
+    const codes = results.map(result => result?.statusCode);
+    expect(codes.filter(code => code === 200)).toHaveLength(1);
+    // The loser is refused: 403 (code already spent) or 409 (recovery already closed), depending on interleaving.
+    expect(codes.filter(code => code === 403 || code === 409)).toHaveLength(1);
+  });
+
+  it('refuses a wrong code and leaves the password and the code alone', async () => {
+    await openRecovery();
+    const res = await handleAuthRoute(post('/api/auth/setup', recoveryBody({ code: 'not the code' })), ctx);
+    expect(res?.statusCode).toBe(403);
+    expect(ctx.recovery).toBe(true);
+    expect((await login(PASSWORD))?.statusCode).toBe(200);
+  });
+
+  it('enforces the password policy and keeps recovery open', async () => {
+    await openRecovery();
+    const res = await handleAuthRoute(post('/api/auth/setup', recoveryBody({ password: 'short' })), ctx);
+    expect(res?.statusCode).toBe(400);
+    expect(ctx.recovery).toBe(true);
+    expect((await handleAuthRoute(post('/api/auth/setup', recoveryBody()), ctx))?.statusCode).toBe(200);
+  });
+
+  it('still answers 409 for an existing account when recovery is not open', async () => {
+    await createAccount(store, 'me@example.com', PASSWORD);
+    const res = await handleAuthRoute(post('/api/auth/setup', recoveryBody()), ctx);
+    expect(res?.statusCode).toBe(409);
+  });
+
+  it('tells the host when the recovery code is spent', async () => {
+    await openRecovery();
+    const onCodeUsed = vi.fn();
+    ctx.onCodeUsed = onCodeUsed;
+    expect((await handleAuthRoute(post('/api/auth/setup', recoveryBody()), ctx))?.statusCode).toBe(200);
+    expect(onCodeUsed).toHaveBeenCalledTimes(1);
+  });
+
+  it('tells the host when a first-run setup code is used', async () => {
+    const onCodeUsed = vi.fn();
+    ctx.onCodeUsed = onCodeUsed;
+    expect((await handleAuthRoute(post('/api/auth/setup', setupBody()), ctx))?.statusCode).toBe(200);
+    expect(onCodeUsed).toHaveBeenCalledTimes(1);
   });
 });

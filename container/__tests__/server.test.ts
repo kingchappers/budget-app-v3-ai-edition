@@ -75,7 +75,7 @@ describe('serving', () => {
 
   it('runs the whole login flow against a real database and keeps the session across a restart', async () => {
     let base = await start();
-    expect(await (await fetch(`${base}/api/auth/status`)).json()).toEqual({ setupRequired: true });
+    expect(await (await fetch(`${base}/api/auth/status`)).json()).toEqual({ setupRequired: true, recoveryOpen: false });
 
     const code = setupCodeFromLogs();
     const origin = base;
@@ -93,7 +93,7 @@ describe('serving', () => {
     await running!.close();
     running = undefined;
     base = await start();
-    expect(await (await fetch(`${base}/api/auth/status`)).json()).toEqual({ setupRequired: false });
+    expect(await (await fetch(`${base}/api/auth/status`)).json()).toEqual({ setupRequired: false, recoveryOpen: false });
     expect((await fetch(`${base}/api/categories`, { headers: { Cookie: cookie } })).status).toBe(200);
   });
 });
