@@ -177,11 +177,24 @@ Backend uses:
 
 The demo is the real app with an invented household, running entirely in your browser: an in-memory store plus the real API router and handlers stand in for the server. You are signed in as a fixed visitor, and a banner says changes stay in this browser tab and vanish on reload (a Reset demo button restores the starting data). Push reminders, the account/sign-in control and the PWA manifest are hidden. The demo is built to make no requests beyond its own origin: it answers same-origin `/api` and `/config.json` calls in memory, the build checks its HTML and CSS for external references, and the Content-Security-Policy below enforces the rule when your host sends it.
 
-Live demo: (add the demo link here once it is deployed)
+Live demo: planned at https://demo.budget.scgrid.xyz (not live until the first deploy has run; see "Deploying the demo" below).
 
-Build it with `yarn build:demo`. This needs no Auth0 values: the script uses dummy ones and refuses to run if real `VITE_AUTH0_*` values are set in your shell. The output is the site in `build/demo/client/` and a ready `Content-Security-Policy` header value in `build/demo/csp-header.txt` (with inline-script hashes) for your static host to send. The recommended header is that policy, and your host must send it for the browser to enforce it. Any static host can serve it, but it must be served over HTTPS (or from `localhost`): the API handlers use `crypto.randomUUID`, which browsers only offer on secure origins. Unknown paths should fall back to `index.html`.
+Build it with `yarn build:demo`. This needs no Auth0 values: the script uses dummy ones and refuses to run if real `VITE_AUTH0_*` values are set in your shell. The output is the site in `build/demo/client/` and a ready `Content-Security-Policy` header value in `build/demo/csp-header.txt` (with inline-script hashes) for your static host to send. The recommended header is that policy, and your host must send it for the browser to enforce it. The build also writes it, with a few other headers, as `_headers` in the site folder, which Cloudflare Pages and Netlify read. Any static host can serve it, but it must be served over HTTPS (or from `localhost`): the API handlers use `crypto.randomUUID`, which browsers only offer on secure origins. Unknown paths should fall back to `index.html`.
 
 A normal `yarn build` wipes `build/demo`, so when building both locally, build the demo last. To check a built demo in a real browser, run `node scripts/demo-smoke.mjs` (Playwright; local only, not part of CI).
+
+### Deploying the demo
+
+`.github/workflows/demo.yml` publishes the demo to Cloudflare Pages on every push to `main`. It is plain static files, which Cloudflare serves free and unlimited on its free plan. The workflow builds and checks the demo in one job (no secrets), then a second job verifies a checksum of the built site and publishes it; it never runs for pull requests or forks. Until the two secrets below exist it still builds and checks the demo and skips publishing with a notice, so it is safe to merge first.
+
+One-time setup (you need a Cloudflare account; nothing secret goes in this repository, and the dashboard menu names may differ slightly from these):
+
+1. **Create the Pages project** with Direct Upload, named `budget-demo` (the workflow uses that name) and with `main` as the production branch. Either use the dashboard (Workers & Pages, Create, Pages, Direct Upload) or run `npx wrangler pages project create budget-demo --production-branch=main`.
+2. **Create an API token** limited to your account with the single permission "Cloudflare Pages: Edit".
+3. **Add two repository secrets** in GitHub (Settings, Secrets and variables, Actions): `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` (the account id is shown on the Cloudflare dashboard).
+4. **Run it**: Actions, "Deploy demo", Run workflow (or push to `main`). The site appears at `budget-demo.pages.dev`.
+5. **Add the custom domain** in the project's settings (Custom domains): `demo.budget.scgrid.xyz`, and create the CNAME it shows at your DNS provider (automatic when the domain's DNS is on Cloudflare). Then replace the "planned" wording above with the live link.
+6. **Leave Cloudflare Web Analytics off** for this project. It injects a third-party script, which the policy blocks and which would break the demo's promise of making no outside requests.
 
 ## Self-hosting
 
