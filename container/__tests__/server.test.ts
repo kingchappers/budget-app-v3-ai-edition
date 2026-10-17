@@ -39,10 +39,10 @@ const start = async (extra: NodeJS.ProcessEnv = {}, options: StartOptions = {}) 
   return `http://127.0.0.1:${running.port}`;
 };
 const setupCodeFromLogs = (): string => {
-  const line = logSpy.mock.calls.map((call: unknown[]) => String(call[0])).find((text: string) => text.includes('setup code'));
-  const match = line?.match(/: (\S+)$/);
-  if (!match) throw new Error('no setup code was logged');
-  return match[1];
+  const text = logSpy.mock.calls.map((call: unknown[]) => String(call[0])).join('\n');
+  const last = [...text.matchAll(/^(?:Setup|Recovery) code: (\S+)$/gm)].at(-1);
+  if (!last) throw new Error('no setup code was logged');
+  return last[1];
 };
 
 describe('serving', () => {
@@ -413,5 +413,107 @@ describe('Caddy supervision', () => {
     // Nothing is left listening on the port, and the registries are free again.
     running = await startServer(env(env1), { clientDir, log: () => undefined, spawnCaddy: asSpawn(new FakeChild()) });
     expect(running.port).toBe(Number(env1.PORT));
+  });
+});
+
+describe('first-run code and password recovery', () => {
+  const PASSWORD = 'a perfectly fine password';
+  const NEW_PASSWORD = 'a different perfectly fine password';
+  const codePath = (): string => join(dir, 'data', 'SETUP_CODE.txt');
+  const markerPath = (): string => join(dir, 'data', 'RESET_PASSWORD');
+
+  const call = (base: string, path: string, init: { method?: string; body?: unknown; cookie?: string } = {}): Promise<Response> =>
+    fetch(`${base}${path}`, {
+      method: init.method ?? (init.body === undefined ? 'GET' : 'POST'),
+      headers: { 'Content-Type': 'application/json', Origin: base, ...(init.cookie ? { Cookie: init.cookie } : {}) },
+      body: init.body === undefined ? undefined : JSON.stringify(init.body),
+    });
+  const cookieOf = (res: Response): string => res.headers.getSetCookie()[0].split(';')[0];
+  const status = async (base: string): Promise<{ setupRequired: boolean; recoveryOpen: boolean }> =>
+    (await call(base, '/api/auth/status')).json() as Promise<{ setupRequired: boolean; recoveryOpen: boolean }>;
+  const restart = async (): Promise<string> => {
+    await running?.close();
+    running = undefined;
+    logSpy.mockClear();
+    return start();
+  };
+
+  it('saves the code as an owner-only file while setup is pending and removes it once the account exists', async () => {
+    const base = await start();
+    const code = setupCodeFromLogs();
+    expect(readFileSync(codePath(), 'utf8')).toBe(`${code}\n`);
+    expect(statSync(codePath()).mode & 0o777).toBe(0o600);
+    const res = await call(base, '/api/auth/setup', { body: { code, email: 'me@example.com', password: PASSWORD } });
+    expect(res.status).toBe(200);
+    expect(existsSync(codePath())).toBe(false);
+  });
+
+  it('replaces a stale code file at start-up and removes the file at shutdown', async () => {
+    mkdirSync(join(dir, 'data'), { recursive: true });
+    writeFileSync(codePath(), 'stale\n');
+    await start();
+    expect(readFileSync(codePath(), 'utf8')).toBe(`${setupCodeFromLogs()}\n`);
+    await running?.close();
+    running = undefined;
+    expect(existsSync(codePath())).toBe(false);
+  });
+
+  it('just removes a marker when there is no account, and offers normal setup', async () => {
+    mkdirSync(join(dir, 'data'), { recursive: true });
+    writeFileSync(markerPath(), '');
+    const base = await start();
+    expect(existsSync(markerPath())).toBe(false);
+    expect(await status(base)).toEqual({ setupRequired: true, recoveryOpen: false });
+    expect(logSpy.mock.calls.map((entry: unknown[]) => String(entry[0])).join('\n')).toMatch(/^Setup code: /m);
+  });
+
+  it('ignores a directory named RESET_PASSWORD and starts normally', async () => {
+    mkdirSync(markerPath(), { recursive: true });
+    const warn = vi.mocked(console.warn);
+    const base = await start();
+    expect(existsSync(markerPath())).toBe(true);
+    expect(warn.mock.calls.map(call => String(call[0])).join('\n')).toMatch(/not a regular file/);
+    expect(await status(base)).toMatchObject({ recoveryOpen: false });
+  });
+
+  it('recovers a forgotten password through the marker file, keeping the account and its data', async () => {
+    let base = await start();
+    const setup = await call(base, '/api/auth/setup', { body: { code: setupCodeFromLogs(), email: 'me@example.com', password: PASSWORD } });
+    const oldCookie = cookieOf(setup);
+    const { userId } = (await setup.json()) as { userId: string };
+
+    await running?.close();
+    running = undefined;
+    writeFileSync(markerPath(), '');
+    logSpy.mockClear();
+    base = await start();
+
+    expect(existsSync(markerPath())).toBe(false);
+    expect(await status(base)).toEqual({ setupRequired: false, recoveryOpen: true });
+    expect((await call(base, '/api/auth/me', { cookie: oldCookie })).status).toBe(401);
+    const code = setupCodeFromLogs();
+    expect(readFileSync(codePath(), 'utf8')).toBe(`${code}\n`);
+    expect(logSpy.mock.calls.map((entry: unknown[]) => String(entry[0])).join('\n')).toMatch(/^Recovery code: /m);
+
+    const recovered = await call(base, '/api/auth/setup', { body: { code, password: NEW_PASSWORD } });
+    expect(recovered.status).toBe(200);
+    expect(((await (await call(base, '/api/auth/me', { cookie: cookieOf(recovered) })).json()) as { userId: string }).userId).toBe(userId);
+    expect((await call(base, '/api/auth/login', { body: { email: 'me@example.com', password: NEW_PASSWORD } })).status).toBe(200);
+    expect((await call(base, '/api/auth/login', { body: { email: 'me@example.com', password: PASSWORD } })).status).toBe(401);
+    expect(existsSync(codePath())).toBe(false);
+    expect(await status(base)).toEqual({ setupRequired: false, recoveryOpen: false });
+  });
+
+  it('closes recovery again on a restart without a fresh marker, leaving no code file', async () => {
+    let base = await start();
+    await call(base, '/api/auth/setup', { body: { code: setupCodeFromLogs(), email: 'me@example.com', password: PASSWORD } });
+    await running?.close();
+    running = undefined;
+    writeFileSync(markerPath(), '');
+    base = await start();
+    expect(await status(base)).toMatchObject({ recoveryOpen: true });
+    base = await restart();
+    expect(await status(base)).toMatchObject({ recoveryOpen: false });
+    expect(existsSync(codePath())).toBe(false);
   });
 });
