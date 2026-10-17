@@ -206,7 +206,9 @@ Runs the app as a single container alongside the AWS deployment, so people can h
 
 Moving your data from AWS to a self-hosted instance is described in [`SELF-HOSTING.md`](SELF-HOSTING.md#moving-your-data-from-aws).
 
-Later, separate from the three above: Demo Mode (a public try-it instance with fake data) and Generic OIDC login.
+**Demo Mode** (implemented on `feat/demo-mode`, awaiting review): a separate static build of the real SPA (`yarn build:demo`) whose backend runs in the browser: an in-memory store, the real API router and handlers, and the invented household from `scripts/screenshots/fixtures.mjs` plus a small invented Gifts set-aside. Visitors are signed in as a fixed user and see a banner with a Reset demo button; changes vanish on reload. A compile-time flag keeps all demo code out of the normal builds, and CI checks both builds (`scripts/check-demo-build.mjs`). The build also writes a ready Content-Security-Policy header value. Deploying it to a public address is deliberately left to the owner. Persistence across reloads, a server-side demo and multi-user were considered and not built. Spec: `superpowers/specs/2026-10-17-demo-mode-design.md`.
+
+Later, separate from the above: Generic OIDC login.
 
 ## Deliberately excluded
 
