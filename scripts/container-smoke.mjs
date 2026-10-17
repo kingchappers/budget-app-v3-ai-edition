@@ -1,4 +1,4 @@
-// Usage: node scripts/container-smoke.mjs <image> [--tls]
+// Usage: node scripts/container-smoke.mjs <image> [--tls|--proxy]
 // Runs the image with throwaway volumes and checks the whole path over HTTP(S). Needs a running Docker daemon.
 // Prints one PASS/FAIL line per step and exits non-zero on the first failure. Node built-ins only.
 import { spawnSync } from 'node:child_process';
@@ -8,8 +8,13 @@ import https from 'node:https';
 import { createServer } from 'node:net';
 
 const [image, ...flags] = process.argv.slice(2);
-if (!image) throw new Error('Usage: node scripts/container-smoke.mjs <image> [--tls]');
+if (!image) throw new Error('Usage: node scripts/container-smoke.mjs <image> [--tls|--proxy]');
 const tls = flags.includes('--tls');
+const proxy = flags.includes('--proxy');
+if (tls && proxy) throw new Error('Use either --tls or --proxy, not both');
+// A made-up public name: the container only ever sees it in headers, so nothing here touches the network.
+const PROXY_ORIGIN = 'https://budget.example.test';
+const PROXY_CLIENT_IP = '203.0.113.7';
 
 const docker = (...args) => {
   const result = spawnSync('docker', args, { encoding: 'utf8' });
@@ -22,6 +27,9 @@ const dockerLogs = (...extra) => {
   const result = spawnSync('docker', ['logs', ...extra, name], { encoding: 'utf8' });
   return `${result.stdout}\n${result.stderr}`;
 };
+
+// The newest "Setup code:" / "Recovery code:" line in the log (the boxed block prints it on a line of its own).
+const lastCode = () => [...dockerLogs().matchAll(/^(?:Setup|Recovery) code: (\S+)$/gm)].map(match => match[1]).at(-1);
 
 const freePort = () => new Promise((resolve, reject) => {
   const server = createServer();
@@ -112,18 +120,25 @@ async function main() {
     docker('run', '-d', '--name', name, ...mounts, '--sysctl', 'net.ipv4.ip_unprivileged_port_start=1024', '-p', `127.0.0.1:${https443}:443`, '-p', `127.0.0.1:${http80}:80`,
       '-e', 'TLS_DOMAIN=localhost', '-e', `APP_ORIGIN=${publicOrigin}`, image);
     base = `https://127.0.0.1:${https443}`;
+  } else if (proxy) {
+    const port = await freePort();
+    publicOrigin = PROXY_ORIGIN;
+    // Plain HTTP inside the container, as behind a managed host's proxy: forwarded headers trusted, public origin https.
+    docker('run', '-d', '--name', name, ...mounts, '-p', `127.0.0.1:${port}:8080`, '-e', 'TRUST_PROXY=true', '-e', `APP_ORIGIN=${publicOrigin}`, image);
+    base = `http://127.0.0.1:${port}`;
   } else {
     const port = await freePort();
     publicOrigin = `http://127.0.0.1:${port}`;
     docker('run', '-d', '--name', name, ...mounts, '-p', `127.0.0.1:${port}:8080`, '-e', `APP_ORIGIN=${publicOrigin}`, image);
     base = publicOrigin;
   }
-  const hostHeader = tls ? { Host: new URL(publicOrigin).host } : {};
+  const hostHeader = tls || proxy ? { Host: new URL(publicOrigin).host } : {};
+  const forwarded = proxy ? { 'X-Forwarded-Proto': 'https', 'X-Forwarded-For': PROXY_CLIENT_IP } : {};
 
-  const get = (path, extra = {}) => request(base, path, { headers: { ...hostHeader, ...extra } });
+  const get = (path, extra = {}) => request(base, path, { headers: { ...hostHeader, ...forwarded, ...extra } });
   const post = (path, payload, extra = {}) => request(base, path, {
     method: 'POST', body: JSON.stringify(payload),
-    headers: { ...hostHeader, 'Content-Type': 'application/json', Origin: publicOrigin, ...extra },
+    headers: { ...hostHeader, ...forwarded, 'Content-Type': 'application/json', Origin: publicOrigin, ...extra },
   });
 
   if (tls) {
@@ -179,19 +194,28 @@ async function main() {
   }, 'the container to become healthy');
   step('the HEALTHCHECK reaches healthy', health === 'healthy');
 
-  const code = dockerLogs().match(/setup code to create your account: (\S+)/)?.[1];
+  const code = lastCode();
   step('the setup code is in the log from boot', Boolean(code));
+
+  const fileStat = docker('exec', name, 'stat', '-c', '%u %a', '/data/SETUP_CODE.txt');
+  step('SETUP_CODE.txt is owned by 10001 with mode 600', fileStat === '10001 600', fileStat);
+  step('SETUP_CODE.txt holds the logged code', docker('exec', name, 'cat', '/data/SETUP_CODE.txt') === code);
 
   const setup = await post('/api/auth/setup', { code, email: 'smoke@example.com', password: 'a perfectly fine password' });
   step('setup succeeds', setup.status === 200, setup.body);
+  step('SETUP_CODE.txt is removed once setup completes', spawnSync('docker', ['exec', name, 'test', '-e', '/data/SETUP_CODE.txt']).status !== 0);
+  const userId = JSON.parse(setup.body).userId;
   const setCookie = [].concat(setup.headers['set-cookie'] ?? [])[0] ?? '';
   const cookie = setCookie.split(';')[0];
 
-  if (tls) {
+  if (tls || proxy) {
     step('the session cookie is __Host- and Secure', setCookie.startsWith('__Host-budget_session=') && setCookie.includes('Secure'), setCookie);
+  }
+  if (tls) {
     const redirect = await request(`http://127.0.0.1:${http80}`, '/', { headers: { Host: 'localhost' } });
     step('HTTP redirects to HTTPS', [301, 302, 307, 308].includes(redirect.status) && String(redirect.headers.location).startsWith('https://'), `${redirect.status} ${redirect.headers.location}`);
-  } else {
+  }
+  if (!tls && !proxy) {
     step('the session cookie is set', cookie.startsWith('budget_session='), setCookie);
   }
 
@@ -199,6 +223,8 @@ async function main() {
   step('the session works', me.status === 200, me.body);
   const anonymous = await get('/api/categories');
   step('the API refuses an anonymous request', anonymous.status === 401, String(anonymous.status));
+  const crossSite = await post('/api/auth/logout', {}, { Origin: 'https://evil.example', Cookie: cookie });
+  step('a request from another origin is refused', crossSite.status === 403, String(crossSite.status));
 
   // Sends a request with a forged X-Forwarded-For to an API route that answers 401, waits for the app to log exactly one
   // new "Request:" line for it, and returns that line's sourceIp.
@@ -214,6 +240,10 @@ async function main() {
     // Caddy must replace a client-supplied X-Forwarded-For, so the app never sees the spoofed address.
     const seen = await spoofedSourceIp('6.6.6.6');
     step(`through Caddy the logged client address is not the spoofed one (logged: ${seen})`, Boolean(seen) && seen !== '6.6.6.6' && seen !== '7.7.7.7');
+  } else if (proxy) {
+    // TRUST_PROXY is on, so the app logs the forwarded client address.
+    const seen = await spoofedSourceIp('198.51.100.9');
+    step(`with TRUST_PROXY on the logged client address is the forwarded one (logged: ${seen})`, seen === '198.51.100.9');
   } else {
     // TRUST_PROXY is off by default without TLS_DOMAIN, so a forwarding header is ignored.
     const seen = await spoofedSourceIp('6.6.6.6');
@@ -230,6 +260,31 @@ async function main() {
   const backup = docker('exec', '-e', 'STORE=sqlite', '-e', 'SQLITE_PATH=/data/budget.sqlite', name,
     'node', 'build/store-cli/store-cli.js', 'backup', '--out', '/data/manual-backup.sqlite');
   step('store-cli backup works inside the image', backup.includes('Backed up'), backup);
+
+  // Password recovery without a shell: create the marker as the app user, restart, set a new password with the logged code.
+  docker('exec', name, 'touch', '/data/RESET_PASSWORD');
+  docker('restart', name);
+  await waitFor(async () => (await get('/healthz')).status === 200, '/healthz after the recovery restart');
+  step('the reset marker is consumed at start-up', spawnSync('docker', ['exec', name, 'test', '-e', '/data/RESET_PASSWORD']).status !== 0);
+  const opened = JSON.parse((await get('/api/auth/status')).body);
+  step('recovery is open and setup stays closed', opened.recoveryOpen === true && opened.setupRequired === false, JSON.stringify(opened));
+  const oldSession = await get('/api/auth/me', { Cookie: cookie });
+  step('the old session ended when recovery opened', oldSession.status === 401, String(oldSession.status));
+  const recoveryCode = await waitFor(() => { const next = lastCode(); return next && next !== code ? next : undefined; }, 'a recovery code in the log', 30_000);
+  step('SETUP_CODE.txt holds the recovery code', docker('exec', name, 'cat', '/data/SETUP_CODE.txt') === recoveryCode);
+  const NEW_PASSWORD = 'a different perfectly fine password';
+  const recovered = await post('/api/auth/setup', { code: recoveryCode, password: NEW_PASSWORD });
+  step('recovery with the code succeeds', recovered.status === 200, recovered.body);
+  const recoveredCookie = ([].concat(recovered.headers['set-cookie'] ?? [])[0] ?? '').split(';')[0];
+  const meAfter = await get('/api/auth/me', { Cookie: recoveredCookie });
+  step('it is the same account after recovery', meAfter.status === 200 && JSON.parse(meAfter.body).userId === userId, meAfter.body);
+  const newLogin = await post('/api/auth/login', { email: 'smoke@example.com', password: NEW_PASSWORD });
+  step('the new password signs in', newLogin.status === 200, newLogin.body);
+  const oldLogin = await post('/api/auth/login', { email: 'smoke@example.com', password: 'a perfectly fine password' });
+  step('the old password no longer signs in', oldLogin.status === 401, String(oldLogin.status));
+  step('SETUP_CODE.txt is removed once recovery completes', spawnSync('docker', ['exec', name, 'test', '-e', '/data/SETUP_CODE.txt']).status !== 0);
+  const closed = JSON.parse((await get('/api/auth/status')).body);
+  step('recovery is closed again', closed.recoveryOpen === false, JSON.stringify(closed));
 
   const started = Date.now();
   docker('stop', '-t', '20', name);
