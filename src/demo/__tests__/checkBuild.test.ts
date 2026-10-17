@@ -66,6 +66,9 @@ describe('findServerOnlyCode', () => {
     ["import x from'node:path';", 'node:'],
     ['const m=await import("node:crypto");', 'node:'],
     ['const m=require("node:os");', 'node:'],
+    ['import"node:fs";', 'node:'],
+    ['import "node:fs";', 'node:'],
+    ['const m=await import(`node:fs`);', 'node:'],
     ['var a="@aws-sdk/client-dynamodb";', '@aws-sdk'],
     ['var a="aws-sdk";', 'aws-sdk'],
     ['var a="node:sqlite";', 'node:sqlite'],
@@ -77,6 +80,10 @@ describe('findServerOnlyCode', () => {
 
   it('passes clean code, including a plain node: string in UI code', () => {
     expect(findServerOnlyCode(fixture({ 'x.js': 'var a="node:"; var b="note:node: list";' }))).toEqual([]);
+  });
+
+  it('passes object keys that look like node: specifiers', () => {
+    expect(findServerOnlyCode(fixture({ 'x.js': 'var t={"node:":1,import:"x",from:{"node:a":2}};' }))).toEqual([]);
   });
 });
 
@@ -142,7 +149,7 @@ describe('check-demo-build CLI', () => {
   });
 
   it('--demo fails on server-only code even with the marker present', () => {
-    const dir = fixture({ 'index.html': page, 'assets/app.js': `var m="${DEMO_MARKER}";import"node:fs";var q="@aws-sdk/x";` });
+    const dir = fixture({ 'index.html': page, 'assets/app.js': `var m="${DEMO_MARKER}";import"node:fs";` });
     expect(run('--demo', dir).status).toBe(1);
   });
 

@@ -10,7 +10,7 @@ const MARKER_EXTENSIONS = new Set(['.js', '.html', '.css', '.json', '.txt', '.ma
 
 // Plain substrings. Bare `node:` is matched only as an import specifier (below): UI libraries carry the text in ordinary strings.
 const SERVER_ONLY_SUBSTRINGS = ['@aws-sdk', 'aws-sdk', 'node:sqlite', '__vite-browser-external'];
-const NODE_IMPORT_SPECIFIER = /(?:from\s*|import\s*\(\s*|require\s*\(\s*)["']node:/;
+const NODE_IMPORT_SPECIFIER = /(?:from\s*|import\s*\(?\s*|require\s*\(\s*)["'`]node:/;
 
 function listFiles(dir, base = dir) {
   const files = [];

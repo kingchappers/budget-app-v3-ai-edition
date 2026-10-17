@@ -7,7 +7,9 @@ import tsconfigPaths from "vite-tsconfig-paths";
 // Runs in every build, not only the demo one. src/store/index.ts lazily imports the DynamoDB and SQLite stores for the Lambda
 // and the container. Rollup resolves the guarded demo import in app/entry.client.tsx even in normal builds, so the server stores
 // must be stubbed for that resolution to succeed (otherwise node:sqlite fails the build). Nothing outside src/demo reaches
-// src/store/index.ts in browser code, so the stub never ends up in a normal bundle.
+// src/store/index.ts in browser code, so the stub never ends up in a normal bundle. For the same reason (Rollup resolves the demo
+// import graph in every build), scripts/screenshots/fixtures.mjs, imported by src/demo/seed.ts, is now an input of production and
+// container builds too: do not move it or add it to .dockerignore.
 function stubServerStores(): Plugin {
   const stub = path.resolve("src/demo/unavailableStore.ts");
   return {
