@@ -1,9 +1,14 @@
 # Publishes the browser demo (invented data, the whole backend runs in the visitor's browser) to Cloudflare Pages.
 #
 # Kept apart from the main workflow on purpose: that one holds AWS credentials, this one holds only a Cloudflare token.
-# The build job never sees a secret (CICD-09); the deploy job verifies what the build produced before it publishes (CICD-07).
-# It publishes only from main, so a pull request or a fork can never reach the token. Until the two secrets exist the build
-# still runs and the publish step is skipped with a notice, so merging this file does not turn main red.
+# - The build job never sees a secret (CICD-09).
+# - The deploy job verifies what the build produced before it publishes (CICD-07).
+# - The token is given to exactly two things: a small shell check and the wrangler pinned in deploy/demo/package-lock.json,
+#   which is installed with `npm ci --ignore-scripts` in an earlier step that holds no secret. No third-party action receives it.
+# - The secrets live in the `demo` environment, which the repository settings restrict to main, and both jobs refuse to run
+#   from any other branch, so a pull request, a fork or a manual run from another branch cannot publish.
+# - Until the two secrets exist the build still runs and the publish step is skipped with a notice, so merging this file
+#   does not turn main red.
 #
 # One-time setup is in the README ("Deploying the demo").
 
@@ -25,7 +30,6 @@ concurrency:
 jobs:
   build_demo:
     name: Build the demo
-    # A manual run from another branch must not be able to publish.
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -63,9 +67,30 @@ jobs:
   deploy_demo:
     name: Publish to Cloudflare Pages
     needs: build_demo
+    # Repeated here so the rule survives a later change to how this job is scheduled.
+    if: github.ref == 'refs/heads/main'
+    # Holds CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID; set its deployment branches to main only (see the README).
+    environment: demo
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
+    # Only the wrangler manifest and lockfile, not the rest of the repository.
+    - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
+      with:
+        sparse-checkout: deploy/demo
+        persist-credentials: false
+
+    - name: Use Node.js 24.x
+      uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4.4.0
+      with:
+        node-version: 24.x
+
+    # The exact wrangler (and every package under it) recorded in the lockfile, with install scripts disabled. This step has
+    # no secret, so nothing it installs can read the token.
+    - name: Install the pinned wrangler
+      working-directory: deploy/demo
+      run: npm ci --ignore-scripts
+
     - name: Fetch the built site
       uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4.3.0
       with:
@@ -77,14 +102,14 @@ jobs:
       working-directory: build/demo/client
       run: |
         sha256sum --check --strict ../site.sha256
-        listed="$(awk '{print $2}' ../site.sha256 | sort)"
+        listed="$(sed -E 's/^\\?[0-9a-f]{64} [ *]//' ../site.sha256 | sort)"
         present="$(find . -type f | sort)"
         if [ "$listed" != "$present" ]; then
           echo "::error::The site folder does not match its checksum list"
           exit 1
         fi
 
-    # Only this small, trusted shell step and the pinned action below ever receive the token.
+    # `secrets` cannot be used in a step condition, so look for them here and pass the answer on.
     - name: Check the Cloudflare secrets exist
       id: cloudflare
       env:
@@ -95,14 +120,16 @@ jobs:
           echo "configured=true" >> "$GITHUB_OUTPUT"
         else
           echo "configured=false" >> "$GITHUB_OUTPUT"
-          echo "::notice::The demo was built and checked but not published: add the CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID repository secrets (see the README, 'Deploying the demo')."
+          echo "::notice::The demo was built and checked but not published: add the CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID secrets to the 'demo' environment (see the README, 'Deploying the demo')."
         fi
 
     - name: Publish to Cloudflare Pages
       if: steps.cloudflare.outputs.configured == 'true'
-      uses: cloudflare/wrangler-action@953926a2e2182532811c01a25e53647d93bf07c0  # v4.1.3
-      with:
-        apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-        accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        wranglerVersion: '4.147.0'
-        command: pages deploy build/demo/client --project-name=budget-demo --branch=main --commit-dirty=true
+      env:
+        CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        WRANGLER_SEND_METRICS: 'false'
+        COMMIT_SHA: ${{ github.sha }}
+      run: >-
+        ./deploy/demo/node_modules/.bin/wrangler pages deploy build/demo/client
+        --project-name=budget-demo --branch=main --commit-hash="$COMMIT_SHA" --commit-dirty=true

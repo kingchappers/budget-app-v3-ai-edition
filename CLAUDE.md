@@ -92,6 +92,6 @@ Reference control IDs in commits (e.g., "addresses AUTH-02", "fixes IO-03").
 | `.github/workflows/container.yml` | CI for the container image: amd64 build, smoke tests and Trivy scan on every PR and push; multi-arch publish to GHCR from `main` (`edge`) and `vX.Y.Z` tags |
 | `scripts/build-container.cjs` | Compiles `container/` (with the API and static handlers it imports) to `build/container/` |
 | `src/demo/` | Browser demo backend: in-memory API adapter, seed and fetch installer; the UI side is `app/demo/`; see README |
-| `.github/workflows/demo.yml` | Publishes the browser demo to Cloudflare Pages from `main`: a secret-free build job, then a deploy job that verifies a checksum first; skips publishing until the Cloudflare secrets exist (see README, "Deploying the demo") |
+| `.github/workflows/demo.yml` | Publishes the browser demo to Cloudflare Pages from `main`: a secret-free build job, then a deploy job (environment `demo`, branch-restricted) that verifies a checksum and runs the wrangler pinned in `deploy/demo/`; skips publishing until the Cloudflare secrets exist (see README, "Deploying the demo") |
 | `infra/lambda.tf` | Static Lambda + API Gateway + IAM |
 | `infra/api-lambda.tf` | API Lambda + routes |

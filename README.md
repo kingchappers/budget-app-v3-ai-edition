@@ -185,16 +185,18 @@ A normal `yarn build` wipes `build/demo`, so when building both locally, build t
 
 ### Deploying the demo
 
-`.github/workflows/demo.yml` publishes the demo to Cloudflare Pages on every push to `main`. It is plain static files, which Cloudflare serves free and unlimited on its free plan. The workflow builds and checks the demo in one job (no secrets), then a second job verifies a checksum of the built site and publishes it; it never runs for pull requests or forks. Until the two secrets below exist it still builds and checks the demo and skips publishing with a notice, so it is safe to merge first.
+`.github/workflows/demo.yml` publishes the demo to Cloudflare Pages on every push to `main`. It is plain static files, so there is no server to run, and Cloudflare serves static requests free of charge on its free plan. The workflow builds and checks the demo in one job that holds no secrets, then a second job verifies a checksum of the built site and publishes it. It never runs for pull requests or forks, and both jobs refuse to run from any branch except `main`. Until the two secrets below exist it still builds and checks the demo and skips publishing with a notice, so it is safe to merge first.
 
 One-time setup (you need a Cloudflare account; nothing secret goes in this repository, and the dashboard menu names may differ slightly from these):
 
 1. **Create the Pages project** with Direct Upload, named `budget-demo` (the workflow uses that name) and with `main` as the production branch. Either use the dashboard (Workers & Pages, Create, Pages, Direct Upload) or run `npx wrangler pages project create budget-demo --production-branch=main`.
 2. **Create an API token** limited to your account with the single permission "Cloudflare Pages: Edit".
-3. **Add two repository secrets** in GitHub (Settings, Secrets and variables, Actions): `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` (the account id is shown on the Cloudflare dashboard).
-4. **Run it**: Actions, "Deploy demo", Run workflow (or push to `main`). The site appears at `budget-demo.pages.dev`.
+3. **Create a GitHub environment called `demo`** (Settings, Environments), set its deployment branches to `main` only, and add the two secrets **to that environment**, not to the repository: `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` (the account id is shown on the Cloudflare dashboard). This is what keeps the token away from any other branch or workflow.
+4. **Run it**: Actions, "Deploy demo", Run workflow (or push to `main`). The site appears at `budget-demo.pages.dev`. Load a deep link such as `/transactions` once to confirm unknown paths fall back to the app.
 5. **Add the custom domain** in the project's settings (Custom domains): `demo.budget.scgrid.xyz`, and create the CNAME it shows at your DNS provider (automatic when the domain's DNS is on Cloudflare). Then replace the "planned" wording above with the live link.
 6. **Leave Cloudflare Web Analytics off** for this project. It injects a third-party script, which the policy blocks and which would break the demo's promise of making no outside requests.
+
+The publishing tool is pinned: `deploy/demo/package.json` and its lockfile fix the exact `wrangler` and every package under it, and the workflow installs them with `npm ci --ignore-scripts` in a step that holds no secret. That folder is separate from the app's Yarn dependencies, so the app's audit step does not cover it: to update, run `npm install wrangler@<version> --ignore-scripts` and then `npm audit` in `deploy/demo`, and commit both files.
 
 ## Self-hosting
 
