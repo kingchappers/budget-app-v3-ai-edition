@@ -61,6 +61,7 @@ Security requirements for this React + Auth0 + Lambda project. Reference control
 - React JSX escapes by default — don't bypass it
 - Set `Content-Security-Policy` headers (WEB-A05)
 - Generic error messages to clients, detailed logs server-side (API-02)
+- The browser demo build (`yarn build:demo`) is data-free by construction: it holds no credentials (dummy Auth0 values, and the build script refuses real ones), is built to make no requests beyond its own origin (the demo code answers same-origin `/api` and `/config.json` in memory and makes no other calls; the build check scans its HTML and CSS for external references; and the supplied `connect-src 'self'` policy in `build/demo/csp-header.txt` enforces it when the host sends that header). A compile-time flag (`VITE_DEMO`) keeps demo code out of the other builds: `yarn build` and CI run `scripts/check-demo-build.mjs --production` to check that, and CI runs it with `--demo` to check that the demo build holds no server-only code or external references
 
 ---
 

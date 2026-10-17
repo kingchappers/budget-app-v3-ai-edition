@@ -16,6 +16,7 @@ yarn typecheck        # Generate route types + run tsc
 yarn test             # Run Vitest suite (API handlers)
 yarn test:watch       # Vitest in watch mode
 yarn build:container   # Compile the self-hosting server (container/) to build/container/
+yarn build:demo       # Build the browser demo (invented data, in-memory API) into build/demo/
 yarn screenshots      # Regenerate the About page images in public/about/ (first run: yarn playwright install chromium)
 ```
 
@@ -90,5 +91,6 @@ Reference control IDs in commits (e.g., "addresses AUTH-02", "fixes IO-03").
 | `Dockerfile` | Multi-stage image build for the self-hosting server; check it with `node scripts/container-smoke.mjs <image> [--tls\|--proxy]` |
 | `.github/workflows/container.yml` | CI for the container image: amd64 build, smoke tests and Trivy scan on every PR and push; multi-arch publish to GHCR from `main` (`edge`) and `vX.Y.Z` tags |
 | `scripts/build-container.cjs` | Compiles `container/` (with the API and static handlers it imports) to `build/container/` |
+| `src/demo/` | Browser demo backend: in-memory API adapter, seed and fetch installer; the UI side is `app/demo/`; see README |
 | `infra/lambda.tf` | Static Lambda + API Gateway + IAM |
 | `infra/api-lambda.tf` | API Lambda + routes |

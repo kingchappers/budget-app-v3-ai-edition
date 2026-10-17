@@ -173,6 +173,16 @@ Backend uses:
 - **jsonwebtoken** - JWT verification
 - **jwks-rsa** - Auth0 public key fetching
 
+## Try the demo
+
+The demo is the real app with an invented household, running entirely in your browser: an in-memory store plus the real API router and handlers stand in for the server. You are signed in as a fixed visitor, and a banner says changes stay in this browser tab and vanish on reload (a Reset demo button restores the starting data). Push reminders, the account/sign-in control and the PWA manifest are hidden. The demo is built to make no requests beyond its own origin: it answers same-origin `/api` and `/config.json` calls in memory, the build checks its HTML and CSS for external references, and the Content-Security-Policy below enforces the rule when your host sends it.
+
+Live demo: (add the demo link here once it is deployed)
+
+Build it with `yarn build:demo`. This needs no Auth0 values: the script uses dummy ones and refuses to run if real `VITE_AUTH0_*` values are set in your shell. The output is the site in `build/demo/client/` and a ready `Content-Security-Policy` header value in `build/demo/csp-header.txt` (with inline-script hashes) for your static host to send. The recommended header is that policy, and your host must send it for the browser to enforce it. Any static host can serve it, but it must be served over HTTPS (or from `localhost`): the API handlers use `crypto.randomUUID`, which browsers only offer on secure origins. Unknown paths should fall back to `index.html`.
+
+A normal `yarn build` wipes `build/demo`, so when building both locally, build the demo last. To check a built demo in a real browser, run `node scripts/demo-smoke.mjs` (Playwright; local only, not part of CI).
+
 ## Self-hosting
 
 Run your own copy as a single container with SQLite and the built-in login: see [`docs/SELF-HOSTING.md`](docs/SELF-HOSTING.md).

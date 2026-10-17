@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { Suspense, lazy, useCallback, useState } from 'react';
 import { ActionIcon, AppShell, Button, Flex, Text, NavLink, Group, Loader, Paper, Tooltip, UnstyledButton } from '@mantine/core';
 import { useHotkeys } from '@mantine/hooks';
 import { useAuth } from '~/lib/auth';
@@ -11,6 +11,7 @@ import { Link, NavLink as RouterNavLink, useLocation } from 'react-router';
 import { TransactionSheet } from '../transactions/TransactionSheet';
 import { LaunchIntent } from './LaunchIntent';
 import { OfflineQueueBanner } from './OfflineQueueBanner';
+import { isDemo } from '~/demo/flag';
 import { currentYearMonth } from '~/lib/months';
 import { SignedOutPanel } from './SignedOutPanel';
 import { isSessionEndedError, useSessionEnded } from '~/lib/session';
@@ -175,6 +176,8 @@ function SettingsLink() {
   );
 }
 
+const DemoBanner = isDemo ? lazy(() => import('~/demo/DemoBanner')) : null;
+
 function LayoutShell({ children }: { children: React.ReactNode }) {
   const [addOpen, setAddOpen] = useState(false);
   const openAdd = useCallback(() => setAddOpen(true), []);
@@ -207,7 +210,7 @@ function LayoutShell({ children }: { children: React.ReactNode }) {
             <SettingsLink />
             <QuickEntryTips />
             <ColorSchemeToggle />
-            <Authentication />
+            {!isDemo && <Authentication />}
           </Group>
         </Flex>
       </AppShell.Header>
@@ -217,6 +220,7 @@ function LayoutShell({ children }: { children: React.ReactNode }) {
 
       {/* Clears the phone tab bar, which is fixed to the bottom of the screen. */}
       <AppShell.Main id="main" tabIndex={-1} style={{ outline: 'none', paddingBottom: 'calc(var(--tab-bar-height) + var(--mantine-spacing-xl))' }}>
+        {DemoBanner && <Suspense fallback={null}><DemoBanner /></Suspense>}
         <OfflineQueueBanner />
         <MainContent session={session}>{children}</MainContent>
       </AppShell.Main>
