@@ -7,6 +7,7 @@ import { DEMO_MARKER } from '../marker';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   buildCspHeader,
+  buildHeadersFile,
   findExternalReferences,
   findMarkerFiles,
   findServerOnlyCode,
@@ -130,6 +131,41 @@ describe('buildCspHeader', () => {
   });
 });
 
+describe('buildHeadersFile', () => {
+  const csp = buildCspHeader(['sha256-AAA']);
+
+  it('sends the policy and the basic hardening headers for every path', () => {
+    const file = buildHeadersFile(csp);
+    const everything = file.split('\n\n')[0].split('\n');
+    expect(everything[0]).toBe('/*');
+    expect(everything).toContain(`  Content-Security-Policy: ${csp}`);
+    expect(everything).toContain('  X-Content-Type-Options: nosniff');
+    expect(everything).toContain('  Referrer-Policy: no-referrer');
+  });
+
+  it('caches only the hashed assets, for a year and immutably', () => {
+    const blocks = buildHeadersFile(csp).trim().split('\n\n');
+    const assets = blocks.find(block => block.startsWith('/assets/*')) ?? '';
+    expect(assets.split('\n')).toContain('  Cache-Control: public, max-age=31536000, immutable');
+    expect(blocks[0]).not.toContain('Cache-Control');
+  });
+
+  it('indents every header line, separates blocks with a blank line and ends with a newline', () => {
+    const file = buildHeadersFile(csp);
+    expect(file.endsWith('\n')).toBe(true);
+    for (const block of file.trim().split('\n\n')) {
+      const [path, ...headers] = block.split('\n');
+      expect(path.startsWith('/')).toBe(true);
+      expect(headers.length).toBeGreaterThan(0);
+      for (const header of headers) expect(header).toMatch(/^ {2}[A-Za-z-]+: \S/);
+    }
+  });
+
+  it.each(['a\nb', 'a\r\nb', 'a\rb'])('refuses a policy containing a line break (header injection): %j', value => {
+    expect(() => buildHeadersFile(value)).toThrow(/line break/);
+  });
+});
+
 describe('check-demo-build CLI', () => {
   const script = path.resolve(__dirname, '../../../scripts/check-demo-build.mjs');
   const run = (mode: string, dir: string) => spawnSync(process.execPath, [script, mode, dir], { encoding: 'utf8' });
@@ -157,5 +193,24 @@ describe('check-demo-build CLI', () => {
     const root = fixture({ 'client/index.html': page, 'client/assets/app.js': `var m="${DEMO_MARKER}";` });
     expect(run('--demo', path.join(root, 'client')).status).toBe(0);
     expect(readFileSync(path.join(root, 'csp-header.txt'), 'utf8')).toContain("script-src 'self' 'sha256-");
+  });
+
+  it('--demo writes _headers inside the site folder, from the same policy it writes to csp-header.txt', () => {
+    const root = fixture({ 'client/index.html': page, 'client/assets/app.js': `var m="${DEMO_MARKER}";` });
+    expect(run('--demo', path.join(root, 'client')).status).toBe(0);
+    const policy = readFileSync(path.join(root, 'csp-header.txt'), 'utf8').trim();
+    expect(readFileSync(path.join(root, 'client', '_headers'), 'utf8')).toBe(buildHeadersFile(policy));
+  });
+
+  it('--demo still passes when run twice over the same folder (the _headers file is not scanned as site code)', () => {
+    const root = fixture({ 'client/index.html': page, 'client/assets/app.js': `var m="${DEMO_MARKER}";` });
+    expect(run('--demo', path.join(root, 'client')).status).toBe(0);
+    expect(run('--demo', path.join(root, 'client')).status).toBe(0);
+  });
+
+  it('--production does not write a _headers file', () => {
+    const dir = fixture({ 'index.html': page, 'assets/app.js': 'var a=1;' });
+    expect(run('--production', dir).status).toBe(0);
+    expect(() => readFileSync(path.join(dir, '_headers'), 'utf8')).toThrow();
   });
 });

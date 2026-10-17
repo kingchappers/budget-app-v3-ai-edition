@@ -1,0 +1,135 @@
+# Publishes the browser demo (invented data, the whole backend runs in the visitor's browser) to Cloudflare Pages.
+#
+# Kept apart from the main workflow on purpose: that one holds AWS credentials, this one holds only a Cloudflare token.
+# - The build job never sees a secret (CICD-09).
+# - The deploy job verifies what the build produced before it publishes (CICD-07).
+# - The token is given to exactly two things: a small shell check and the wrangler pinned in deploy/demo/package-lock.json,
+#   which is installed with `npm ci --ignore-scripts` in an earlier step that holds no secret. No third-party action receives it.
+# - The secrets live in the `demo` environment, which the repository settings restrict to main, and both jobs refuse to run
+#   from any other branch, so a pull request, a fork or a manual run from another branch cannot publish.
+# - Until the two secrets exist the build still runs and the publish step is skipped with a notice, so merging this file
+#   does not turn main red.
+#
+# One-time setup is in the README ("Deploying the demo").
+
+name: Deploy demo
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A deploy in flight finishes; the next one waits its turn.
+concurrency:
+  group: deploy-demo
+  cancel-in-progress: false
+
+jobs:
+  build_demo:
+    name: Build the demo
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+    - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
+
+    - name: Use Node.js 24.x
+      uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4.4.0
+      with:
+        node-version: 24.x
+        cache: 'yarn'
+
+    - run: yarn install --frozen-lockfile
+
+    # Builds the demo with dummy Auth0 values and runs its checks: demo code present, nothing server-only, no external
+    # references. It also writes build/demo/client/_headers with the Content-Security-Policy for Cloudflare to send.
+    - name: Build and check the demo
+      run: yarn build:demo
+
+    - name: Record a checksum of every file to publish
+      working-directory: build/demo/client
+      run: find . -type f -print0 | sort -z | xargs -0 sha256sum > ../site.sha256
+
+    - name: Keep the built site for the deploy job
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
+      with:
+        name: demo-site
+        # Only the site and its checksum list: the build folder also holds unused server output.
+        path: |
+          build/demo/client
+          build/demo/site.sha256
+        if-no-files-found: error
+        retention-days: 7
+
+  deploy_demo:
+    name: Publish to Cloudflare Pages
+    needs: build_demo
+    # Repeated here so the rule survives a later change to how this job is scheduled.
+    if: github.ref == 'refs/heads/main'
+    # Holds CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID; set its deployment branches to main only (see the README).
+    environment: demo
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+    # Only the wrangler manifest and lockfile, not the rest of the repository.
+    - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
+      with:
+        sparse-checkout: deploy/demo
+        persist-credentials: false
+
+    - name: Use Node.js 24.x
+      uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4.4.0
+      with:
+        node-version: 24.x
+
+    # The exact wrangler (and every package under it) recorded in the lockfile, with install scripts disabled. This step has
+    # no secret, so nothing it installs can read the token.
+    - name: Install the pinned wrangler
+      working-directory: deploy/demo
+      run: npm ci --ignore-scripts
+
+    - name: Fetch the built site
+      uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4.3.0
+      with:
+        name: demo-site
+        path: build/demo
+
+    # Publishing exactly what was built: every listed file must match, and nothing else may be in the folder.
+    - name: Verify the built site
+      working-directory: build/demo/client
+      run: |
+        sha256sum --check --strict ../site.sha256
+        listed="$(sed -E 's/^\\?[0-9a-f]{64} [ *]//' ../site.sha256 | sort)"
+        present="$(find . -type f | sort)"
+        if [ "$listed" != "$present" ]; then
+          echo "::error::The site folder does not match its checksum list"
+          exit 1
+        fi
+
+    # `secrets` cannot be used in a step condition, so look for them here and pass the answer on.
+    - name: Check the Cloudflare secrets exist
+      id: cloudflare
+      env:
+        CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      run: |
+        if [ -n "$CLOUDFLARE_API_TOKEN" ] && [ -n "$CLOUDFLARE_ACCOUNT_ID" ]; then
+          echo "configured=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "configured=false" >> "$GITHUB_OUTPUT"
+          echo "::notice::The demo was built and checked but not published: add the CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID secrets to the 'demo' environment (see the README, 'Deploying the demo')."
+        fi
+
+    - name: Publish to Cloudflare Pages
+      if: steps.cloudflare.outputs.configured == 'true'
+      env:
+        CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        WRANGLER_SEND_METRICS: 'false'
+        COMMIT_SHA: ${{ github.sha }}
+      run: >-
+        ./deploy/demo/node_modules/.bin/wrangler pages deploy build/demo/client
+        --project-name=budget-demo --branch=main --commit-hash="$COMMIT_SHA" --commit-dirty=true

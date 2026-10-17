@@ -1,0 +1,9 @@
+{
+  "name": "budget-demo-deploy",
+  "private": true,
+  "description": "Pins the exact wrangler used to publish the browser demo to Cloudflare Pages. Installed by .github/workflows/demo.yml with `npm ci --ignore-scripts` in a step that holds no secrets.",
+  "license": "AGPL-3.0-or-later",
+  "dependencies": {
+    "wrangler": "4.151.1"
+  }
+}

@@ -91,6 +91,22 @@ export function buildCspHeader(hashes) {
   ].join('; ');
 }
 
+// The file Cloudflare Pages reads from the site folder to set response headers. The policy is the one the build just verified,
+// so the host cannot send a different one. Hashed assets never change, so they are cached for a year; everything else is revalidated.
+export function buildHeadersFile(csp) {
+  if (/[\r\n]/.test(csp)) throw new Error('The policy must not contain a line break');
+  return [
+    '/*',
+    `  Content-Security-Policy: ${csp}`,
+    '  X-Content-Type-Options: nosniff',
+    '  Referrer-Policy: no-referrer',
+    '',
+    '/assets/*',
+    '  Cache-Control: public, max-age=31536000, immutable',
+    '',
+  ].join('\n');
+}
+
 function checkProduction(dir) {
   const marker = readMarker(readFileSync(MARKER_FILE, 'utf8'));
   const files = findMarkerFiles(dir, marker);
@@ -120,8 +136,13 @@ function checkDemo(dir) {
 
   const hashes = inlineScriptHashes(readFileSync(path.join(dir, 'index.html'), 'utf8'));
   const headerFile = path.join(dir, '..', 'csp-header.txt');
-  writeFileSync(headerFile, `${buildCspHeader(hashes)}\n`);
+  const policy = buildCspHeader(hashes);
+  writeFileSync(headerFile, `${policy}\n`);
   console.log(`PASS  wrote ${path.relative(process.cwd(), headerFile)} with ${hashes.length} inline script hash(es)`);
+
+  const hostHeaders = path.join(dir, '_headers');
+  writeFileSync(hostHeaders, buildHeadersFile(policy));
+  console.log(`PASS  wrote ${path.relative(process.cwd(), hostHeaders)} for the static host`);
   return true;
 }
 
