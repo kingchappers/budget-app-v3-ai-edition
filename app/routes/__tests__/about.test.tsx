@@ -38,6 +38,15 @@ describe('About page', () => {
     expectSoundHeadings(container);
   });
 
+  it('links to the source code in a new tab', () => {
+    renderAbout();
+    const link = screen.getByRole('link', { name: /source code/i });
+    expect(link).toHaveAttribute('href', 'https://github.com/kingchappers/budget-app-v3-ai-edition');
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(link.getAttribute('rel')).toContain('noopener');
+    expect(link.getAttribute('rel')).toContain('noreferrer');
+  });
+
   it('has no labelling or heading violations', async () => {
     const { container } = renderAbout();
     await expectNoViolations(container);

@@ -173,6 +173,10 @@ Backend uses:
 - **jsonwebtoken** - JWT verification
 - **jwks-rsa** - Auth0 public key fetching
 
+## Self-hosting
+
+Run your own copy as a single container with SQLite and the built-in login: see [`docs/SELF-HOSTING.md`](docs/SELF-HOSTING.md).
+
 ## Decisions
 
 Notable architecture/product decisions — including things that were tried and reverted — are recorded in [`docs/DECISIONS.md`](docs/DECISIONS.md). Check there before re-attempting something that looks unbuilt but was actually tried before (e.g. automatic bank sync).

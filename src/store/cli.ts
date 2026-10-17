@@ -10,6 +10,7 @@ const USAGE = `Usage:
   export <userId> --out <file>             write one user's data as JSONL (owner-only file, never overwritten)
   import --in <file> --as-user <userId> [--replace]
                                            load a JSONL file under a user id; refuses a user that has data unless --replace
+  backup --out <file>                      write a consistent, verified, owner-only copy of the SQLite database (never overwrites; STORE=sqlite only)
   reset-password                           set a new password for the built-in login, end every session and clear any lock-out (prompts; the password is never taken from arguments)
 
 The backend comes from the environment: STORE=dynamodb with DYNAMODB_TABLE (and your AWS credentials),
@@ -66,6 +67,17 @@ export async function runCli(argv: string[], env: NodeJS.ProcessEnv = process.en
     await deleteAllSessions(store);
     await clearThrottle(store);
     return 'Password reset. All sessions have ended and any login lock-out is cleared.';
+  }
+
+  if (command === 'backup') {
+    if (!values.out) throw new Error(USAGE);
+    const store = await initStore(env);
+    // Loaded here so the AWS export path never touches node:sqlite.
+    const { SqliteStore } = await import('./sqlite');
+    if (!(store instanceof SqliteStore)) throw new Error('backup works with STORE=sqlite only');
+    const { backupToFile } = await import('./backup');
+    backupToFile(store, values.out);
+    return `Backed up the database to ${values.out}`;
   }
 
   throw new Error(USAGE);

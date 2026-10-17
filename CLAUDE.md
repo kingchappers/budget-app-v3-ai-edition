@@ -15,6 +15,7 @@ yarn build            # Three-stage build: react-router build → inject static 
 yarn typecheck        # Generate route types + run tsc
 yarn test             # Run Vitest suite (API handlers)
 yarn test:watch       # Vitest in watch mode
+yarn build:container   # Compile the self-hosting server (container/) to build/container/
 yarn screenshots      # Regenerate the About page images in public/about/ (first run: yarn playwright install chromium)
 ```
 
@@ -85,5 +86,9 @@ Reference control IDs in commits (e.g., "addresses AUTH-02", "fixes IO-03").
 | `src/static/handler.ts` | Static file server Lambda source (tested) |
 | `scripts/build-static-handler.cjs` | Compiles the static handler to `build/client/index.js` |
 | `scripts/build-api-handler.cjs` | Compiles API handler + bundles deps |
+| `container/` | Self-hosting server: Node HTTP adapter over the same handlers, Caddy supervision, backups (Docker image; see `docs/SELF-HOSTING.md`) |
+| `Dockerfile` | Multi-stage image build for the self-hosting server; check it with `node scripts/container-smoke.mjs <image> [--tls]` |
+| `.github/workflows/container.yml` | CI for the container image: amd64 build, smoke tests and Trivy scan on every PR and push; multi-arch publish to GHCR from `main` (`edge`) and `vX.Y.Z` tags |
+| `scripts/build-container.cjs` | Compiles `container/` (with the API and static handlers it imports) to `build/container/` |
 | `infra/lambda.tf` | Static Lambda + API Gateway + IAM |
 | `infra/api-lambda.tf` | API Lambda + routes |

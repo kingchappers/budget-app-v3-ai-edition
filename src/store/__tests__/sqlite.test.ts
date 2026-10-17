@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
@@ -12,6 +12,20 @@ describe('SqliteStore on disk', () => {
 
   beforeEach(() => { dir = mkdtempSync(join(tmpdir(), 'sqlite-store-')); });
   afterEach(() => { rmSync(dir, { recursive: true, force: true }); });
+
+  it('refuses a newer database without modifying it', () => {
+    const path = join(dir, 'newer.sqlite');
+    const raw = new DatabaseSync(path);
+    raw.exec('PRAGMA user_version = 99');
+    raw.close();
+
+    expect(() => new SqliteStore(path)).toThrow(/newer version/);
+
+    const check = new DatabaseSync(path);
+    expect(check.prepare('PRAGMA journal_mode').get()).toEqual({ journal_mode: 'delete' });
+    check.close();
+    expect(existsSync(`${path}-wal`)).toBe(false);
+  });
 
   it('keeps data across reopening and records the schema version', async () => {
     const path = join(dir, 'budget.sqlite');

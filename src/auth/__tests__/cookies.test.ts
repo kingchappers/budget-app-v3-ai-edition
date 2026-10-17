@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
-import { clearedCookie, originAllowed, readSessionCookie, sessionCookie } from '../cookies';
+import { clearedCookie, cookieName, originAllowed, readSessionCookie, sessionCookie } from '../cookies';
 import { SESSION_LIFETIME_SECONDS } from '../localData';
 
 function event(over: { method?: string; headers?: Record<string, string>; cookies?: string[] } = {}): APIGatewayProxyEventV2 {
@@ -13,25 +13,25 @@ function event(over: { method?: string; headers?: Record<string, string>; cookie
 
 describe('readSessionCookie', () => {
   it('reads the API Gateway cookies array', () => {
-    expect(readSessionCookie(event({ cookies: ['theme=dark', 'budget_session=abc'] }))).toBe('abc');
+    expect(readSessionCookie(event({ cookies: ['theme=dark', 'budget_session=abc'] }), false)).toBe('abc');
   });
 
   it('reads a Cookie header when there is no cookies array', () => {
-    expect(readSessionCookie(event({ headers: { cookie: 'a=1; budget_session=xyz; b=2' } }))).toBe('xyz');
+    expect(readSessionCookie(event({ headers: { cookie: 'a=1; budget_session=xyz; b=2' } }), false)).toBe('xyz');
   });
 
   it('keeps an = inside the value', () => {
-    expect(readSessionCookie(event({ cookies: ['budget_session=ab=cd'] }))).toBe('ab=cd');
+    expect(readSessionCookie(event({ cookies: ['budget_session=ab=cd'] }), false)).toBe('ab=cd');
   });
 
   it('uses the first of duplicate cookies, so a later one cannot override it', () => {
-    expect(readSessionCookie(event({ cookies: ['budget_session=first', 'budget_session=second'] }))).toBe('first');
+    expect(readSessionCookie(event({ cookies: ['budget_session=first', 'budget_session=second'] }), false)).toBe('first');
   });
 
   it('is undefined with no cookie, an empty value, or a lookalike name', () => {
-    expect(readSessionCookie(event())).toBeUndefined();
-    expect(readSessionCookie(event({ cookies: ['budget_session='] }))).toBeUndefined();
-    expect(readSessionCookie(event({ cookies: ['xbudget_session=abc'] }))).toBeUndefined();
+    expect(readSessionCookie(event(), false)).toBeUndefined();
+    expect(readSessionCookie(event({ cookies: ['budget_session='] }), false)).toBeUndefined();
+    expect(readSessionCookie(event({ cookies: ['xbudget_session=abc'] }), false)).toBeUndefined();
   });
 });
 
@@ -88,5 +88,50 @@ describe('originAllowed', () => {
   it('prefers x-forwarded-host behind a proxy', () => {
     const headers = { host: 'internal:3000', 'x-forwarded-host': 'budget.example.com', origin: 'https://budget.example.com' };
     expect(originAllowed(event({ method: 'DELETE', headers }))).toBe(true);
+  });
+});
+
+describe('the __Host- cookie name', () => {
+  it('uses the plain name without Secure and the __Host- name with it', () => {
+    expect(cookieName(false)).toBe('budget_session');
+    expect(cookieName(true)).toBe('__Host-budget_session');
+  });
+
+  it('reads only the name for the current mode, so a tossed plain cookie is ignored while Secure', () => {
+    const cookies = ['budget_session=tossed', '__Host-budget_session=real'];
+    expect(readSessionCookie(event({ cookies }), true)).toBe('real');
+    expect(readSessionCookie(event({ cookies: ['budget_session=tossed'] }), true)).toBeUndefined();
+    expect(readSessionCookie(event({ cookies: ['__Host-budget_session=real'] }), false)).toBeUndefined();
+  });
+
+  it('sets a __Host- cookie with Secure, Path=/ and no Domain', () => {
+    const cookie = sessionCookie('tok', true);
+    expect(cookie.startsWith('__Host-budget_session=tok;')).toBe(true);
+    expect(cookie).toContain('Secure');
+    expect(cookie).toContain('Path=/');
+    expect(cookie).not.toContain('Domain');
+    expect(clearedCookie(true).startsWith('__Host-budget_session=;')).toBe(true);
+  });
+});
+
+describe('originAllowed with APP_ORIGIN', () => {
+  const post = (headers: Record<string, string>) => event({ method: 'POST', headers });
+
+  it('compares scheme, host and port against APP_ORIGIN and ignores the Host header', () => {
+    const appOrigin = 'https://budget.example.com';
+    expect(originAllowed(post({ origin: 'https://budget.example.com', host: 'internal:8080' }), appOrigin)).toBe(true);
+    expect(originAllowed(post({ origin: 'https://evil.example.com', host: 'evil.example.com' }), appOrigin)).toBe(false);
+    expect(originAllowed(post({ origin: 'http://budget.example.com', host: 'budget.example.com' }), appOrigin)).toBe(false);
+    expect(originAllowed(post({ origin: 'https://budget.example.com:8443', host: 'budget.example.com' }), appOrigin)).toBe(false);
+  });
+
+  it('refuses a missing, null or unparseable Origin, and an unparseable APP_ORIGIN', () => {
+    expect(originAllowed(post({ host: 'budget.example.com' }), 'https://budget.example.com')).toBe(false);
+    expect(originAllowed(post({ origin: 'null' }), 'https://budget.example.com')).toBe(false);
+    expect(originAllowed(post({ origin: 'https://budget.example.com' }), 'not a url')).toBe(false);
+  });
+
+  it('still lets safe methods through', () => {
+    expect(originAllowed(event({ method: 'GET' }), 'https://budget.example.com')).toBe(true);
   });
 });

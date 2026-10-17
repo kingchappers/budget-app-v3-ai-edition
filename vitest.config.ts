@@ -13,7 +13,7 @@ export default defineConfig({
         test: {
           name: 'api',
           environment: 'node',
-          include: ['src/**/__tests__/**/*.test.ts'],
+          include: ['src/**/__tests__/**/*.test.ts', 'container/**/__tests__/**/*.test.ts'],
         },
       },
       {

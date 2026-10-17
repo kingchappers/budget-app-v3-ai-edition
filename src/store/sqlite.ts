@@ -42,8 +42,16 @@ export class SqliteStore implements Store {
 
   constructor(path: string) {
     this.db = new DatabaseSync(path);
-    this.db.exec('PRAGMA busy_timeout = 5000; PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL;');
-    this.migrate();
+    try {
+      this.db.exec('PRAGMA busy_timeout = 5000');
+      // Before any PRAGMA that writes, so a newer database is refused untouched.
+      this.assertNotNewer();
+      this.db.exec('PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL;');
+      this.migrate();
+    } catch (error) {
+      this.db.close();
+      throw error;
+    }
   }
 
   close(): void {
@@ -55,6 +63,11 @@ export class SqliteStore implements Store {
       .prepare('DELETE FROM items WHERE expires_at IS NOT NULL AND expires_at <= ?')
       .run(nowSeconds);
     return Number(result.changes);
+  }
+
+  // VACUUM INTO writes a consistent snapshot even while the app is writing (WAL) and refuses to overwrite an existing file.
+  backupTo(path: string): void {
+    this.db.prepare('VACUUM INTO ?').run(path);
   }
 
   async get(key: Key): Promise<Item | undefined> {
@@ -123,13 +136,18 @@ export class SqliteStore implements Store {
     });
   }
 
-  private migrate(): void {
+  private assertNotNewer(): number {
     const row = this.db.prepare('PRAGMA user_version').get() as { user_version: number };
     if (row.user_version > MIGRATIONS.length) {
       throw new Error(
         `This database was created by a newer version of the app (schema ${row.user_version}, this build knows ${MIGRATIONS.length})`,
       );
     }
+    return row.user_version;
+  }
+
+  private migrate(): void {
+    const row = { user_version: this.assertNotNewer() };
     for (let version = row.user_version; version < MIGRATIONS.length; version += 1) {
       this.inTransaction(() => {
         this.db.exec(MIGRATIONS[version]);
