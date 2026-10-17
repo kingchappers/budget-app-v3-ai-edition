@@ -10,8 +10,6 @@ The image is `ghcr.io/kingchappers/budget-app-v3-ai-edition`, tagged `latest`, `
 
 ## Quick start
 
-> Until the first release is tagged, use the `edge` tag (built from `main`) instead of `latest`: change the `image:` line in the compose file to `ghcr.io/kingchappers/budget-app-v3-ai-edition:edge`.
-
 1. Copy [`compose.example.yml`](../compose.example.yml) to `compose.yml` and set `TLS_DOMAIN` (and `TLS_EMAIL`). The domain's DNS must point at this machine, and ports 80 and 443 must be reachable from the internet. Without a domain, see [HTTPS](#https).
 2. `docker compose up -d`
 3. Find the one-time setup code in the log: `docker compose logs budget`.
@@ -157,7 +155,7 @@ Export and import only touch your own data, never the login records, so the step
 
 `git tag v1.2.3 && git push origin v1.2.3` publishes `1.2.3`, `1.2` and `latest`. A push to `main` publishes `edge`. Tags must look like `v1.2.3` (or `v1.2.3-rc1`, which publishes only that tag); other `v*` tags such as `v1` or `v1.2` do not trigger a publish.
 
-`latest` does not exist until the first stable tag is pushed, so tag a release (for example `v0.1.0`) soon after merging. After the first publish, open the repository's Packages settings and check the package's visibility: a new GHCR package may default to private. Set it public so users can pull it without logging in.
+The first release is `v0.1.0`. After a new package's first publish, check its visibility in the repository's Packages settings: a new GHCR package may default to private, and it must be public for users to pull it without logging in.
 
 ### When the vulnerability scan fails
 
