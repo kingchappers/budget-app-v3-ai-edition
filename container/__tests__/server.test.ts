@@ -1,5 +1,5 @@
 import { EventEmitter } from 'node:events';
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { createConnection, createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -472,8 +472,32 @@ describe('first-run code and password recovery', () => {
     const warn = vi.mocked(console.warn);
     const base = await start();
     expect(existsSync(markerPath())).toBe(true);
-    expect(warn.mock.calls.map(call => String(call[0])).join('\n')).toMatch(/not a regular file/);
+    expect(warn.mock.calls.map((entry: unknown[]) => String(entry[0])).join('\n')).toMatch(/not a regular file/);
     expect(await status(base)).toMatchObject({ recoveryOpen: false });
+  });
+
+  it('ignores a symlink named RESET_PASSWORD and starts normally', async () => {
+    mkdirSync(join(dir, 'data'), { recursive: true });
+    const target = join(dir, 'elsewhere');
+    writeFileSync(target, 'keep');
+    symlinkSync(target, markerPath());
+    const warn = vi.mocked(console.warn);
+    const base = await start();
+    expect(lstatSync(markerPath()).isSymbolicLink()).toBe(true);
+    expect(existsSync(target)).toBe(true);
+    expect(warn.mock.calls.map((entry: unknown[]) => String(entry[0])).join('\n')).toMatch(/not a regular file/);
+    expect(await status(base)).toMatchObject({ recoveryOpen: false });
+  });
+
+  it('removes a stale code file left by a crash when recovery is not requested', async () => {
+    const base = await start();
+    await call(base, '/api/auth/setup', { body: { code: setupCodeFromLogs(), email: 'me@example.com', password: PASSWORD } });
+    await running?.close();
+    running = undefined;
+    writeFileSync(codePath(), 'stale\n');
+    const next = await start();
+    expect(existsSync(codePath())).toBe(false);
+    expect(await status(next)).toEqual({ setupRequired: false, recoveryOpen: false });
   });
 
   it('recovers a forgotten password through the marker file, keeping the account and its data', async () => {
