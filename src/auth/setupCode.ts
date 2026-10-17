@@ -4,7 +4,8 @@ function digest(value: string): Buffer {
   return createHash('sha256').update(value).digest();
 }
 
-// Lives in memory only. It is logged once, when the provider is first built (the first API request), and discarded when the account is created.
+// Lives in memory only. It doubles as the AUTH-11 recovery code. It is announced once when the provider is built
+// (at container boot, or on the first API request elsewhere) and discarded when the account is created or recovery completes.
 export class SetupCode {
   private code: string | undefined;
 

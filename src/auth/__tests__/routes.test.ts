@@ -348,6 +348,7 @@ describe('password recovery', () => {
     await openRecovery();
     const res = await handleAuthRoute(post('/api/auth/setup', recoveryBody({ code: 'not the code' })), ctx);
     expect(res?.statusCode).toBe(403);
+    expect(JSON.parse(res!.body)).toEqual({ error: 'Invalid recovery code' });
     expect(ctx.recovery).toBe(true);
     expect((await login(PASSWORD))?.statusCode).toBe(200);
   });

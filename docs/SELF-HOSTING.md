@@ -13,7 +13,7 @@ The image is `ghcr.io/kingchappers/budget-app-v3-ai-edition`, tagged `latest`, `
 1. Copy [`compose.example.yml`](../compose.example.yml) to `compose.yml` and set `TLS_DOMAIN` (and `TLS_EMAIL`). The domain's DNS must point at this machine, and ports 80 and 443 must be reachable from the internet. Without a domain, see [HTTPS](#https).
 2. `docker compose up -d`
 3. Find the one-time setup code: in the log (`docker compose logs budget`, look for the line starting `Setup code:`), or in the file `SETUP_CODE.txt` in your data folder.
-4. Open the app in your browser and create your account with the setup code. The setup page closes for good once an account exists.
+4. Open the app in your browser and create your account with the setup code. The setup page closes once an account exists, except for marker-file recovery (see [Forgot your password](#forgot-your-password)).
 
 ## Configuration
 
@@ -136,6 +136,8 @@ docker compose exec -u 0 budget chown -R 10001:10001 /data/backups
 
 **Without a shell (works on any host).** In your data folder create an empty file named `RESET_PASSWORD` (the host's file manager, or `touch /data/RESET_PASSWORD`), then restart the app. On start-up the app deletes the file, signs everyone out, clears any login lock-out, and prints a `Recovery code: ...` line in the log (also saved as `SETUP_CODE.txt`). Open the app, enter the recovery code and choose a new password; this replaces only the password and signs you in. Your account, email and data are unchanged. There is no email-based reset. If you restart again before finishing, create the file again; the same applies if start-up fails after the file was deleted.
 
+If you create the file before any account exists, the app simply removes it and the first-run setup code appears instead.
+
 If the app cannot delete `RESET_PASSWORD` (for example the folder is read-only) it says so in the log and does **not** open recovery. A directory or symlink with that name is ignored.
 
 **With a shell.** The same effect from the command line:
@@ -151,7 +153,7 @@ It prompts for the new password (never taken from arguments), ends every session
 Export and import only touch your own data, never the login records, so the steps are:
 
 1. On a machine with a checkout of the repository, dependencies installed (`yarn install`) and AWS credentials, run `STORE=dynamodb DYNAMODB_TABLE=<table> yarn store-cli export 'auth0|abc' --out budget-export.jsonl` (your Auth0 `sub`). The file is owner-only and holds financial data: keep it private and never commit it.
-2. Start the self-hosted instance and finish the first-run setup (create the account with the setup code from the server log). The import needs this, because you need the local user id.
+2. Start the self-hosted instance and finish the first-run setup (create the account with the setup code: the `Setup code:` line in the log, or `SETUP_CODE.txt` in the data folder). The import needs this, because you need the local user id.
 3. While signed in, read your local user id from `GET /api/auth/me` (the `userId` field, `local|<uuid>`), for example `fetch('/api/auth/me').then(r => r.json())` in the browser console on the app's own page.
 4. Stream the export into the container as the app user (the host file's permissions never change and the copy is owner-only), import it, then remove it. It goes in `/tmp`, not `/data`, so it is never left on the data volume or inside a backup. Add `--replace` to the import only if the account already has data:
 
@@ -166,7 +168,7 @@ Export and import only touch your own data, never the login records, so the step
 ## Security notes
 
 - The login throttle is global: anyone who can reach the login can lock you out for up to 15 minutes. `reset-password` clears it.
-- The recovery code and the first-run setup code are the only credentials ever written to the log or to disk; the file (`SETUP_CODE.txt`) is owner-only and removed when the code is used, at shutdown and at the next start.
+- The recovery code and the first-run setup code are the only plaintext credentials ever written to the log or to disk; the file (`SETUP_CODE.txt`) is owner-only and removed when the code is used, at shutdown and at the next start.
 - Backups on the same volume are not off-site; see above.
 - Run it behind HTTPS (or on a network you trust). See [HTTPS](#https) for what plain HTTP gives up.
 

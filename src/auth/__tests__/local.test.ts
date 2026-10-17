@@ -125,6 +125,7 @@ describe('createLocalProvider code hooks', () => {
     const account = await createAccount(store, 'me@example.com', 'a long enough password');
     const token = await createSession(store, account.userId, now());
     for (let i = 0; i < 5; i += 1) await recordFailure(store, now()); // the first 3 failures are free
+    expect(await throttleRemaining(store, now())).toBeGreaterThan(0);
     const hooks = makeHooks();
     const provider = await createLocalProvider({}, { hooks, recovery: true });
     expect(hooks.announce).toHaveBeenCalledWith(expect.any(String), 'recovery');
@@ -143,6 +144,7 @@ describe('createLocalProvider code hooks', () => {
   it('logs a recovery line when there are no hooks', async () => {
     await createAccount(store, 'me@example.com', 'a long enough password');
     await createLocalProvider({}, { recovery: true });
+    expect(console.log).toHaveBeenCalledTimes(1);
     expect(String(vi.mocked(console.log).mock.calls[0][0])).toMatch(/recovery code/i);
   });
 

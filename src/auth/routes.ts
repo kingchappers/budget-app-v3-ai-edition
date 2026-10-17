@@ -60,7 +60,7 @@ function recover(body: JsonBody, ctx: AuthRouteContext, account: { userId: strin
 
 async function attemptRecovery(body: JsonBody, ctx: AuthRouteContext, account: { userId: string; email: string }): Promise<ApiResponse> {
   const code = ctx.setupCode;
-  if (typeof body.code !== 'string' || !code?.matches(body.code)) return err(403, 'Invalid setup code');
+  if (typeof body.code !== 'string' || !code?.matches(body.code)) return err(403, 'Invalid recovery code');
   const passwordProblem = validatePassword(body.password);
   if (passwordProblem) return err(400, passwordProblem);
 
