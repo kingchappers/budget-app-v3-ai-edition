@@ -110,7 +110,7 @@ function ResponsiveNotifications() {
 export const meta: Route.MetaFunction = () => [{ title: pageTitle() }];
 
 export const links: Route.LinksFunction = () => [
-  { rel: "manifest", href: "/manifest.webmanifest" },
+  ...(isDemo ? [] : [{ rel: "manifest", href: "/manifest.webmanifest" }]),
   { rel: "apple-touch-icon", href: "/icons/apple-touch-icon.png" },
 ];
 

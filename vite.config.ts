@@ -4,14 +4,14 @@ import tailwindcss from "@tailwindcss/vite";
 import { defineConfig, type Plugin } from "vite";
 import tsconfigPaths from "vite-tsconfig-paths";
 
-// src/store/index.ts lazily imports the DynamoDB and SQLite stores for the Lambda and the container. The browser never needs
-// them, so they are replaced by a stub and never reach the bundle. It applies to every browser build, not only the demo one:
-// the guarded demo import in app/entry.client.tsx is still resolved (then dropped) in the normal build, and would otherwise
-// fail on node:sqlite.
+// Runs in every build, not only the demo one. src/store/index.ts lazily imports the DynamoDB and SQLite stores for the Lambda
+// and the container. Rollup resolves the guarded demo import in app/entry.client.tsx even in normal builds, so the server stores
+// must be stubbed for that resolution to succeed (otherwise node:sqlite fails the build). Nothing outside src/demo reaches
+// src/store/index.ts in browser code, so the stub never ends up in a normal bundle.
 function stubServerStores(): Plugin {
   const stub = path.resolve("src/demo/unavailableStore.ts");
   return {
-    name: "demo-stub-server-stores",
+    name: "stub-server-stores",
     enforce: "pre",
     resolveId(source, importer) {
       if (!importer) return null;
