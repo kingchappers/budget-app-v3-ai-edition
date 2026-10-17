@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  ensureLocalAuth, expireLocalSession, getLocalAuthState, loginLocal, logoutLocal, resetLocalAuthForTests, setupLocal,
+  ensureLocalAuth, expireLocalSession, getLocalAuthState, loginLocal, logoutLocal, recoverLocal, resetLocalAuthForTests, setupLocal,
 } from '../localAuth';
 
 const fetchMock = vi.fn();
@@ -31,7 +31,22 @@ describe('local auth store', () => {
   it('asks whether setup is needed when /me says 401', async () => {
     fetchMock.mockResolvedValueOnce(reply(401, {})).mockResolvedValueOnce(reply(200, { setupRequired: true }));
     await ensureLocalAuth();
-    expect(getLocalAuthState()).toEqual({ status: 'signedOut', setupRequired: true });
+    expect(getLocalAuthState()).toEqual({ status: 'signedOut', setupRequired: true, recoveryOpen: false });
+  });
+
+  it('reads recoveryOpen from the status', async () => {
+    fetchMock.mockResolvedValueOnce(reply(401, {})).mockResolvedValueOnce(reply(200, { setupRequired: false, recoveryOpen: true }));
+    await ensureLocalAuth();
+    expect(getLocalAuthState()).toEqual({ status: 'signedOut', setupRequired: false, recoveryOpen: true });
+  });
+
+  it('signs in after a recovery, posting only the code and the new password', async () => {
+    fetchMock.mockResolvedValueOnce(reply(200, { userId: 'local|1', email: 'me@example.com' }));
+    await recoverLocal({ code: 'abc', password: 'a long enough password' });
+    expect(fetchMock).toHaveBeenCalledWith('/api/auth/setup', expect.objectContaining({
+      method: 'POST', body: JSON.stringify({ code: 'abc', password: 'a long enough password' }),
+    }));
+    expect(getLocalAuthState()).toMatchObject({ status: 'signedIn' });
   });
 
   it('checks only once however many layouts mount', async () => {
@@ -43,7 +58,7 @@ describe('local auth store', () => {
   it('falls back to signed out, and logs, when the server is unreachable', async () => {
     fetchMock.mockRejectedValue(new TypeError('Failed to fetch'));
     await ensureLocalAuth();
-    expect(getLocalAuthState()).toEqual({ status: 'signedOut', setupRequired: false });
+    expect(getLocalAuthState()).toEqual({ status: 'signedOut', setupRequired: false, recoveryOpen: false });
     expect(console.error).toHaveBeenCalled();
   });
 
@@ -69,7 +84,7 @@ describe('local auth store', () => {
     fetchMock.mockResolvedValueOnce(reply(200, { userId: 'local|1', email: 'me@example.com' }));
     await ensureLocalAuth();
     expireLocalSession();
-    expect(getLocalAuthState()).toEqual({ status: 'signedOut', setupRequired: false });
+    expect(getLocalAuthState()).toEqual({ status: 'signedOut', setupRequired: false, recoveryOpen: false });
   });
 
   it('posts to /logout', async () => {

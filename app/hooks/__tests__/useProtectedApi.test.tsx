@@ -93,7 +93,7 @@ describe('useProtectedApi in local mode', () => {
       await expect(result.current.request('/api/categories')).rejects.toBeInstanceOf(ApiError);
       expect(fetchMock.mock.calls[0][1].headers).not.toHaveProperty('Authorization');
       expect(markSessionEnded).toHaveBeenCalled();
-      expect(getLocalAuthState()).toEqual({ status: 'signedOut', setupRequired: false });
+      expect(getLocalAuthState()).toEqual({ status: 'signedOut', setupRequired: false, recoveryOpen: false });
     } finally {
       vi.unstubAllGlobals();
       resetLocalAuthForTests();

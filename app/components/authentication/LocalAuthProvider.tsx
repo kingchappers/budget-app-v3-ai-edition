@@ -5,7 +5,7 @@ import { LocalAuthContext } from '~/lib/auth';
 import type { AuthState } from '~/lib/auth';
 import { clearSessionEnded } from '~/lib/session';
 import {
-  ensureLocalAuth, getLocalAuthState, loginLocal, logoutLocal, setupLocal, subscribeLocalAuth,
+  ensureLocalAuth, getLocalAuthState, loginLocal, logoutLocal, recoverLocal, setupLocal, subscribeLocalAuth,
 } from '~/lib/localAuth';
 import { LocalAuthForm } from './LocalAuthForm';
 
@@ -48,7 +48,13 @@ export function LocalAuthProvider({ children }: { children: React.ReactNode }) {
       {children}
       <Modal opened={formOpen && snapshot.status === 'signedOut'} onClose={() => setFormOpen(false)} title="Sign in" centered>
         {snapshot.status === 'signedOut' && (
-          <LocalAuthForm setupRequired={snapshot.setupRequired} onLogin={loginLocal} onSetup={setupLocal} />
+          <LocalAuthForm
+            setupRequired={snapshot.setupRequired}
+            recoveryOpen={snapshot.recoveryOpen}
+            onLogin={loginLocal}
+            onSetup={setupLocal}
+            onRecover={recoverLocal}
+          />
         )}
       </Modal>
     </LocalAuthContext.Provider>
