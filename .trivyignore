@@ -6,3 +6,10 @@
 CVE-2026-78667 exp:2026-11-14
 CVE-2026-78669 exp:2026-11-14
 CVE-2026-97031 exp:2026-11-14
+
+# Added 2026-10-22: crypto/x509 man-in-the-middle via untrusted intermediate certificates in the Go standard library inside the
+# upstream caddy:2 image (still Go 1.26.8 after its 2026-10-21 rebuild; fixed in Go 1.26.10 / 1.27.3). Same exposure as the entries above:
+# Caddy only runs when TLS_DOMAIN is set, and plain HTTP mode (including behind a hosting platform's proxy) never starts it.
+# Expires with them on 2026-11-14. If caddy:2 has not moved to Go >= 1.26.10 by then, build Caddy with xcaddy on a patched golang image
+# instead of renewing again.
+CVE-2026-111943 exp:2026-11-14
