@@ -84,7 +84,7 @@ Hosts such as PikaPods run the image for you and give you environment variables,
 docker compose pull && docker compose up -d
 ```
 
-The database schema migrates automatically at start. An older image refuses to open a database written by a newer one, with a clear message, so take a backup before upgrading and never downgrade across a schema change.
+Check [CHANGELOG.md](../CHANGELOG.md) for what changed and whether a release touches the database schema. The database schema migrates automatically at start. An older image refuses to open a database written by a newer one, with a clear message, so take a backup before upgrading and never downgrade across a schema change.
 
 Stopping: a clean shutdown stops taking new requests (they get a 503), lets open connections finish for up to 10 seconds, waits up to 2 more seconds for requests still running, then closes the database. That is about 12 seconds in the worst case, and Docker's default stop timeout is 10 seconds, after which `docker stop` kills the process before the database is closed cleanly. The write-ahead log recovers, so no data is lost, but a clean close is better. The compose examples therefore set `stop_grace_period: 20s`; keep it, and pass `--time 20` to a bare `docker stop`. With a plain `docker run`, add `--stop-timeout 20` so the default 10 seconds does not cut the shutdown short.
 
