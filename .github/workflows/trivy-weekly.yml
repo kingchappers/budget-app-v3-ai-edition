@@ -1,0 +1,37 @@
+# Weekly vulnerability scan of the published container image (DEP-05).
+#
+# The scan in container.yml only sees an image built from a pull request or push, so a new CVE in the base image or in
+# Caddy goes unnoticed until the next code change. This scans what is actually published, with the same gate and the same
+# .trivyignore, so there is one list of accepted risks. A finding turns the run red and GitHub emails the repository owner.
+#
+# `latest` is what hosting platforms run; `edge` is what the next release will carry. Both tags are public: no login, no secrets.
+
+name: Weekly image scan
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'   # Mondays, 06:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    name: Scan ${{ matrix.tag }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        tag: [ latest, edge ]
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
+      - name: Scan for high and critical vulnerabilities
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25  # v0.36.0
+        with:
+          image-ref: ghcr.io/kingchappers/budget-app-v3-ai-edition:${{ matrix.tag }}
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+          trivyignores: .trivyignore

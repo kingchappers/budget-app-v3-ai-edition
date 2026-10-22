@@ -129,6 +129,7 @@ Security requirements for this React + Auth0 + Lambda project. Reference control
 - Review transitive dependency changes in PRs that modify lockfiles
 - Pin CI/CD actions to commit SHAs (CICD-08)
 - Verify build artifact checksums before deployment (CICD-09)
+- The published container image (`latest` and `edge`) is scanned for high and critical vulnerabilities every week by `.github/workflows/trivy-weekly.yml`, with the same gate and `.trivyignore` as CI, so a new CVE in the base image or Caddy shows up without waiting for a code change (DEP-05)
 
 ---
 
