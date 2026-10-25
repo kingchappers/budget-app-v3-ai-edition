@@ -4,7 +4,7 @@ Thanks for considering a contribution. This is a small, owner-maintained project
 
 ## Agreement
 
-Before a pull request can be merged you need to agree to the [Contributor Licence Agreement](CLA.md). You keep your copyright; the agreement lets the Maintainer relicense the project, for example to offer an extra edition, without asking each contributor. Agreeing takes one comment on your first pull request (the wording is in the agreement). The public project stays AGPL-3.0-or-later either way.
+Before a pull request can be merged you need to agree to the [Individual Contributor License Agreement](CLA.md), which is with Samuel Chapman, trading as Hoardwise Studios. It is the standard Harmony agreement: you keep your copyright, and you grant a licence that lets the project be offered under other terms as well, for example in an extra edition, without asking each contributor. The public project stays AGPL-3.0-or-later either way. Agreeing takes one comment on your first pull request (the wording is in section 7 of the agreement). If you contribute as part of your job, make sure your employer is happy with that first.
 
 ## Setting up
 
