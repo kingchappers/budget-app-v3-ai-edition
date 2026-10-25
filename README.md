@@ -205,3 +205,7 @@ Run your own copy as a single container with SQLite and the built-in login: see 
 ## Decisions
 
 Notable architecture/product decisions — including things that were tried and reverted — are recorded in [`docs/DECISIONS.md`](docs/DECISIONS.md). Check there before re-attempting something that looks unbuilt but was actually tried before (e.g. automatic bank sync).
+
+## Contributing and licence
+
+The project is licensed under AGPL-3.0-or-later ([`LICENSE`](LICENSE)). Contributions are welcome: see [`CONTRIBUTING.md`](CONTRIBUTING.md), and note that a pull request needs agreement to the [Individual Contributor License Agreement](CLA.md) first.
