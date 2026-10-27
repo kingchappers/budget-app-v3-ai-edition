@@ -152,6 +152,31 @@ async function main() {
       assert(categories.json.categories.length > 0, 'no categories after reset');
     });
 
+    await check('settings saved under the old browser storage names are carried over', async () => {
+      const context = await browser.newContext();
+      try {
+        const legacyPage = await context.newPage();
+        await legacyPage.addInitScript(() => {
+          if (sessionStorage.getItem('smoke-seeded') === null) {
+            sessionStorage.setItem('smoke-seeded', '1');
+            localStorage.setItem('budget.preferences', JSON.stringify({ textSize: 'large' }));
+          }
+        });
+        await legacyPage.goto(`${origin}/`);
+        await legacyPage.getByRole('button', { name: 'Reset demo' }).waitFor({ timeout: 15000 });
+        const stored = await legacyPage.evaluate(() => ({
+          next: localStorage.getItem('hoardwise.preferences'),
+          old: localStorage.getItem('budget.preferences'),
+          size: document.documentElement.getAttribute('data-text-size'),
+        }));
+        assert(stored.old === null, 'the old key was not removed');
+        assert(stored.next !== null && JSON.parse(stored.next).textSize === 'large', `the new key holds ${stored.next}`);
+        assert(stored.size === 'large', `the text size attribute is ${stored.size}`);
+      } finally {
+        await context.close();
+      }
+    });
+
     await check('no request goes to another origin', async () => {
       assert(foreign.length === 0, `foreign requests: ${foreign.join(', ')}`);
     });
