@@ -3,3 +3,7 @@ state_bucket = "your-terraform-state-bucket"
 environment  = "production"
 app_name     = "budget-app-v3-ai-edition"
 custom_domain = "budget.scgrid.xyz"
+# The GitHub repository name (after a rename, apply this stack again or CI cannot assume the role)
+github_repo   = "hoardwise"
+github_owner_id = "10738951"
+github_repo_id  = "1157808700"

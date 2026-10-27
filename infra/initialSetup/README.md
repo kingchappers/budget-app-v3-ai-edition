@@ -70,13 +70,15 @@ The IAM role is configured to trust only the **main branch**. To allow pull requ
 
 ```hcl
 # Current (main branch only):
-values = ["repo:kingchappers/${var.app_name}:ref:refs/heads/main"]
+values = ["repo:kingchappers@${var.github_owner_id}/${var.github_repo}@${var.github_repo_id}:ref:refs/heads/main"]
 
 # To allow PRs:
 values = [
-  "repo:kingchappers/${var.app_name}:ref:refs/heads/main",
-  "repo:kingchappers/${var.app_name}:pull_request"
+  "repo:kingchappers@${var.github_owner_id}/${var.github_repo}@${var.github_repo_id}:ref:refs/heads/main",
+  "repo:kingchappers@${var.github_owner_id}/${var.github_repo}@${var.github_repo_id}:pull_request"
 ]
+
+# The subject embeds the account and repository IDs because GitHub issues that form for renamed repositories.
 ```
 
 ## Permissions Granted
