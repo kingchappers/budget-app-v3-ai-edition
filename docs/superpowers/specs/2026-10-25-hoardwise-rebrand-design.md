@@ -30,18 +30,19 @@ Rename the product to **Hoardwise** everywhere a person meets it, before hosting
 
 ### Browser storage keys
 
-In use today, in `localStorage`: `budget.preferences`, `budget.targetsCardDismissed`, `budget.launchHandled`, `budget.openAddOnLaunch`, `budget.pendingAdd`, and the per-user families `budget.billSnoozes.<id>` and `budget.billDismissedMatches.<id>`. In `sessionStorage`: `budget.transactionDraft`.
+In use today, in `localStorage`: `budget.preferences`, `budget.targetsCardDismissed`, `budget.openAddOnLaunch` (an older setting that `app/lib/preferences.ts` still reads), and the per-user families `budget.billSnoozes.<id>` and `budget.billDismissedMatches.<id>`. In `sessionStorage`: `budget.pendingAdd`, `budget.launchHandled` and `budget.transactionDraft`.
 
 - New prefix: `hoardwise.`.
 - A migration runs once at app start, before anything reads storage. For each `budget.*` key in `localStorage`, copy the value to the matching `hoardwise.*` key if that key is absent, then remove the old key. The per-user families are matched by prefix. The migration tolerates unavailable or throwing storage, as `app/lib/preferences.ts` already does.
 - The inline script `TEXT_SIZE_SCRIPT` in `app/lib/textSize.ts` reads the preferences key before the page paints, so it reads `hoardwise.preferences` and falls back to `budget.preferences`. Otherwise the text size would flash wrong on the first load after the update.
-- The transaction draft lives in `sessionStorage` for one tab session, so it is renamed with no migration.
+- The three `sessionStorage` keys last one tab session, so they are renamed with no migration.
 
 ### SQLite file and backups
 
-- File choice at start-up: if `<DATA_DIR>/hoardwise.sqlite` exists, use it. Otherwise, if `<DATA_DIR>/budget.sqlite` exists, use that. Otherwise create `hoardwise.sqlite`. An explicit `SQLITE_PATH` still wins. The decision lives in `container/config.ts`.
+- File choice at start-up: if `<DATA_DIR>/hoardwise.sqlite` exists, use it. Otherwise, if `<DATA_DIR>/budget.sqlite` exists, use that. Otherwise create `hoardwise.sqlite`. The decision lives in `container/config.ts`.
 - Existing files are never renamed. A rename must also move the `-wal` and `-shm` files, and a crash between the moves can lose recent writes.
 - If both files exist (a deliberate restore), use `hoardwise.sqlite` and log a warning that names both.
+- The container sets `SQLITE_PATH` itself from this choice and does not read it from the environment. The store command-line tool still takes an explicit `SQLITE_PATH`, unchanged. `parseConfig` stays free of side effects: it takes an injectable file-exists check, defaulting to `existsSync`, and never creates, renames or deletes a file.
 - New backups are named `hoardwise-YYYYMMDD-HHMMSS.sqlite`. `BACKUP_PATTERN` in `src/store/backup.ts` becomes `/^(?:budget|hoardwise)-\d{8}-\d{6}\.sqlite$/`, so old backups are still listed, pruned and found by the "newest backup" check, and pruning still never touches a file that does not match.
 - The documentation's command lines that name the database file say "`hoardwise.sqlite` (`budget.sqlite` on installs created before 0.3.0)".
 
@@ -53,7 +54,7 @@ In use today, in `localStorage`: `budget.preferences`, `budget.targetsCardDismis
 
 - Storage migration: old key only, new key only, both present (new wins, old removed), neither, per-user keys, and storage that throws.
 - Text-size script: reads the new key, falls back to the old.
-- SQLite choice: the four combinations of the two files existing, plus `SQLITE_PATH` precedence and the both-exist warning.
+- SQLite choice: the four combinations of the two files existing, with the both-exist warning.
 - `BACKUP_PATTERN`: both prefixes accepted, an unrelated file rejected, and pruning leaves unrelated files alone.
 - A server test that starts on a data folder containing only `budget.sqlite` and still reads the existing data.
 - Cookie tests updated for the new names.
