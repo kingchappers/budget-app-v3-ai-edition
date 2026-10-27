@@ -269,13 +269,13 @@ describe('Recurring page', () => {
       expect(screen.queryByRole('button', { name: 'Add bills to your calendar' })).not.toBeInTheDocument();
     });
 
-    it('downloads budget-bills.ics containing each bill, made in the browser', async () => {
+    it('downloads hoardwise-bills.ics containing each bill, made in the browser', async () => {
       mockQuery.data = [rent(), rec({ recurringId: 'salary' })];
       renderPage();
 
       await userEvent.setup().click(screen.getByRole('button', { name: 'Add bills to your calendar' }));
 
-      expect(downloads).toEqual(['budget-bills.ics']);
+      expect(downloads).toEqual(['hoardwise-bills.ics']);
       expect(blobs).toHaveLength(1);
       expect(blobs[0].type).toBe('text/calendar;charset=utf-8');
       const text = await readBlob(blobs[0]);

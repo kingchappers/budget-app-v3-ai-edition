@@ -204,4 +204,4 @@ export function buildBillsCalendar({ bills, categories, today = todayIso(), now 
   return lines.map(foldLine).join(LINE_END) + LINE_END;
 }
 
-export const CALENDAR_FILENAME = 'budget-bills.ics';
+export const CALENDAR_FILENAME = 'hoardwise-bills.ics';
