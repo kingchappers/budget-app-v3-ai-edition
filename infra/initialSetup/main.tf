@@ -116,8 +116,8 @@ data "aws_iam_policy_document" "assume_role" {
       test     = "StringLike"
       variable = "token.actions.githubusercontent.com:sub"
       values   = [
-        "repo:kingchappers/${var.app_name}:ref:refs/heads/main",
-        "repo:kingchappers/${var.app_name}:pull_request"
+        "repo:kingchappers/${var.github_repo}:ref:refs/heads/main",
+        "repo:kingchappers/${var.github_repo}:pull_request"
       ]
     }
 

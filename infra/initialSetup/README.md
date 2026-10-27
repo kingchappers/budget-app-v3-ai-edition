@@ -70,12 +70,12 @@ The IAM role is configured to trust only the **main branch**. To allow pull requ
 
 ```hcl
 # Current (main branch only):
-values = ["repo:kingchappers/${var.app_name}:ref:refs/heads/main"]
+values = ["repo:kingchappers/${var.github_repo}:ref:refs/heads/main"]
 
 # To allow PRs:
 values = [
-  "repo:kingchappers/${var.app_name}:ref:refs/heads/main",
-  "repo:kingchappers/${var.app_name}:pull_request"
+  "repo:kingchappers/${var.github_repo}:ref:refs/heads/main",
+  "repo:kingchappers/${var.github_repo}:pull_request"
 ]
 ```
 
