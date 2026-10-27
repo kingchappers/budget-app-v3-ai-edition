@@ -53,6 +53,7 @@ terraform.rc
 
 # Exports and local databases hold personal financial data (SEC-01)
 budget-export*.jsonl
+hoardwise-export*.jsonl
 *.sqlite
 *.sqlite-shm
 *.sqlite-wal

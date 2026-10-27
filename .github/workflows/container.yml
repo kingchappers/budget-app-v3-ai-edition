@@ -16,7 +16,7 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
-  IMAGE: ghcr.io/kingchappers/budget-app-v3-ai-edition
+  IMAGE: ghcr.io/kingchappers/hoardwise
 
 jobs:
   smoke:
@@ -32,7 +32,7 @@ jobs:
           context: .
           platforms: linux/amd64
           load: true
-          tags: budget-app:ci
+          tags: hoardwise:ci
           build-args: DEBIAN_UPDATES_STAMP=${{ github.run_id }}
           cache-from: type=gha,scope=container-smoke
           cache-to: type=gha,scope=container-smoke,mode=max
@@ -40,15 +40,15 @@ jobs:
         with:
           node-version: 24.x
       - name: Smoke test (plain HTTP)
-        run: node scripts/container-smoke.mjs budget-app:ci
+        run: node scripts/container-smoke.mjs hoardwise:ci
       - name: Smoke test (built-in HTTPS on localhost)
-        run: node scripts/container-smoke.mjs budget-app:ci --tls
+        run: node scripts/container-smoke.mjs hoardwise:ci --tls
       - name: Smoke test (plain HTTP behind a TLS-terminating proxy)
-        run: node scripts/container-smoke.mjs budget-app:ci --proxy
+        run: node scripts/container-smoke.mjs hoardwise:ci --proxy
       - name: Scan for high and critical vulnerabilities
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25  # v0.36.0
         with:
-          image-ref: budget-app:ci
+          image-ref: hoardwise:ci
           severity: HIGH,CRITICAL
           ignore-unfixed: true
           exit-code: '1'
@@ -88,9 +88,9 @@ jobs:
             latest=false
           # Keep these in step with the Dockerfile labels.
           labels: |
-            org.opencontainers.image.title=Budget app
+            org.opencontainers.image.title=Hoardwise
             org.opencontainers.image.licenses=AGPL-3.0-or-later
-            org.opencontainers.image.source=https://github.com/kingchappers/budget-app-v3-ai-edition
+            org.opencontainers.image.source=https://github.com/kingchappers/hoardwise
       - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc  # v7.4.0
         with:
           context: .

@@ -101,7 +101,7 @@ export function parseConfig(env: NodeJS.ProcessEnv, exists: (path: string) => bo
   let tlsDomain: string | undefined;
   if (rawDomain) {
     if (isValidHostname(rawDomain)) tlsDomain = rawDomain;
-    else problems.push('TLS_DOMAIN must be a plain hostname such as budget.example.com (no scheme, port, path or wildcard)');
+    else problems.push('TLS_DOMAIN must be a plain hostname such as hoardwise.example.com (no scheme, port, path or wildcard)');
     if (port === 0) problems.push('PORT must be a fixed port (not 0) when TLS_DOMAIN is set');
     if (port === 80 || port === 443) problems.push('PORT must not be 80 or 443 when TLS_DOMAIN is set (Caddy uses those ports)');
   }
@@ -126,7 +126,7 @@ export function parseConfig(env: NodeJS.ProcessEnv, exists: (path: string) => bo
       if (tlsDomain && url.hostname !== tlsDomain) problems.push('APP_ORIGIN must use the same host as TLS_DOMAIN');
       if (tlsDomain && url.protocol !== 'https:') problems.push('APP_ORIGIN must be https when TLS_DOMAIN is set');
     } catch {
-      problems.push('APP_ORIGIN must be a plain URL such as https://budget.example.com (no path, query or credentials)');
+      problems.push('APP_ORIGIN must be a plain URL such as https://hoardwise.example.com (no path, query or credentials)');
     }
   } else if (tlsDomain) {
     appOrigin = `https://${tlsDomain}`;

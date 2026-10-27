@@ -1,11 +1,11 @@
-# Budget app over plain HTTP, for a hosting platform or your own reverse proxy that provides HTTPS.
+# Hoardwise over plain HTTP, for a hosting platform or your own reverse proxy that provides HTTPS.
 # Set APP_ORIGIN to the public https URL so cookies are Secure and the Origin check is exact.
 # On a home network with NO HTTPS proxy, delete the APP_ORIGIN and TRUST_PROXY lines below (cookies are then not
 # Secure). If you keep them, every login and setup request is rejected with 403, because the browser's Origin will
-# not match https://budget.example.com.
+# not match https://hoardwise.example.com.
 services:
-  budget:
-    image: ghcr.io/kingchappers/budget-app-v3-ai-edition:latest
+  hoardwise:
+    image: ghcr.io/kingchappers/hoardwise:latest
     restart: unless-stopped
     # A clean shutdown can take about 12 seconds (10 s for open connections, up to 2 s for running requests).
     # Docker's default of 10 s would kill the process before the database is closed cleanly.
@@ -16,7 +16,7 @@ services:
       # address. Never publish this port to the internet: with TRUST_PROXY on, the app believes X-Forwarded-* headers.
       - "127.0.0.1:8080:8080"
     environment:
-      APP_ORIGIN: https://budget.example.com
+      APP_ORIGIN: https://hoardwise.example.com
       TRUST_PROXY: "true"   # only when a proxy you control sets X-Forwarded-* and nothing else can reach this port
       # BACKUP_HOUR: "3"
       # BACKUP_KEEP: "7"
@@ -28,6 +28,7 @@ services:
       # are working" in docs/SELF-HOSTING.md.
       - budget-backups:/data/backups
 
+# The volume names keep their old prefix on purpose, so an existing install keeps its data.
 volumes:
   budget-data:
   budget-backups:

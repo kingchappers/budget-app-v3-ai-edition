@@ -3,7 +3,7 @@ import { Alert, Anchor, Button, PasswordInput, Stack, Text, TextInput } from '@m
 
 const MIN_PASSWORD_LENGTH = 12;
 const MAX_PASSWORD_LENGTH = 128;
-const DOCS_URL = 'https://github.com/kingchappers/budget-app-v3-ai-edition/blob/main/docs/SELF-HOSTING.md#forgot-your-password';
+const DOCS_URL = 'https://github.com/kingchappers/hoardwise/blob/main/docs/SELF-HOSTING.md#forgot-your-password';
 
 interface Props {
   setupRequired: boolean;

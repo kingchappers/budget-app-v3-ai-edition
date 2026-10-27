@@ -46,9 +46,9 @@ COPY --from=build /app/build/container ./build/container
 COPY --from=build /app/build/store-cli ./build/store-cli
 
 ENV NODE_ENV=production DATA_DIR=/data TZ=UTC
-LABEL org.opencontainers.image.source="https://github.com/kingchappers/budget-app-v3-ai-edition" \
+LABEL org.opencontainers.image.source="https://github.com/kingchappers/hoardwise" \
       org.opencontainers.image.licenses="AGPL-3.0-or-later" \
-      org.opencontainers.image.title="Budget app"
+      org.opencontainers.image.title="Hoardwise"
 USER app
 VOLUME /data
 EXPOSE 80 443 443/udp 8080

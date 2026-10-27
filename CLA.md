@@ -1,6 +1,6 @@
 # Individual Contributor License Agreement
 
-Thank you for your interest in contributing to the Budget app project, <https://github.com/kingchappers/budget-app-v3-ai-edition> ("We" or "Us"). "We" and "Us" mean Samuel Chapman, trading as Hoardwise Studios.
+Thank you for your interest in contributing to the Hoardwise project, <https://github.com/kingchappers/hoardwise> ("We" or "Us"). "We" and "Us" mean Samuel Chapman, trading as Hoardwise Studios.
 
 This contributor agreement ("Agreement") documents the rights granted by contributors to Us. To make this document effective, please agree to it by following the instructions in section 7. This is a legally binding document, so please read it carefully before agreeing to it. The Agreement may cover more than one software project managed by Us.
 

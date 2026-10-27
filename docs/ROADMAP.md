@@ -4,17 +4,17 @@ Bank sync was dropped (see `DECISIONS.md`), so manual entry is the core interact
 
 | # | Sub-project | Status |
 |---|---|---|
-| A | Entry sheet rework | Implemented on `feat/entry-sheet-rework` ([PR #29](https://github.com/kingchappers/budget-app-v3-ai-edition/pull/29)). Spec: `superpowers/specs/2026-09-18-entry-sheet-rework-design.md`, plan: `superpowers/plans/2026-09-18-entry-sheet-rework.md` |
-| B | Smart prefill | Implemented on `feat/smart-prefill` ([PR #30](https://github.com/kingchappers/budget-app-v3-ai-edition/pull/30)). Spec: `superpowers/specs/2026-09-19-smart-prefill-design.md`, plan: `superpowers/plans/2026-09-19-smart-prefill.md` |
-| C | Recurring templates | Implemented on `feat/recurring-templates` ([PR #32](https://github.com/kingchappers/budget-app-v3-ai-edition/pull/32)). Spec: `superpowers/specs/2026-09-19-recurring-templates-design.md`, plan: `superpowers/plans/2026-09-20-recurring-templates.md` |
-| D | PWA and add shortcut | Merged ([PR #36](https://github.com/kingchappers/budget-app-v3-ai-edition/pull/36)). Spec: `superpowers/specs/2026-09-23-pwa-add-shortcut-design.md`, plan: `superpowers/plans/2026-09-23-pwa-add-shortcut.md` |
+| A | Entry sheet rework | Implemented on `feat/entry-sheet-rework` ([PR #29](https://github.com/kingchappers/hoardwise/pull/29)). Spec: `superpowers/specs/2026-09-18-entry-sheet-rework-design.md`, plan: `superpowers/plans/2026-09-18-entry-sheet-rework.md` |
+| B | Smart prefill | Implemented on `feat/smart-prefill` ([PR #30](https://github.com/kingchappers/hoardwise/pull/30)). Spec: `superpowers/specs/2026-09-19-smart-prefill-design.md`, plan: `superpowers/plans/2026-09-19-smart-prefill.md` |
+| C | Recurring templates | Implemented on `feat/recurring-templates` ([PR #32](https://github.com/kingchappers/hoardwise/pull/32)). Spec: `superpowers/specs/2026-09-19-recurring-templates-design.md`, plan: `superpowers/plans/2026-09-20-recurring-templates.md` |
+| D | PWA and add shortcut | Merged ([PR #36](https://github.com/kingchappers/hoardwise/pull/36)). Spec: `superpowers/specs/2026-09-23-pwa-add-shortcut-design.md`, plan: `superpowers/plans/2026-09-23-pwa-add-shortcut.md` |
 | E | CSV/OFX import | Dropped: manual CSV/OFX import was judged clunky and would not be used. |
-| F1 | Category groups and YNAB defaults | Implemented on `feat/category-groups` ([PR #37](https://github.com/kingchappers/budget-app-v3-ai-edition/pull/37)). Spec: `superpowers/specs/2026-09-24-category-groups-design.md`, plan: `superpowers/plans/2026-09-24-category-groups.md` |
-| F2 | Savings and sinking-fund pots | Merged ([PR #38](https://github.com/kingchappers/budget-app-v3-ai-edition/pull/38)). Spec: `superpowers/specs/2026-09-25-savings-pots-design.md`, plan: `superpowers/plans/2026-09-25-savings-pots.md` |
-| G | Polish and hardening | Merged ([PR #39](https://github.com/kingchappers/budget-app-v3-ai-edition/pull/39)). Spec: `superpowers/specs/2026-09-26-polish-hardening-design.md`, plan: `superpowers/plans/2026-09-26-polish-hardening.md` |
-| H | Spending insights | Merged ([PR #40](https://github.com/kingchappers/budget-app-v3-ai-edition/pull/40)). Spec: `superpowers/specs/2026-09-27-spending-insights-design.md`, plan: `superpowers/plans/2026-09-27-spending-insights.md` |
-| I | Net worth and accounts | Merged ([PR #41](https://github.com/kingchappers/budget-app-v3-ai-edition/pull/41)). Spec: `superpowers/specs/2026-09-27-net-worth-accounts-design.md`, plan: `superpowers/plans/2026-09-27-net-worth-accounts.md` |
-| J | Offline entry queue | Implemented on `feat/offline-queue` ([PR #43](https://github.com/kingchappers/budget-app-v3-ai-edition/pull/43)). Spec: `superpowers/specs/2026-09-27-offline-entry-queue-design.md`, plan: `superpowers/plans/2026-09-27-offline-entry-queue.md` |
+| F1 | Category groups and YNAB defaults | Implemented on `feat/category-groups` ([PR #37](https://github.com/kingchappers/hoardwise/pull/37)). Spec: `superpowers/specs/2026-09-24-category-groups-design.md`, plan: `superpowers/plans/2026-09-24-category-groups.md` |
+| F2 | Savings and sinking-fund pots | Merged ([PR #38](https://github.com/kingchappers/hoardwise/pull/38)). Spec: `superpowers/specs/2026-09-25-savings-pots-design.md`, plan: `superpowers/plans/2026-09-25-savings-pots.md` |
+| G | Polish and hardening | Merged ([PR #39](https://github.com/kingchappers/hoardwise/pull/39)). Spec: `superpowers/specs/2026-09-26-polish-hardening-design.md`, plan: `superpowers/plans/2026-09-26-polish-hardening.md` |
+| H | Spending insights | Merged ([PR #40](https://github.com/kingchappers/hoardwise/pull/40)). Spec: `superpowers/specs/2026-09-27-spending-insights-design.md`, plan: `superpowers/plans/2026-09-27-spending-insights.md` |
+| I | Net worth and accounts | Merged ([PR #41](https://github.com/kingchappers/hoardwise/pull/41)). Spec: `superpowers/specs/2026-09-27-net-worth-accounts-design.md`, plan: `superpowers/plans/2026-09-27-net-worth-accounts.md` |
+| J | Offline entry queue | Implemented on `feat/offline-queue` ([PR #43](https://github.com/kingchappers/hoardwise/pull/43)). Spec: `superpowers/specs/2026-09-27-offline-entry-queue-design.md`, plan: `superpowers/plans/2026-09-27-offline-entry-queue.md` |
 
 ## B: Smart prefill
 
