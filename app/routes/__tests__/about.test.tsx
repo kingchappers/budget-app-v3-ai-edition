@@ -33,6 +33,11 @@ beforeEach(() => {
 });
 
 describe('About page', () => {
+  it('introduces the app by its name', () => {
+    renderAbout();
+    expect(screen.getByText(/Hoardwise is a small app/)).toBeInTheDocument();
+  });
+
   it('has one h1 and no skipped heading levels', () => {
     const { container } = renderAbout();
     expectSoundHeadings(container);

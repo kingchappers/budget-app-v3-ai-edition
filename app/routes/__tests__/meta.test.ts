@@ -19,17 +19,17 @@ interface RouteWithMeta {
 }
 
 const cases: [string, RouteWithMeta, string][] = [
-  ['Home', home, 'Home – Budget'],
-  ['Transactions', transactions, 'Transactions – Budget'],
-  ['Budgets', budgets, 'Budgets – Budget'],
-  ['Pots', pots, 'Pots – Budget'],
-  ['Categories', categories, 'Categories – Budget'],
-  ['Recurring', recurring, 'Recurring – Budget'],
-  ['Insights', insights, 'Insights – Budget'],
-  ['Accounts', accounts, 'Accounts – Budget'],
-  ['Settings', settings, 'Settings – Budget'],
-  ['About', about, 'About – Budget'],
-  ['Any other page', root, 'Budget'],
+  ['Home', home, 'Home – Hoardwise'],
+  ['Transactions', transactions, 'Transactions – Hoardwise'],
+  ['Budgets', budgets, 'Budgets – Hoardwise'],
+  ['Pots', pots, 'Pots – Hoardwise'],
+  ['Categories', categories, 'Categories – Hoardwise'],
+  ['Recurring', recurring, 'Recurring – Hoardwise'],
+  ['Insights', insights, 'Insights – Hoardwise'],
+  ['Accounts', accounts, 'Accounts – Hoardwise'],
+  ['Settings', settings, 'Settings – Hoardwise'],
+  ['About', about, 'About – Hoardwise'],
+  ['Any other page', root, 'Hoardwise'],
 ];
 
 describe('route titles', () => {

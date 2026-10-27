@@ -309,11 +309,11 @@ describe('Home without targets', () => {
 describe('Home page title', () => {
   it('names the month shown and follows month changes', async () => {
     renderHome();
-    expect(document.title).toBe(`Home – ${formatMonthLabel(currentYearMonth())} – Budget`);
+    expect(document.title).toBe(`Home – ${formatMonthLabel(currentYearMonth())} – Hoardwise`);
 
     await userEvent.setup().click(screen.getByRole('button', { name: 'Previous month' }));
 
-    expect(document.title).toBe(`Home – ${formatMonthLabel(shiftMonth(currentYearMonth(), -1))} – Budget`);
+    expect(document.title).toBe(`Home – ${formatMonthLabel(shiftMonth(currentYearMonth(), -1))} – Hoardwise`);
   });
 });
 

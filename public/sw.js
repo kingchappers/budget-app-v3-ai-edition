@@ -3,7 +3,7 @@
 
 const ACTIONS = ['add', 'skip'];
 const FALLBACK_TITLE = 'Bill reminder';
-const FALLBACK_BODY = 'Open Budget to see what is due.';
+const FALLBACK_BODY = 'Open Hoardwise to see what is due.';
 
 // Where a tap should lead: the app at Home, with the bill and the chosen action in the address.
 // Anything that is not an address on this site, or an action we know, is ignored.

@@ -14,7 +14,7 @@ import {
 
 import type { Route } from "./+types/root";
 import "./app.css";
-import { pageTitle } from "./lib/pageTitle";
+import { APP_NAME, APP_DESCRIPTION, pageTitle } from "./lib/pageTitle";
 import { ReduceMotion } from "./components/layout/ReduceMotion";
 import { TextSize } from "./components/layout/TextSize";
 import { TEXT_SIZE_SCRIPT } from "./lib/textSize";
@@ -124,8 +124,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#134e4a" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-title" content="Budget" />
+        <meta name="apple-mobile-web-app-title" content={APP_NAME} />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        <meta name="application-name" content={APP_NAME} />
+        <meta name="description" content={APP_DESCRIPTION} />
+        <meta property="og:type" content="website" />
+        <meta property="og:title" content={APP_NAME} />
+        <meta property="og:description" content={APP_DESCRIPTION} />
         {isDemo && <meta name="robots" content="noindex" />}
         <ColorSchemeScript defaultColorScheme="auto" />
         <script dangerouslySetInnerHTML={{ __html: TEXT_SIZE_SCRIPT }} />

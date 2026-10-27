@@ -92,7 +92,7 @@ describe('Plan page', () => {
 
   it('names the page and the tab in the document title', () => {
     renderPlan('/plan?tab=pots');
-    expect(document.title).toBe('Plan – Pots – Budget');
+    expect(document.title).toBe('Plan – Pots – Hoardwise');
   });
 
   it('still opens Budgets from an old ?tab=targets link', () => {

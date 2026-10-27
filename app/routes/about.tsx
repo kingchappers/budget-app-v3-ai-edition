@@ -4,7 +4,7 @@ import { Link } from 'react-router';
 import { DefaultLayout } from '~/components/layout/DefaultLayout';
 import { SHOTS, SIZES, shotUrl, type Shot } from '~/lib/aboutShots';
 import { GLOSSARY } from '~/lib/glossary';
-import { pageTitle } from '~/lib/pageTitle';
+import { APP_NAME, pageTitle } from '~/lib/pageTitle';
 import { SESSION_LIFETIME_TEXT } from '~/lib/sessionLifetime';
 import type { Route } from './+types/about';
 
@@ -71,7 +71,7 @@ function AboutContent() {
       <Stack gap="sm">
         <Title order={1} size="h2">A calm way to keep track of your money</Title>
         <Text>
-          Budget is a small app for knowing what you have left to spend. Add what you buy, set a budget only if you want one,
+          {APP_NAME} is a small app for knowing what you have left to spend. Add what you buy, set a budget only if you want one,
           and keep money apart in pots for the things you are saving towards. It works on a phone and on a computer, and it
           can be hosted by you.
         </Text>

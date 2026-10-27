@@ -171,8 +171,12 @@ describe('what goes in the calendar', () => {
     const calendar = new ICAL.Component(ICAL.parse(build([bill(), dated('YEARLY', '2027-03-14', { recurringId: 'bill-3' })])));
     expect(calendar.name).toBe('vcalendar');
     expect(calendar.getFirstPropertyValue('version')).toBe('2.0');
-    expect(calendar.getFirstPropertyValue('prodid')).toBe('-//Budget//Bills//EN');
+    expect(calendar.getFirstPropertyValue('prodid')).toBe('-//Hoardwise//Bills//EN');
     expect(calendar.getAllSubcomponents('vevent')).toHaveLength(2);
+  });
+
+  it('keeps event identities stable across the rename, so re-importing updates events instead of duplicating them', () => {
+    expect(events(build([bill()]))[0].getFirstPropertyValue('uid')).toMatch(/@budget$/);
   });
 
   it('does not block the time on a calendar, since a bill is not a meeting', () => {
