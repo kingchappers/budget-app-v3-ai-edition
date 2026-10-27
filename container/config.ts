@@ -80,7 +80,7 @@ export function chooseSqliteFile(dataDir: string, exists: (path: string) => bool
   if (!exists(legacy)) return { path: current };
   return {
     path: current,
-    warning: `Both ${SQLITE_FILE} and ${LEGACY_SQLITE_FILE} exist in ${dataDir}. Using ${SQLITE_FILE}; move ${LEGACY_SQLITE_FILE} away if it is an old copy.`,
+    warning: `Both ${SQLITE_FILE} and ${LEGACY_SQLITE_FILE} exist in ${dataDir}. Using ${SQLITE_FILE}; the data in ${LEGACY_SQLITE_FILE} is not being read. If ${SQLITE_FILE} is an empty file created by mistake, stop the app and remove it so ${LEGACY_SQLITE_FILE} is used again.`,
   };
 }
 

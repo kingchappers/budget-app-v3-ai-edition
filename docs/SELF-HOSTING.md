@@ -21,7 +21,7 @@ Environment variables only. The container sets `AUTH_MODE`, `STORE` and `SQLITE_
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `DATA_DIR` | `/data` | Volume holding the database (`hoardwise.sqlite`; an install created before 0.3.0 keeps its `budget.sqlite`, which is used as it is and never renamed), backups, the `caddy/` certificate storage and `caddy-data/` (Caddy's own data directory, such as its instance id). An absolute path using only letters, digits and `. _ / -`, with no `..` segment and not `/` |
+| `DATA_DIR` | `/data` | Volume holding the database (`hoardwise.sqlite`; an install created before 0.3.0 keeps its `budget.sqlite`, which is used as it is and never renamed; if both files are present the app uses `hoardwise.sqlite`), backups, the `caddy/` certificate storage and `caddy-data/` (Caddy's own data directory, such as its instance id). An absolute path using only letters, digits and `. _ / -`, with no `..` segment and not `/` |
 | `PORT` | `8080` | Port the app listens on inside the container. Must be a fixed port (not 0) with `TLS_DOMAIN` |
 | `TLS_DOMAIN` | unset | A plain hostname such as `budget.example.com` for automatic HTTPS on ports 80 and 443. Unset means plain HTTP |
 | `TLS_EMAIL` | unset | Optional contact address for the certificate authority. Needs `TLS_DOMAIN` |
@@ -90,7 +90,7 @@ Stopping: a clean shutdown stops taking new requests (they get a 503), lets open
 
 ## Backups and restore
 
-The commands in this section and in the next two use `hoardwise.sqlite`. If your data folder holds `budget.sqlite` (an install from before 0.3.0), use that name instead.
+> **Check which file your data folder holds first.** Run `docker compose exec budget ls /data`. Use the name you see, `hoardwise.sqlite` or `budget.sqlite`, in every command that follows and in "Forgot your password" and "Moving your data from AWS". On an install from before 0.3.0, running a command with the wrong name creates an empty file with that name, and the app then starts on the empty file and looks like it has lost your data. Your data is still in the other file: stop the app, delete the empty file, and start again.
 
 - A backup is taken automatically at the first hourly check at or after `BACKUP_HOUR` (03:00 by default, in `TZ`, default UTC; the check runs hourly from when the container started) once the newest backup is older than that hour on the current day. That gives one backup per day, and a missed hour or a skipped day is made up at the next check. A backup taken before `BACKUP_HOUR` (a catch-up at start, say) counts as the previous day's, so the check at `BACKUP_HOUR` takes another. Backups go into `/data/backups`. The newest `BACKUP_KEEP` (default 7) are kept. Each is integrity-checked before it counts, so a corrupt copy never causes a good one to be pruned, and is owner-only. `BACKUP_KEEP=0` turns this off.
 - File names are `hoardwise-YYYYMMDD-HHMMSS.sqlite` in local time (`TZ`). Backups made before 0.3.0 are named `budget-…`; they are kept, restored and pruned in the same way.
@@ -148,7 +148,7 @@ If the app cannot delete `RESET_PASSWORD` (for example the folder is read-only) 
 docker compose exec budget sh -c 'STORE=sqlite SQLITE_PATH=/data/hoardwise.sqlite node build/store-cli/store-cli.js reset-password'
 ```
 
-(use `budget.sqlite` if that is the file in your data folder)
+On an install from before 0.3.0, use `budget.sqlite` in place of `hoardwise.sqlite` in this command if that is the file in your data folder.
 
 It prompts for the new password (never taken from arguments), ends every session and clears any login lock-out.
 
@@ -167,7 +167,7 @@ Export and import only touch your own data, never the login records, so the step
    docker compose exec budget rm /tmp/budget-export.jsonl
    ```
 
-   (use `budget.sqlite` if that is the file in your data folder)
+   On an install from before 0.3.0, use `budget.sqlite` in place of `hoardwise.sqlite` in this command if that is the file in your data folder.
 
 5. Delete the export file on the host too, and never commit it. Push subscriptions are not carried over.
 

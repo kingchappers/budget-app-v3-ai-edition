@@ -7,6 +7,7 @@ Releases of the self-hosted container image (`ghcr.io/kingchappers/budget-app-v3
 - **Self-hosted sign-in cookie renamed.** The session cookie is now `hoardwise_session` (`__Host-hoardwise_session` over HTTPS), so everyone signs in once more after updating.
 - **Database and backup names.** New installs create `hoardwise.sqlite` and `hoardwise-…` backups. An install that already has `budget.sqlite` keeps using it, and older `budget-…` backups are still kept, restored and pruned. Nothing is renamed on disk.
 - **Saved browser settings** (preferences, snoozed bills and similar) move to new names the first time the app loads, with nothing lost.
+- **Rolling back.** If you go back to a version before 0.3.0 after updating, you sign in again and settings changed since the update (browser preferences) are not carried back; your database and backups are untouched.
 
 Not in the image yet, or not part of it:
 
