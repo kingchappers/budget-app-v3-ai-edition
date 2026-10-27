@@ -175,10 +175,10 @@ async function main() {
   step('/data and the fresh /data/backups volume are owned by uid 10001', dataOwner === '10001' && backupOwner === '10001', `${dataOwner} ${backupOwner}`);
   const listing = await waitFor(() => {
     const out = docker('exec', name, 'ls', '/data/backups');
-    return /^budget-\d{8}-\d{6}\.sqlite$/m.test(out) ? out : undefined;
+    return /^hoardwise-\d{8}-\d{6}\.sqlite$/m.test(out) ? out : undefined;
   }, 'the start-up backup', 30_000);
   step('the start-up backup exists on the backups volume', true, listing);
-  const backupFile = `/data/backups/${listing.match(/^budget-\d{8}-\d{6}\.sqlite$/m)[0]}`;
+  const backupFile = `/data/backups/${listing.match(/^hoardwise-\d{8}-\d{6}\.sqlite$/m)[0]}`;
   const backupStat = docker('exec', name, 'stat', '-c', '%u %a', backupFile);
   step('the start-up backup is owned by 10001 with mode 600', backupStat === '10001 600', backupStat);
   const integrity = docker('exec', name, 'node', '--disable-warning=ExperimentalWarning', '-e',
