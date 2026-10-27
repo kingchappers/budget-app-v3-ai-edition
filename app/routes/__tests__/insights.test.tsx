@@ -131,11 +131,11 @@ describe('Insights page', () => {
 describe('Insights page title', () => {
   it('names the period shown and follows changes to it', async () => {
     const user = renderInsightsUser();
-    expect(document.title).toBe('Insights – April 2026 – September 2026 – Budget');
+    expect(document.title).toBe('Insights – April 2026 – September 2026 – Hoardwise');
 
     await user.click(screen.getByRole('radio', { name: 'This month' }));
 
-    expect(document.title).toBe('Insights – September 2026 – Budget');
+    expect(document.title).toBe('Insights – September 2026 – Hoardwise');
   });
 });
 

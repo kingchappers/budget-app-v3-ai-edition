@@ -17,6 +17,7 @@ import { SignedOutPanel } from './SignedOutPanel';
 import { isSessionEndedError, useSessionEnded } from '~/lib/session';
 import { usePreferences } from '~/lib/preferences';
 import { useNavTarget } from '~/hooks/useNavTarget';
+import { APP_NAME } from '~/lib/pageTitle';
 
 // The same four places on every device. Add and Settings sit beside them, not among them.
 export const NAV_ITEMS = [
@@ -200,7 +201,7 @@ function LayoutShell({ children }: { children: React.ReactNode }) {
     >
       <AppShell.Header>
         <Flex h="100%" px="md" justify="space-between" align="center">
-          <Text fw={700} className="app-wordmark">Budget</Text>
+          <Text fw={700} className="app-wordmark">{APP_NAME}</Text>
           <Group gap="xs" wrap="nowrap">
             {signedIn && (
               <Tooltip label={shortcutN ? 'Add transaction (N)' : 'Add transaction'} events={{ hover: true, focus: true, touch: false }}>

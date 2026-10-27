@@ -322,11 +322,11 @@ describe('Transactions route sync status', () => {
 describe('Transactions page title', () => {
   it('names the month shown and follows month changes', async () => {
     renderRoute();
-    expect(document.title).toBe(`Transactions – ${formatMonthLabel(currentYearMonth())} – Budget`);
+    expect(document.title).toBe(`Transactions – ${formatMonthLabel(currentYearMonth())} – Hoardwise`);
 
     await userEvent.setup().click(screen.getByRole('button', { name: 'Next month' }));
 
-    expect(document.title).toBe(`Transactions – ${formatMonthLabel(shiftMonth(currentYearMonth(), 1))} – Budget`);
+    expect(document.title).toBe(`Transactions – ${formatMonthLabel(shiftMonth(currentYearMonth(), 1))} – Hoardwise`);
   });
 });
 
