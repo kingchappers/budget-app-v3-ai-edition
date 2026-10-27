@@ -104,7 +104,7 @@ function AboutContent() {
       </Stack>
 
       <Text size="sm" ta="center">
-        <Anchor href="https://github.com/kingchappers/budget-app-v3-ai-edition" target="_blank" rel="noopener noreferrer">
+        <Anchor href="https://github.com/kingchappers/hoardwise" target="_blank" rel="noopener noreferrer">
           Source code (AGPL-3.0)
         </Anchor>
       </Text>
