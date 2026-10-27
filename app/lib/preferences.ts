@@ -106,8 +106,8 @@ const MAX_RELEASE_KEY_LENGTH = 64;
 const MAX_NOTHING_TO_LOG_DAYS = 400;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
-export const PREFERENCES_KEY = 'budget.preferences';
-export const LEGACY_OPEN_ON_LAUNCH_KEY = 'budget.openAddOnLaunch';
+export const PREFERENCES_KEY = 'hoardwise.preferences';
+export const LEGACY_OPEN_ON_LAUNCH_KEY = 'hoardwise.openAddOnLaunch';
 
 type Listener = () => void;
 

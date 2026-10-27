@@ -1,7 +1,7 @@
 import type { DateChoice } from '~/lib/months';
 import type { TransactionType } from '~/lib/types';
 
-export const TRANSACTION_DRAFT_KEY = 'budget.transactionDraft';
+export const TRANSACTION_DRAFT_KEY = 'hoardwise.transactionDraft';
 
 const TYPES: readonly TransactionType[] = ['EXPENSE', 'INCOME', 'SET_ASIDE', 'TAKE_OUT'];
 const DATE_CHOICES: readonly DateChoice[] = ['today', 'yesterday', 'other'];

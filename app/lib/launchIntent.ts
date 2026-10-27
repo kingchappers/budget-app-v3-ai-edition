@@ -1,8 +1,8 @@
 import { readPreferences, writePreferences } from './preferences';
 
 export const ADD_PARAM = 'add';
-export const PENDING_ADD_KEY = 'budget.pendingAdd';
-export const LAUNCH_HANDLED_KEY = 'budget.launchHandled';
+export const PENDING_ADD_KEY = 'hoardwise.pendingAdd';
+export const LAUNCH_HANDLED_KEY = 'hoardwise.launchHandled';
 export { LEGACY_OPEN_ON_LAUNCH_KEY as OPEN_ON_LAUNCH_KEY } from './preferences';
 
 export interface LocationParts {

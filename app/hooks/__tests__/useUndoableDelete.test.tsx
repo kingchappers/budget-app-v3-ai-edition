@@ -116,7 +116,7 @@ describe('useUndoableDelete', () => {
   });
 
   describe('how long the Deleted message stays (Settings)', () => {
-    afterEach(() => { window.localStorage.removeItem('budget.preferences'); });
+    afterEach(() => { window.localStorage.removeItem('hoardwise.preferences'); });
 
     function autoCloseOfDeletedMessage(): unknown {
       const show = vi.spyOn(notifications, 'show');
@@ -131,7 +131,7 @@ describe('useUndoableDelete', () => {
     });
 
     it.each([['30s', 30000], ['10s', 10000]])('goes after %s if asked', (undoDuration, milliseconds) => {
-      window.localStorage.setItem('budget.preferences', JSON.stringify({ undoDuration }));
+      window.localStorage.setItem('hoardwise.preferences', JSON.stringify({ undoDuration }));
       expect(autoCloseOfDeletedMessage()).toBe(milliseconds);
     });
 

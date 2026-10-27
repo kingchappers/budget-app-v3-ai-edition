@@ -76,7 +76,7 @@ async function main(server, url) {
     const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
     // Hide the first-run tour and "What's changed" cards, whose overlay would otherwise block the Profile menu.
     await context.addInitScript(() => {
-      window.localStorage.setItem('budget.preferences', JSON.stringify({ seenReleases: ['menu-2026-10', 'names-2026-10'], tourStep: 3 }));
+      window.localStorage.setItem('hoardwise.preferences', JSON.stringify({ seenReleases: ['menu-2026-10', 'names-2026-10'], tourStep: 3 }));
     });
     const page = await context.newPage();
     const dialog = page.getByRole('dialog');

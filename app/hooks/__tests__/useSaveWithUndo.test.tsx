@@ -160,7 +160,7 @@ describe('useSaveWithUndo', () => {
     const earlier = [{ transactionId: 'old', yearMonth: input.date.slice(0, 7), amount: 3000, type: 'EXPENSE', categoryId: 'cat-dining', description: '', date: input.date, createdAt: '' }];
 
     function renderSaver(preferences: object) {
-      window.localStorage.setItem('budget.preferences', JSON.stringify(preferences));
+      window.localStorage.setItem('hoardwise.preferences', JSON.stringify(preferences));
       const client = new QueryClient();
       client.setQueryData(queryKeys.targets, budget);
       client.setQueryData(queryKeys.transactions(input.date.slice(0, 7)), earlier);
@@ -243,19 +243,19 @@ describe('useSaveWithUndo', () => {
       return update.mock.calls.at(-1)?.[0].autoClose;
     }
 
-    afterEach(() => { window.localStorage.removeItem('budget.preferences'); });
+    afterEach(() => { window.localStorage.removeItem('hoardwise.preferences'); });
 
     it('stays until closed by default', async () => {
       expect(await saveAndGetAutoClose()).toBe(false);
     });
 
     it.each([['30s', 30000], ['10s', 10000]])('goes after %s once the save has settled, if asked', async (undoDuration, milliseconds) => {
-      window.localStorage.setItem('budget.preferences', JSON.stringify({ undoDuration }));
+      window.localStorage.setItem('hoardwise.preferences', JSON.stringify({ undoDuration }));
       expect(await saveAndGetAutoClose()).toBe(milliseconds);
     });
 
     it('waits while still saving, then starts the clock', async () => {
-      window.localStorage.setItem('budget.preferences', JSON.stringify({ undoDuration: '10s' }));
+      window.localStorage.setItem('hoardwise.preferences', JSON.stringify({ undoDuration: '10s' }));
       const show = vi.spyOn(notifications, 'show');
       let finish!: (value: unknown) => void;
       mockCreate.mutateAsync.mockReturnValue(new Promise(resolve => { finish = resolve; }));
@@ -267,7 +267,7 @@ describe('useSaveWithUndo', () => {
     });
 
     it('never makes an error message go away by itself', async () => {
-      window.localStorage.setItem('budget.preferences', JSON.stringify({ undoDuration: '10s' }));
+      window.localStorage.setItem('hoardwise.preferences', JSON.stringify({ undoDuration: '10s' }));
       const show = vi.spyOn(notifications, 'show');
       mockCreate.mutateAsync.mockRejectedValue(new ApiError(400, 'Bad Request'));
       const { result } = renderSaver();

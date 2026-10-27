@@ -92,7 +92,7 @@ describe('DueRecurringCard', () => {
 
   afterEach(() => {
     notifications.clean();
-    window.localStorage.removeItem('budget.preferences');
+    window.localStorage.removeItem('hoardwise.preferences');
     vi.useRealTimers();
   });
 
@@ -171,7 +171,7 @@ describe('DueRecurringCard', () => {
     ['30s', 30000],
     ['10s', 10000],
   ])('keeps the skipped message on screen for the chosen time (%s)', async (undoDuration, expected) => {
-    if (undoDuration) window.localStorage.setItem('budget.preferences', JSON.stringify({ undoDuration }));
+    if (undoDuration) window.localStorage.setItem('hoardwise.preferences', JSON.stringify({ undoDuration }));
     const show = vi.spyOn(notifications, 'show');
     show.mockClear();
     const user = userEvent.setup();
@@ -291,7 +291,7 @@ describe('DueRecurringCard', () => {
       expect(screen.getByRole('link', { name: 'Get a reminder before bills are due' })).toHaveAttribute('href', '/settings');
       unmount();
 
-      window.localStorage.setItem('budget.preferences', JSON.stringify({ billReminders: true }));
+      window.localStorage.setItem('hoardwise.preferences', JSON.stringify({ billReminders: true }));
       renderCard();
       expect(screen.queryByRole('link', { name: 'Get a reminder before bills are due' })).not.toBeInTheDocument();
       window.localStorage.clear();
