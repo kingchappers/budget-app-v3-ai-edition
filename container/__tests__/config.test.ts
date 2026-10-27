@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ConfigError, isValidEmail, isValidHostname, parseConfig } from '../config';
+import { ConfigError, chooseSqliteFile, isValidEmail, isValidHostname, parseConfig } from '../config';
 
 const problemsOf = (env: NodeJS.ProcessEnv): string[] => {
   try {
@@ -13,9 +13,9 @@ const problemsOf = (env: NodeJS.ProcessEnv): string[] => {
 
 describe('defaults', () => {
   it('runs plain HTTP on 8080 with a /data volume and a warning about the missing public URL', () => {
-    const config = parseConfig({});
+    const config = parseConfig({}, () => false);
     expect(config).toMatchObject({
-      dataDir: '/data', sqlitePath: '/data/budget.sqlite', port: 8080, backupHour: 3, backupKeep: 7,
+      dataDir: '/data', sqlitePath: '/data/hoardwise.sqlite', port: 8080, backupHour: 3, backupKeep: 7,
       backupDir: '/data/backups', trustProxy: false, secureCookie: false,
     });
     expect(config.tlsDomain).toBeUndefined();
@@ -171,5 +171,41 @@ describe('directories', () => {
 
   it('accepts a backup directory of letters, digits, dots, dashes and underscores', () => {
     expect(parseConfig({ BACKUP_DIR: '/var/backups-1/x_y.z' }).backupDir).toBe('/var/backups-1/x_y.z');
+  });
+});
+
+describe('the database file', () => {
+  const existing = (...paths: string[]) => (path: string): boolean => paths.includes(path);
+
+  it('creates hoardwise.sqlite for a new install', () => {
+    expect(chooseSqliteFile('/data', existing())).toEqual({ path: '/data/hoardwise.sqlite' });
+  });
+
+  it('keeps using budget.sqlite for an install from before 0.3.0', () => {
+    expect(chooseSqliteFile('/data', existing('/data/budget.sqlite'))).toEqual({ path: '/data/budget.sqlite' });
+  });
+
+  it('uses hoardwise.sqlite when it is the only one', () => {
+    expect(chooseSqliteFile('/data', existing('/data/hoardwise.sqlite'))).toEqual({ path: '/data/hoardwise.sqlite' });
+  });
+
+  it('uses hoardwise.sqlite and warns, naming both files, when both exist', () => {
+    const chosen = chooseSqliteFile('/data', existing('/data/hoardwise.sqlite', '/data/budget.sqlite'));
+    expect(chosen.path).toBe('/data/hoardwise.sqlite');
+    expect(chosen.warning).toContain('hoardwise.sqlite');
+    expect(chosen.warning).toContain('budget.sqlite');
+  });
+
+  it('is applied by parseConfig, with the warning added to the others', () => {
+    expect(parseConfig({}, existing('/data/budget.sqlite')).sqlitePath).toBe('/data/budget.sqlite');
+    const both = parseConfig({}, existing('/data/hoardwise.sqlite', '/data/budget.sqlite'));
+    expect(both.sqlitePath).toBe('/data/hoardwise.sqlite');
+    expect(both.warnings.join(' ')).toMatch(/budget\.sqlite/);
+  });
+
+  it('only asks whether the two files exist, and follows DATA_DIR', () => {
+    const asked: string[] = [];
+    parseConfig({ DATA_DIR: '/vol' }, path => { asked.push(path); return false; });
+    expect(asked.sort()).toEqual(['/vol/budget.sqlite', '/vol/hoardwise.sqlite']);
   });
 });

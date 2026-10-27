@@ -33,29 +33,45 @@ describe('text size scale', () => {
 });
 
 describe('the script that runs before the page paints', () => {
-  it('applies a larger size before anything is drawn', () => {
-    window.localStorage.setItem('budget.preferences', JSON.stringify({ textSize: 'largest' }));
-    expect(runScript()).toBe('largest');
-  });
-
-  it('applies Large too', () => {
+  it('reads the key used before the rename when the new one is not saved yet', () => {
     window.localStorage.setItem('budget.preferences', JSON.stringify({ textSize: 'large' }));
     expect(runScript()).toBe('large');
   });
 
-  it('leaves standard size alone', () => {
+  it('prefers the new key over the old one', () => {
+    window.localStorage.setItem('hoardwise.preferences', JSON.stringify({ textSize: 'largest' }));
     window.localStorage.setItem('budget.preferences', JSON.stringify({ textSize: 'standard' }));
+    expect(runScript()).toBe('largest');
+  });
+
+  it('does not throw when only the old key holds broken text', () => {
+    window.localStorage.setItem('budget.preferences', '{not json');
+    expect(runScript()).toBeNull();
+  });
+
+  it('applies a larger size before anything is drawn', () => {
+    window.localStorage.setItem('hoardwise.preferences', JSON.stringify({ textSize: 'largest' }));
+    expect(runScript()).toBe('largest');
+  });
+
+  it('applies Large too', () => {
+    window.localStorage.setItem('hoardwise.preferences', JSON.stringify({ textSize: 'large' }));
+    expect(runScript()).toBe('large');
+  });
+
+  it('leaves standard size alone', () => {
+    window.localStorage.setItem('hoardwise.preferences', JSON.stringify({ textSize: 'standard' }));
     expect(runScript()).toBeNull();
   });
 
   it('ignores a value it does not know, instead of setting it', () => {
-    window.localStorage.setItem('budget.preferences', JSON.stringify({ textSize: '999%' }));
+    window.localStorage.setItem('hoardwise.preferences', JSON.stringify({ textSize: '999%' }));
     expect(runScript()).toBeNull();
   });
 
   it('does nothing, and does not throw, when nothing is saved or the saved text is broken', () => {
     expect(runScript()).toBeNull();
-    window.localStorage.setItem('budget.preferences', '{not json');
+    window.localStorage.setItem('hoardwise.preferences', '{not json');
     expect(runScript()).toBeNull();
   });
 });

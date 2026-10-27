@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router';
 import { Button, Card, Group, Text } from '@mantine/core';
 
-export const TARGETS_CARD_DISMISSED_KEY = 'budget.targetsCardDismissed';
+export const TARGETS_CARD_DISMISSED_KEY = 'hoardwise.targetsCardDismissed';
 
 function readDismissed(): boolean {
   try {

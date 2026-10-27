@@ -28,7 +28,7 @@ describe('bill snooze', () => {
 
   it('treats unreadable or broken storage as not snoozed, and logs it', () => {
     const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
-    window.localStorage.setItem('budget.billSnoozes.user-1', '{not json');
+    window.localStorage.setItem('hoardwise.billSnoozes.user-1', '{not json');
     expect(isSnoozed('user-1', 'r1', '2026-09', '2026-09-30')).toBe(false);
 
     vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('blocked'); });

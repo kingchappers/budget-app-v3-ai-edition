@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import type { SqliteStore } from './sqlite';
 
-export const BACKUP_PATTERN = /^budget-\d{8}-\d{6}\.sqlite$/;
+export const BACKUP_PATTERN = /^(?:budget|hoardwise)-\d{8}-\d{6}\.sqlite$/;
 
 const pad = (value: number): string => String(value).padStart(2, '0');
 
@@ -11,7 +11,7 @@ const pad = (value: number): string => String(value).padStart(2, '0');
 export function backupFileName(now: Date): string {
   const date = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}`;
   const time = `${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
-  return `budget-${date}-${time}.sqlite`;
+  return `hoardwise-${date}-${time}.sqlite`;
 }
 
 export function integrityCheck(path: string): boolean {

@@ -76,7 +76,7 @@ async function main(server, url) {
     const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
     // Hide the first-run tour and "What's changed" cards, whose overlay would otherwise block the Profile menu.
     await context.addInitScript(() => {
-      window.localStorage.setItem('budget.preferences', JSON.stringify({ seenReleases: ['menu-2026-10', 'names-2026-10'], tourStep: 3 }));
+      window.localStorage.setItem('hoardwise.preferences', JSON.stringify({ seenReleases: ['menu-2026-10', 'names-2026-10'], tourStep: 3 }));
     });
     const page = await context.newPage();
     const dialog = page.getByRole('dialog');
@@ -115,8 +115,8 @@ async function main(server, url) {
 
     await step('the session cookie is HttpOnly (not in document.cookie)', async () => {
       const visible = await page.evaluate(() => document.cookie);
-      assert(!visible.includes('budget_session'), `document.cookie exposes the session: ${visible}`);
-      const stored = (await context.cookies()).find(cookie => cookie.name === 'budget_session');
+      assert(!visible.includes('hoardwise_session'), `document.cookie exposes the session: ${visible}`);
+      const stored = (await context.cookies()).find(cookie => cookie.name === 'hoardwise_session');
       assert(stored && stored.httpOnly && stored.sameSite === 'Strict', 'cookie missing or not HttpOnly/SameSite=Strict');
     });
 
@@ -130,7 +130,7 @@ async function main(server, url) {
 
     let oldCookie;
     await step('logout returns to the signed-out state', async () => {
-      const stored = (await context.cookies()).find(cookie => cookie.name === 'budget_session');
+      const stored = (await context.cookies()).find(cookie => cookie.name === 'hoardwise_session');
       assert(stored, 'no session cookie before logout');
       oldCookie = stored.value;
       await profileEmail.click();
@@ -140,7 +140,7 @@ async function main(server, url) {
     });
 
     await step('the old session cookie is rejected server-side after logout', async () => {
-      const response = await fetch(`${url}/api/auth/me`, { headers: { Cookie: `budget_session=${oldCookie}` } });
+      const response = await fetch(`${url}/api/auth/me`, { headers: { Cookie: `hoardwise_session=${oldCookie}` } });
       assert(response.status === 401, `expected 401, got ${response.status}`);
     });
 

@@ -175,17 +175,17 @@ async function main() {
   step('/data and the fresh /data/backups volume are owned by uid 10001', dataOwner === '10001' && backupOwner === '10001', `${dataOwner} ${backupOwner}`);
   const listing = await waitFor(() => {
     const out = docker('exec', name, 'ls', '/data/backups');
-    return /^budget-\d{8}-\d{6}\.sqlite$/m.test(out) ? out : undefined;
+    return /^hoardwise-\d{8}-\d{6}\.sqlite$/m.test(out) ? out : undefined;
   }, 'the start-up backup', 30_000);
   step('the start-up backup exists on the backups volume', true, listing);
-  const backupFile = `/data/backups/${listing.match(/^budget-\d{8}-\d{6}\.sqlite$/m)[0]}`;
+  const backupFile = `/data/backups/${listing.match(/^hoardwise-\d{8}-\d{6}\.sqlite$/m)[0]}`;
   const backupStat = docker('exec', name, 'stat', '-c', '%u %a', backupFile);
   step('the start-up backup is owned by 10001 with mode 600', backupStat === '10001 600', backupStat);
   const integrity = docker('exec', name, 'node', '--disable-warning=ExperimentalWarning', '-e',
     "const { DatabaseSync } = require('node:sqlite'); const db = new DatabaseSync(process.argv[1], { readOnly: true }); console.log(db.prepare('PRAGMA integrity_check').get().integrity_check);",
     backupFile);
   step('the start-up backup passes an independent PRAGMA integrity_check', integrity === 'ok', integrity);
-  const dbMode = docker('exec', name, 'stat', '-c', '%a', '/data/budget.sqlite');
+  const dbMode = docker('exec', name, 'stat', '-c', '%a', '/data/hoardwise.sqlite');
   step('the database file is mode 600', dbMode === '600', dbMode);
 
   const health = await waitFor(() => {
@@ -209,14 +209,14 @@ async function main() {
   const cookie = setCookie.split(';')[0];
 
   if (tls || proxy) {
-    step('the session cookie is __Host- and Secure', setCookie.startsWith('__Host-budget_session=') && setCookie.includes('Secure'), setCookie);
+    step('the session cookie is __Host- and Secure', setCookie.startsWith('__Host-hoardwise_session=') && setCookie.includes('Secure'), setCookie);
   }
   if (tls) {
     const redirect = await request(`http://127.0.0.1:${http80}`, '/', { headers: { Host: 'localhost' } });
     step('HTTP redirects to HTTPS', [301, 302, 307, 308].includes(redirect.status) && String(redirect.headers.location).startsWith('https://'), `${redirect.status} ${redirect.headers.location}`);
   }
   if (!tls && !proxy) {
-    step('the session cookie is set', cookie.startsWith('budget_session='), setCookie);
+    step('the session cookie is set', cookie.startsWith('hoardwise_session='), setCookie);
   }
 
   const me = await get('/api/auth/me', { Cookie: cookie });
@@ -257,7 +257,7 @@ async function main() {
   const again = await get('/api/auth/status');
   step('setup stays closed after a restart', JSON.parse(again.body).setupRequired === false, again.body);
 
-  const backup = docker('exec', '-e', 'STORE=sqlite', '-e', 'SQLITE_PATH=/data/budget.sqlite', name,
+  const backup = docker('exec', '-e', 'STORE=sqlite', '-e', 'SQLITE_PATH=/data/hoardwise.sqlite', name,
     'node', 'build/store-cli/store-cli.js', 'backup', '--out', '/data/manual-backup.sqlite');
   step('store-cli backup works inside the image', backup.includes('Backed up'), backup);
 

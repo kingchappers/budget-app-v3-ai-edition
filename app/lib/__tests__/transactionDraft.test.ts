@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { TransactionDraftFields } from '../transactionDraft';
 
-const KEY = 'budget.transactionDraft';
+const KEY = 'hoardwise.transactionDraft';
 
 const fields: TransactionDraftFields = {
   amount: '4.80',

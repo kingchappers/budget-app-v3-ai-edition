@@ -30,6 +30,6 @@ export function authStorage(now = new Date()) {
     [`@@auth0spajs@@::${clientId}::@@user@@`]: JSON.stringify({ id_token: 'demo.id.token', decodedToken: { claims, user } }),
     // Hide the one-time "What's changed" cards and the first-run tour, which would otherwise sit in the shots,
     // and leave the two Insights charts open so that shot shows them.
-    'budget.preferences': JSON.stringify({ seenReleases: ['menu-2026-10', 'names-2026-10'], tourStep: 3, insightsOpenSections: ['groups', 'trend'] }),
+    'hoardwise.preferences': JSON.stringify({ seenReleases: ['menu-2026-10', 'names-2026-10'], tourStep: 3, insightsOpenSections: ['groups', 'trend'] }),
   };
 }

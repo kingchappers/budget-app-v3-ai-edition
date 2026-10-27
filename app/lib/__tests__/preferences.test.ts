@@ -62,12 +62,12 @@ describe('readPreferences', () => {
   });
 
   it('carries over the old launch setting and drops the old value on the next save', () => {
-    window.localStorage.setItem('budget.openAddOnLaunch', '1');
+    window.localStorage.setItem('hoardwise.openAddOnLaunch', '1');
     expect(prefs.readPreferences(window.localStorage).openAddOnLaunch).toBe(true);
 
     prefs.writePreferences(window.localStorage, { ...prefs.DEFAULT_PREFERENCES, shortcutN: false, openAddOnLaunch: true });
 
-    expect(window.localStorage.getItem('budget.openAddOnLaunch')).toBeNull();
+    expect(window.localStorage.getItem('hoardwise.openAddOnLaunch')).toBeNull();
     expect(prefs.readPreferences(window.localStorage)).toEqual({ ...prefs.DEFAULT_PREFERENCES, shortcutN: false, openAddOnLaunch: true });
   });
 

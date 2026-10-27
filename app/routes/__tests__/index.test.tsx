@@ -450,20 +450,20 @@ describe('Home money ahead', () => {
   });
 
   it('says when pay day is and what bills fall due before it, as plain facts', () => {
-    window.localStorage.setItem('budget.preferences', JSON.stringify({ payDay: 25 }));
+    window.localStorage.setItem('hoardwise.preferences', JSON.stringify({ payDay: 25 }));
     renderHome();
     expect(screen.getByText('Next pay day: Fri 25 Sep, in 15 days.')).toBeInTheDocument();
     expect(screen.getByText('Bills due before then: £850.00 (1 bill).')).toBeInTheDocument();
   });
 
   it('says so when nothing is due before pay day', () => {
-    window.localStorage.setItem('budget.preferences', JSON.stringify({ payDay: 15 }));
+    window.localStorage.setItem('hoardwise.preferences', JSON.stringify({ payDay: 15 }));
     renderHome();
     expect(screen.getByText('No bills are due before then.')).toBeInTheDocument();
   });
 
   it('is not shown on another month', () => {
-    window.localStorage.setItem('budget.preferences', JSON.stringify({ payDay: 25 }));
+    window.localStorage.setItem('hoardwise.preferences', JSON.stringify({ payDay: 25 }));
     renderHome('/?month=2026-08');
     expect(screen.queryByText(/Next pay day/)).not.toBeInTheDocument();
   });

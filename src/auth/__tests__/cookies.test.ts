@@ -13,32 +13,32 @@ function event(over: { method?: string; headers?: Record<string, string>; cookie
 
 describe('readSessionCookie', () => {
   it('reads the API Gateway cookies array', () => {
-    expect(readSessionCookie(event({ cookies: ['theme=dark', 'budget_session=abc'] }), false)).toBe('abc');
+    expect(readSessionCookie(event({ cookies: ['theme=dark', 'hoardwise_session=abc'] }), false)).toBe('abc');
   });
 
   it('reads a Cookie header when there is no cookies array', () => {
-    expect(readSessionCookie(event({ headers: { cookie: 'a=1; budget_session=xyz; b=2' } }), false)).toBe('xyz');
+    expect(readSessionCookie(event({ headers: { cookie: 'a=1; hoardwise_session=xyz; b=2' } }), false)).toBe('xyz');
   });
 
   it('keeps an = inside the value', () => {
-    expect(readSessionCookie(event({ cookies: ['budget_session=ab=cd'] }), false)).toBe('ab=cd');
+    expect(readSessionCookie(event({ cookies: ['hoardwise_session=ab=cd'] }), false)).toBe('ab=cd');
   });
 
   it('uses the first of duplicate cookies, so a later one cannot override it', () => {
-    expect(readSessionCookie(event({ cookies: ['budget_session=first', 'budget_session=second'] }), false)).toBe('first');
+    expect(readSessionCookie(event({ cookies: ['hoardwise_session=first', 'hoardwise_session=second'] }), false)).toBe('first');
   });
 
   it('is undefined with no cookie, an empty value, or a lookalike name', () => {
     expect(readSessionCookie(event(), false)).toBeUndefined();
-    expect(readSessionCookie(event({ cookies: ['budget_session='] }), false)).toBeUndefined();
-    expect(readSessionCookie(event({ cookies: ['xbudget_session=abc'] }), false)).toBeUndefined();
+    expect(readSessionCookie(event({ cookies: ['hoardwise_session='] }), false)).toBeUndefined();
+    expect(readSessionCookie(event({ cookies: ['xhoardwise_session=abc'] }), false)).toBeUndefined();
   });
 });
 
 describe('cookie formatting', () => {
   it('sets HttpOnly, SameSite=Strict, Path=/ and a 30-day Max-Age', () => {
     const cookie = sessionCookie('tok', true);
-    expect(cookie).toContain('budget_session=tok');
+    expect(cookie).toContain('hoardwise_session=tok');
     for (const part of ['HttpOnly', 'SameSite=Strict', 'Path=/', 'Secure', `Max-Age=${SESSION_LIFETIME_SECONDS}`]) {
       expect(cookie).toContain(part);
     }
@@ -50,7 +50,7 @@ describe('cookie formatting', () => {
 
   it('clears with Max-Age=0', () => {
     expect(clearedCookie(true)).toContain('Max-Age=0');
-    expect(clearedCookie(true)).toContain('budget_session=;');
+    expect(clearedCookie(true)).toContain('hoardwise_session=;');
   });
 });
 
@@ -93,24 +93,24 @@ describe('originAllowed', () => {
 
 describe('the __Host- cookie name', () => {
   it('uses the plain name without Secure and the __Host- name with it', () => {
-    expect(cookieName(false)).toBe('budget_session');
-    expect(cookieName(true)).toBe('__Host-budget_session');
+    expect(cookieName(false)).toBe('hoardwise_session');
+    expect(cookieName(true)).toBe('__Host-hoardwise_session');
   });
 
   it('reads only the name for the current mode, so a tossed plain cookie is ignored while Secure', () => {
-    const cookies = ['budget_session=tossed', '__Host-budget_session=real'];
+    const cookies = ['hoardwise_session=tossed', '__Host-hoardwise_session=real'];
     expect(readSessionCookie(event({ cookies }), true)).toBe('real');
-    expect(readSessionCookie(event({ cookies: ['budget_session=tossed'] }), true)).toBeUndefined();
-    expect(readSessionCookie(event({ cookies: ['__Host-budget_session=real'] }), false)).toBeUndefined();
+    expect(readSessionCookie(event({ cookies: ['hoardwise_session=tossed'] }), true)).toBeUndefined();
+    expect(readSessionCookie(event({ cookies: ['__Host-hoardwise_session=real'] }), false)).toBeUndefined();
   });
 
   it('sets a __Host- cookie with Secure, Path=/ and no Domain', () => {
     const cookie = sessionCookie('tok', true);
-    expect(cookie.startsWith('__Host-budget_session=tok;')).toBe(true);
+    expect(cookie.startsWith('__Host-hoardwise_session=tok;')).toBe(true);
     expect(cookie).toContain('Secure');
     expect(cookie).toContain('Path=/');
     expect(cookie).not.toContain('Domain');
-    expect(clearedCookie(true).startsWith('__Host-budget_session=;')).toBe(true);
+    expect(clearedCookie(true).startsWith('__Host-hoardwise_session=;')).toBe(true);
   });
 });
 
@@ -133,5 +133,12 @@ describe('originAllowed with APP_ORIGIN', () => {
 
   it('still lets safe methods through', () => {
     expect(originAllowed(event({ method: 'GET' }), 'https://budget.example.com')).toBe(true);
+  });
+});
+
+describe('the names used before 0.3.0', () => {
+  it('are no longer accepted as the session', () => {
+    expect(readSessionCookie(event({ cookies: ['budget_session=abc'] }), false)).toBeUndefined();
+    expect(readSessionCookie(event({ cookies: ['__Host-budget_session=abc'] }), true)).toBeUndefined();
   });
 });

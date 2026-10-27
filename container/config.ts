@@ -1,3 +1,5 @@
+import { existsSync } from 'node:fs';
+
 export class ConfigError extends Error {
   readonly problems: string[];
 
@@ -66,7 +68,23 @@ function checkDirectory(name: string, value: string, problems: string[]): void {
   if (!safe) problems.push(`${name} must be an absolute path using only letters, digits and . _ / -, with no .. segment and not /`);
 }
 
-export function parseConfig(env: NodeJS.ProcessEnv): ContainerConfig {
+export const SQLITE_FILE = 'hoardwise.sqlite';
+// Installs created before the rename keep this file as it is: renaming a live SQLite file also means moving its -wal and
+// -shm files, and a crash between the moves can lose recent writes.
+export const LEGACY_SQLITE_FILE = 'budget.sqlite';
+
+export function chooseSqliteFile(dataDir: string, exists: (path: string) => boolean): { path: string; warning?: string } {
+  const current = `${dataDir}/${SQLITE_FILE}`;
+  const legacy = `${dataDir}/${LEGACY_SQLITE_FILE}`;
+  if (!exists(current)) return { path: exists(legacy) ? legacy : current };
+  if (!exists(legacy)) return { path: current };
+  return {
+    path: current,
+    warning: `Both ${SQLITE_FILE} and ${LEGACY_SQLITE_FILE} exist in ${dataDir}. Using ${SQLITE_FILE}; the data in ${LEGACY_SQLITE_FILE} is not being read. If ${SQLITE_FILE} is an empty file created by mistake, stop the app and remove it so ${LEGACY_SQLITE_FILE} is used again.`,
+  };
+}
+
+export function parseConfig(env: NodeJS.ProcessEnv, exists: (path: string) => boolean = existsSync): ContainerConfig {
   const problems: string[] = [];
   const warnings: string[] = [];
 
@@ -127,8 +145,11 @@ export function parseConfig(env: NodeJS.ProcessEnv): ContainerConfig {
 
   if (problems.length > 0) throw new ConfigError(problems);
 
+  const sqlite = chooseSqliteFile(dataDir, exists);
+  if (sqlite.warning) warnings.push(sqlite.warning);
+
   return {
-    dataDir, sqlitePath: `${dataDir}/budget.sqlite`, port, tlsDomain, tlsEmail, appOrigin, secureCookie,
+    dataDir, sqlitePath: sqlite.path, port, tlsDomain, tlsEmail, appOrigin, secureCookie,
     trustProxy, backupHour, backupKeep, backupDir, warnings,
   };
 }

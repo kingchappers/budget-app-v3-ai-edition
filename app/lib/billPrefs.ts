@@ -1,7 +1,7 @@
 import { addDaysIso } from './months';
 
-const SNOOZE_PREFIX = 'budget.billSnoozes.';
-const DISMISSED_PREFIX = 'budget.billDismissedMatches.';
+const SNOOZE_PREFIX = 'hoardwise.billSnoozes.';
+const DISMISSED_PREFIX = 'hoardwise.billDismissedMatches.';
 const MAX_DISMISSED = 200;
 
 type SnoozeMap = Record<string, string>;

@@ -21,7 +21,7 @@ Environment variables only. The container sets `AUTH_MODE`, `STORE` and `SQLITE_
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `DATA_DIR` | `/data` | Volume holding the database (`budget.sqlite`), backups, the `caddy/` certificate storage and `caddy-data/` (Caddy's own data directory, such as its instance id). An absolute path using only letters, digits and `. _ / -`, with no `..` segment and not `/` |
+| `DATA_DIR` | `/data` | Volume holding the database (`hoardwise.sqlite`; an install created before 0.3.0 keeps its `budget.sqlite`, which is used as it is and never renamed; if both files are present the app uses `hoardwise.sqlite`), backups, the `caddy/` certificate storage and `caddy-data/` (Caddy's own data directory, such as its instance id). An absolute path using only letters, digits and `. _ / -`, with no `..` segment and not `/` |
 | `PORT` | `8080` | Port the app listens on inside the container. Must be a fixed port (not 0) with `TLS_DOMAIN` |
 | `TLS_DOMAIN` | unset | A plain hostname such as `budget.example.com` for automatic HTTPS on ports 80 and 443. Unset means plain HTTP |
 | `TLS_EMAIL` | unset | Optional contact address for the certificate authority. Needs `TLS_DOMAIN` |
@@ -64,7 +64,7 @@ Run the plain-HTTP variant and let your proxy terminate HTTPS:
 - **Publish the port on loopback only** (`127.0.0.1:8080:8080`, as in the compose file) when the proxy runs on the same host. If it runs elsewhere, use a private network or a firewall, and only then publish on a specific private address. Never publish this port to the internet: with `TRUST_PROXY` on, the app believes `X-Forwarded-*` headers from whoever can reach it.
 - Set `TRUST_PROXY=true` only if the proxy sets `X-Forwarded-*` itself and nothing else can reach the app's port.
 - Forward the original `Host` header.
-- The session cookie is named `__Host-budget_session` and is `Secure` only when the effective origin is https. With plain HTTP and no `APP_ORIGIN`, it is named `budget_session`, is not `Secure`, and the container logs a warning at start. If you are behind HTTPS but cannot set `APP_ORIGIN`, set `COOKIE_SECURE=true`.
+- The session cookie is named `__Host-hoardwise_session` and is `Secure` only when the effective origin is https. With plain HTTP and no `APP_ORIGIN`, it is named `hoardwise_session`, is not `Secure`, and the container logs a warning at start. If you are behind HTTPS but cannot set `APP_ORIGIN`, set `COOKIE_SECURE=true`.
 
 ## Running on a managed host
 
@@ -90,14 +90,16 @@ Stopping: a clean shutdown stops taking new requests (they get a 503), lets open
 
 ## Backups and restore
 
+> **Check which file your data folder holds first.** Run `docker compose exec budget ls /data`. Use the name you see, `hoardwise.sqlite` or `budget.sqlite`, in every command that follows and in "Forgot your password" and "Moving your data from AWS". On an install from before 0.3.0, running a command with the wrong name creates an empty file with that name, and the app then starts on the empty file and looks like it has lost your data. Your data is still in the other file: stop the app, delete the empty file, and start again.
+
 - A backup is taken automatically at the first hourly check at or after `BACKUP_HOUR` (03:00 by default, in `TZ`, default UTC; the check runs hourly from when the container started) once the newest backup is older than that hour on the current day. That gives one backup per day, and a missed hour or a skipped day is made up at the next check. A backup taken before `BACKUP_HOUR` (a catch-up at start, say) counts as the previous day's, so the check at `BACKUP_HOUR` takes another. Backups go into `/data/backups`. The newest `BACKUP_KEEP` (default 7) are kept. Each is integrity-checked before it counts, so a corrupt copy never causes a good one to be pruned, and is owner-only. `BACKUP_KEEP=0` turns this off.
-- File names are `budget-YYYYMMDD-HHMMSS.sqlite` in local time (`TZ`).
+- File names are `hoardwise-YYYYMMDD-HHMMSS.sqlite` in local time (`TZ`). Backups made before 0.3.0 are named `budget-…`; they are kept, restored and pruned in the same way.
 - At start, if there is no backup or the newest is more than a day old, one is taken straight away.
 - Backups are ordered by file modification time, so do not `touch` or re-copy old backup files in the backups directory.
 - For a backup on demand (the file is never overwritten, so use a new name):
 
   ```bash
-  docker compose exec budget sh -c 'STORE=sqlite SQLITE_PATH=/data/budget.sqlite node build/store-cli/store-cli.js backup --out /data/manual-backup.sqlite'
+  docker compose exec budget sh -c 'STORE=sqlite SQLITE_PATH=/data/hoardwise.sqlite node build/store-cli/store-cli.js backup --out /data/manual-backup.sqlite'
   ```
 
 - **Backups on the same volume do not protect you from losing the volume or the disk.** Copy them somewhere else regularly. The compose examples put backups on their own volume to make that easy, for example:
@@ -110,7 +112,7 @@ Stopping: a clean shutdown stops taking new requests (they get a 503), lets open
 
   ```bash
   docker compose stop
-  docker compose run --rm --no-deps --entrypoint sh budget -c 'rm -f /data/budget.sqlite-wal /data/budget.sqlite-shm && cp /data/backups/budget-YYYYMMDD-HHMMSS.sqlite /data/budget.sqlite'
+  docker compose run --rm --no-deps --entrypoint sh budget -c 'rm -f /data/hoardwise.sqlite-wal /data/hoardwise.sqlite-shm && cp /data/backups/hoardwise-YYYYMMDD-HHMMSS.sqlite /data/hoardwise.sqlite'
   docker compose up -d
   ```
 
@@ -118,15 +120,15 @@ Stopping: a clean shutdown stops taking new requests (they get a 503), lets open
 
   ```bash
   docker compose stop
-  docker compose run --rm --no-deps -T --entrypoint sh budget -c 'rm -f /data/budget.sqlite-wal /data/budget.sqlite-shm; umask 077; cat > /data/budget.sqlite' < ./budget-backup.sqlite
+  docker compose run --rm --no-deps -T --entrypoint sh budget -c 'rm -f /data/hoardwise.sqlite-wal /data/hoardwise.sqlite-shm; umask 077; cat > /data/hoardwise.sqlite' < ./budget-backup.sqlite
   docker compose up -d
   ```
 
-  A file brought in with `docker cp` is owned by root, which the app cannot write; if you used it, fix the owner with `docker compose run --rm --no-deps -u 0 --entrypoint chown budget 10001:10001 /data/budget.sqlite` (or `docker compose exec -u 0 budget chown 10001:10001 /data/budget.sqlite` while it is running).
+  A file brought in with `docker cp` is owned by root, which the app cannot write; if you used it, fix the owner with `docker compose run --rm --no-deps -u 0 --entrypoint chown budget 10001:10001 /data/hoardwise.sqlite` (or `docker compose exec -u 0 budget chown 10001:10001 /data/hoardwise.sqlite` while it is running).
 
 ### Check your backups are working
 
-After the first start, run `docker compose exec budget ls -l /data/backups`. A file named `budget-YYYYMMDD-HHMMSS.sqlite` should exist, written at start-up. If the directory is empty or `docker compose logs budget` shows "Backup failed", the likely cause is volume ownership (the app runs as uid 10001 and cannot write a root-owned volume). Repair it with:
+After the first start, run `docker compose exec budget ls -l /data/backups`. A file named `hoardwise-YYYYMMDD-HHMMSS.sqlite` (`budget-…` for older backups) should exist, written at start-up. If the directory is empty or `docker compose logs budget` shows "Backup failed", the likely cause is volume ownership (the app runs as uid 10001 and cannot write a root-owned volume). Repair it with:
 
 ```bash
 docker compose exec -u 0 budget chown -R 10001:10001 /data/backups
@@ -143,8 +145,10 @@ If the app cannot delete `RESET_PASSWORD` (for example the folder is read-only) 
 **With a shell.** The same effect from the command line:
 
 ```bash
-docker compose exec budget sh -c 'STORE=sqlite SQLITE_PATH=/data/budget.sqlite node build/store-cli/store-cli.js reset-password'
+docker compose exec budget sh -c 'STORE=sqlite SQLITE_PATH=/data/hoardwise.sqlite node build/store-cli/store-cli.js reset-password'
 ```
+
+On an install from before 0.3.0, use `budget.sqlite` in place of `hoardwise.sqlite` in this command if that is the file in your data folder.
 
 It prompts for the new password (never taken from arguments), ends every session and clears any login lock-out.
 
@@ -159,9 +163,11 @@ Export and import only touch your own data, never the login records, so the step
 
    ```bash
    docker compose exec -T budget sh -c 'umask 077; cat > /tmp/budget-export.jsonl' < budget-export.jsonl
-   docker compose exec -e STORE=sqlite -e SQLITE_PATH=/data/budget.sqlite budget node build/store-cli/store-cli.js import --in /tmp/budget-export.jsonl --as-user 'local|<uuid>'
+   docker compose exec -e STORE=sqlite -e SQLITE_PATH=/data/hoardwise.sqlite budget node build/store-cli/store-cli.js import --in /tmp/budget-export.jsonl --as-user 'local|<uuid>'
    docker compose exec budget rm /tmp/budget-export.jsonl
    ```
+
+   On an install from before 0.3.0, use `budget.sqlite` in place of `hoardwise.sqlite` in this command if that is the file in your data folder.
 
 5. Delete the export file on the host too, and never commit it. Push subscriptions are not carried over.
 

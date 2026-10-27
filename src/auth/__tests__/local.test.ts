@@ -44,12 +44,12 @@ describe('createLocalProvider', () => {
   it('authenticates a live session cookie', async () => {
     const provider = await createLocalProvider({});
     const token = await createSession(store, 'local|u1', now());
-    expect(await provider.authenticate(event({ cookie: `__Host-budget_session=${token}` }))).toEqual({ userId: 'local|u1' });
+    expect(await provider.authenticate(event({ cookie: `__Host-hoardwise_session=${token}` }))).toEqual({ userId: 'local|u1' });
   });
 
   it.each([
     ['no cookie', undefined],
-    ['an unknown cookie', '__Host-budget_session=bogus'],
+    ['an unknown cookie', '__Host-hoardwise_session=bogus'],
   ])('answers 401 for %s', async (_label, cookie) => {
     const provider = await createLocalProvider({});
     const result = await provider.authenticate(event({ cookie }));
@@ -59,29 +59,29 @@ describe('createLocalProvider', () => {
   it('answers 403 for a state-changing request from another origin, even with a valid cookie', async () => {
     const provider = await createLocalProvider({});
     const token = await createSession(store, 'local|u1', now());
-    const result = await provider.authenticate(event({ method: 'DELETE', cookie: `__Host-budget_session=${token}`, origin: 'https://evil.example.com' }));
+    const result = await provider.authenticate(event({ method: 'DELETE', cookie: `__Host-hoardwise_session=${token}`, origin: 'https://evil.example.com' }));
     expect('rejection' in result && result.rejection.statusCode).toBe(403);
   });
 
-  it('ignores a plain budget_session cookie while cookies are Secure', async () => {
+  it('ignores a plain hoardwise_session cookie while cookies are Secure', async () => {
     const provider = await createLocalProvider({});
     const token = await createSession(store, 'local|u1', now());
-    const result = await provider.authenticate(event({ cookie: `budget_session=${token}` }));
+    const result = await provider.authenticate(event({ cookie: `hoardwise_session=${token}` }));
     expect('rejection' in result && result.rejection.statusCode).toBe(401);
   });
 
   it('uses the plain name when COOKIE_SECURE=false', async () => {
     const provider = await createLocalProvider({ COOKIE_SECURE: 'false' });
     const token = await createSession(store, 'local|u1', now());
-    expect(await provider.authenticate(event({ cookie: `budget_session=${token}` }))).toEqual({ userId: 'local|u1' });
-    const hosted = await provider.authenticate(event({ cookie: `__Host-budget_session=${token}` }));
+    expect(await provider.authenticate(event({ cookie: `hoardwise_session=${token}` }))).toEqual({ userId: 'local|u1' });
+    const hosted = await provider.authenticate(event({ cookie: `__Host-hoardwise_session=${token}` }));
     expect('rejection' in hosted && hosted.rejection.statusCode).toBe(401);
   });
 
   it('checks Origin against APP_ORIGIN, not the Host header, for state-changing requests', async () => {
     const provider = await createLocalProvider({ APP_ORIGIN: 'https://budget.example.com' });
     const token = await createSession(store, 'local|u1', now());
-    const cookie = `__Host-budget_session=${token}`;
+    const cookie = `__Host-hoardwise_session=${token}`;
     const ok = await provider.authenticate(event({ method: 'DELETE', cookie, origin: 'https://budget.example.com' }));
     expect(ok).toEqual({ userId: 'local|u1' });
     const bad = await provider.authenticate(event({ method: 'DELETE', cookie, origin: 'https://budget.example.com.evil.test' }));

@@ -1,9 +1,9 @@
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { SESSION_LIFETIME_SECONDS } from './localData';
 
-const PLAIN_COOKIE_NAME = 'budget_session';
+const PLAIN_COOKIE_NAME = 'hoardwise_session';
 // Browsers refuse to let a sibling subdomain set a __Host- cookie (cookie tossing). The prefix requires Secure, Path=/ and no Domain.
-const HOST_COOKIE_NAME = '__Host-budget_session';
+const HOST_COOKIE_NAME = '__Host-hoardwise_session';
 
 export function cookieName(secure: boolean): string {
   return secure ? HOST_COOKIE_NAME : PLAIN_COOKIE_NAME;
