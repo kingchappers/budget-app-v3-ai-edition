@@ -1,18 +1,25 @@
 # Changelog
 
-Releases of the self-hosted container image (`ghcr.io/kingchappers/budget-app-v3-ai-edition`). Versions follow `vX.Y.Z` tags; `edge` is the latest `main` and is not a release. See "Upgrading" in [docs/SELF-HOSTING.md](docs/SELF-HOSTING.md) before you update, and take a backup first.
+Releases of the self-hosted container image (`ghcr.io/kingchappers/hoardwise`; releases up to 0.2.0 were published as `ghcr.io/kingchappers/budget-app-v3-ai-edition`). Versions follow `vX.Y.Z` tags; `edge` is the latest `main` and is not a release. See "Upgrading" in [docs/SELF-HOSTING.md](docs/SELF-HOSTING.md) before you update, and take a backup first.
 
 ## Unreleased
-
-- **Self-hosted sign-in cookie renamed.** The session cookie is now `hoardwise_session` (`__Host-hoardwise_session` over HTTPS), so everyone signs in once more after updating.
-- **Database and backup names.** New installs create `hoardwise.sqlite` and `hoardwise-…` backups. An install that already has `budget.sqlite` keeps using it, and older `budget-…` backups are still kept, restored and pruned. Nothing is renamed on disk.
-- **Saved browser settings** (preferences, snoozed bills and similar) move to new names the first time the app loads, with nothing lost.
-- **Rolling back.** If you go back to a version before 0.3.0 after updating, you sign in again and settings changed since the update (browser preferences) are not carried back; your database and backups are untouched.
 
 Not in the image yet, or not part of it:
 
 - **Browser demo.** A separate static build of the app with an invented household, running entirely in the visitor's browser. It is published at https://demo.budget.scgrid.xyz and is not part of the container image.
 - **Weekly image scan.** The published `latest` and `edge` images are scanned for high and critical vulnerabilities every Monday.
+
+## 0.3.0 - 2026-10-27
+
+The app is now called **Hoardwise**.
+
+- **The image is renamed** to `ghcr.io/kingchappers/hoardwise`. Update the `image:` line in your compose file; see "Upgrading" in `docs/SELF-HOSTING.md`. The old name `ghcr.io/kingchappers/budget-app-v3-ai-edition` keeps its existing tags (`0.1.0`, `0.2.0`, `latest`) but gets no further updates.
+- The repository is now `kingchappers/hoardwise`; the old address redirects.
+- **Self-hosted sign-in cookie renamed.** The session cookie is now `hoardwise_session` (`__Host-hoardwise_session` over HTTPS), so everyone signs in once more after updating.
+- **Database and backup names.** New installs create `hoardwise.sqlite` and `hoardwise-…` backups. An install that already has `budget.sqlite` keeps using it, and older `budget-…` backups are still kept, restored and pruned. Nothing is renamed on disk.
+- **Saved browser settings** (preferences, snoozed bills and similar) move to new names the first time the app loads, with nothing lost.
+- **Rolling back.** If you go back to a version before 0.3.0 after updating, you sign in again and settings changed since the update (browser preferences) are not carried back; your database and backups are untouched.
+- Nothing else is needed on upgrade: your data, backups and account carry over, and you sign in once more.
 
 ## 0.2.0 - 2026-10-17
 
