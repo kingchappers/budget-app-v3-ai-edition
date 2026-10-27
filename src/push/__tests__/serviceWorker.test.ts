@@ -93,7 +93,7 @@ describe('showing a reminder', () => {
 
   it('still shows something plain when the message cannot be read, since it must show something', async () => {
     await pushEvent(new Error('bad json'), scope);
-    expect(scope.showNotification).toHaveBeenCalledWith('Bill reminder', expect.objectContaining({ body: 'Open Budget to see what is due.', actions: [] }));
+    expect(scope.showNotification).toHaveBeenCalledWith('Bill reminder', expect.objectContaining({ body: 'Open Hoardwise to see what is due.', actions: [] }));
   });
 
   it('does the same for a push with no content', async () => {

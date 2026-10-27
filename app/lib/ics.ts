@@ -173,7 +173,7 @@ function eventLines(bill: Recurring, categories: Category[], rule: Rule, today: 
     `DTSTART;VALUE=DATE:${compactDate(start)}`,
     `RRULE:${rule.rrule}`,
     `SUMMARY:${escapeText(summary)}`,
-    `DESCRIPTION:${escapeText('From your Budget app. Download the calendar again after changing your bills.')}`,
+    `DESCRIPTION:${escapeText('From your Hoardwise app. Download the calendar again after changing your bills.')}`,
     'TRANSP:TRANSPARENT',
     'BEGIN:VALARM',
     'ACTION:DISPLAY',
@@ -194,10 +194,10 @@ export function buildBillsCalendar({ bills, categories, today = todayIso(), now 
   const lines = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
-    'PRODID:-//Budget//Bills//EN',
+    'PRODID:-//Hoardwise//Bills//EN',
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
-    'X-WR-CALNAME:Budget bills',
+    'X-WR-CALNAME:Hoardwise bills',
     ...bills.filter(isCalendarBill).flatMap(bill => rulesFor(bill).flatMap(rule => eventLines(bill, categories, rule, today, stamp))),
     'END:VCALENDAR',
   ];

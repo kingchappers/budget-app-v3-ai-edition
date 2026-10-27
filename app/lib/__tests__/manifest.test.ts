@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
+import { APP_NAME, APP_DESCRIPTION } from '../pageTitle';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = path.resolve(HERE, '../../../public');
@@ -17,6 +18,7 @@ interface ManifestIcon {
 interface Manifest {
   name: string;
   short_name: string;
+  description: string;
   id: string;
   start_url: string;
   scope: string;
@@ -47,8 +49,9 @@ describe('web manifest', () => {
   it('names the app and launches it standalone from the site root', () => {
     const manifest = readManifest();
 
-    expect(manifest.name).toBe('Budget');
-    expect(manifest.short_name).toBe('Budget');
+    expect(manifest.name).toBe(APP_NAME);
+    expect(manifest.short_name).toBe(APP_NAME);
+    expect(manifest.description).toBe(APP_DESCRIPTION);
     expect(manifest.id).toBe('/');
     expect(manifest.start_url).toBe('/');
     expect(manifest.scope).toBe('/');

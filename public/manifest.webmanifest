@@ -1,6 +1,7 @@
 {
-  "name": "Budget",
-  "short_name": "Budget",
+  "name": "Hoardwise",
+  "short_name": "Hoardwise",
+  "description": "A calm way to keep track of your money.",
   "id": "/",
   "start_url": "/",
   "scope": "/",
