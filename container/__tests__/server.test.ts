@@ -85,7 +85,7 @@ describe('serving', () => {
     });
     expect(setup.status).toBe(200);
     const cookie = setup.headers.getSetCookie()[0].split(';')[0];
-    expect(cookie.startsWith('budget_session=')).toBe(true);
+    expect(cookie.startsWith('hoardwise_session=')).toBe(true);
 
     expect((await fetch(`${base}/api/categories`, { headers: { Cookie: cookie } })).status).toBe(200);
     expect((await fetch(`${base}/api/categories`)).status).toBe(401);

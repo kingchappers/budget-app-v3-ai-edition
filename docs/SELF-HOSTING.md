@@ -64,7 +64,7 @@ Run the plain-HTTP variant and let your proxy terminate HTTPS:
 - **Publish the port on loopback only** (`127.0.0.1:8080:8080`, as in the compose file) when the proxy runs on the same host. If it runs elsewhere, use a private network or a firewall, and only then publish on a specific private address. Never publish this port to the internet: with `TRUST_PROXY` on, the app believes `X-Forwarded-*` headers from whoever can reach it.
 - Set `TRUST_PROXY=true` only if the proxy sets `X-Forwarded-*` itself and nothing else can reach the app's port.
 - Forward the original `Host` header.
-- The session cookie is named `__Host-budget_session` and is `Secure` only when the effective origin is https. With plain HTTP and no `APP_ORIGIN`, it is named `budget_session`, is not `Secure`, and the container logs a warning at start. If you are behind HTTPS but cannot set `APP_ORIGIN`, set `COOKIE_SECURE=true`.
+- The session cookie is named `__Host-hoardwise_session` and is `Secure` only when the effective origin is https. With plain HTTP and no `APP_ORIGIN`, it is named `hoardwise_session`, is not `Secure`, and the container logs a warning at start. If you are behind HTTPS but cannot set `APP_ORIGIN`, set `COOKIE_SECURE=true`.
 
 ## Running on a managed host
 

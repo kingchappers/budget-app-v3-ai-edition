@@ -209,14 +209,14 @@ async function main() {
   const cookie = setCookie.split(';')[0];
 
   if (tls || proxy) {
-    step('the session cookie is __Host- and Secure', setCookie.startsWith('__Host-budget_session=') && setCookie.includes('Secure'), setCookie);
+    step('the session cookie is __Host- and Secure', setCookie.startsWith('__Host-hoardwise_session=') && setCookie.includes('Secure'), setCookie);
   }
   if (tls) {
     const redirect = await request(`http://127.0.0.1:${http80}`, '/', { headers: { Host: 'localhost' } });
     step('HTTP redirects to HTTPS', [301, 302, 307, 308].includes(redirect.status) && String(redirect.headers.location).startsWith('https://'), `${redirect.status} ${redirect.headers.location}`);
   }
   if (!tls && !proxy) {
-    step('the session cookie is set', cookie.startsWith('budget_session='), setCookie);
+    step('the session cookie is set', cookie.startsWith('hoardwise_session='), setCookie);
   }
 
   const me = await get('/api/auth/me', { Cookie: cookie });
