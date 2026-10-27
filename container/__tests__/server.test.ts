@@ -132,6 +132,26 @@ describe('boot', () => {
     await expect(startServer(env(), { clientDir })).rejects.toThrow(/newer version/);
   });
 
+  it('keeps using a budget.sqlite from an older install and does not create a second database', async () => {
+    const { DatabaseSync } = await import('node:sqlite');
+    const legacy = join(dir, 'data', 'budget.sqlite');
+    mkdirSync(join(dir, 'data'), { recursive: true });
+    const seeded = new DatabaseSync(legacy);
+    seeded.exec('CREATE TABLE older_install_marker (id INTEGER)');
+    seeded.close();
+
+    const base = await start();
+    expect((await fetch(`${base}/healthz`)).status).toBe(200);
+    await running?.close();
+    running = undefined;
+
+    expect(existsSync(join(dir, 'data', 'hoardwise.sqlite'))).toBe(false);
+    const reopened = new DatabaseSync(legacy, { readOnly: true });
+    const marker = reopened.prepare("SELECT name FROM sqlite_master WHERE name = 'older_install_marker'").all();
+    reopened.close();
+    expect(marker).toHaveLength(1);
+  });
+
   it('reports a port that is already in use, and leaves nothing running', async () => {
     const blocker = createServer();
     await new Promise<void>(resolve => blocker.listen(0, '0.0.0.0', resolve));
@@ -142,7 +162,7 @@ describe('boot', () => {
       // A different data directory proves the registries were cleared: a leftover store would be reused instead.
       const base = await start({ DATA_DIR: join(dir, 'data2') });
       expect((await fetch(`${base}/healthz`)).status).toBe(200);
-      expect(existsSync(join(dir, 'data2', 'budget.sqlite'))).toBe(true);
+      expect(existsSync(join(dir, 'data2', 'hoardwise.sqlite'))).toBe(true);
     } finally {
       blocker.close();
     }

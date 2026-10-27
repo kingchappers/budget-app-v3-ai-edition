@@ -185,7 +185,7 @@ async function main() {
     "const { DatabaseSync } = require('node:sqlite'); const db = new DatabaseSync(process.argv[1], { readOnly: true }); console.log(db.prepare('PRAGMA integrity_check').get().integrity_check);",
     backupFile);
   step('the start-up backup passes an independent PRAGMA integrity_check', integrity === 'ok', integrity);
-  const dbMode = docker('exec', name, 'stat', '-c', '%a', '/data/budget.sqlite');
+  const dbMode = docker('exec', name, 'stat', '-c', '%a', '/data/hoardwise.sqlite');
   step('the database file is mode 600', dbMode === '600', dbMode);
 
   const health = await waitFor(() => {
@@ -257,7 +257,7 @@ async function main() {
   const again = await get('/api/auth/status');
   step('setup stays closed after a restart', JSON.parse(again.body).setupRequired === false, again.body);
 
-  const backup = docker('exec', '-e', 'STORE=sqlite', '-e', 'SQLITE_PATH=/data/budget.sqlite', name,
+  const backup = docker('exec', '-e', 'STORE=sqlite', '-e', 'SQLITE_PATH=/data/hoardwise.sqlite', name,
     'node', 'build/store-cli/store-cli.js', 'backup', '--out', '/data/manual-backup.sqlite');
   step('store-cli backup works inside the image', backup.includes('Backed up'), backup);
 
