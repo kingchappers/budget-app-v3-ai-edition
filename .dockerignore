@@ -10,6 +10,7 @@ docs
 **/*.sqlite-shm
 **/*.sqlite-wal
 **/budget-export*.jsonl
+**/hoardwise-export*.jsonl
 **/.env
 **/.env.*
 **/*.pem

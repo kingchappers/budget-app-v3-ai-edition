@@ -1,8 +1,8 @@
-# Budget app with built-in HTTPS. Point your domain's DNS at this machine and open ports 80 and 443.
+# Hoardwise with built-in HTTPS. Point your domain's DNS at this machine and open ports 80 and 443.
 # Copy to compose.yml, change TLS_DOMAIN (and TLS_EMAIL), then: docker compose up -d
 services:
-  budget:
-    image: ghcr.io/kingchappers/budget-app-v3-ai-edition:latest
+  hoardwise:
+    image: ghcr.io/kingchappers/hoardwise:latest
     restart: unless-stopped
     # A clean shutdown can take about 12 seconds (10 s for open connections, up to 2 s for running requests).
     # Docker's default of 10 s would kill the process before the database is closed cleanly.
@@ -12,7 +12,7 @@ services:
       - "443:443"
       - "443:443/udp"   # optional: enables HTTP/3
     environment:
-      TLS_DOMAIN: budget.example.com
+      TLS_DOMAIN: hoardwise.example.com
       TLS_EMAIL: you@example.com
       # BACKUP_HOUR: "3"   # first hourly check at or after this hour takes the daily backup, in TZ (default UTC)
       # BACKUP_KEEP: "7"   # newest backups kept; 0 turns them off
@@ -26,6 +26,7 @@ services:
       # are working" in docs/SELF-HOSTING.md.
       - budget-backups:/data/backups
 
+# The volume names keep their old prefix on purpose, so an existing install keeps its data.
 volumes:
   budget-data:
   budget-backups:
