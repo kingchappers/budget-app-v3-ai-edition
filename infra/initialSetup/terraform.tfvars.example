@@ -1,6 +1,7 @@
 aws_region   = "eu-west-2"
 state_bucket = "your-terraform-state-bucket"
 environment  = "production"
+# Do not change app_name on an existing deployment: the DynamoDB table name is derived from it, and a new name makes OpenTofu replace the table with an empty one. It keeps the product's old name for that reason.
 app_name     = "budget-app-v3-ai-edition"
 custom_domain = "budget.scgrid.xyz"
 # The GitHub repository name (after a rename, apply this stack again or CI cannot assume the role)

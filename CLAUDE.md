@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Budget tracking app: React SPA + Auth0 + AWS Lambda. Two Lambda functions serve the app — one for static files (public), one for protected API endpoints (JWT-validated in Auth0 mode, session-validated in local mode). Infrastructure managed with OpenTofu.
+Hoardwise is a budget tracking app: React SPA + Auth0 + AWS Lambda. Two Lambda functions serve the app — one for static files (public), one for protected API endpoints (JWT-validated in Auth0 mode, session-validated in local mode). Infrastructure managed with OpenTofu.
 
 ## Commands
 

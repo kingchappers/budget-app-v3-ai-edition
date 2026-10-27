@@ -1,10 +1,8 @@
-# Authentication Tester App
+# Hoardwise
 
-This is a small scale attempt to integrate authentication within a basic react application. This is a single-page application (SPA) that allows users to login via Auth0 and make authenticated API requests to protected endpoints.
+A calm, self-hostable budgeting app: record what you spend, set a budget only if you want one, and keep money apart in pots for the things you are saving towards. It is designed to be gentle on attention, with neurodivergent users in mind.
 
-The application is deployed to AWS Lambda and API Gateway using OpenTofu (Infrastructure as Code). It's designed to be cheap to run and easy to maintain.
-
-This serves as a template for future projects requiring web apps with authentication and protected APIs.
+You can [try the demo](https://demo.budget.scgrid.xyz) with invented data, [run it yourself](docs/SELF-HOSTING.md) as a single container, or deploy it to AWS Lambda with Auth0 (the original setup, described below).
 
 ## Architecture Overview
 
