@@ -19,6 +19,9 @@ RUN react-router build \
  && rm -f build/client/config.json
 
 FROM node:24-bookworm-slim@sha256:a5f4366e834695d5f363b920c104953a535d3a9864d1bdf74566a0ebe01daee5 AS runtime
+# CI passes a new value on every build. Without it Docker reuses the cached layer below, and the packages stay as they were before
+# a Debian security fix, however recent the fix is.
+ARG DEBIAN_UPDATES_STAMP=none
 RUN apt-get update \
  && apt-get install -y --no-install-recommends tini libcap2-bin ca-certificates \
  && apt-get upgrade -y --no-install-recommends \

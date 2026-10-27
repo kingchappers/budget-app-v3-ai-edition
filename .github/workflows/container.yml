@@ -33,6 +33,7 @@ jobs:
           platforms: linux/amd64
           load: true
           tags: budget-app:ci
+          build-args: DEBIAN_UPDATES_STAMP=${{ github.run_id }}
           cache-from: type=gha,scope=container-smoke
           cache-to: type=gha,scope=container-smoke,mode=max
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4.4.0
@@ -99,5 +100,6 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           provenance: true
           sbom: true
+          build-args: DEBIAN_UPDATES_STAMP=${{ github.run_id }}
           cache-from: type=gha,scope=container-publish
           cache-to: type=gha,scope=container-publish,mode=max
