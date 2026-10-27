@@ -183,7 +183,7 @@ export async function startServer(env: NodeJS.ProcessEnv, options: StartOptions 
     let caddyExited = true;
     let caddyDir: string | undefined;
     const startCaddy = (tlsDomain: string): void => {
-      caddyDir = mkdtempSync(path.join(os.tmpdir(), 'budget-caddy-'));
+      caddyDir = mkdtempSync(path.join(os.tmpdir(), 'hoardwise-caddy-'));
       const caddyfile = path.join(caddyDir, 'Caddyfile');
       writeFileSync(
         caddyfile,
