@@ -277,19 +277,25 @@ data "aws_iam_policy_document" "github_iam_policy_document" {
       "apigateway:TagResource",
       "apigateway:UntagResource",
     ]
-    resources = [
-      "arn:aws:apigateway:${var.aws_region}::/apis",
-      "arn:aws:apigateway:${var.aws_region}::/apis/*",
-      "arn:aws:apigateway:${var.aws_region}::/v2/apis",
-      "arn:aws:apigateway:${var.aws_region}::/v2/apis/*",
-      "arn:aws:apigateway:${var.aws_region}::/tags/*",
-      "arn:aws:apigateway:${var.aws_region}::/domainnames",
-      # Only the app's own custom domain, and what hangs beneath it (its API mappings)
-      "arn:aws:apigateway:${var.aws_region}::/domainnames/${var.custom_domain}",
-      "arn:aws:apigateway:${var.aws_region}::/domainnames/${var.custom_domain}/*",
-      "arn:aws:apigateway:${var.aws_region}::/v2/domainnames/${var.custom_domain}",
-      "arn:aws:apigateway:${var.aws_region}::/v2/domainnames/${var.custom_domain}/*"
-    ]
+    resources = concat(
+      [
+        "arn:aws:apigateway:${var.aws_region}::/apis",
+        "arn:aws:apigateway:${var.aws_region}::/apis/*",
+        "arn:aws:apigateway:${var.aws_region}::/v2/apis",
+        "arn:aws:apigateway:${var.aws_region}::/v2/apis/*",
+        "arn:aws:apigateway:${var.aws_region}::/tags/*",
+        "arn:aws:apigateway:${var.aws_region}::/domainnames",
+      ],
+      # Only the app's own custom domains, and what hangs beneath them (their API mappings)
+      flatten([
+        for domain in concat([var.custom_domain], var.additional_custom_domains) : [
+          "arn:aws:apigateway:${var.aws_region}::/domainnames/${domain}",
+          "arn:aws:apigateway:${var.aws_region}::/domainnames/${domain}/*",
+          "arn:aws:apigateway:${var.aws_region}::/v2/domainnames/${domain}",
+          "arn:aws:apigateway:${var.aws_region}::/v2/domainnames/${domain}/*",
+        ]
+      ])
+    )
   }
 
   # CloudWatch Logs for Lambda and API Gateway (resource-specific)
