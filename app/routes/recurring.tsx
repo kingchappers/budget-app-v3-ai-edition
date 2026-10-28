@@ -44,7 +44,7 @@ function RecurringRow({ item, category, categoriesLoaded, skipped, onEdit, onDel
   return (
     <Group justify="space-between" wrap="nowrap" py={4}>
       <Group gap="sm" wrap="nowrap" style={{ minWidth: 0 }}>
-        <ThemeIcon variant="light" color="primary" radius="xl" size={32}>
+        <ThemeIcon variant="light" color="hoard" radius="xl" size={32}>
           <CategoryIcon icon={category?.icon ?? 'tag'} />
         </ThemeIcon>
         <div style={{ minWidth: 0 }}>

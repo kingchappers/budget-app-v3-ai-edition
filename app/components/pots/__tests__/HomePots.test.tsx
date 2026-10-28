@@ -83,6 +83,6 @@ describe('HomePots below zero', () => {
       </MantineProvider>,
     );
     const balance = screen.getByText('−£12.00');
-    expect(balance).toHaveStyle({ color: 'var(--mantine-color-attention-text)' });
+    expect(balance).toHaveStyle({ color: 'var(--mantine-color-ember-text)' });
   });
 });

@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
 import { APP_NAME, APP_DESCRIPTION } from '../pageTitle';
+import { BRAND } from '../brand';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = path.resolve(HERE, '../../../public');
@@ -56,8 +57,8 @@ describe('web manifest', () => {
     expect(manifest.start_url).toBe('/');
     expect(manifest.scope).toBe('/');
     expect(manifest.display).toBe('standalone');
-    expect(manifest.theme_color).toBe('#0f766e');
-    expect(manifest.background_color).toBe('#ffffff');
+    expect(manifest.theme_color).toBe(BRAND.pine);
+    expect(manifest.background_color).toBe(BRAND.mist);
   });
 
   it('declares 192 and 512 PNG icons that exist at exactly the declared size', () => {
@@ -91,16 +92,16 @@ describe('web manifest', () => {
 });
 
 describe('install metadata', () => {
-  it('ships a 180px apple-touch-icon and keeps the SVG source', () => {
-    expect(pngSize(publicFile('/icons/apple-touch-icon.png'))).toEqual({ width: 180, height: 180 });
-    expect(fs.existsSync(publicFile('/icons/icon.svg'))).toBe(true);
+  it('ships a 180px apple-touch-icon and an SVG favicon', () => {
+    expect(pngSize(publicFile('/apple-touch-icon.png'))).toEqual({ width: 180, height: 180 });
+    expect(fs.existsSync(publicFile('/favicon.svg'))).toBe(true);
   });
 
   it('links the manifest and the touch icon from root.tsx', () => {
     const source = fs.readFileSync(ROOT_TSX, 'utf8');
 
     expect(source).toContain('/manifest.webmanifest');
-    expect(source).toContain('/icons/apple-touch-icon.png');
+    expect(source).toContain('/apple-touch-icon.png');
     expect(source).toContain('theme-color');
   });
 });
