@@ -30,7 +30,7 @@ export function PotTrend({ values }: { values: number[] }) {
       preserveAspectRatio="none"
       style={{ width: '100%', height: 48, display: 'block' }}
     >
-      <polyline points={points} fill="none" stroke="var(--mantine-color-teal-8)" strokeWidth={2} vectorEffect="non-scaling-stroke" />
+      <polyline points={points} fill="none" stroke="var(--mantine-color-hoard-text)" strokeWidth={2} vectorEffect="non-scaling-stroke" />
     </svg>
   );
 }

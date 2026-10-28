@@ -48,13 +48,13 @@ export function CategoryProgressRow({ progress, to, pace = null, paceCaption = f
     <Stack gap={4}>
       <Group justify="space-between" wrap="nowrap">
         <Text fw={500}>{name}</Text>
-        <Text fw={600} c={isOver ? 'attention' : undefined}>
+        <Text fw={600} c={isOver ? 'ember' : undefined}>
           {remainingLabel(basisSpent, basisTarget)}{week ? ' this week' : ''}
         </Text>
       </Group>
       {showPace && paceCaption && <PaceCaption pace={pace} />}
       <div style={{ position: 'relative' }}>
-        <Progress value={percent} color={isOver ? 'attention' : 'primary'} aria-label={`${name} progress`} />
+        <Progress value={percent} color={isOver ? 'ember' : undefined} aria-label={`${name} progress`} />
         {showPace && (
           <div
             aria-hidden

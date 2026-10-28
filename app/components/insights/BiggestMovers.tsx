@@ -7,7 +7,7 @@ function MoverRow({ mover, direction }: { mover: Mover; direction: 'more' | 'les
   return (
     <Group justify="space-between">
       <Text>{mover.name}</Text>
-      <Text c={direction === 'more' ? 'attention' : 'success'}>{formatPence(Math.abs(mover.deltaPence))} {direction}</Text>
+      <Text c={direction === 'more' ? 'ember' : 'success'}>{formatPence(Math.abs(mover.deltaPence))} {direction}</Text>
     </Group>
   );
 }

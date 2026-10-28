@@ -49,7 +49,7 @@ function DayTile({ day, today, count, nothing, onOpen }: DayTileProps) {
       <Group gap={4} justify="center" mih={20} aria-hidden>
         {count > 0 && (
           <>
-            <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--mantine-color-primary-7)' }} />
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--mantine-color-hoard-7)' }} />
             <Text size="sm">{count}</Text>
           </>
         )}

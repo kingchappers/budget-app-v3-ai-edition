@@ -74,6 +74,16 @@ All code changes must follow security controls in `SECURITY.md`. Key requirement
 
 Reference control IDs in commits (e.g., "addresses AUTH-02", "fixes IO-03").
 
+## Brand and UI
+
+Follow `docs/brand.md` for anything visual (UI, colours, icons, images, copy tone). Key rules:
+- Use Mantine theme tokens (`hoard`, `gold`, `ember`) or `--hw-*` variables; never hard-code hex values.
+- Gold (`#D9A441`) is for the logo and fills only, never text on light backgrounds.
+- All text meets WCAG AA. Colour never carries meaning alone (pair it with an icon or +/−).
+- Calm, low-stimulation UI: no flashing, confetti or auto-playing motion; respect reduced motion.
+- Never edit files in `docs/brand/logo/`; regenerate assets from them instead.
+- Run `yarn screenshots` after visual changes.
+
 ## Key Files
 
 | File | Role |
