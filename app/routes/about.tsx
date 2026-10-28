@@ -2,6 +2,7 @@ import { Anchor, Button, Card, Stack, Text, Title } from '@mantine/core';
 import { useAuth } from '~/lib/auth';
 import { Link } from 'react-router';
 import { DefaultLayout } from '~/components/layout/DefaultLayout';
+import { Mark } from '~/components/layout/Logo';
 import { SHOTS, SIZES, shotUrl, type Shot } from '~/lib/aboutShots';
 import { GLOSSARY } from '~/lib/glossary';
 import { APP_NAME, pageTitle } from '~/lib/pageTitle';
@@ -69,6 +70,7 @@ function AboutContent() {
   return (
     <Stack maw={820} mx="auto" gap="xl">
       <Stack gap="sm">
+        <Mark size={72} />
         <Title order={1} size="h2">A calm way to keep track of your money</Title>
         <Text>
           {APP_NAME} is a small app for knowing what you have left to spend. Add what you buy, set a budget only if you want one,

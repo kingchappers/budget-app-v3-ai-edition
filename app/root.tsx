@@ -16,7 +16,8 @@ import {
 import type { Route } from "./+types/root";
 import "./app.css";
 import { APP_NAME, APP_DESCRIPTION, SITE_URL, pageTitle } from "./lib/pageTitle";
-import { BRAND, dark, ember, gold, hoard } from "./lib/brand";
+import { BRAND, dark, ember, gold, gray, hoard } from "./lib/brand";
+import { Mark } from "./components/layout/Logo";
 import { ReduceMotion } from "./components/layout/ReduceMotion";
 import { TextSize } from "./components/layout/TextSize";
 import { TEXT_SIZE_SCRIPT } from "./lib/textSize";
@@ -68,10 +69,7 @@ export const theme = createTheme({
       '#f0fdf4', '#dcfce7', '#bbf7d0', '#86efac', '#4ade80',
       '#22c55e', '#16a34a', '#15803d', '#166534', '#14532d',
     ],
-    gray: [
-      '#f8fafc', '#f1f5f9', '#e2e8f0', '#cbd5e1', '#94a3b8',
-      '#64748b', '#475569', '#334155', '#1e293b', '#0f172a',
-    ],
+    gray,
   },
 });
 
@@ -183,6 +181,7 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
   return (
     <main className="pt-16 p-4 container mx-auto">
       <Stack maw={560}>
+        <Mark size={56} />
         <Title order={1} size="h2">
           {notFound ? "We couldn't find that page" : "Something didn't load. Your data is safe."}
         </Title>

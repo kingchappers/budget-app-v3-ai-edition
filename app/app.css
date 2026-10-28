@@ -127,12 +127,22 @@ html[data-text-size='largest'] .tab-label {
   top: 8px;
 }
 
-/* A phone header cannot hold the name and four controls at the larger text sizes. The name is
-   the one that goes; every control stays. */
+/* The mark stands in for the lockup where the lockup is hidden (below). */
+.app-mark {
+  display: none;
+}
+
+/* A phone header cannot hold the name and four controls at the larger text sizes. The lockup
+   is the one that goes, leaving the mark; every control stays. */
 @media (max-width: 30em) {
   html[data-text-size='large'] .app-wordmark,
   html[data-text-size='largest'] .app-wordmark {
     display: none;
+  }
+
+  html[data-text-size='large'] .app-mark,
+  html[data-text-size='largest'] .app-mark {
+    display: inline-flex;
   }
 }
 
