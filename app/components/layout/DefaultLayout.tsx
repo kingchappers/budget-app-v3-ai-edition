@@ -5,7 +5,7 @@ import { useAuth } from '~/lib/auth';
 import Authentication from "../authentication/Authentication";
 import { AuthProvider } from "../authentication/AuthProvider";
 import { ColorSchemeToggle } from './ColorSchemeToggle';
-import { Logo } from './Logo';
+import { Logo, Mark } from './Logo';
 import { QuickEntryTips } from './QuickEntryTips';
 import { IconChartBar, IconHome, IconList, IconPlus, IconSettings, IconTarget } from '@tabler/icons-react';
 import { Link, NavLink as RouterNavLink, useLocation } from 'react-router';
@@ -116,9 +116,9 @@ function SidebarNav() {
             label={label}
             active={active}
             leftSection={<Icon size={16} stroke={1.5} />}
-            // Bold with a bar at the edge, in addition to the highlight.
+            // Bold with a gold bar at the edge, in addition to the highlight; the bar is a fill, so it never carries the meaning alone.
             styles={{ label: { fontWeight: active ? 700 : 400 } }}
-            style={{ borderLeft: `3px solid ${active ? 'currentColor' : 'transparent'}`, minHeight: 44 }}
+            style={{ borderLeft: `3px solid ${active ? 'var(--mantine-color-gold-4)' : 'transparent'}`, minHeight: 44 }}
           />
         );
       })}
@@ -202,6 +202,7 @@ function LayoutShell({ children }: { children: React.ReactNode }) {
       <AppShell.Header>
         <Flex h="100%" px="md" justify="space-between" align="center">
           <Logo height={36} className="app-wordmark" />
+          <span className="app-mark"><Mark size={36} alt="Hoardwise" /></span>
           <Group gap="xs" wrap="nowrap">
             {signedIn && (
               <Tooltip label={shortcutN ? 'Add transaction (N)' : 'Add transaction'} events={{ hover: true, focus: true, touch: false }}>

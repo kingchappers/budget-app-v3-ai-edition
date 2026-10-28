@@ -28,6 +28,13 @@ export const dark: MantineColorsTuple = [
   '#2A413C', '#17302C', '#0C1F1C', '#08171A', '#050F11',
 ];
 
+// Neutrals tinted from Pine, so card borders, dividers and bar tracks match the brand instead of
+// Mantine's blue-grey. Shade 6 is the brand's muted text (6.5:1 on Mist).
+export const gray: MantineColorsTuple = [
+  '#F6F8F7', '#EEF2F0', '#E1E8E5', '#CBD7D3', '#9DB0AA',
+  '#6B7F79', '#4A5C57', '#34433F', '#22302C', '#141F1C',
+];
+
 export const BRAND = {
   pine: '#10302B',
   mist: '#F2F5F3',

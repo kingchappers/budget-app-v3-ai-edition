@@ -1,3 +1,10 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/brand/logo/hoardwise-lockup-dark-bg.svg">
+    <img src="docs/brand/logo/hoardwise-lockup.svg" alt="Hoardwise" width="282">
+  </picture>
+</p>
+
 # Hoardwise
 
 A calm, self-hostable budgeting app: record what you spend, set a budget only if you want one, and keep money apart in pots for the things you are saving towards. It is designed to be gentle on attention, with neurodivergent users in mind.
