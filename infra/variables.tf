@@ -9,6 +9,12 @@ variable "state_bucket" {
   type        = string
 }
 
+variable "app_domain" {
+  type        = string
+  description = "The app's hoardwise.xyz hostname, served alongside the original budget.scgrid.xyz until that is retired."
+  default     = "app.hoardwise.xyz"
+}
+
 variable "app_name" {
   # No default (matches state_bucket): this names/tags every resource in the
   # stack. A generic placeholder default here previously let a local

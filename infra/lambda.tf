@@ -186,6 +186,53 @@ output "api_gateway_cname_target" {
   value = aws_apigatewayv2_domain_name.default.domain_name_configuration[0].target_domain_name
 }
 
+# ─── hoardwise.xyz hostname (alongside budget.scgrid.xyz) ──────────
+resource "aws_acm_certificate" "hoardwise" {
+  domain_name       = var.app_domain
+  validation_method = "DNS"
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+# Add this CNAME at the DNS provider for hoardwise.xyz after the first apply
+output "hoardwise_acm_validation_cname" {
+  value = {
+    for dvo in aws_acm_certificate.hoardwise.domain_validation_options :
+    dvo.domain_name => {
+      name  = dvo.resource_record_name
+      value = dvo.resource_record_value
+    }
+  }
+}
+
+resource "aws_acm_certificate_validation" "hoardwise" {
+  certificate_arn         = aws_acm_certificate.hoardwise.arn
+  validation_record_fqdns = [for dvo in aws_acm_certificate.hoardwise.domain_validation_options : dvo.resource_record_name]
+}
+
+resource "aws_apigatewayv2_domain_name" "hoardwise" {
+  domain_name = var.app_domain
+
+  domain_name_configuration {
+    certificate_arn = aws_acm_certificate_validation.hoardwise.certificate_arn
+    endpoint_type   = "REGIONAL"
+    security_policy = "TLS_1_2"
+  }
+}
+
+resource "aws_apigatewayv2_api_mapping" "hoardwise" {
+  api_id      = aws_apigatewayv2_api.app.id
+  domain_name = aws_apigatewayv2_domain_name.hoardwise.id
+  stage       = aws_apigatewayv2_stage.default.id
+}
+
+# CNAME target for app.hoardwise.xyz
+output "hoardwise_api_gateway_cname_target" {
+  value = aws_apigatewayv2_domain_name.hoardwise.domain_name_configuration[0].target_domain_name
+}
+
 ####################################################################################################
 # ↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑
 # DNS Config
