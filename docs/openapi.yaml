@@ -15,7 +15,7 @@ info:
 
     - Transaction `type`: `EXPENSE` is Spend, `INCOME` is Income, `SET_ASIDE` is Add to pot and `TAKE_OUT` is
       Take from pot.
-    - A budget is a category target.
+    - A budget is a category target (`/api/targets`), weekly or monthly.
     - A pot is a category whose balance carries over from month to month.
 
     ## Examples and the clock
@@ -33,7 +33,7 @@ info:
 
     - A browser session: the Auth0 JWT as a Bearer token (Auth0 mode), or the session cookie set by the built-in
       login (local mode). Cookie-authenticated requests that change data must send an `Origin` header matching the
-      host.
+      app's origin (`APP_ORIGIN` when set, otherwise the host).
     - A personal API token, created on the Access tokens page or with `POST /api/tokens`, sent as
       `Authorization: Bearer <token>`. A read token starts `hwr_` and a read-write token starts `hww_`. Examples in this
       document use placeholders such as `hwr_EXAMPLE`; never paste a real token into shared text.
@@ -58,7 +58,7 @@ info:
     An error response has a JSON body `{ "error": "<message>" }`, and some add extra fields. The statuses are 400
     (invalid input), 401 (missing or invalid credential), 403 (forbidden, including token limits and protected
     default categories), 404 (unknown route or record), 409 (conflict with the current state), 429 (too many
-    requests; see `Retry-After`) and 500 (an unexpected server failure, with a generic message).
+    requests; see `Retry-After`) and 500 (an unexpected server failure, with a generic message). A request body of JSON `null` makes several write routes answer 500 instead of 400 (tracked as HOA-42).
 
     ## HEAD
 
@@ -75,7 +75,7 @@ tags:
   - name: transactions
     description: Spend, income and pot movements.
   - name: targets
-    description: Monthly budgets, one per category.
+    description: Budgets (category targets), weekly or monthly, one per category.
   - name: pots
     description: Pot settings, balances and archiving.
   - name: recurring
@@ -1969,7 +1969,7 @@ paths:
         Creates a personal API token. Not available to access tokens: a request with an access token is refused with
         403 `Not available to access tokens`. The secret (`token`) is in the 201 response only; it is stored as a hash
         and cannot be shown again, so keep it somewhere safe. The response carries `Cache-Control: no-store`. A read
-        token (`hwr_`) can only make `GET` requests; a read-write token (`hww_`) can use every method. A household can
+        token (`hwr_`) can only make `GET` (and `HEAD`; see the HEAD note in the overview) requests; a read-write token (`hww_`) can use every method. A household can
         have at most 25 tokens (409); revoke one first. `expiryDays` is required: send 90, 180, 365 or 730, or `null`
         for a token that never expires. In local mode (the built-in login), creating a `write` token also needs the
         account `password`: a missing password is a 403 `Password required`, a wrong one a 403 `Incorrect password`,
@@ -3025,7 +3025,7 @@ components:
         scope:
           type: string
           enum: [read, write]
-          description: '`read` tokens start `hwr_` and may only make `GET` requests; `write` tokens start `hww_`.'
+          description: '`read` tokens start `hwr_` and may only make `GET` (and `HEAD`; see the HEAD note in the overview) requests; `write` tokens start `hww_`.'
         createdAt:
           type: integer
           description: When the token was created, in Unix seconds.
