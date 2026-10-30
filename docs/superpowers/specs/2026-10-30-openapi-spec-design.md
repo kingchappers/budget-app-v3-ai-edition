@@ -30,6 +30,8 @@ Tokens (HOA-5/6) let agents and scripts call the API, but nothing describes it. 
 3. **Token access parity.** `x-token-access` is checked against `createTokenRouter()` (which routes a token reaches) and the method rule in `tokenAccessRejection` (GET/HEAD vs write).
 4. **Contract test.** Each operation is called once against a `MemoryStore` seeded with a small household, using the spec's own request examples, and the 2xx response body is validated against the operation's response schema with Ajv. Error responses are validated against the `Error` schema for one representative case per status the spec lists. Operations whose success needs a push service or the network are skipped with a listed reason.
 
+   As built, push routes are contract-tested too, because they only write a record, so nothing is skipped. `x-untested` is supported but unused. The contract test fakes the clock to 2026-10-30 so dated examples stay valid.
+
 Spec examples double as the contract test's inputs, so an example that stops being valid fails CI too.
 
 ## Decisions

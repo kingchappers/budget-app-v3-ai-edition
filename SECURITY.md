@@ -29,7 +29,7 @@ Security requirements for this React + Auth0 + Lambda project. Reference control
 | AUTH-11 | WEB-A01, WEB-A07 | Password recovery without a shell is armed only by creating a regular file named `RESET_PASSWORD` in the data directory (write access there already means full control of the data). The marker is deleted before recovery opens and recovery stays closed if it cannot be deleted; a directory or symlink with that name is ignored; opening recovery ends every session and clears the lock-out; completing it replaces only the password (same account, same data), ends every session again and spends the one-time recovery code, which follows AUTH-09 |
 | AUTH-12 | WEB-A01, WEB-A07, API2, CWE-287 | Personal API tokens are random (at least 128 bits, here 256), stored only as hashes outside `USER#`, shown once, expiring by user choice, revocable, and never logged or exported |
 | AUTH-13 | WEB-A01, API1, API5, CWE-862, CWE-863 | Token requests are read-only unless the stored scope allows writes; enforcement is central and deny by default; scope and expiry come only from the stored record |
-| AUTH-14 | WEB-A01, API5, CWE-863 | A token may not call token management, `/api/auth/*` or push-subscription routes |
+| AUTH-14 | WEB-A01, API5, CWE-863 | A token may not call token management, `/api/auth/*` or push-subscription routes; the token-access rules in `docs/openapi.yaml` (`x-token-access`) are checked against the router by CI |
 | AUTH-15 | WEB-A07, API2 | A password reset revokes every token. Local mode only: Auth0 mode has no local password reset to hook |
 | AUTH-16 | WEB-A07, API2, API4 | Failed token lookups are rate limited per client address: exact in the container, best-effort per instance on AWS |
 
