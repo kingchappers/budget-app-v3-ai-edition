@@ -289,6 +289,51 @@ describe('AccessTokens', () => {
       expect(await navigator.clipboard.readText()).toBe(SECRET);
     });
 
+    describe('when copying is not possible', () => {
+      const COPY_FAILED = "Couldn't copy automatically. The token is selected: copy it with your keyboard.";
+
+      function expectTokenSelected(): void {
+        const field = screen.getByDisplayValue(SECRET) as HTMLInputElement;
+        expect(document.activeElement).toBe(field);
+        expect([field.selectionStart, field.selectionEnd]).toEqual([0, SECRET.length]);
+      }
+
+      it('says so and selects the token when the browser has no clipboard (plain HTTP)', async () => {
+        const user = userEvent.setup();
+        const clipboard = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
+        Object.defineProperty(navigator, 'clipboard', { value: undefined, configurable: true });
+        vi.spyOn(console, 'error').mockImplementation(() => undefined);
+        try {
+          renderSection();
+          await createOne(user);
+          await user.click(screen.getByRole('button', { name: 'Copy' }));
+
+          expect(await screen.findByRole('status')).toHaveTextContent(COPY_FAILED);
+          expectTokenSelected();
+          expect(screen.queryByRole('button', { name: 'Copied' })).not.toBeInTheDocument();
+        } finally {
+          if (clipboard) Object.defineProperty(navigator, 'clipboard', clipboard);
+          vi.restoreAllMocks();
+        }
+      });
+
+      it('says so and selects the token when the browser refuses to copy', async () => {
+        const user = userEvent.setup();
+        vi.spyOn(navigator.clipboard, 'writeText').mockRejectedValue(new DOMException('Denied', 'NotAllowedError'));
+        vi.spyOn(console, 'error').mockImplementation(() => undefined);
+        try {
+          renderSection();
+          await createOne(user);
+          await user.click(screen.getByRole('button', { name: 'Copy' }));
+
+          expect(await screen.findByRole('status')).toHaveTextContent(COPY_FAILED);
+          expectTokenSelected();
+        } finally {
+          vi.restoreAllMocks();
+        }
+      });
+    });
+
     it('clears the form, including the password, after creating', async () => {
       const user = userEvent.setup();
       state.mode = 'local';
