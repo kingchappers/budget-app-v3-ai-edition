@@ -43,7 +43,7 @@ function SettingsContent() {
   return (
     <Stack maw={640}>
       <Title order={1} size="h3">Settings</Title>
-      <Text size="sm" c="dimmed">Settings are saved on this device.</Text>
+      <Text size="sm" c="dimmed">Most settings are saved on this device.</Text>
 
       <Card withBorder>
         <Title order={2} size="h4" mb="sm">Signing in</Title>

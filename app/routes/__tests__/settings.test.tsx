@@ -51,6 +51,11 @@ describe('Settings page', () => {
     expect(screen.getByRole('heading', { name: 'Settings' })).toBeInTheDocument();
   });
 
+  it('does not claim that everything is saved on this device, since access tokens are kept on the server', () => {
+    renderSettings();
+    expect(screen.getByText('Most settings are saved on this device.')).toBeInTheDocument();
+  });
+
   it('shows the Reduce motion switch off by default and saves it when turned on', async () => {
     renderSettings();
     const toggle = screen.getByRole('switch', { name: /^Reduce motion/ });
