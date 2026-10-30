@@ -12,6 +12,7 @@ import {
 import { MAX_PASSWORD_LENGTH, dummyRecord, validatePassword, verifyPassword } from './password';
 import { serialisedPasswordAttempt } from './passwordAttempts';
 import type { SetupCode } from './setupCode';
+import { revokeAllTokens } from './tokens';
 
 export interface AuthRouteContext {
   store: Store;
@@ -59,6 +60,7 @@ async function attemptRecovery(body: JsonBody, ctx: AuthRouteContext, account: {
   ctx.recovery = false;
   try {
     await deleteAllSessions(ctx.store);
+    await revokeAllTokens(ctx.store);
     await replacePassword(ctx.store, body.password as string);
     await clearThrottle(ctx.store);
     const token = await createSession(ctx.store, account.userId, ctx.nowSeconds());

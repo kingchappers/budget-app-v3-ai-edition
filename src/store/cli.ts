@@ -4,6 +4,7 @@ import { chooseSqliteFile } from '../../container/config';
 import { clearThrottle, deleteAllSessions, getAccount, replacePassword } from '../auth/localData';
 import { validatePassword } from '../auth/password';
 import { promptHidden } from '../auth/prompt';
+import { revokeAllTokens } from '../auth/tokens';
 import { initStore, type Store } from '.';
 import { exportUser, importUser, parseJsonl, toJsonl } from './transfer';
 
@@ -79,6 +80,7 @@ export async function runCli(argv: string[], env: NodeJS.ProcessEnv = process.en
     if (problem) throw new Error(problem);
     await replacePassword(store, password);
     await deleteAllSessions(store);
+    await revokeAllTokens(store);
     await clearThrottle(store);
     return 'Password reset. All sessions have ended and any login lock-out is cleared.';
   }

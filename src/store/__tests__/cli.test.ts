@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { setStore } from '..';
 import { createAccount, createSession, getAccount, recordFailure, throttleRemaining } from '../../auth/localData';
 import { verifyPassword } from '../../auth/password';
+import { createToken, findToken, listTokens } from '../../auth/tokens';
 import { runCli } from '../cli';
 import { SqliteStore } from '../sqlite';
 
@@ -135,6 +136,27 @@ describe('runCli', () => {
       expect(await verifyPassword('the new password 22', (await getAccount(store))!)).toBe(true);
       expect(await store.query('AUTH#SESSIONS')).toEqual([]);
       expect(await throttleRemaining(store, Math.floor(Date.now() / 1000))).toBe(0);
+      store.close();
+    });
+
+    it('revokes every access token and leaves other data alone', async () => {
+      await seedAccount();
+      const now = Math.floor(Date.now() / 1000);
+      const seed = new SqliteStore(env.SQLITE_PATH as string);
+
+      const read = await createToken(seed, { userId: 'local|u1', name: 'r', scope: 'read', expiryDays: null }, now);
+      const write = await createToken(seed, { userId: 'local|u1', name: 'w', scope: 'write', expiryDays: null }, now);
+      await seed.put({ PK: 'USER#local|u1', SK: 'CAT#c1', name: 'Garden' });
+      seed.close();
+
+      await runCli(['reset-password'], env, { readPassword: async () => 'the new password 22' });
+
+      const store = new SqliteStore(env.SQLITE_PATH as string);
+
+      expect(await listTokens(store, 'local|u1')).toEqual([]);
+      expect(await findToken(store, read.token, now)).toBeUndefined();
+      expect(await findToken(store, write.token, now)).toBeUndefined();
+      expect(await store.get({ PK: 'USER#local|u1', SK: 'CAT#c1' })).toBeDefined();
       store.close();
     });
 
