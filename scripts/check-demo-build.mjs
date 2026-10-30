@@ -91,11 +91,16 @@ export function buildCspHeader(hashes) {
   ].join('; ');
 }
 
+// Cloudflare Pages ignores a _headers line longer than this, indentation included (developers.cloudflare.com/pages/configuration/headers).
+const MAX_HEADERS_LINE = 2000;
+
 // The file Cloudflare Pages reads from the site folder to set response headers. The policy is the one the build just verified,
 // so the host cannot send a different one. Hashed assets never change, so they are cached for a year; everything else is revalidated.
+// A missing /assets/ file is answered with index.html (Pages falls back to the SPA shell when there is no top-level 404.html) and
+// gets this same long cache. That is harmless: the only URL affected is a stale hash that never becomes valid again.
 export function buildHeadersFile(csp) {
   if (/[\r\n]/.test(csp)) throw new Error('The policy must not contain a line break');
-  return [
+  const lines = [
     '/*',
     `  Content-Security-Policy: ${csp}`,
     '  X-Content-Type-Options: nosniff',
@@ -104,7 +109,10 @@ export function buildHeadersFile(csp) {
     '/assets/*',
     '  Cache-Control: public, max-age=31536000, immutable',
     '',
-  ].join('\n');
+  ];
+  const tooLong = lines.find(line => line.length > MAX_HEADERS_LINE);
+  if (tooLong) throw new Error(`A _headers line is ${tooLong.length} characters; Cloudflare Pages allows at most 2,000`);
+  return lines.join('\n');
 }
 
 function checkProduction(dir) {

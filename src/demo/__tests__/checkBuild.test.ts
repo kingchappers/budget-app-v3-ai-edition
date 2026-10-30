@@ -150,6 +150,11 @@ describe('buildHeadersFile', () => {
     expect(blocks[0]).not.toContain('Cache-Control');
   });
 
+  it("refuses a line over Cloudflare's 2,000-character limit instead of publishing a file it would reject", () => {
+    const hashes = Array.from({ length: 40 }, (_, index) => `sha256-${String(index).padStart(43, 'A')}=`);
+    expect(() => buildHeadersFile(buildCspHeader(hashes))).toThrow(/2,000/);
+  });
+
   it('indents every header line, separates blocks with a blank line and ends with a newline', () => {
     const file = buildHeadersFile(csp);
     expect(file.endsWith('\n')).toBe(true);
