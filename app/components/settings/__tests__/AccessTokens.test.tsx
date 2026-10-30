@@ -72,7 +72,10 @@ async function chooseReadAndWrite(user: ReturnType<typeof userEvent.setup>): Pro
 
 const createButton = () => screen.getByRole('button', { name: 'Create token' });
 
+// Every date in the fixtures is read against 10 Mar 2027, so the suite does not change meaning as the real clock moves on.
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date(2027, 2, 10, 12));
   window.localStorage.clear();
   window.sessionStorage.clear();
   state.list = { data: [CLAUDE, SCRIPT], isLoading: false, error: null, refetch: vi.fn() };
@@ -82,6 +85,10 @@ beforeEach(() => {
   state.revoke.mockReset();
   state.revoke.mockResolvedValue(undefined);
   state.mode = 'auth0';
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe('AccessTokens', () => {
@@ -455,17 +462,7 @@ describe('AccessTokens storage', () => {
 
 describe('AccessTokens fixes', () => {
   describe('expired tokens', () => {
-    afterEach(() => {
-      vi.useRealTimers();
-    });
-
-    function at(year: number, month: number, day: number): void {
-      vi.useFakeTimers({ toFake: ['Date'] });
-      vi.setSystemTime(new Date(year, month - 1, day, 12));
-    }
-
     it('words a past expiry as Expired, with an icon, and still offers Revoke', () => {
-      at(2027, 3, 10);
       state.list = { ...state.list, data: [{ ...CLAUDE, expiresAt: seconds(2027, 1, 3) }] };
       renderSection();
       const row = screen.getByRole('listitem', { name: 'Claude desktop' });
@@ -476,13 +473,11 @@ describe('AccessTokens fixes', () => {
     });
 
     it('words a future expiry as Expires', () => {
-      at(2027, 3, 10);
       renderSection();
       expect(screen.getByRole('listitem', { name: 'Claude desktop' })).toHaveTextContent('Expires 14 May 2027');
     });
 
     it('words an expiry at exactly now as Expired', () => {
-      at(2027, 3, 10);
       state.list = { ...state.list, data: [{ ...CLAUDE, expiresAt: seconds(2027, 3, 10) }] };
       renderSection();
       expect(screen.getByRole('listitem', { name: 'Claude desktop' })).toHaveTextContent('Expired 10 Mar 2027');
