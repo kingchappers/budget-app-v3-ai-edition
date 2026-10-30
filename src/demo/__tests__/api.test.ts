@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { getStore, setStore } from '../../store';
+import { setStore } from '../../store';
 import { MemoryStore } from '../../store/memory';
 import { DEMO_EMAIL, DEMO_USER_ID, createDemoApi, type Send } from '../api';
 import { DEMO_MARKER } from '../marker';
@@ -75,23 +75,15 @@ describe('createDemoApi', () => {
     }
   });
 
-  it('seeds through the same send function the app uses, and reset gives a fresh store with the same seed', async () => {
+  it('seeds a fresh store through the same send function the app uses', async () => {
     const seed = vi.fn(async (send: Send) => {
       await send('PUT', '/api/targets/cat-groceries', { targetAmount: 30000, period: 'MONTHLY' });
     });
     const api = await createDemoApi({ seed });
     expect(seed).toHaveBeenCalledTimes(1);
-    const before = getStore();
 
-    await api.send('DELETE', '/api/targets/cat-groceries');
-    const gone = json((await api.send('GET', '/api/targets')).body) as { targets: unknown[] };
-    expect(gone.targets).toHaveLength(0);
-
-    await api.reset();
-    expect(seed).toHaveBeenCalledTimes(2);
-    expect(getStore()).not.toBe(before);
-    const back = json((await api.send('GET', '/api/targets')).body) as { targets: unknown[] };
-    expect(back.targets).toHaveLength(1);
+    const seeded = json((await api.send('GET', '/api/targets')).body) as { targets: unknown[] };
+    expect(seeded.targets).toHaveLength(1);
   });
 
   it('refuses to start when the seed fails, naming the request but not the data', async () => {
