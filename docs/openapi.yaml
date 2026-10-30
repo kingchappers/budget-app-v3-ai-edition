@@ -24,6 +24,9 @@ info:
     `archivePot` reject a month more than one month away from the server's current UTC month, so the `2026-10`
     values in those examples fail outside September to November 2026.
 
+    The `addAccountBalance` example records a balance on 2026-10-29; the date may be at most one day after the
+    server's current UTC date, so it fails if the clock is before 28 October 2026.
+
     ## Authentication
 
     There are two ways to authenticate, and every operation accepts either unless its `x-token-access` says otherwise.
@@ -1489,6 +1492,659 @@ paths:
           $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
+  /api/accounts:
+    get:
+      tags: [accounts]
+      summary: List accounts
+      description: >-
+        Returns every account with its full balance history (oldest date first), mapped (no storage keys), in id order.
+        An account stored without a balance list reads with `balances: []`.
+      operationId: listAccounts
+      x-token-access: read
+      responses:
+        '200':
+          description: All accounts.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [accounts]
+                properties:
+                  accounts:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Account'
+              example:
+                accounts:
+                  - accountId: 2c9f4e1a-7d3b-4a58-b6e2-1f0c9d8a7b64
+                    name: Rainy day savings
+                    kind: ASSET
+                    type: SAVINGS
+                    balances:
+                      - date: '2026-09-30'
+                        pence: 240000
+                      - date: '2026-10-29'
+                        pence: 245000
+                    createdAt: '2026-10-01T08:00:00.000Z'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      tags: [accounts]
+      summary: Add an account
+      description: >-
+        Creates an account with a server-generated UUID id and an empty balance history. `kind` says whether the account
+        is money held (`ASSET`) or money owed (`LIABILITY`), and `type` must belong to that kind: `CASH`, `SAVINGS` or
+        `INVESTMENT` for an `ASSET`; `CREDIT_CARD` or `LOAN` for a `LIABILITY`. `name` is trimmed before it is stored.
+        Add balances with `addAccountBalance`.
+      operationId: createAccount
+      x-token-access: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AccountInput'
+            examples:
+              asset:
+                summary: A savings account
+                value:
+                  name: Rainy day savings
+                  kind: ASSET
+                  type: SAVINGS
+              liability:
+                summary: A credit card
+                value:
+                  name: Visa
+                  kind: LIABILITY
+                  type: CREDIT_CARD
+      responses:
+        '201':
+          description: The account was created.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [account]
+                properties:
+                  account:
+                    $ref: '#/components/schemas/Account'
+              example:
+                account:
+                  accountId: 2c9f4e1a-7d3b-4a58-b6e2-1f0c9d8a7b64
+                  name: Rainy day savings
+                  kind: ASSET
+                  type: SAVINGS
+                  balances: []
+                  createdAt: '2026-10-30T09:15:00.000Z'
+        '400':
+          description: >-
+            The body is not valid JSON (`Invalid JSON body`); `name` is missing, blank or over 50 characters
+            (`name must be a non-empty string of at most 50 characters`); `kind` is not `ASSET` or `LIABILITY`
+            (`kind must be ASSET or LIABILITY`); or `type` does not belong to `kind` (`type must match kind: CASH,
+            SAVINGS, INVESTMENT` for an asset, `type must match kind: CREDIT_CARD, LOAN` for a liability). The first rule
+            broken, in that order, is reported.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: 'type must match kind: CREDIT_CARD, LOAN'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/accounts/{accountId}:
+    parameters:
+      - $ref: '#/components/parameters/accountId'
+    put:
+      tags: [accounts]
+      summary: Rename an account or change its type
+      description: >-
+        Changes `name` and `type`; both are required. `kind` and the balance history cannot be changed here, and a
+        `kind` in the body is ignored. The new `type` must belong to the account's existing `kind` (see
+        `createAccount`). The account is looked up first, so an unknown id is a 404 even when the body is invalid.
+      operationId: updateAccount
+      x-token-access: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AccountUpdateInput'
+            example:
+              name: Emergency savings
+              type: SAVINGS
+      responses:
+        '200':
+          description: The updated account.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [account]
+                properties:
+                  account:
+                    $ref: '#/components/schemas/Account'
+              example:
+                account:
+                  accountId: 2c9f4e1a-7d3b-4a58-b6e2-1f0c9d8a7b64
+                  name: Emergency savings
+                  kind: ASSET
+                  type: SAVINGS
+                  balances:
+                    - date: '2026-10-29'
+                      pence: 245000
+                  createdAt: '2026-10-01T08:00:00.000Z'
+        '400':
+          description: >-
+            The body is not valid JSON (`Invalid JSON body`); `name` is missing, blank or over 50 characters
+            (`name must be a non-empty string of at most 50 characters`); or `type` does not belong to the account's kind
+            (`type must match the account's existing kind: CASH, SAVINGS, INVESTMENT` for an asset, `... CREDIT_CARD, LOAN`
+            for a liability).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: 'name must be a non-empty string of at most 50 characters'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: No account has this id (`Account not found`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Account not found
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    delete:
+      tags: [accounts]
+      summary: Delete an account
+      description: >-
+        Moves the account, with its balance history, to the trash, where `restoreFromTrash` can bring it back for 30
+        days (`entityType` `ACCOUNT`, `id` the account id). Deleting an account that does not exist still returns 204 and
+        adds nothing to the trash.
+      operationId: deleteAccount
+      x-token-access: write
+      responses:
+        '204':
+          description: The account is deleted. No body.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/accounts/{accountId}/balances:
+    parameters:
+      - $ref: '#/components/parameters/accountId'
+    post:
+      tags: [accounts]
+      summary: Record an account balance
+      description: >-
+        Records the balance on a date. A balance is an integer `pence` that may be zero (an account paid off or closed)
+        or negative (an overdrawn account), with a magnitude of at most 1,000,000,000. Recording a date that already
+        has an entry replaces that entry; otherwise the entry is added. The history is kept sorted by date and holds at
+        most 500 entries. `date` must be a real calendar date and no later than tomorrow (UTC), so the example assumes
+        the server clock is no earlier than 28 October 2026 (UTC). The body is validated before the account is looked up.
+        Unknown body fields are ignored.
+      operationId: addAccountBalance
+      x-token-access: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BalanceInput'
+            example:
+              date: '2026-10-29'
+              pence: 245000
+      responses:
+        '200':
+          description: The account with the balance recorded.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [account]
+                properties:
+                  account:
+                    $ref: '#/components/schemas/Account'
+              example:
+                account:
+                  accountId: 2c9f4e1a-7d3b-4a58-b6e2-1f0c9d8a7b64
+                  name: Rainy day savings
+                  kind: ASSET
+                  type: SAVINGS
+                  balances:
+                    - date: '2026-10-29'
+                      pence: 245000
+                  createdAt: '2026-10-01T08:00:00.000Z'
+        '400':
+          description: >-
+            The body is not valid JSON (`Invalid JSON body`); `date` is not a real `YYYY-MM-DD` date or is more than one
+            day ahead (`date must be a YYYY-MM-DD date, at most one day ahead of today`); `pence` is not an integer of at
+            most 1,000,000,000 in magnitude (the message says `pence must be a positive integer, at most 1000000000`,
+            although zero and negative values are accepted); or the account already has 500 entries on other dates
+            (`an account can have at most 500 balance entries`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: date must be a YYYY-MM-DD date, at most one day ahead of today
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: No account has this id (`Account not found`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Account not found
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/push/subscriptions:
+    post:
+      tags: [push]
+      summary: Turn on bill reminders for a device
+      description: >-
+        Stores a browser push subscription and when it wants reminders, and signs the household up for the reminder
+        scheduler. Not available to access tokens: a request with an access token is refused with 403 `Not available to
+        access tokens`. The subscription is the object a browser's `PushManager.subscribe()` returns. A device is
+        identified by its `endpoint`, so sending the same endpoint again replaces that device's settings and keys rather
+        than adding a second one. At most 5 devices can have reminders on; a sixth distinct endpoint is a 409. The body
+        may hold only `subscription` and `settings`, and `subscription` only `endpoint`, `keys` and `expirationTime`
+        (any value; it is not stored).
+      operationId: createPushSubscription
+      x-token-access: none
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PushSubscriptionInput'
+            example:
+              subscription:
+                endpoint: https://fcm.googleapis.com/fcm/send/EXAMPLE-endpoint-not-a-real-device
+                expirationTime: null
+                keys:
+                  p256dh: EXAMPLE_p256dh_key_not_real
+                  auth: EXAMPLE_auth_secret
+              settings:
+                hour: 8
+                quietStart: 22
+                quietEnd: 7
+                timeZone: Europe/London
+      responses:
+        '200':
+          description: The device is subscribed (created or updated).
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [subscribed]
+                properties:
+                  subscribed:
+                    type: boolean
+                    const: true
+              example:
+                subscribed: true
+        '400':
+          description: >-
+            The body is not a JSON object (`Invalid JSON body`) or breaks a rule. The messages are
+            `Unexpected fields in the request`, `subscription is required`,
+            `subscription.endpoint must be an https address of a supported push service, at most 1000 characters`,
+            `subscription.keys must hold p256dh and auth as base64url text`, `settings are required`,
+            `settings.hour must be a whole number from 0 to 23`,
+            `quiet hours must be whole numbers from 0 to 23, or null`,
+            `quietStart and quietEnd must both be set or both be null` and
+            `settings.timeZone must be a valid time zone name`. The first rule broken, in that order, is reported.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: settings.hour must be a whole number from 0 to 23
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: >-
+            An access token was used (`Not available to access tokens`), or a cookie-authenticated request came from
+            another origin.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Not available to access tokens
+        '409':
+          description: Five other devices already have reminders on (`At most 5 devices can have reminders turned on`). Nothing was changed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: At most 5 devices can have reminders turned on
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    delete:
+      tags: [push]
+      summary: Turn off bill reminders for a device
+      description: >-
+        Removes the subscription for the given endpoint. Not available to access tokens: a request with an access token
+        is refused with 403 `Not available to access tokens`. The body must be exactly `{ "endpoint": "<url>" }`, and the
+        endpoint must pass the same allow-list as `createPushSubscription`. Removing an endpoint that is not subscribed
+        still returns 204. When the household has no device left it drops out of the reminder scheduler.
+      operationId: deletePushSubscription
+      x-token-access: none
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PushUnsubscribeInput'
+            example:
+              endpoint: https://fcm.googleapis.com/fcm/send/EXAMPLE-endpoint-not-a-real-device
+      responses:
+        '204':
+          description: The device has no reminders. No body.
+        '400':
+          description: >-
+            The body is not a JSON object, or holds a field other than `endpoint` (`Invalid JSON body`); or `endpoint` is
+            not an https address of a supported push service (`endpoint must be an https address of a supported push
+            service`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: endpoint must be an https address of a supported push service
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: >-
+            An access token was used (`Not available to access tokens`), or a cookie-authenticated request came from
+            another origin.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Not available to access tokens
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/tokens:
+    get:
+      tags: [tokens]
+      summary: List access tokens
+      description: >-
+        Lists the household's personal API tokens, newest first. Not available to access tokens: a request with an access
+        token is refused with 403 `Not available to access tokens`. A listing never includes the secret or its hash;
+        `prefix` is only the first 8 characters, enough to recognise a token. The response carries
+        `Cache-Control: no-store`. Expired tokens remain listed until they are purged.
+      operationId: listAccessTokens
+      x-token-access: none
+      responses:
+        '200':
+          description: The tokens.
+          headers:
+            Cache-Control:
+              description: Always `no-store`.
+              schema:
+                type: string
+                const: no-store
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [tokens]
+                properties:
+                  tokens:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AccessToken'
+              example:
+                tokens:
+                  - tokenId: 5d1e8f20-3c4b-4a6d-9e7f-8b0a1c2d3e4f
+                    name: Spreadsheet sync
+                    scope: read
+                    createdAt: 1793351700
+                    expiresAt: 1801127700
+                    lastUsedAt: null
+                    prefix: hwr_EXAM
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: >-
+            An access token was used (`Not available to access tokens`), or the request was refused for another reason
+            (see the shared `Forbidden` response).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Not available to access tokens
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      tags: [tokens]
+      summary: Create an access token
+      description: >-
+        Creates a personal API token. Not available to access tokens: a request with an access token is refused with
+        403 `Not available to access tokens`. The secret (`token`) is in the 201 response only; it is stored as a hash
+        and cannot be shown again, so keep it somewhere safe. The response carries `Cache-Control: no-store`. A read
+        token (`hwr_`) can only make `GET` requests; a read-write token (`hww_`) can use every method. A household can
+        have at most 25 tokens (409); revoke one first. `expiryDays` is required: send 90, 180, 365 or 730, or `null`
+        for a token that never expires. In local mode (the built-in login), creating a `write` token also needs the
+        account `password`: a missing password is a 403 `Password required`, a wrong one a 403 `Incorrect password`,
+        and repeated wrong guesses (shared with the login screen) are throttled with a 429. `password` is ignored for
+        a `read` token and in Auth0 mode. It is checked before the token cap, and is never stored or logged. Unknown
+        body fields are rejected.
+      operationId: createAccessToken
+      x-token-access: none
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAccessTokenInput'
+            examples:
+              read:
+                summary: A read token that expires in 90 days
+                value:
+                  name: Spreadsheet sync
+                  scope: read
+                  expiryDays: 90
+              write:
+                summary: A read-write token that never expires, in local mode
+                value:
+                  name: Import script
+                  scope: write
+                  expiryDays: null
+                  password: your-account-password
+      responses:
+        '201':
+          description: The token was created. This is the only time the secret is shown.
+          headers:
+            Cache-Control:
+              description: Always `no-store`.
+              schema:
+                type: string
+                const: no-store
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NewAccessToken'
+              example:
+                token: hwr_EXAMPLE
+                record:
+                  tokenId: 5d1e8f20-3c4b-4a6d-9e7f-8b0a1c2d3e4f
+                  name: Spreadsheet sync
+                  scope: read
+                  createdAt: 1793351700
+                  expiresAt: 1801127700
+                  lastUsedAt: null
+                  prefix: hwr_EXAM
+        '400':
+          description: >-
+            The body is not a JSON object (`Invalid JSON`) or breaks a rule. The messages are
+            `Unexpected fields in the request`, `name is required` (missing, not a string or blank),
+            `name must be at most 60 characters` (after trimming), `name must not contain control characters`,
+            `scope must be 'read' or 'write'`, `expiryDays must be 90, 180, 365, 730 or null` (also when omitted) and
+            `password must be a string of at most 128 characters`. The first rule broken, in that order, is reported.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: expiryDays must be 90, 180, 365, 730 or null
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: >-
+            An access token was used (`Not available to access tokens`); in local mode a `write` token was requested
+            without the account password (`Password required`) or with the wrong one (`Incorrect password`); or the
+            request was refused for another reason (see the shared `Forbidden` response).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                token:
+                  summary: Called with an access token
+                  value:
+                    error: Not available to access tokens
+                missingPassword:
+                  summary: Local mode, write token, no password
+                  value:
+                    error: Password required
+                wrongPassword:
+                  summary: Local mode, write token, wrong password
+                  value:
+                    error: Incorrect password
+        '409':
+          description: The household already has 25 tokens (`You can have at most 25 access tokens. Revoke one first.`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: You can have at most 25 access tokens. Revoke one first.
+        '429':
+          description: >-
+            Too many requests (`Too many requests`, with `Retry-After`, as in the shared `TooManyRequests` response), or,
+            in local mode when creating a `write` token, too many wrong passwords (`Too many attempts`). The password
+            throttle adds `retryAfter` (seconds) to the body, sends `Retry-After`, and refuses even a correct password
+            until it ends.
+          headers:
+            Retry-After:
+              description: Seconds to wait before trying again.
+              schema:
+                type: integer
+                minimum: 1
+              example: 60
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                requests:
+                  summary: Rate limit
+                  value:
+                    error: Too many requests
+                attempts:
+                  summary: Password throttle
+                  value:
+                    error: Too many attempts
+                    retryAfter: 60
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/tokens/{tokenId}:
+    parameters:
+      - $ref: '#/components/parameters/tokenId'
+    delete:
+      tags: [tokens]
+      summary: Revoke an access token
+      description: >-
+        Revokes the token for good; requests that present it are refused from then on. Not available to access tokens: a
+        request with an access token is refused with 403 `Not available to access tokens`. The response is 200 with an
+        empty JSON object and carries `Cache-Control: no-store`. An id that is not a UUID, does not exist or belongs to
+        another household is a 404.
+      operationId: revokeAccessToken
+      x-token-access: none
+      responses:
+        '200':
+          description: The token is revoked.
+          headers:
+            Cache-Control:
+              description: Always `no-store`.
+              schema:
+                type: string
+                const: no-store
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+              example: {}
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: >-
+            An access token was used (`Not available to access tokens`), or the request was refused for another reason
+            (see the shared `Forbidden` response).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Not available to access tokens
+        '404':
+          description: No token of this household has this id (`Token not found`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Token not found
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
 components:
   securitySchemes:
     bearerToken:
@@ -1628,7 +2284,10 @@ components:
   schemas:
     Error:
       type: object
-      description: The body of every error response. Some errors add fields, for example `retryAfter` on a 429.
+      description: >-
+        The body of every error response. Two errors add fields: the 409 from `archivePot` adds `balance`, and the
+        429 `Too many attempts` from `createAccessToken` (the password throttle) adds `retryAfter`. Other 429
+        responses (`Too many requests`) have no extra fields and signal the wait only in the `Retry-After` header.
       required: [error]
       properties:
         error:
@@ -2191,3 +2850,227 @@ components:
           description: >-
             The `id` from `listTrash`. For `TRANSACTION`, `YYYY-MM#<transactionId>`; otherwise 1 to 100 letters, digits,
             `_` or `-`. The transaction id part has the same character rules.
+    AccountKind:
+      type: string
+      description: '`ASSET` is money held; `LIABILITY` is money owed.'
+      enum: [ASSET, LIABILITY]
+    AccountType:
+      type: string
+      description: >-
+        `CASH`, `SAVINGS` and `INVESTMENT` belong to the `ASSET` kind; `CREDIT_CARD` and `LOAN` belong to the
+        `LIABILITY` kind.
+      enum: [CASH, SAVINGS, INVESTMENT, CREDIT_CARD, LOAN]
+    BalanceEntry:
+      type: object
+      additionalProperties: false
+      description: The balance on one date.
+      required: [date, pence]
+      properties:
+        date:
+          type: string
+          pattern: '^\d{4}-\d{2}-\d{2}$'
+          description: The day, `YYYY-MM-DD`.
+        pence:
+          type: integer
+          minimum: -1000000000
+          maximum: 1000000000
+          description: Integer pence (or cents). Zero and negative balances are allowed. A liability is recorded as the amount owed.
+    Account:
+      type: object
+      additionalProperties: false
+      description: An account with its balance history. Responses never include storage keys.
+      required: [accountId, name, kind, type, balances, createdAt]
+      properties:
+        accountId:
+          type: string
+          description: A UUID.
+        name:
+          type: string
+          maxLength: 50
+          description: Trimmed.
+        kind:
+          $ref: '#/components/schemas/AccountKind'
+        type:
+          $ref: '#/components/schemas/AccountType'
+        balances:
+          type: array
+          maxItems: 500
+          description: One entry per date, oldest first.
+          items:
+            $ref: '#/components/schemas/BalanceEntry'
+        createdAt:
+          type: string
+          description: ISO 8601 timestamp.
+    AccountInput:
+      type: object
+      required: [name, kind, type]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 50
+          description: 1 to 50 characters, not blank. The length is checked before trimming.
+        kind:
+          $ref: '#/components/schemas/AccountKind'
+        type:
+          $ref: '#/components/schemas/AccountType'
+    AccountUpdateInput:
+      type: object
+      required: [name, type]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 50
+          description: 1 to 50 characters, not blank. The length is checked before trimming.
+        type:
+          $ref: '#/components/schemas/AccountType'
+    BalanceInput:
+      type: object
+      required: [date, pence]
+      properties:
+        date:
+          type: string
+          pattern: '^\d{4}-\d{2}-\d{2}$'
+          description: A real calendar date, `YYYY-MM-DD`, no later than tomorrow (UTC). There is no earliest date.
+        pence:
+          type: integer
+          minimum: -1000000000
+          maximum: 1000000000
+          description: Integer pence (or cents); zero and negative values are allowed.
+    PushSubscriptionInput:
+      type: object
+      additionalProperties: false
+      required: [subscription, settings]
+      properties:
+        subscription:
+          type: object
+          additionalProperties: false
+          description: The browser's push subscription.
+          required: [endpoint, keys]
+          properties:
+            endpoint:
+              type: string
+              maxLength: 1000
+              description: >-
+                An https address, with no user name, password or port, on a supported push service: `fcm.googleapis.com`,
+                `updates.push.services.mozilla.com`, `web.push.apple.com` or a host ending `.notify.windows.com`.
+            expirationTime:
+              description: Accepted, as sent by browsers, but ignored.
+            keys:
+              type: object
+              additionalProperties: false
+              required: [p256dh, auth]
+              properties:
+                p256dh:
+                  type: string
+                  minLength: 1
+                  maxLength: 200
+                  pattern: '^[A-Za-z0-9_-]+$'
+                  description: The browser's public key, base64url text.
+                auth:
+                  type: string
+                  minLength: 1
+                  maxLength: 200
+                  pattern: '^[A-Za-z0-9_-]+$'
+                  description: The browser's auth secret, base64url text.
+        settings:
+          type: object
+          additionalProperties: false
+          required: [hour, quietStart, quietEnd, timeZone]
+          properties:
+            hour:
+              type: integer
+              minimum: 0
+              maximum: 23
+              description: The hour of the day (in `timeZone`) to send reminders.
+            quietStart:
+              type: [integer, 'null']
+              minimum: 0
+              maximum: 23
+              description: The hour quiet time starts, or null for no quiet hours. Null if and only if `quietEnd` is null.
+            quietEnd:
+              type: [integer, 'null']
+              minimum: 0
+              maximum: 23
+              description: The hour quiet time ends, or null for no quiet hours. Null if and only if `quietStart` is null.
+            timeZone:
+              type: string
+              minLength: 1
+              maxLength: 64
+              description: An IANA time zone name the platform recognises, such as `Europe/London`.
+    PushUnsubscribeInput:
+      type: object
+      additionalProperties: false
+      required: [endpoint]
+      properties:
+        endpoint:
+          type: string
+          maxLength: 1000
+          description: The endpoint to remove; it must pass the same allow-list as in `PushSubscriptionInput`.
+    AccessToken:
+      type: object
+      additionalProperties: false
+      description: A personal API token as listed. It never includes the secret or its hash. Times are Unix seconds.
+      required: [tokenId, name, scope, createdAt, expiresAt, lastUsedAt, prefix]
+      properties:
+        tokenId:
+          type: string
+          description: A UUID, used to revoke the token.
+        name:
+          type: string
+          maxLength: 60
+        scope:
+          type: string
+          enum: [read, write]
+          description: '`read` tokens start `hwr_` and may only make `GET` requests; `write` tokens start `hww_`.'
+        createdAt:
+          type: integer
+          description: When the token was created, in Unix seconds.
+        expiresAt:
+          type: [integer, 'null']
+          description: When the token stops working, in Unix seconds. Null for a token that never expires.
+        lastUsedAt:
+          type: [integer, 'null']
+          description: When the token was last used, in Unix seconds, updated at most hourly. Null until first use.
+        prefix:
+          type: string
+          minLength: 8
+          maxLength: 8
+          description: The first 8 characters of the secret, to recognise it by.
+    NewAccessToken:
+      type: object
+      additionalProperties: false
+      description: A newly created token. This is the only response that carries the secret.
+      required: [token, record]
+      properties:
+        token:
+          type: string
+          description: >-
+            The secret, sent as `Authorization: Bearer <token>`. A real one is `hwr_` (read) or `hww_` (read-write)
+            followed by 43 URL-safe characters. It is not stored and cannot be shown again.
+        record:
+          $ref: '#/components/schemas/AccessToken'
+    CreateAccessTokenInput:
+      type: object
+      additionalProperties: false
+      required: [name, scope, expiryDays]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 60
+          description: A label, at most 60 characters after trimming. Not blank, no control characters.
+        scope:
+          type: string
+          enum: [read, write]
+        expiryDays:
+          type: [integer, 'null']
+          enum: [90, 180, 365, 730, null]
+          description: Days until the token expires, or null for never. Required, but may be null.
+        password:
+          type: string
+          maxLength: 128
+          description: >-
+            The account password. Used only in local mode when `scope` is `write`, where it is required; ignored
+            otherwise.
