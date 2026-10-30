@@ -40,13 +40,14 @@ info:
 
     Token rules:
 
-    - A read token may only make `GET` and `HEAD` requests. Any other method returns 403 `This token is read-only`.
-      A read-write token may use every method.
+    - A read token may only make `GET` and `HEAD` requests (`HEAD` passes the token check but is not served; see HEAD
+      below and HOA-45). Any other method returns 403 `This token is read-only`. A read-write token may use every
+      method.
     - A token can never reach `/api/tokens*`, `/api/push*` or `/api/auth/*`; those return 403
       `Not available to access tokens`. Each operation records this as `x-token-access`: `none` (no token),
       `read` (a read token is enough) or `write` (a read-write token is needed).
-    - A token is shown once when it is created, expires when its owner chose, can be revoked, and is revoked for
-      good by a password reset.
+    - A token is shown once when it is created, expires when its owner chose, can be revoked, and in local mode
+      is revoked for good by a password reset (AUTH-15; Auth0 mode has no local password reset).
     - Repeated failed token lookups from one client address are rate limited and answered with 429 and a
       `Retry-After` header. The limit is exact in the self-hosted container and best-effort per instance on AWS.
 
@@ -63,7 +64,8 @@ info:
 
     `HEAD` is not served. The router matches the request method exactly and registers no `HEAD` handlers, so a `HEAD`
     request to a `GET` route returns 404 `Endpoint not found`. A read token is nonetheless allowed to pass the token
-    check with `HEAD`; use `GET` to read.
+    check with `HEAD`, so "GET and HEAD" above describes the token rule, not what is served (tracked as HOA-45); use
+    `GET` to read.
 servers:
   - url: /
     description: The same origin that serves the app.
