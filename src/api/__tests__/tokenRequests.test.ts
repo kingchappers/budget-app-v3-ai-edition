@@ -12,8 +12,10 @@ import type { TokenScope } from '../../auth/tokens';
 import { setStore } from '../../store';
 import { MemoryStore } from '../../store/memory';
 import { SECURITY_HEADERS } from '../constants';
-import { registerCoreRoutes } from '../routes';
+import { createRouter } from '../router';
 import type { Router } from '../router';
+import { registerCoreRoutes } from '../routes';
+import { createTokenRouter } from '../tokenRouter';
 import type { ApiResponse } from '../types';
 
 const ROUTE_KEY = 'ANY /api/{proxy+}';
@@ -294,7 +296,19 @@ describe('requests without a token', () => {
 });
 
 describe('route table', () => {
-  it('every GET route is on the reviewed list', () => {
+  it('a token cannot reach a route registered only on the main router', async () => {
+    const extra = vi.fn().mockResolvedValue({ statusCode: 200, headers: SECURITY_HEADERS, body: '{}' });
+    const main = createRouter();
+    registerCoreRoutes(main);
+    main.get('/api/settings/export', extra);
+    const event = makeEvent({ path: '/api/settings/export' });
+
+    expect((await main.dispatch(event, 'user-a')).statusCode).toBe(200);
+    expect((await createTokenRouter().dispatch(event, 'user-a')).statusCode).toBe(404);
+    expect(extra).toHaveBeenCalledTimes(1);
+  });
+
+  it('every GET route a token can reach is on the reviewed list', () => {
     const recorded: Array<{ method: string; path: string }> = [];
     const record = (method: string) => (path: string): void => { recorded.push({ method, path }); };
     const router: Router = {
@@ -304,7 +318,7 @@ describe('route table', () => {
       delete: record('DELETE'),
       dispatch: () => Promise.reject(new Error('not used')),
     };
-    registerCoreRoutes(router);
+    createTokenRouter(router);
 
     const getPaths = recorded.filter(r => r.method === 'GET').map(r => r.path).sort();
     // Adding a GET route? Confirm it has no side effects (a read token may call it), then add it here.

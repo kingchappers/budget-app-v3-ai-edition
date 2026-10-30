@@ -6,6 +6,7 @@ import { SECURITY_HEADERS } from './src/api/constants';
 import { err } from './src/api/http';
 import type { ApiResponse } from './src/api/types';
 import { registerCoreRoutes } from './src/api/routes';
+import { createTokenRouter } from './src/api/tokenRouter';
 import { createPushSubscription, deletePushSubscription } from './src/api/push';
 import { createAccessToken, listAccessTokens, revokeAccessToken } from './src/api/tokens';
 import { authenticateToken, presentsAccessToken, tokenAccessRejection } from './src/auth/tokenAuth';
@@ -19,6 +20,8 @@ router.delete('/api/push/subscriptions', deletePushSubscription);
 router.post('/api/tokens', createAccessToken);
 router.get('/api/tokens', listAccessTokens);
 router.delete('/api/tokens/{tokenId}', revokeAccessToken);
+
+const tokenRouter = createTokenRouter();
 
 const INTERNAL_ERROR = JSON.stringify({ error: 'Internal server error' });
 
@@ -56,7 +59,7 @@ async function handleTokenRequest(event: APIGatewayProxyEventV2): Promise<ApiRes
   } catch (error) {
     console.warn('Token last-used update failed:', error instanceof Error ? error.name : 'Error');
   }
-  return router.dispatch(event, result.userId);
+  return tokenRouter.dispatch(event, result.userId);
 }
 
 export const handler: APIGatewayProxyHandlerV2 = async (event) => {
