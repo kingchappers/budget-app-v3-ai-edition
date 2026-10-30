@@ -3,7 +3,8 @@ import '@testing-library/jest-dom/vitest';
 import { notifications } from '@mantine/notifications';
 import { cleanup, configure } from '@testing-library/react';
 import { createElement } from 'react';
-import { afterEach, vi } from 'vitest';
+import { afterAll, afterEach, vi } from 'vitest';
+import { installTimerBackstop } from './app/test-utils/timerBackstop';
 
 // Vitest runs without `globals`, so Testing Library's auto-cleanup never registers. Unmount first, then empty the
 // notification store: clearing it while <Notifications /> is still mounted starts exit transitions whose timers
@@ -12,6 +13,14 @@ import { afterEach, vi } from 'vitest';
 afterEach(() => {
   cleanup();
   notifications.clean();
+});
+
+// A timer or animation frame a test file leaves pending can fire after the environment is torn down and throw
+// "window is not defined" as an unhandled error, which fails the run although every test passed (HOA-25). Cancel
+// whatever is still pending once the file's tests are done. This setup's afterAll runs last, after the file's own.
+const timerBackstops = [...new Set<object>([globalThis, window])].map(installTimerBackstop);
+afterAll(() => {
+  for (const backstop of timerBackstops) backstop.clearPending();
 });
 
 // Mantine menus, dialogs and drawers animate open and closed. CI runs the
