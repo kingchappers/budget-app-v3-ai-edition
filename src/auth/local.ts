@@ -5,6 +5,7 @@ import { clearThrottle, deleteAllSessions, getAccount, readSession } from './loc
 import { handleAuthRoute } from './routes';
 import type { AuthRouteContext } from './routes';
 import { SetupCode } from './setupCode';
+import { revokeAllTokens } from './tokens';
 import type { AuthProvider } from './types';
 
 const nowSeconds = (): number => Math.floor(Date.now() / 1000);
@@ -40,6 +41,7 @@ export async function createLocalProvider(env: NodeJS.ProcessEnv, options: Local
   if (recovery) {
     // Opening recovery signs everyone out and lifts any lock-out, as `store-cli reset-password` does.
     await deleteAllSessions(store);
+    await revokeAllTokens(store);
     await clearThrottle(store);
   }
 
@@ -57,6 +59,7 @@ export async function createLocalProvider(env: NodeJS.ProcessEnv, options: Local
   };
 
   return {
+    mode: 'local',
     handlePublic: event => handleAuthRoute(event, ctx),
 
     async authenticate(event) {

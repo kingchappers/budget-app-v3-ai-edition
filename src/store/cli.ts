@@ -4,6 +4,7 @@ import { chooseSqliteFile } from '../../container/config';
 import { clearThrottle, deleteAllSessions, getAccount, replacePassword } from '../auth/localData';
 import { validatePassword } from '../auth/password';
 import { promptHidden } from '../auth/prompt';
+import { revokeAllTokens } from '../auth/tokens';
 import { initStore, type Store } from '.';
 import { exportUser, importUser, parseJsonl, toJsonl } from './transfer';
 
@@ -12,7 +13,7 @@ const USAGE = `Usage:
   import --in <file> --as-user <userId> [--replace]
                                            load a JSONL file under a user id; refuses a user that has data unless --replace
   backup --out <file>                      write a consistent, verified, owner-only copy of the SQLite database (never overwrites; STORE=sqlite only)
-  reset-password                           set a new password for the built-in login, end every session and clear any lock-out (prompts; the password is never taken from arguments)
+  reset-password                           set a new password for the built-in login, end every session and access token and clear any lock-out (prompts; the password is never taken from arguments)
 
 The backend comes from the environment: STORE=dynamodb with DYNAMODB_TABLE (and your AWS credentials),
 or STORE=sqlite, which opens the database in DATA_DIR (default /data) the way the container does, or the file named by SQLITE_PATH.
@@ -79,8 +80,9 @@ export async function runCli(argv: string[], env: NodeJS.ProcessEnv = process.en
     if (problem) throw new Error(problem);
     await replacePassword(store, password);
     await deleteAllSessions(store);
+    await revokeAllTokens(store);
     await clearThrottle(store);
-    return 'Password reset. All sessions have ended and any login lock-out is cleared.';
+    return 'Password reset. All sessions and access tokens have ended and any login lock-out is cleared.';
   }
 
   if (command === 'backup') {

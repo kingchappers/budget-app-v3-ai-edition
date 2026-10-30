@@ -26,6 +26,7 @@ export function createAuth0Provider(env: NodeJS.ProcessEnv): AuthProvider {
   }
 
   return {
+    mode: 'auth0',
     async authenticate(event) {
       const authHeader = event.headers?.authorization || '';
       const token = authHeader.replace('Bearer ', '');

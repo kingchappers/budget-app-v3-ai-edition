@@ -4,6 +4,7 @@ import { resetTestStore, useTestStore } from '../../store/testing';
 import type { SqliteStore } from '../../store/sqlite';
 import { createAccount, createSession, readSession, recordFailure, throttleRemaining } from '../localData';
 import { createLocalProvider } from '../local';
+import { createToken, findToken, listTokens } from '../tokens';
 import { initAuth, setAuth } from '..';
 
 let store: SqliteStore;
@@ -133,6 +134,20 @@ describe('createLocalProvider code hooks', () => {
     expect(await throttleRemaining(store, now())).toBe(0);
     const status = await provider.handlePublic!(publicEvent('GET', '/api/auth/status'));
     expect(JSON.parse(status!.body)).toEqual({ setupRequired: false, recoveryOpen: true });
+  });
+
+  it('opening recovery revokes every access token', async () => {
+    const account = await createAccount(store, 'me@example.com', 'a long enough password');
+
+    const read = await createToken(store, { userId: account.userId, name: 'r', scope: 'read', expiryDays: null }, now());
+    const write = await createToken(store, { userId: account.userId, name: 'w', scope: 'write', expiryDays: null }, now());
+    await store.put({ PK: `USER#${account.userId}`, SK: 'CAT#c1', name: 'Garden' });
+    await createLocalProvider({}, { hooks: makeHooks(), recovery: true });
+
+    expect(await listTokens(store, account.userId)).toEqual([]);
+    expect(await findToken(store, read.token, now())).toBeUndefined();
+    expect(await findToken(store, write.token, now())).toBeUndefined();
+    expect(await store.get({ PK: `USER#${account.userId}`, SK: 'CAT#c1' })).toBeDefined();
   });
 
   it('ignores a recovery request while no account exists and offers normal setup', async () => {

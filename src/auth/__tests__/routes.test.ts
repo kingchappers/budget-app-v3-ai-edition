@@ -5,6 +5,7 @@ import type { SqliteStore } from '../../store/sqlite';
 import { handleAuthRoute } from '../routes';
 import type { AuthRouteContext } from '../routes';
 import { SetupCode } from '../setupCode';
+import { createToken, findToken, listTokens } from '../tokens';
 import { createAccount, createSession, hashToken, getAccount, readSession, recordFailure, throttleRemaining } from '../localData';
 
 const PASSWORD = 'a perfectly fine password';
@@ -304,6 +305,20 @@ describe('password recovery', () => {
     expect(cookieValue(res)).toMatch(/^__Host-hoardwise_session=/);
     expect((await login(NEW_PASSWORD))?.statusCode).toBe(200);
     expect((await login(PASSWORD))?.statusCode).toBe(401);
+  });
+
+  it('completing a recovery revokes every access token', async () => {
+    const { account } = await openRecovery();
+
+    const read = await createToken(store, { userId: account.userId, name: 'r', scope: 'read', expiryDays: null }, now);
+    const write = await createToken(store, { userId: account.userId, name: 'w', scope: 'write', expiryDays: null }, now);
+    await store.put({ PK: `USER#${account.userId}`, SK: 'CAT#c1', name: 'Garden' });
+    await handleAuthRoute(post('/api/auth/setup', recoveryBody()), ctx);
+
+    expect(await listTokens(store, account.userId)).toEqual([]);
+    expect(await findToken(store, read.token, now)).toBeUndefined();
+    expect(await findToken(store, write.token, now)).toBeUndefined();
+    expect(await store.get({ PK: `USER#${account.userId}`, SK: 'CAT#c1' })).toBeDefined();
   });
 
   it('keeps the same account: user id and email are unchanged', async () => {

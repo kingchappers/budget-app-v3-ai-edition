@@ -28,7 +28,7 @@ describe('auth registry', () => {
   });
 
   it('lets a test override the provider', async () => {
-    const fake: AuthProvider = { authenticate: async () => ({ userId: 'u1' }) };
+    const fake: AuthProvider = { mode: 'auth0', authenticate: async () => ({ userId: 'u1' }) };
     setAuth(fake);
     expect(getAuth()).toBe(fake);
     expect(await initAuth({})).toBe(fake);
