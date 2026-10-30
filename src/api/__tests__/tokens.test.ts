@@ -5,6 +5,7 @@ import { handler } from '../../../api-handler';
 import { setAuth } from '../../auth';
 import type { AuthResult } from '../../auth';
 import { createAccount, recordFailure } from '../../auth/localData';
+import { handleAuthRoute } from '../../auth/routes';
 import { verifyPassword } from '../../auth/password';
 import { MAX_TOKENS_PER_USER, createToken, findToken, listTokens } from '../../auth/tokens';
 import { setStore } from '../../store';
@@ -249,6 +250,26 @@ describe('password re-entry for write tokens in local mode', () => {
     );
     const statuses = responses.map((res) => res.statusCode);
     expect(statuses.filter((s) => s === 403)).toHaveLength(4);
+    expect(statuses.filter((s) => s === 429)).toHaveLength(6);
+    expect(verifyPassword).toHaveBeenCalledTimes(4);
+  });
+
+  it('login and token creation share one queue, so guesses on both together still hit the throttle', async () => {
+    vi.spyOn(Date, 'now').mockReturnValue(NOW_MS);
+    const ctx = { store, setupCode: undefined, secureCookie: true, nowSeconds: (): number => NOW };
+    const loginEvent = (i: number): APIGatewayProxyEventV2 => ({
+      rawPath: '/api/auth/login',
+      headers: { host: 'budget.example.com', origin: 'https://budget.example.com' },
+      body: JSON.stringify({ email: 'owner@example.com', password: `login guess ${i}` }),
+      requestContext: { routeKey: 'POST /api/auth/login', http: { method: 'POST', sourceIp: '198.51.100.1' } },
+    }) as unknown as APIGatewayProxyEventV2;
+
+    const attempts = Array.from({ length: 5 }, (_, i) => [
+      handleAuthRoute(loginEvent(i), ctx),
+      create({ ...VALID, scope: 'write', password: `create guess ${i}` }),
+    ]).flat();
+    const statuses = (await Promise.all(attempts)).map((res) => res?.statusCode);
+
     expect(statuses.filter((s) => s === 429)).toHaveLength(6);
     expect(verifyPassword).toHaveBeenCalledTimes(4);
   });

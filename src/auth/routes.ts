@@ -10,6 +10,7 @@ import {
   readSession, recordFailure, replacePassword, throttleRemaining,
 } from './localData';
 import { MAX_PASSWORD_LENGTH, dummyRecord, validatePassword, verifyPassword } from './password';
+import { serialisedPasswordAttempt } from './passwordAttempts';
 import type { SetupCode } from './setupCode';
 
 export interface AuthRouteContext {
@@ -40,22 +41,11 @@ async function status(ctx: AuthRouteContext): Promise<ApiResponse> {
   return noStore(ok({ setupRequired: (await getAccount(ctx.store)) === undefined, recoveryOpen: ctx.recovery === true }));
 }
 
-// Single-process deployment on SQLite: one login or recovery at a time makes the throttle's read-modify-write safe,
-// queued attempts see the delay and are refused without hashing, and a login can never create a session
-// on the old password after a recovery has ended every session.
-let loginQueue: Promise<unknown> = Promise.resolve();
-
-function serialised(task: () => Promise<ApiResponse>): Promise<ApiResponse> {
-  const result = loginQueue.then(task);
-  loginQueue = result.catch(() => undefined);
-  return result;
-}
-
 type JsonBody = NonNullable<ReturnType<typeof parseJsonObject>>;
 
 // Replaces the password on the existing account. The account's id, email and data are untouched.
 function recover(body: JsonBody, ctx: AuthRouteContext, account: { userId: string; email: string }): Promise<ApiResponse> {
-  return serialised(() => attemptRecovery(body, ctx, account));
+  return serialisedPasswordAttempt(() => attemptRecovery(body, ctx, account));
 }
 
 async function attemptRecovery(body: JsonBody, ctx: AuthRouteContext, account: { userId: string; email: string }): Promise<ApiResponse> {
@@ -144,7 +134,7 @@ async function attemptLogin(event: APIGatewayProxyEventV2, ctx: AuthRouteContext
 }
 
 function login(event: APIGatewayProxyEventV2, ctx: AuthRouteContext): Promise<ApiResponse> {
-  return serialised(() => attemptLogin(event, ctx));
+  return serialisedPasswordAttempt(() => attemptLogin(event, ctx));
 }
 
 async function logout(event: APIGatewayProxyEventV2, ctx: AuthRouteContext): Promise<ApiResponse> {

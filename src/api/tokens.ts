@@ -2,6 +2,7 @@ import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { clearThrottle, getAccount, recordFailure, throttleRemaining } from '../auth/localData';
 import type { Account } from '../auth/localData';
 import { MAX_PASSWORD_LENGTH, verifyPassword } from '../auth/password';
+import { serialisedPasswordAttempt } from '../auth/passwordAttempts';
 import {
   MAX_TOKEN_NAME_LENGTH, TOKEN_EXPIRY_DAYS, TokenLimitError, createToken, listTokens, revokeToken,
 } from '../auth/tokens';
@@ -58,19 +59,10 @@ function validateCreate(body: Record<string, unknown>): Validation {
   return { ok: true, value: { name: trimmed, scope, expiryDays, password } };
 }
 
-// One check at a time, as the login route does: parallel guesses cannot all pass the throttle before any of
-// them records a failure, and queued attempts see the delay and are refused without hashing.
-let passwordQueue: Promise<unknown> = Promise.resolve();
-
-function serialised(task: () => Promise<ApiResponse | null>): Promise<ApiResponse | null> {
-  const result = passwordQueue.then(task);
-  passwordQueue = result.catch(() => undefined);
-  return result;
-}
-
-// Returns a refusal, or null when the caller may go on to create the token.
+// Returns a refusal, or null when the caller may go on to create the token. Shares the login route's queue, so
+// guesses here and at login together are still checked one at a time against the one throttle.
 function checkPassword(store: Store, password: string | undefined): Promise<ApiResponse | null> {
-  return serialised(() => attemptPassword(store, password));
+  return serialisedPasswordAttempt(() => attemptPassword(store, password));
 }
 
 async function attemptPassword(store: Store, password: string | undefined): Promise<ApiResponse | null> {
