@@ -8,6 +8,9 @@ import { addDaysIso, formatDayLabel, todayIso } from '~/lib/months';
 
 vi.mock('@auth0/auth0-react', () => ({ useAuth0: () => ({ user: { sub: 'user-1' } }) }));
 
+const demo = vi.hoisted(() => ({ isDemo: false }));
+vi.mock('~/demo/flag', () => ({ get isDemo() { return demo.isDemo; } }));
+
 const mockCreate = { mutateAsync: vi.fn() };
 const mockRemove = { mutate: vi.fn() };
 
@@ -366,6 +369,21 @@ describe('useSaveWithUndo', () => {
     const entries = await listQueue();
     expect(entries).toHaveLength(1);
     expect(screen.queryByText(/Couldn't save/)).not.toBeInTheDocument();
+  });
+
+  it('never queues in the demo, where nothing may outlive the tab: a failed save shows the failure toast', async () => {
+    demo.isDemo = true;
+    try {
+      mockCreate.mutateAsync.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+      const { result } = renderSaveWithUndo();
+      await act(async () => {
+        await result.current({ amount: 500, type: 'EXPENSE', categoryId: 'cat-1', description: '', date: '2025-01-05' });
+      });
+      expect(await listQueue()).toHaveLength(0);
+      expect(screen.getByText(/Couldn't save/)).toBeInTheDocument();
+    } finally {
+      demo.isDemo = false;
+    }
   });
 
   it('keeps the Saved toast open (relabelled) once queued, instead of closing it within milliseconds', async () => {

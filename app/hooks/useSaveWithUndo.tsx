@@ -8,6 +8,7 @@ import { leftAfterSaveNote } from '~/lib/afterSave';
 import { formatPence } from '~/lib/money';
 import { formatDayLabel, todayIso } from '~/lib/months';
 import { enqueue } from '~/lib/offlineQueue';
+import { isDemo } from '~/demo/flag';
 import { clearPendingEntry, discardQueuedEntry, setPendingEntry } from '~/lib/pendingEntries';
 import { usePreferences } from '~/lib/preferences';
 import { undoAutoClose } from '~/lib/undoDuration';
@@ -125,7 +126,9 @@ export function useSaveWithUndo(): (input: TransactionInput, options?: SaveOptio
         return created;
       },
       async (error: unknown) => {
-        if (error instanceof ApiError) {
+        // In the demo every failure is final: its API answers in the page, so there is no network to wait for, and a
+        // queued entry would sit in IndexedDB and come back after a reload that is meant to wipe everything.
+        if (error instanceof ApiError || isDemo) {
           notifications.hide(toastId);
           clearPendingEntry(qc, transactionId);
           // A cancelled entry must not offer Retry, or one tap would re-create it.
