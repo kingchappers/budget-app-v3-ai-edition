@@ -2,7 +2,7 @@ import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { ConditionFailedError, getStore } from '../store';
 import { pk, catSk } from './db';
 import { DEFAULT_CATEGORY_IDS } from './defaults';
-import { ok, err } from './http';
+import { ok, err, parseJsonObject } from './http';
 import type { ApiResponse } from './types';
 
 const UPDATE_BATCH_SIZE = 25;
@@ -53,12 +53,8 @@ export async function reassignCategory(
     return err(400, 'categoryId is required');
   }
 
-  let body: Record<string, unknown>;
-  try {
-    body = JSON.parse(event.body || '{}');
-  } catch {
-    return err(400, 'Invalid JSON body');
-  }
+  const body = parseJsonObject(event);
+  if (!body) return err(400, 'Invalid JSON body');
 
   const toCategoryId = body.toCategoryId;
   if (!toCategoryId || typeof toCategoryId !== 'string') {

@@ -3,7 +3,7 @@ import { getStore } from '../store';
 import { pk, targetSk } from './db';
 import { MAX_AMOUNT_PENCE, SECURITY_HEADERS, VALID_PERIODS } from './constants';
 import type { CategoryTarget, ApiResponse } from './types';
-import { ok, err } from './http';
+import { ok, err, parseJsonObject } from './http';
 import { moveToTrash } from './trash';
 
 export async function getTargets(
@@ -26,12 +26,8 @@ export async function upsertTarget(
     return err(400, 'categoryId is required');
   }
 
-  let body: Record<string, unknown>;
-  try {
-    body = JSON.parse(event.body || '{}');
-  } catch {
-    return err(400, 'Invalid JSON body');
-  }
+  const body = parseJsonObject(event);
+  if (!body) return err(400, 'Invalid JSON body');
 
   const { targetAmount, period } = body;
 

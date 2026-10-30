@@ -3,7 +3,7 @@ import { getStore } from '../store';
 import { pk, txnSk } from './db';
 import { MAX_AMOUNT_PENCE, SECURITY_HEADERS, VALID_TRANSACTION_TYPES } from './constants';
 import type { Transaction, ApiResponse } from './types';
-import { ok, err } from './http';
+import { ok, err, parseJsonObject } from './http';
 import { moveToTrash } from './trash';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -87,12 +87,8 @@ export async function createTransaction(
   userId: string,
   _params: Record<string, string>,
 ): Promise<ApiResponse> {
-  let body: Record<string, unknown>;
-  try {
-    body = JSON.parse(event.body || '{}');
-  } catch {
-    return err(400, 'Invalid JSON body');
-  }
+  const body = parseJsonObject(event);
+  if (!body) return err(400, 'Invalid JSON body');
 
   const validation = validateTransactionInput(body);
   if (validation.ok === false) {
@@ -158,12 +154,8 @@ export async function updateTransaction(
     return err(400, 'transactionId is required');
   }
 
-  let body: Record<string, unknown>;
-  try {
-    body = JSON.parse(event.body || '{}');
-  } catch {
-    return err(400, 'Invalid JSON body');
-  }
+  const body = parseJsonObject(event);
+  if (!body) return err(400, 'Invalid JSON body');
 
   const validation = validateTransactionInput(body);
   if (validation.ok === false) {

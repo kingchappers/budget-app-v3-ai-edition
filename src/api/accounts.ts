@@ -4,7 +4,7 @@ import { pk, accountSk } from './db';
 import { queryAll, queryOne } from './pots';
 import { ASSET_TYPES, LIABILITY_TYPES, MAX_AMOUNT_PENCE, MAX_BALANCE_ENTRIES, SECURITY_HEADERS } from './constants';
 import type { Account, AccountKind, AccountType, ApiResponse, BalanceEntry } from './types';
-import { ok, err } from './http';
+import { ok, err, parseJsonObject } from './http';
 import { moveToTrash } from './trash';
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
@@ -77,12 +77,8 @@ export async function createAccount(
   userId: string,
   _params: Record<string, string>,
 ): Promise<ApiResponse> {
-  let body: Record<string, unknown>;
-  try {
-    body = JSON.parse(event.body || '{}');
-  } catch {
-    return err(400, 'Invalid JSON body');
-  }
+  const body = parseJsonObject(event);
+  if (!body) return err(400, 'Invalid JSON body');
 
   const { name, kind, type } = body;
   if (!name || typeof name !== 'string' || name.trim().length === 0 || name.length > NAME_MAX_LENGTH) {
@@ -126,12 +122,8 @@ export async function updateAccount(
   }
   const existing = toAccount(existingItem);
 
-  let body: Record<string, unknown>;
-  try {
-    body = JSON.parse(event.body || '{}');
-  } catch {
-    return err(400, 'Invalid JSON body');
-  }
+  const body = parseJsonObject(event);
+  if (!body) return err(400, 'Invalid JSON body');
 
   const { name, type } = body;
   if (!name || typeof name !== 'string' || name.trim().length === 0 || name.length > NAME_MAX_LENGTH) {
@@ -173,12 +165,8 @@ export async function addBalance(
     return err(400, 'accountId is required');
   }
 
-  let body: Record<string, unknown>;
-  try {
-    body = JSON.parse(event.body || '{}');
-  } catch {
-    return err(400, 'Invalid JSON body');
-  }
+  const body = parseJsonObject(event);
+  if (!body) return err(400, 'Invalid JSON body');
 
   const { date, pence } = body;
   if (!isValidDate(date) || date > tomorrowIso()) {

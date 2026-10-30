@@ -58,7 +58,7 @@ info:
     An error response has a JSON body `{ "error": "<message>" }`, and some add extra fields. The statuses are 400
     (invalid input), 401 (missing or invalid credential), 403 (forbidden, including token limits and protected
     default categories), 404 (unknown route or record), 409 (conflict with the current state), 429 (too many
-    requests; see `Retry-After`) and 500 (an unexpected server failure, with a generic message). A request body of JSON `null` makes several write routes answer 500 instead of 400 (tracked as HOA-42).
+    requests; see `Retry-After`) and 500 (an unexpected server failure, with a generic message).
 
     ## HEAD
 
@@ -519,7 +519,7 @@ paths:
         retry safely; supplying an id that already exists in that month silently replaces that transaction. The
         `categoryId` and `recurringId` are not checked against existing records. `date` is checked by shape only, so
         `2026-13-45` is accepted. `description` may be omitted or null and is stored as an empty string. Unknown fields
-        are ignored. A body that is valid JSON but not an object (for example `null`) returns 500, not 400.
+        are ignored.
       operationId: createTransaction
       x-token-access: write
       requestBody:
@@ -841,8 +841,7 @@ paths:
         before `month` is different (the amount is `monthlyAmount` when on, `0` when off). The history may hold at
         most 120 entries. `month` is the first month the change applies to and must be within one month of the
         server's current month (UTC). An existing `archivedAt` is kept, and saving does not unarchive the pot.
-        `categoryId` must be a built-in or custom category of type `POT`. Unknown body fields are ignored. A body of
-        `null` returns 500, not 400 (a string, number or array gives a 400 about `monthlyAmount`).
+        `categoryId` must be a built-in or custom category of type `POT`. Unknown body fields are ignored.
       operationId: putPot
       x-token-access: write
       requestBody:
@@ -890,7 +889,7 @@ paths:
                   updatedAt: '2026-10-30T09:15:00.000Z'
         '400':
           description: >-
-            The body is not valid JSON (`Invalid JSON body`); `monthlyAmount` or `goalAmount` is missing or not null or a
+            The body is not a JSON object (`Invalid JSON body`); `monthlyAmount` or `goalAmount` is missing or not null or a
             positive integer of at most 1,000,000,000 (`monthlyAmount must be null or a positive integer of pence`, and the
             same for `goalAmount`); `autoContribute` is not a boolean (`autoContribute must be a boolean`); `month` is
             missing, malformed or not within one month of now (`month must be a YYYY-MM month within one month of now`);
@@ -1586,7 +1585,7 @@ paths:
                   createdAt: '2026-10-30T09:15:00.000Z'
         '400':
           description: >-
-            The body is not valid JSON (`Invalid JSON body`); `name` is missing, blank or over 50 characters
+            The body is not a JSON object (`Invalid JSON body`); `name` is missing, blank or over 50 characters
             (`name must be a non-empty string of at most 50 characters`); `kind` is not `ASSET` or `LIABILITY`
             (`kind must be ASSET or LIABILITY`); or `type` does not belong to `kind` (`type must match kind: CASH,
             SAVINGS, INVESTMENT` for an asset, `type must match kind: CREDIT_CARD, LOAN` for a liability). The first rule
@@ -1650,7 +1649,7 @@ paths:
                   createdAt: '2026-10-01T08:00:00.000Z'
         '400':
           description: >-
-            The body is not valid JSON (`Invalid JSON body`); `name` is missing, blank or over 50 characters
+            The body is not a JSON object (`Invalid JSON body`); `name` is missing, blank or over 50 characters
             (`name must be a non-empty string of at most 50 characters`); or `type` does not belong to the account's kind
             (`type must match the account's existing kind: CASH, SAVINGS, INVESTMENT` for an asset, `... CREDIT_CARD, LOAN`
             for a liability).
@@ -1744,7 +1743,7 @@ paths:
                   createdAt: '2026-10-01T08:00:00.000Z'
         '400':
           description: >-
-            The body is not valid JSON (`Invalid JSON body`); `date` is not a real `YYYY-MM-DD` date or is more than one
+            The body is not a JSON object (`Invalid JSON body`); `date` is not a real `YYYY-MM-DD` date or is more than one
             day ahead (`date must be a YYYY-MM-DD date, at most one day ahead of today`); `pence` is not an integer of at
             most 1,000,000,000 in magnitude (the message says `pence must be a positive integer, at most 1000000000`,
             although zero and negative values are accepted); or the account already has 500 entries on other dates

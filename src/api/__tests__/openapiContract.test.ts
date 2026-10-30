@@ -552,6 +552,32 @@ describe('docs/openapi.yaml contract: the real handlers', () => {
       }
     });
 
+    it('answers 400 for every operation with a request body when the body is not a JSON object', async () => {
+      const withBody = ops.filter((op) => requestContent(op) !== undefined);
+      expect(withBody.length).toBeGreaterThan(0);
+      // Records that exist, so a 400 can only come from the body check and not from a 404.
+      const category = (await send(opByKey('POST /api/categories'), requestFromSpec(opByKey('POST /api/categories'), 'expense'))).json;
+      const account = (await send(opByKey('POST /api/accounts'), requestFromSpec(opByKey('POST /api/accounts'), 'asset'))).json;
+      const transaction = (await send(opByKey('POST /api/transactions'), requestFromSpec(opByKey('POST /api/transactions'), 'expense'))).json;
+      const recurring = (await send(opByKey('POST /api/recurring'), requestFromSpec(opByKey('POST /api/recurring'), 'monthly'))).json;
+      const existing: Record<string, string> = {
+        categoryId: category.category.categoryId,
+        accountId: account.account.accountId,
+        yearMonth: transaction.transaction.yearMonth,
+        transactionId: transaction.transaction.transactionId,
+        recurringId: recurring.recurring.recurringId,
+      };
+      for (const op of withBody) {
+        const base = requestFromSpec(op, undefined, existing);
+        for (const body of ['null', '[]', '"text"', '123', 'true', '{']) {
+          const reply = await send(op, { ...base, body });
+          expect(replyProblems(op, reply), `${keyOf(op)} body ${body}`).toEqual([]);
+          expect(reply.status, `${keyOf(op)} body ${body}: ${reply.text}`).toBe(400);
+          exercised.add(`${keyOf(op)} 400`);
+        }
+      }
+    });
+
     it('lists no case, and no x-untested marker, for a status the spec does not document', () => {
       const unknown = ERROR_CASES.map((c) => c.key).filter((key) => {
         const separator = key.lastIndexOf(' ');
