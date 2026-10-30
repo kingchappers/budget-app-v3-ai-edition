@@ -59,6 +59,7 @@ export async function createLocalProvider(env: NodeJS.ProcessEnv, options: Local
   };
 
   return {
+    mode: 'local',
     handlePublic: event => handleAuthRoute(event, ctx),
 
     async authenticate(event) {

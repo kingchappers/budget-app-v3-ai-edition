@@ -3,7 +3,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MockInstance } from 'vitest';
 import { handler } from '../../../api-handler';
 import { setAuth } from '../../auth';
-import type { AuthResult } from '../../auth';
+import type { AuthMode, AuthProvider, AuthResult } from '../../auth';
+import { createAuth0Provider } from '../../auth/auth0';
+import { createLocalProvider } from '../../auth/local';
 import { createAccount, recordFailure } from '../../auth/localData';
 import { handleAuthRoute } from '../../auth/routes';
 import { verifyPassword } from '../../auth/password';
@@ -64,15 +66,22 @@ function loggedText(): string {
   return logSpy.mock.calls.map((call) => call.map((part: unknown) => String(part)).join(' ')).join('\n');
 }
 
+function fakeProvider(mode: AuthMode): AuthProvider {
+  return {
+    mode,
+    authenticate: vi.fn<(event: APIGatewayProxyEventV2) => Promise<AuthResult>>().mockResolvedValue({ userId: 'jwt-user' }),
+  };
+}
+
 async function useLocalModeWithAccount(): Promise<void> {
-  vi.stubEnv('AUTH_MODE', 'local');
+  setAuth(fakeProvider('local'));
   await createAccount(store, 'owner@example.com', PASSWORD);
 }
 
 beforeEach(() => {
   store = new MemoryStore();
   setStore(store);
-  vi.stubEnv('AUTH_MODE', 'auth0');
+  setAuth(fakeProvider('auth0'));
   vi.mocked(verifyPassword).mockClear();
   logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
   vi.spyOn(console, 'warn').mockImplementation(() => {});
@@ -82,7 +91,6 @@ beforeEach(() => {
 afterEach(() => {
   setAuth(undefined);
   setStore(undefined);
-  vi.unstubAllEnvs();
   vi.restoreAllMocks();
 });
 
@@ -275,6 +283,25 @@ describe('password re-entry for write tokens in local mode', () => {
   });
 });
 
+describe('the auth mode comes from the active provider, not the environment', () => {
+  it('the built-in login provider requires the password for a write token while AUTH_MODE is unset', async () => {
+    await createAccount(store, 'owner@example.com', PASSWORD);
+    setAuth(await createLocalProvider({}));
+    const res = await create({ ...VALID, scope: 'write' });
+    expect(res.statusCode).toBe(403);
+    expect(errorOf(res)).toBe('Password required');
+    expect(await listTokens(store, 'user-a')).toEqual([]);
+  });
+
+  it('the Auth0 provider never asks for a password for a write token', async () => {
+    await createAccount(store, 'owner@example.com', PASSWORD);
+    setAuth(createAuth0Provider({ AUTH0_DOMAIN: 'example.auth0.com', AUTH0_AUDIENCE: 'https://api.example.com' }));
+    const res = await create({ ...VALID, scope: 'write' });
+    expect(res.statusCode).toBe(201);
+    expect(verifyPassword).not.toHaveBeenCalled();
+  });
+});
+
 describe('Auth0 mode', () => {
   it('a write token never asks for a password', async () => {
     await createAccount(store, 'owner@example.com', PASSWORD);
@@ -387,12 +414,6 @@ describe('through the API handler', () => {
   async function invoke(event: APIGatewayProxyEventV2): Promise<ApiResponse> {
     return (await handler(event, {} as Context, () => {})) as ApiResponse;
   }
-
-  beforeEach(() => {
-    setAuth({
-      authenticate: vi.fn<(event: APIGatewayProxyEventV2) => Promise<AuthResult>>().mockResolvedValue({ userId: 'jwt-user' }),
-    });
-  });
 
   it('a token calling POST /api/tokens gets 403', async () => {
     const { token } = await createToken(store, { userId: 'jwt-user', name: 'w', scope: 'write', expiryDays: 90 }, NOW);

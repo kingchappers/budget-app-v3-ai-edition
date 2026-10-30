@@ -22,6 +22,7 @@ const NOT_FOR_TOKENS = '{"error":"Not available to access tokens"}';
 
 let store: MemoryStore;
 let fakeAuth: {
+  mode: 'auth0';
   authenticate: Mock<(event: APIGatewayProxyEventV2) => Promise<AuthResult>>;
   handlePublic: Mock<(event: APIGatewayProxyEventV2) => Promise<ApiResponse | undefined>>;
 };
@@ -95,6 +96,7 @@ beforeEach(() => {
   store = new MemoryStore();
   setStore(store);
   fakeAuth = {
+    mode: 'auth0',
     authenticate: vi.fn<(event: APIGatewayProxyEventV2) => Promise<AuthResult>>().mockResolvedValue({ userId: 'jwt-user' }),
     handlePublic: vi.fn<(event: APIGatewayProxyEventV2) => Promise<ApiResponse | undefined>>().mockResolvedValue(undefined),
   };

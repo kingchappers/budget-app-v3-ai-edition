@@ -1,4 +1,5 @@
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
+import { getAuth } from '../auth';
 import { clearThrottle, getAccount, recordFailure, throttleRemaining } from '../auth/localData';
 import type { Account } from '../auth/localData';
 import { MAX_PASSWORD_LENGTH, verifyPassword } from '../auth/password';
@@ -93,7 +94,7 @@ async function passwordMatches(password: string, account: Account): Promise<bool
 }
 
 function needsPassword(scope: TokenScope): boolean {
-  return process.env.AUTH_MODE === 'local' && scope === 'write';
+  return getAuth().mode === 'local' && scope === 'write';
 }
 
 async function create(event: APIGatewayProxyEventV2, userId: string): Promise<ApiResponse> {

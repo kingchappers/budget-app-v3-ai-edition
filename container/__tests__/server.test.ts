@@ -96,6 +96,26 @@ describe('serving', () => {
     expect(await (await fetch(`${base}/api/auth/status`)).json()).toEqual({ setupRequired: false, recoveryOpen: false });
     expect((await fetch(`${base}/api/categories`, { headers: { Cookie: cookie } })).status).toBe(200);
   });
+
+  it('asks for the password before a signed-in session can create a write access token', async () => {
+    expect(process.env.AUTH_MODE ?? '').toBe('');
+    const base = await start();
+    const password = 'a perfectly fine password';
+    const setup = await fetch(`${base}/api/auth/setup`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Origin: base },
+      body: JSON.stringify({ code: setupCodeFromLogs(), email: 'me@example.com', password }),
+    });
+    const cookie = setup.headers.getSetCookie()[0].split(';')[0];
+    const createToken = (body: object): Promise<Response> => fetch(`${base}/api/tokens`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Origin: base, Cookie: cookie },
+      body: JSON.stringify({ name: 'Sync', scope: 'write', expiryDays: null, ...body }),
+    });
+
+    const refused = await createToken({});
+    expect(refused.status).toBe(403);
+    expect(await refused.json()).toEqual({ error: 'Password required' });
+    expect((await createToken({ password })).status).toBe(201);
+  });
 });
 
 describe('boot', () => {
