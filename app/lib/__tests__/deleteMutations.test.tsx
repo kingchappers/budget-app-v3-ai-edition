@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, waitFor, act } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import type { Account, CategoryTarget, Recurring, Transaction } from '../types';
+import type { AccessToken, Account, CategoryTarget, Recurring, Transaction } from '../types';
 
 const request = vi.fn();
 
@@ -9,7 +9,7 @@ vi.mock('~/hooks/useProtectedApi', () => ({ useProtectedApi: () => ({ request })
 vi.mock('@auth0/auth0-react', () => ({ useAuth0: () => ({ isAuthenticated: true }) }));
 
 import {
-  queryKeys, useDeleteAccount, useDeleteRecurring, useDeleteTarget, useDeleteTransaction, useRestoreFromTrash, useTrash,
+  queryKeys, useAccessTokens, useCreateAccessToken, useRevokeAccessToken, useDeleteAccount, useDeleteRecurring, useDeleteTarget, useDeleteTransaction, useRestoreFromTrash, useTrash,
 } from '../queries';
 
 function deferred<T>() {
@@ -152,5 +152,45 @@ describe('useRestoreFromTrash', () => {
     await act(async () => { await result.current.mutateAsync({ entityType: 'ACCOUNT', id: 'acc-1' }); });
 
     expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.accounts });
+  });
+});
+
+describe('access token hooks', () => {
+  const record: AccessToken = {
+    tokenId: 'tok1', name: 'Script', scope: 'read', createdAt: 1700000000, expiresAt: null, lastUsedAt: null, prefix: 'hw_abcd',
+  };
+
+  it('loads the token list', async () => {
+    request.mockResolvedValue({ tokens: [record] });
+    const { result } = renderHook(() => useAccessTokens(), { wrapper });
+    await waitFor(() => expect(result.current.data).toEqual([record]));
+    expect(request).toHaveBeenCalledWith('/api/tokens');
+  });
+
+  it('invalidates the list after creating and keeps the secret out of the cache', async () => {
+    const secret = 'hw_SECRET_VALUE_123';
+    request.mockResolvedValue({ token: secret, record });
+    client.setQueryData(queryKeys.accessTokens, []);
+    const { result, unmount } = renderHook(() => useCreateAccessToken(), { wrapper });
+
+    let created: { token: string; record: AccessToken } | undefined;
+    await act(async () => {
+      created = await result.current.mutateAsync({ name: 'Script', scope: 'read', expiryDays: null });
+    });
+
+    expect(created?.token).toBe(secret);
+    expect(client.getQueryState(queryKeys.accessTokens)?.isInvalidated).toBe(true);
+    expect(JSON.stringify(client.getQueryCache().getAll())).not.toContain(secret);
+    unmount();
+    await waitFor(() => expect(JSON.stringify(client.getMutationCache().getAll())).not.toContain(secret));
+  });
+
+  it('invalidates the list after revoking', async () => {
+    request.mockResolvedValue({});
+    client.setQueryData(queryKeys.accessTokens, [record]);
+    const { result } = renderHook(() => useRevokeAccessToken(), { wrapper });
+    await act(async () => { await result.current.mutateAsync('tok1'); });
+    expect(request).toHaveBeenCalledWith('/api/tokens/tok1', { method: 'DELETE' });
+    expect(client.getQueryState(queryKeys.accessTokens)?.isInvalidated).toBe(true);
   });
 });

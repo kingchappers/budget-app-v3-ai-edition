@@ -91,3 +91,16 @@ export interface Account {
   balances: BalanceEntry[];
   createdAt: string;
 }
+
+export type AccessTokenScope = 'read' | 'write';
+export type AccessTokenExpiryDays = 90 | 180 | 365 | 730 | null;
+
+export interface AccessToken {
+  tokenId: string;
+  name: string;
+  scope: AccessTokenScope;
+  createdAt: number;
+  expiresAt: number | null;
+  lastUsedAt: number | null;
+  prefix: string;
+}
