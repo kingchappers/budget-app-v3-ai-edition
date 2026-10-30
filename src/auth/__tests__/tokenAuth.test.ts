@@ -21,10 +21,16 @@ describe('presentsAccessToken', () => {
     expect(presentsAccessToken(eventWith('Bearer hww_x'))).toBe(true);
   });
 
-  it('is false for a JWT, a missing header, wrong case and a missing Bearer', () => {
+  it('matches the Bearer scheme in any case, followed by one or more spaces', () => {
+    expect(presentsAccessToken(eventWith('bearer hwr_x'))).toBe(true);
+    expect(presentsAccessToken(eventWith('BEARER   hww_x'))).toBe(true);
+  });
+
+  it('is false for a JWT, a missing header, an upper-case token prefix and a missing Bearer', () => {
     expect(presentsAccessToken(eventWith('Bearer eyJhbGciOi.eyJzdWIi.sig'))).toBe(false);
     expect(presentsAccessToken(eventWith())).toBe(false);
-    expect(presentsAccessToken(eventWith('bearer hwr_x'))).toBe(false);
+    expect(presentsAccessToken(eventWith('Bearer HWR_x'))).toBe(false);
+    expect(presentsAccessToken(eventWith('Bearerhwr_x'))).toBe(false);
     expect(presentsAccessToken(eventWith('hwr_x'))).toBe(false);
   });
 });
@@ -34,6 +40,12 @@ describe('authenticateToken', () => {
     const { token } = await createToken(store, { userId: 'u1', name: 't', scope: 'write', expiryDays: 90 }, NOW);
     const result = await authenticateToken(eventWith(`Bearer ${token}`), store, NOW);
     expect(result).toMatchObject({ userId: 'u1', scope: 'write' });
+  });
+
+  it.each(['bearer ', 'BEARER   '])('accepts the scheme written as %j', async (scheme) => {
+    const { token } = await createToken(store, { userId: 'u1', name: 't', scope: 'read', expiryDays: 90 }, NOW);
+    const result = await authenticateToken(eventWith(`${scheme}${token}`), store, NOW);
+    expect(result).toMatchObject({ userId: 'u1', scope: 'read' });
   });
 
   it('gives identical 401s for unknown, expired and revoked tokens', async () => {
@@ -71,6 +83,8 @@ describe('authenticateToken', () => {
       const result = await authenticateToken(eventWith(`Bearer ${body}`), store, NOW);
       expect(result).toHaveProperty('rejection.statusCode', 401);
     }
+    const lowerCase = await authenticateToken(eventWith(`bearer  hwr_${'A'.repeat(42)}`), store, NOW);
+    expect(lowerCase).toHaveProperty('rejection.statusCode', 401);
     expect(get).not.toHaveBeenCalled();
   });
 
@@ -95,29 +109,32 @@ describe('tokenAccessRejection', () => {
   });
 
   it.each(['POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS', 'get', 'PROPFIND'])('refuses %s on a read token', (method) => {
-    const rejection = tokenAccessRejection('read', method, '/api/transactions');
-    expect(rejection?.statusCode).toBe(403);
-    expect(rejection?.body).toBe('{"error":"This token is read-only"}');
+    const refusal = tokenAccessRejection('read', method, '/api/transactions');
+    expect(refusal?.reason).toBe('read-only');
+    expect(refusal?.rejection.statusCode).toBe(403);
+    expect(refusal?.rejection.body).toBe('{"error":"This token is read-only"}');
   });
 
   it.each(['read', 'write'] as const)('refuses the account paths for a %s token', (scope) => {
     for (const path of ['/api/auth/me', '/api/tokens', '/api/tokens/abc', '/api/push/subscriptions']) {
-      const rejection = tokenAccessRejection(scope, 'GET', path);
-      expect(rejection?.statusCode).toBe(403);
-      expect(rejection?.body).toBe('{"error":"Not available to access tokens"}');
+      const refusal = tokenAccessRejection(scope, 'GET', path);
+      expect(refusal?.reason).toBe('account-route');
+      expect(refusal?.rejection.statusCode).toBe(403);
+      expect(refusal?.rejection.body).toBe('{"error":"Not available to access tokens"}');
     }
   });
 
   it.each(['read', 'write'] as const)('refuses bare /api/auth and /api/push for a %s token', (scope) => {
     for (const path of ['/api/auth', '/api/push']) {
-      const rejection = tokenAccessRejection(scope, 'GET', path);
-      expect(rejection?.statusCode).toBe(403);
-      expect(rejection?.body).toBe('{"error":"Not available to access tokens"}');
+      const refusal = tokenAccessRejection(scope, 'GET', path);
+      expect(refusal?.reason).toBe('account-route');
+      expect(refusal?.rejection.statusCode).toBe(403);
+      expect(refusal?.rejection.body).toBe('{"error":"Not available to access tokens"}');
     }
   });
 
   it('checks the path rule before the read-only rule', () => {
-    expect(tokenAccessRejection('read', 'POST', '/api/tokens')?.body).toBe('{"error":"Not available to access tokens"}');
+    expect(tokenAccessRejection('read', 'POST', '/api/tokens')?.reason).toBe('account-route');
   });
 
   it('lets a write token write', () => {

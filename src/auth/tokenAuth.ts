@@ -9,8 +9,11 @@ export type TokenAuthResult =
   | { userId: string; scope: TokenScope; stored: StoredToken }
   | { rejection: ApiResponse };
 
-const BEARER_PREFIX = 'Bearer ';
-const TOKEN_PREFIXES = ['Bearer hwr_', 'Bearer hww_'];
+export type TokenRefusal = { rejection: ApiResponse; reason: 'account-route' | 'read-only' };
+
+// The scheme is case-insensitive (RFC 7235); the token prefix after it is not.
+const BEARER_SCHEME = /^bearer +/i;
+const TOKEN_PREFIXES = ['hwr_', 'hww_'];
 const READ_ONLY_METHODS = new Set(['GET', 'HEAD']);
 const NON_TOKEN_PATHS = ['/api/auth', '/api/tokens', '/api/push'];
 
@@ -18,9 +21,16 @@ function authorizationHeader(event: APIGatewayProxyEventV2): string {
   return event.headers?.authorization ?? '';
 }
 
-export function presentsAccessToken(event: APIGatewayProxyEventV2): boolean {
+function bearerCredential(event: APIGatewayProxyEventV2): string {
   const header = authorizationHeader(event);
-  return TOKEN_PREFIXES.some((prefix) => header.startsWith(prefix));
+  const scheme = BEARER_SCHEME.exec(header);
+  if (!scheme) return '';
+  return header.slice(scheme[0].length);
+}
+
+export function presentsAccessToken(event: APIGatewayProxyEventV2): boolean {
+  const credential = bearerCredential(event);
+  return TOKEN_PREFIXES.some((prefix) => credential.startsWith(prefix));
 }
 
 function reject(reason: 'malformed' | 'unknown-or-expired'): { rejection: ApiResponse } {
@@ -33,7 +43,7 @@ export async function authenticateToken(
   store: Store,
   nowSeconds: number,
 ): Promise<TokenAuthResult> {
-  const token = authorizationHeader(event).slice(BEARER_PREFIX.length);
+  const token = bearerCredential(event);
   if (!TOKEN_PATTERN.test(token)) return reject('malformed');
 
   const stored = await findToken(store, token, nowSeconds);
@@ -41,12 +51,12 @@ export async function authenticateToken(
   return { userId: stored.userId, scope: stored.scope, stored };
 }
 
-export function tokenAccessRejection(scope: TokenScope, method: string, path: string): ApiResponse | undefined {
+export function tokenAccessRejection(scope: TokenScope, method: string, path: string): TokenRefusal | undefined {
   if (NON_TOKEN_PATHS.some((prefix) => path.startsWith(prefix))) {
-    return err(403, 'Not available to access tokens');
+    return { rejection: err(403, 'Not available to access tokens'), reason: 'account-route' };
   }
   if (scope === 'read' && !READ_ONLY_METHODS.has(method)) {
-    return err(403, 'This token is read-only');
+    return { rejection: err(403, 'This token is read-only'), reason: 'read-only' };
   }
   return undefined;
 }

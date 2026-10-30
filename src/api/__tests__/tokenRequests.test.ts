@@ -170,6 +170,15 @@ describe('a token takes the place of every other credential', () => {
     expect(await transactionsOf('user-b')).toEqual([]);
   });
 
+  it('a lower-case bearer scheme still makes it a token request, ahead of the session cookie', async () => {
+    await useLocalMode();
+    const token = await tokenFor('user-a', 'write');
+    const cookie = await sessionCookieFor('user-b');
+    expect((await invoke(postTransaction({ authorization: `bearer  ${token}`, cookie }))).statusCode).toBe(201);
+    expect(await transactionsOf('user-a')).toHaveLength(1);
+    expect(await transactionsOf('user-b')).toEqual([]);
+  });
+
   it('a write token works on a POST with no Origin header', async () => {
     await useLocalMode();
     const cookie = await sessionCookieFor('user-a');
@@ -209,10 +218,12 @@ describe('account routes', () => {
     }
   });
 
-  it('logs a refusal with the templated route only', async () => {
+  it('logs a refusal with the templated route and the reason only', async () => {
     const token = await tokenFor('user-a', 'read');
     await invoke(makeEvent({ method: 'DELETE', path: '/api/transactions/2026-10/secret-id', authorization: `Bearer ${token}` }));
-    expect(warnSpy).toHaveBeenCalledWith('Token access refused:', ROUTE_KEY, 403);
+    await invoke(makeEvent({ method: 'GET', path: '/api/tokens/secret-id', authorization: `Bearer ${token}` }));
+    expect(warnSpy).toHaveBeenCalledWith('Token access refused:', ROUTE_KEY, 'read-only');
+    expect(warnSpy).toHaveBeenCalledWith('Token access refused:', ROUTE_KEY, 'account-route');
     const logged = JSON.stringify(warnSpy.mock.calls);
     expect(logged).not.toContain('secret-id');
     expect(logged).not.toContain(token.slice(0, 8));

@@ -48,10 +48,10 @@ async function handleTokenRequest(event: APIGatewayProxyEventV2): Promise<ApiRes
     return result.rejection;
   }
 
-  const rejection = tokenAccessRejection(result.scope, event.requestContext.http.method, event.rawPath);
-  if (rejection) {
-    console.warn('Token access refused:', event.requestContext.routeKey, rejection.statusCode);
-    return rejection;
+  const refusal = tokenAccessRejection(result.scope, event.requestContext.http.method, event.rawPath);
+  if (refusal) {
+    console.warn('Token access refused:', event.requestContext.routeKey, refusal.reason);
+    return refusal.rejection;
   }
 
   try {
