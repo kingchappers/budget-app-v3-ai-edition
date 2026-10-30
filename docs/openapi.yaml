@@ -1,0 +1,219 @@
+openapi: 3.1.0
+info:
+  title: Hoardwise API
+  version: 1.0.0
+  description: |
+    The Hoardwise budget API. Every route is under `/api` and speaks JSON.
+
+    ## Amounts, dates and months
+
+    - Amounts are integers in the smallest currency unit (pence or cents), never decimals. A transaction, target,
+      pot or recurring amount is positive and at most 1,000,000,000. Account balances are sent as `pence`.
+    - Dates are `YYYY-MM-DD`, months are `YYYY-MM` and timestamps are ISO 8601.
+
+    ## Glossary
+
+    - Transaction `type`: `EXPENSE` is Spend, `INCOME` is Income, `SET_ASIDE` is Add to pot and `TAKE_OUT` is
+      Take from pot.
+    - A budget is a category target.
+    - A pot is a category whose balance carries over from month to month.
+
+    ## Authentication
+
+    There are two ways to authenticate, and every operation accepts either unless its `x-token-access` says otherwise.
+
+    - A browser session: the Auth0 JWT as a Bearer token (Auth0 mode), or the session cookie set by the built-in
+      login (local mode). Cookie-authenticated requests that change data must send an `Origin` header matching the
+      host.
+    - A personal API token, created on the Access tokens page or with `POST /api/tokens`, sent as
+      `Authorization: Bearer <token>`. A read token starts `hwr_` and a read-write token starts `hww_`. Examples in this
+      document use placeholders such as `hwr_EXAMPLE`; never paste a real token into shared text.
+
+    Token rules:
+
+    - A read token may only make `GET` and `HEAD` requests. Any other method returns 403 `This token is read-only`.
+      A read-write token may use every method.
+    - A token can never reach `/api/tokens*`, `/api/push*` or `/api/auth/*`; those return 403
+      `Not available to access tokens`. Each operation records this as `x-token-access`: `none` (no token),
+      `read` (a read token is enough) or `write` (a read-write token is needed).
+    - A token is shown once when it is created, expires when its owner chose, can be revoked, and is revoked for
+      good by a password reset.
+    - Repeated failed token lookups from one client address are rate limited and answered with 429 and a
+      `Retry-After` header. The limit is exact in the self-hosted container and best-effort per instance on AWS.
+
+    `/api/auth/*` (login, logout, setup and recovery for the built-in login) is not described here.
+
+    ## Errors
+
+    An error response has a JSON body `{ "error": "<message>" }`, and some add extra fields. The statuses are 400
+    (invalid input), 401 (missing or invalid credential), 403 (forbidden, including token limits and protected
+    default categories), 404 (unknown route or record), 409 (conflict with the current state), 429 (too many
+    requests; see `Retry-After`) and 500 (an unexpected server failure, with a generic message).
+
+    ## HEAD
+
+    `HEAD` is not served. The router matches the request method exactly and registers no `HEAD` handlers, so a `HEAD`
+    request to a `GET` route returns 404 `Endpoint not found`. A read token is nonetheless allowed to pass the token
+    check with `HEAD`; use `GET` to read.
+servers:
+  - url: /
+    description: The same origin that serves the app.
+tags:
+  - name: categories
+    description: Spending and income categories, including pot categories.
+  - name: transactions
+    description: Spend, income and pot movements.
+  - name: targets
+    description: Monthly budgets, one per category.
+  - name: pots
+    description: Pot settings, balances and archiving.
+  - name: recurring
+    description: Reminders for bills and income that repeat.
+  - name: accounts
+    description: Savings, investments and debts, with a balance history.
+  - name: trash
+    description: Deleted items that can be restored.
+  - name: push
+    description: Web push reminder subscriptions. Not available to access tokens.
+  - name: tokens
+    description: Personal API token management. Not available to access tokens.
+security:
+  - bearerToken: []
+  - sessionCookie: []
+paths: {}
+components:
+  securitySchemes:
+    bearerToken:
+      type: http
+      scheme: bearer
+      description: >-
+        An Auth0 JWT (Auth0 mode) or a personal API token starting `hwr_` (read) or `hww_` (read-write). Tokens are
+        limited as described in the API overview.
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: hoardwise_session
+      description: >-
+        The session cookie set by the built-in login (local mode). Over HTTPS it is named
+        `__Host-hoardwise_session`.
+  parameters:
+    yearMonth:
+      name: yearMonth
+      in: path
+      required: true
+      description: The month a transaction belongs to, as `YYYY-MM`.
+      schema:
+        type: string
+        pattern: '^\d{4}-(0[1-9]|1[0-2])$'
+        examples: ['2026-10']
+    categoryId:
+      name: categoryId
+      in: path
+      required: true
+      description: The id of a category.
+      schema:
+        type: string
+    transactionId:
+      name: transactionId
+      in: path
+      required: true
+      description: The id of a transaction.
+      schema:
+        type: string
+    recurringId:
+      name: recurringId
+      in: path
+      required: true
+      description: The id of a recurring reminder.
+      schema:
+        type: string
+    accountId:
+      name: accountId
+      in: path
+      required: true
+      description: The id of an account.
+      schema:
+        type: string
+    tokenId:
+      name: tokenId
+      in: path
+      required: true
+      description: The id of an access token.
+      schema:
+        type: string
+  responses:
+    ValidationError:
+      description: The request was invalid. The message says which field or rule.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Request body must be a JSON object
+    Unauthorized:
+      description: The credential is missing, invalid, expired or revoked.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Unauthorized
+    Forbidden:
+      description: >-
+        The credential is valid but may not do this: a read token on a write method, a token on a route tokens cannot
+        use, a cross-origin cookie request, or a protected default category.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: This token is read-only
+    NotFound:
+      description: No such route or record.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Endpoint not found
+    Conflict:
+      description: The request conflicts with the current state.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: This item is already in place, so it was not restored
+    TooManyRequests:
+      description: Too many requests. Wait for the number of seconds in `Retry-After`.
+      headers:
+        Retry-After:
+          description: Seconds to wait before trying again.
+          schema:
+            type: integer
+            minimum: 1
+          example: 60
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Too many requests
+    InternalError:
+      description: An unexpected failure. The message is generic; the detail is in the server logs only.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Internal server error
+  schemas:
+    Error:
+      type: object
+      description: The body of every error response. Some errors add fields, for example `retryAfter` on a 429.
+      required: [error]
+      properties:
+        error:
+          type: string
+          description: A short message that is safe to show to the user.
+      additionalProperties: true
