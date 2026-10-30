@@ -220,6 +220,17 @@ describe('AccessTokens', () => {
       expect(state.create).not.toHaveBeenCalled();
     });
 
+    it('does not send a name with a tab or other control character', async () => {
+      const user = userEvent.setup();
+      renderSection();
+      fireEvent.change(screen.getByLabelText(/^Name/), { target: { value: 'My\ttool' } });
+
+      await user.click(createButton());
+
+      expect(screen.getByText("Check the name and try again. It can't contain tabs or other control characters.")).toBeInTheDocument();
+      expect(state.create).not.toHaveBeenCalled();
+    });
+
     it('keeps names to 60 characters', () => {
       renderSection();
       expect(screen.getByLabelText(/^Name/)).toHaveAttribute('maxlength', '60');
@@ -361,7 +372,8 @@ describe('AccessTokens', () => {
 
   describe('when creating fails', () => {
     it.each([
-      [403, "That password wasn't right."],
+      [400, "Check the name and try again. It can't contain tabs or other control characters."],
+      [403, "You don't have permission to create a token right now. Reload the page and try again."],
       [409, 'You have 25 access tokens, the most allowed. Revoke one to make room.'],
       [429, 'Too many attempts. Wait a little and try again.'],
       [500, "Couldn't create the token. Check your connection and try again."],
@@ -375,6 +387,20 @@ describe('AccessTokens', () => {
 
       expect(await screen.findByRole('alert')).toHaveTextContent(message);
       expect(screen.queryByRole('region', { name: 'Your new token' })).not.toBeInTheDocument();
+    });
+
+    it('says the password was wrong only when a password was sent', async () => {
+      state.create.mockRejectedValue(new ApiError(403, 'Forbidden'));
+      const user = userEvent.setup();
+      state.mode = 'local';
+      renderSection();
+      await user.type(screen.getByLabelText(/^Name/), 'Backup script');
+      await chooseReadAndWrite(user);
+      await user.type(screen.getByLabelText('Your password'), 'wrong horse');
+
+      await user.click(createButton());
+
+      expect(await screen.findByRole('alert')).toHaveTextContent("That password wasn't right.");
     });
 
     it('explains a network failure', async () => {

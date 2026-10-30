@@ -48,15 +48,26 @@ export function lastUsedText(token: AccessToken): string {
   return `Last used ${formatTokenDate(token.lastUsedAt)}`;
 }
 
+export const NAME_CONTROL_CHARACTERS = "Check the name and try again. It can't contain tabs or other control characters.";
+
+// Mirrors the server's check, so a name it would reject is caught before sending.
+export function hasControlCharacters(value: string): boolean {
+  return /[\u0000-\u001f\u007f]/.test(value);
+}
+
 const CREATE_ERRORS: Record<number, string> = {
-  403: "That password wasn't right.",
+  400: NAME_CONTROL_CHARACTERS,
+  403: "You don't have permission to create a token right now. Reload the page and try again.",
   409: 'You have 25 access tokens, the most allowed. Revoke one to make room.',
   429: 'Too many attempts. Wait a little and try again.',
 };
 
+const WRONG_PASSWORD = "That password wasn't right.";
 const CREATE_FAILED = "Couldn't create the token. Check your connection and try again.";
 
-export function createErrorText(error: unknown): string {
+// A 403 also covers a failed Origin check, so it only means a wrong password when one was sent.
+export function createErrorText(error: unknown, sentPassword: boolean): string {
   if (!(error instanceof ApiError)) return CREATE_FAILED;
+  if (error.status === 403 && sentPassword) return WRONG_PASSWORD;
   return CREATE_ERRORS[error.status] ?? CREATE_FAILED;
 }
