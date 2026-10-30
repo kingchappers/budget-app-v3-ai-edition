@@ -126,6 +126,13 @@ describe('AccessTokens', () => {
       expect(screen.getByText('Loading your access tokens…')).toBeInTheDocument();
     });
 
+    it('keeps a loaded list when a later refresh fails', () => {
+      state.list = { ...state.list, error: new ApiError(500, 'Server Error') };
+      renderSection();
+      expect(screen.getByRole('button', { name: 'Revoke Claude desktop' })).toBeInTheDocument();
+      expect(screen.queryByText("Couldn't load your access tokens.")).not.toBeInTheDocument();
+    });
+
     it('offers to try again when the list could not load', async () => {
       state.list = { ...state.list, data: undefined, error: new ApiError(500, 'Server Error') };
       const user = userEvent.setup();
@@ -231,6 +238,42 @@ describe('AccessTokens', () => {
       expect(state.create).not.toHaveBeenCalled();
     });
 
+    it('moves focus to the name when it is missing', async () => {
+      const user = userEvent.setup();
+      state.mode = 'local';
+      renderSection();
+      await chooseReadAndWrite(user);
+
+      await user.click(createButton());
+
+      expect(document.activeElement).toBe(screen.getByLabelText(/^Name/));
+    });
+
+    it('moves focus to the password when only the password is missing', async () => {
+      const user = userEvent.setup();
+      state.mode = 'local';
+      renderSection();
+      await user.type(screen.getByLabelText(/^Name/), 'Backup script');
+      await chooseReadAndWrite(user);
+
+      await user.click(createButton());
+
+      expect(document.activeElement).toBe(screen.getByLabelText('Your password'));
+    });
+
+    it('forgets the password when Read only is chosen instead', async () => {
+      const user = userEvent.setup();
+      state.mode = 'local';
+      renderSection();
+      await chooseReadAndWrite(user);
+      await user.type(screen.getByLabelText('Your password'), 'correct horse');
+
+      await user.click(screen.getByRole('radio', { name: 'Read only' }));
+      await chooseReadAndWrite(user);
+
+      expect(screen.getByLabelText('Your password')).toHaveValue('');
+    });
+
     it('keeps names to 60 characters', () => {
       renderSection();
       expect(screen.getByLabelText(/^Name/)).toHaveAttribute('maxlength', '60');
@@ -276,6 +319,15 @@ describe('AccessTokens', () => {
       expect(within(region).getByDisplayValue(SECRET)).toHaveAttribute('readonly');
       expect(within(region).getByRole('button', { name: 'Copy' })).toBeInTheDocument();
       expect(region).toHaveTextContent("Copy this token now. You won't be able to see it again.");
+    });
+
+    it('describes the token field with the note, shown once', async () => {
+      const user = userEvent.setup();
+      renderSection();
+      await createOne(user);
+
+      expect(screen.getByDisplayValue(SECRET)).toHaveAccessibleDescription("Copy this token now. You won't be able to see it again.");
+      expect(screen.getAllByText("Copy this token now. You won't be able to see it again.")).toHaveLength(1);
     });
 
     it('says Copied, in words, once copied', async () => {
@@ -401,6 +453,31 @@ describe('AccessTokens', () => {
 
       expect(state.revoke).not.toHaveBeenCalled();
       expect(screen.queryByText(/Anything using it will stop working/)).not.toBeInTheDocument();
+    });
+
+    it('groups the confirmation under its question', async () => {
+      const user = userEvent.setup();
+      renderSection();
+
+      await user.click(screen.getByRole('button', { name: 'Revoke Claude desktop' }));
+
+      const group = screen.getByRole('group', { name: 'Revoke “Claude desktop”? Anything using it will stop working.' });
+      expect(within(group).getByRole('button', { name: 'Revoke token' })).toBeInTheDocument();
+    });
+
+    it('clears a failed revoke message on Cancel', async () => {
+      state.revoke.mockRejectedValue(new ApiError(500, 'Server Error'));
+      vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      const user = userEvent.setup();
+      renderSection();
+      await user.click(screen.getByRole('button', { name: 'Revoke Claude desktop' }));
+      await user.click(screen.getByRole('button', { name: 'Revoke token' }));
+      await screen.findByRole('alert');
+
+      await user.click(screen.getByRole('button', { name: 'Cancel' }));
+
+      expect(screen.queryByText("Couldn't revoke that token. Try again.")).not.toBeInTheDocument();
+      vi.restoreAllMocks();
     });
 
     it('says so when it could not revoke', async () => {

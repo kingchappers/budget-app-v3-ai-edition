@@ -1,5 +1,6 @@
 import { useId, useRef, useState, type Ref } from 'react';
 import { Button, Group, Input, PasswordInput, SegmentedControl, Select, Stack, Text, TextInput, Title } from '@mantine/core';
+import { useMergedRef } from '@mantine/hooks';
 import { IconAlertTriangle } from '@tabler/icons-react';
 import { useAuth } from '~/lib/auth';
 import type { AccessTokenInput } from '~/lib/api';
@@ -39,6 +40,9 @@ export function CreateAccessTokenForm({ onCreate, nameRef }: CreateAccessTokenFo
   const [failure, setFailure] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const pending = useRef(false);
+  const nameField = useRef<HTMLInputElement>(null);
+  const passwordField = useRef<HTMLInputElement>(null);
+  const nameRefs = useMergedRef(nameField, nameRef);
 
   const asksForPassword = mode === 'local' && scope === 'write';
 
@@ -55,13 +59,25 @@ export function CreateAccessTokenForm({ onCreate, nameRef }: CreateAccessTokenFo
     return null;
   }
 
+  function chooseScope(value: AccessTokenScope): void {
+    setScope(value);
+    if (value !== 'write') setPassword('');
+  }
+
   function inputFromForm(): AccessTokenInput | null {
     const trimmed = name.trim();
     const invalidName = nameErrorFor(trimmed);
     const missingPassword = asksForPassword && password === '';
     setNameError(invalidName);
     setPasswordError(missingPassword ? 'Enter your password to continue.' : null);
-    if (invalidName || missingPassword) return null;
+    if (invalidName) {
+      nameField.current?.focus();
+      return null;
+    }
+    if (missingPassword) {
+      passwordField.current?.focus();
+      return null;
+    }
 
     const input: AccessTokenInput = { name: trimmed, scope, expiryDays: expiryDaysFor(expiry) };
     if (asksForPassword) input.password = password;
@@ -95,7 +111,7 @@ export function CreateAccessTokenForm({ onCreate, nameRef }: CreateAccessTokenFo
       <Stack gap="md">
         <Title order={3} size="h5" id={headingId}>Create a token</Title>
         <TextInput
-          ref={nameRef}
+          ref={nameRefs}
           label="Name"
           description="So you can tell your tokens apart, for example the tool that uses it."
           required
@@ -110,7 +126,7 @@ export function CreateAccessTokenForm({ onCreate, nameRef }: CreateAccessTokenFo
             mt={4}
             aria-label="Access"
             value={scope}
-            onChange={value => setScope(value as AccessTokenScope)}
+            onChange={value => chooseScope(value as AccessTokenScope)}
             data={SCOPE_OPTIONS}
           />
         </Input.Wrapper>
@@ -125,6 +141,7 @@ export function CreateAccessTokenForm({ onCreate, nameRef }: CreateAccessTokenFo
         {expiry === NEVER && <Warning>This token stays valid until you revoke it.</Warning>}
         {asksForPassword && (
           <PasswordInput
+            ref={passwordField}
             label="Your password"
             description="Needed to create a token that can change your data."
             autoComplete="off"

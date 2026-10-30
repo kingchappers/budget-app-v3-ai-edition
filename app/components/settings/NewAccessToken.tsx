@@ -53,13 +53,17 @@ export function NewAccessToken({ token, onDone }: NewAccessTokenProps): React.JS
         <TextInput
           ref={field}
           label="Token"
+          description="Copy this token now. You won't be able to see it again."
+          inputWrapperOrder={['label', 'input', 'description']}
           value={token}
           readOnly
           autoComplete="off"
           spellCheck={false}
-          styles={{ input: { fontFamily: 'var(--mantine-font-family-monospace)' } }}
+          styles={{
+            input: { fontFamily: 'var(--mantine-font-family-monospace)' },
+            description: { fontSize: 'var(--mantine-font-size-sm)', color: 'var(--mantine-color-text)' },
+          }}
         />
-        <Text size="sm">Copy this token now. You won't be able to see it again.</Text>
         <Group gap="sm">
           <Button
             variant="default"

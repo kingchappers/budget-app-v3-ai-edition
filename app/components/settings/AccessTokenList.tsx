@@ -35,9 +35,10 @@ interface RevokeConfirmationProps {
 }
 
 function RevokeConfirmation({ name, busy, onConfirm, onCancel }: RevokeConfirmationProps): React.JSX.Element {
+  const questionId = useId();
   return (
-    <Stack gap="xs" mt="sm">
-      <Text size="sm">Revoke “{name}”? Anything using it will stop working.</Text>
+    <Stack gap="xs" mt="sm" role="group" aria-labelledby={questionId}>
+      <Text size="sm" id={questionId}>Revoke “{name}”? Anything using it will stop working.</Text>
       <Group gap="sm">
         <Button color="ember" loading={busy} onClick={onConfirm}>Revoke token</Button>
         <Button variant="default" autoFocus disabled={busy} onClick={onCancel}>Cancel</Button>
@@ -61,6 +62,7 @@ function AccessTokenRow({ token, onRevoked }: AccessTokenRowProps): React.JSX.El
 
   function cancel(): void {
     setConfirming(false);
+    setFailed(false);
     revokeButton.current?.focus();
   }
 
@@ -110,7 +112,7 @@ export function AccessTokenList({ onRevoked }: AccessTokenListProps): React.JSX.
 
   if (isLoading) return <Text size="sm">Loading your access tokens…</Text>;
 
-  if (error) {
+  if (error && !data) {
     return (
       <Group gap="sm">
         <Text size="sm" role="alert">Couldn't load your access tokens.</Text>
