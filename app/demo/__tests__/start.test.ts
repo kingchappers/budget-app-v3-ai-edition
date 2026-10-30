@@ -54,7 +54,7 @@ describe('startDemoOrShowError', () => {
     });
     vi.doMock('../../../src/demo', () => ({
       DEMO_MARKER: 'marker',
-      createSeededDemoApi: vi.fn().mockResolvedValue({ reset: vi.fn() }),
+      createSeededDemoApi: vi.fn().mockResolvedValue({}),
       installDemoFetch: takeover,
     }));
     const { startDemoOrShowError } = await import('../start');

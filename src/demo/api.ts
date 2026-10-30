@@ -27,11 +27,10 @@ export interface DemoApi {
   handles(pathname: string): boolean;
   handle(request: DemoRequest): Promise<DemoResponse>;
   send: Send;
-  reset(): Promise<void>;
 }
 
 export interface DemoApiOptions {
-  // Fills a fresh store through the API, once at start-up and again on every reset.
+  // Fills the fresh store through the API at start-up.
   seed?: (send: Send) => Promise<void>;
 }
 
@@ -103,16 +102,11 @@ export async function createDemoApi(options: DemoApiOptions = {}): Promise<DemoA
     body: body === undefined ? undefined : JSON.stringify(body),
   });
 
-  async function fresh(): Promise<void> {
-    setStore(new MemoryStore());
-    await options.seed?.(send);
-  }
-
-  await fresh();
+  setStore(new MemoryStore());
+  await options.seed?.(send);
   return {
     handles: pathname => pathname === '/config.json' || pathname.startsWith('/api/'),
     handle,
     send,
-    reset: fresh,
   };
 }
