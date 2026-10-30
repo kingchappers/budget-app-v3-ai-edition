@@ -36,10 +36,7 @@ describe('useUndoableDelete', () => {
   });
 
   afterEach(() => {
-    // Unmount first: clearing while <Notifications /> is mounted starts exit timers
-    // that can fire after the test environment is torn down.
     cleanup();
-    notifications.clean();
     vi.restoreAllMocks();
   });
 

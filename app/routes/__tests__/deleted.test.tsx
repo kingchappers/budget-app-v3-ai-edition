@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MantineProvider } from '@mantine/core';
-import { Notifications, notifications } from '@mantine/notifications';
+import { Notifications } from '@mantine/notifications';
 import type { Category } from '~/lib/types';
 import type { TrashEntry } from '~/lib/trash';
 
@@ -50,10 +50,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  // Unmount first: clearing while <Notifications /> is mounted starts exit timers
-  // that can fire after the test environment is torn down.
   cleanup();
-  notifications.clean();
   vi.restoreAllMocks();
 });
 

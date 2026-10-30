@@ -58,7 +58,6 @@ describe('useSaveWithUndo', () => {
     await clearQueue();
   });
 
-  afterEach(() => { notifications.clean(); });
 
   it('shows a Saved toast and resolves to the created transaction', async () => {
     mockCreate.mutateAsync.mockResolvedValue(created);

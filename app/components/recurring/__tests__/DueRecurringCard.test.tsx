@@ -91,7 +91,6 @@ describe('DueRecurringCard', () => {
   });
 
   afterEach(() => {
-    notifications.clean();
     window.localStorage.removeItem('hoardwise.preferences');
     vi.useRealTimers();
   });
