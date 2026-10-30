@@ -78,4 +78,15 @@ describe('router', () => {
     await router.dispatch(makeEvent('POST', '/api/categories/cat-custom/reassign'), 'user-1');
     expect(captured).toEqual({ categoryId: 'cat-custom' });
   });
+
+  it('lists registered routes in registration order', () => {
+    const router = createRouter();
+    const handler = async () => ({ statusCode: 200, headers: {}, body: '' });
+    router.get('/api/a/{id}', handler);
+    router.post('/api/a', handler);
+    expect(router.routes()).toEqual([
+      { method: 'GET', template: '/api/a/{id}' },
+      { method: 'POST', template: '/api/a' },
+    ]);
+  });
 });

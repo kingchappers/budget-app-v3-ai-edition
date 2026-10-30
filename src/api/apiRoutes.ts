@@ -1,0 +1,13 @@
+import type { Router } from './router';
+import { registerCoreRoutes } from './routes';
+import { createPushSubscription, deletePushSubscription } from './push';
+import { createAccessToken, listAccessTokens, revokeAccessToken } from './tokens';
+
+export function registerApiRoutes(router: Router): void {
+  registerCoreRoutes(router);
+  router.post('/api/push/subscriptions', createPushSubscription);
+  router.delete('/api/push/subscriptions', deletePushSubscription);
+  router.post('/api/tokens', createAccessToken);
+  router.get('/api/tokens', listAccessTokens);
+  router.delete('/api/tokens/{tokenId}', revokeAccessToken);
+}

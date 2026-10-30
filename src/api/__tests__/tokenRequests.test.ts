@@ -328,6 +328,7 @@ describe('route table', () => {
       put: record('PUT'),
       delete: record('DELETE'),
       dispatch: () => Promise.reject(new Error('not used')),
+      routes: () => [],
     };
     createTokenRouter(router);
 

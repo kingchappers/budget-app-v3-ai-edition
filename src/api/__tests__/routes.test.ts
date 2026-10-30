@@ -8,6 +8,7 @@ function recordingRouter(): { router: Router; routes: string[] } {
   const router: Router = {
     get: add('GET'), post: add('POST'), put: add('PUT'), delete: add('DELETE'),
     dispatch: async () => { throw new Error('not used'); },
+    routes: () => [],
   };
   return { router, routes };
 }
