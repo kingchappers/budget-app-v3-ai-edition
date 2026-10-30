@@ -730,6 +730,627 @@ paths:
           $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
+  /api/pots:
+    get:
+      tags: [pots]
+      summary: List pots with balances
+      description: >-
+        Returns one `PotSummary` per pot category: the built-in pots (Holidays, Home maintenance, Gifts, Insurance,
+        Emergency fund, Investment) followed by the household's custom pot categories. Archived pots are included and
+        carry a non-null `archivedAt`. A pot's balance carries over from month to month and is worked out from its
+        transactions (`SET_ASIDE` adds, `TAKE_OUT` and `EXPENSE` subtract; `INCOME` is ignored) and its automatic
+        contributions, from the earliest month with any activity up to `asOf`. A pot with no activity has an empty
+        `months` list, a zero balance and a zero `thisMonth`. Transactions dated after `asOf` are ignored.
+      operationId: listPots
+      x-token-access: read
+      parameters:
+        - name: asOf
+          in: query
+          required: true
+          description: >-
+            The month to work out balances for, as `YYYY-MM`. It may be in the past, and at most one month after the
+            server's current month (UTC).
+          schema:
+            type: string
+            pattern: '^\d{4}-(0[1-9]|1[0-2])$'
+          example: '2026-10'
+      responses:
+        '200':
+          description: The pots (abridged in this example; the real list has one entry for every pot category).
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [pots]
+                properties:
+                  pots:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PotSummary'
+              example:
+                pots:
+                  - categoryId: cat-holidays
+                    monthlyAmount: 5000
+                    goalAmount: 120000
+                    autoAmountNow: 5000
+                    archivedAt: null
+                    balance: 7000
+                    thisMonth:
+                      setAside: 2000
+                      autoAdded: 5000
+                      takeOut: 0
+                      spent: 0
+                    months:
+                      - yearMonth: '2026-10'
+                        opening: 0
+                        setAside: 2000
+                        autoAdded: 5000
+                        takeOut: 0
+                        spent: 0
+                        closing: 7000
+                  - categoryId: cat-gifts
+                    monthlyAmount: null
+                    goalAmount: null
+                    autoAmountNow: 0
+                    archivedAt: null
+                    balance: 0
+                    thisMonth:
+                      setAside: 0
+                      autoAdded: 0
+                      takeOut: 0
+                      spent: 0
+                    months: []
+        '400':
+          description: '`asOf` is missing, not a `YYYY-MM` month, or more than one month ahead (`asOf must be a month in YYYY-MM format, at most one month ahead`).'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: asOf must be a month in YYYY-MM format, at most one month ahead
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/pots/{categoryId}:
+    parameters:
+      - $ref: '#/components/parameters/potCategoryId'
+    put:
+      tags: [pots]
+      summary: Set a pot's monthly amount, goal and automatic contribution
+      description: >-
+        Creates or replaces the pot's settings. All four body fields are required. `monthlyAmount` and `goalAmount`
+        are positive integer pence, or `null` for none (omitting them is a 400, not the same as null).
+        `autoContribute: true` adds `monthlyAmount` to the pot automatically every month from `month`; it needs a
+        non-null `monthlyAmount`. The setting is stored as a history (`autoContribute` in the response): saving removes
+        every entry that starts in `month` or later, then adds `{from: month, amount}` only if the amount in force
+        before `month` is different (the amount is `monthlyAmount` when on, `0` when off). The history may hold at
+        most 120 entries. `month` is the first month the change applies to and must be within one month of the
+        server's current month (UTC). An existing `archivedAt` is kept, and saving does not unarchive the pot.
+        `categoryId` must be a built-in or custom category of type `POT`. Unknown body fields are ignored. A body that
+        is valid JSON but not an object (for example `null`) returns 500, not 400.
+      operationId: putPot
+      x-token-access: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PotInput'
+            examples:
+              autoOn:
+                summary: Save 50.00 a month towards a 1,200.00 goal
+                value:
+                  monthlyAmount: 5000
+                  goalAmount: 120000
+                  autoContribute: true
+                  month: '2026-10'
+              noAuto:
+                summary: No monthly amount, no goal
+                value:
+                  monthlyAmount: null
+                  goalAmount: null
+                  autoContribute: false
+                  month: '2026-10'
+      responses:
+        '200':
+          description: The stored settings (without storage keys).
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [settings]
+                properties:
+                  settings:
+                    $ref: '#/components/schemas/PotSettings'
+              example:
+                settings:
+                  categoryId: cat-holidays
+                  monthlyAmount: 5000
+                  goalAmount: 120000
+                  autoContribute:
+                    - from: '2026-10'
+                      amount: 5000
+                  archivedAt: null
+                  updatedAt: '2026-10-30T09:15:00.000Z'
+        '400':
+          description: >-
+            The body is not valid JSON (`Invalid JSON body`); `monthlyAmount` or `goalAmount` is missing or not null or a
+            positive integer of at most 1,000,000,000 (`monthlyAmount must be null or a positive integer of pence`, and the
+            same for `goalAmount`); `autoContribute` is not a boolean (`autoContribute must be a boolean`); `month` is
+            missing, malformed or not within one month of now (`month must be a YYYY-MM month within one month of now`);
+            `autoContribute` is true with a null `monthlyAmount` (`autoContribute needs a monthlyAmount`); `categoryId` is
+            not a pot category (`categoryId must be an existing pot category`); or the history would exceed 120 entries
+            (`Too many auto-contribute changes for this pot`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: autoContribute needs a monthlyAmount
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/pots/{categoryId}/archive:
+    parameters:
+      - $ref: '#/components/parameters/potCategoryId'
+    post:
+      tags: [pots]
+      summary: Archive a pot
+      description: >-
+        Retires a pot that is empty. The pot's balance as at `month`, counting only real transactions and the
+        automatic contributions made before `month`, must be exactly zero, otherwise the call is a 409 with the
+        balance. On success the pot is marked archived (`archivedAt`, kept if it was already archived), automatic
+        contributions stop from `month` (history entries that start in `month` or later are removed, so `month` itself
+        gets no automatic contribution), the monthly amount and goal are kept, and every recurring reminder in this
+        category is moved to the trash (`cancelledRecurring` counts them; `restoreFromTrash` can bring them back for 30
+        days). The body must be exactly `{ "month": "YYYY-MM" }` with `month` within one month of the server's current
+        month (UTC). Archiving is not atomic: the settings are saved before the reminders are trashed.
+      operationId: archivePot
+      x-token-access: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PotArchiveInput'
+            example:
+              month: '2026-10'
+      responses:
+        '200':
+          description: The pot is archived.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [settings, cancelledRecurring]
+                properties:
+                  settings:
+                    $ref: '#/components/schemas/PotSettings'
+                  cancelledRecurring:
+                    type: integer
+                    minimum: 0
+                    description: How many recurring reminders in this category were moved to the trash.
+              example:
+                settings:
+                  categoryId: cat-holidays
+                  monthlyAmount: 5000
+                  goalAmount: 120000
+                  autoContribute: []
+                  archivedAt: '2026-10-30T09:15:00.000Z'
+                  updatedAt: '2026-10-30T09:15:00.000Z'
+                cancelledRecurring: 0
+        '400':
+          description: >-
+            The body is not a JSON object of exactly `{ month }`, or `month` is malformed or not within one month of now
+            (`Body must be { month } as a YYYY-MM month within one month of now`); or `categoryId` is not a pot category
+            (`categoryId must be an existing pot category`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Body must be { month } as a YYYY-MM month within one month of now
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: The pot still holds money (or is overdrawn). Nothing was changed.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [error, balance]
+                additionalProperties: false
+                properties:
+                  error:
+                    type: string
+                  balance:
+                    type: integer
+                    description: The non-zero balance in pence as at `month`; negative when overdrawn.
+              example:
+                error: Take the balance out of this pot before archiving it
+                balance: 2000
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/pots/{categoryId}/unarchive:
+    parameters:
+      - $ref: '#/components/parameters/potCategoryId'
+    post:
+      tags: [pots]
+      summary: Unarchive a pot
+      description: >-
+        Clears `archivedAt`. The request needs no body, and any body is ignored. Nothing else is restored: the
+        automatic contribution stays stopped (turn it on again with `putPot`) and reminders trashed by archiving stay in
+        the trash. Unarchiving a pot that is not archived succeeds and just refreshes `updatedAt`; for a pot with no
+        stored settings it creates them with no monthly amount or goal.
+      operationId: unarchivePot
+      x-token-access: write
+      responses:
+        '200':
+          description: The pot's settings with `archivedAt` cleared.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [settings]
+                properties:
+                  settings:
+                    $ref: '#/components/schemas/PotSettings'
+              example:
+                settings:
+                  categoryId: cat-holidays
+                  monthlyAmount: 5000
+                  goalAmount: 120000
+                  autoContribute: []
+                  archivedAt: null
+                  updatedAt: '2026-10-30T09:20:00.000Z'
+        '400':
+          description: '`categoryId` is not a pot category (`categoryId must be an existing pot category`).'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: categoryId must be an existing pot category
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/recurring:
+    get:
+      tags: [recurring]
+      summary: List recurring reminders
+      description: >-
+        Returns every recurring reminder, mapped (no storage keys), in id order. A reminder stored before `frequency`
+        existed reads as `MONTHLY`.
+      operationId: listRecurring
+      x-token-access: read
+      responses:
+        '200':
+          description: All recurring reminders.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [recurring]
+                properties:
+                  recurring:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Recurring'
+              example:
+                recurring:
+                  - recurringId: 8a7e3c1d-5b2f-4e60-9d14-7c2b1a0f3e55
+                    type: EXPENSE
+                    categoryId: cat-mortgage
+                    amount: 90000
+                    description: Mortgage
+                    dayOfMonth: 1
+                    frequency: MONTHLY
+                    anchorDate: null
+                    leadDays: 3
+                    handledPeriod: null
+                    createdAt: '2026-10-30T09:15:00.000Z'
+                    updatedAt: '2026-10-30T09:15:00.000Z'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      tags: [recurring]
+      summary: Add a recurring reminder
+      description: >-
+        Creates a reminder with a server-generated UUID id and `handledPeriod: null`. A monthly reminder
+        (`frequency` `MONTHLY`, which is also the default when `frequency` is omitted or null) needs `dayOfMonth`
+        and ignores `anchorDate`. Every other frequency needs a real `anchorDate`, ignores any `dayOfMonth` in the body
+        and stores `dayOfMonth` as the day of the anchor date. `leadDays` (how many days before the due date the
+        reminder starts) defaults to 3 and may be at most 14 for `WEEKLY` and `FOUR_WEEKLY`, 30 for `MONTHLY` and 60
+        for `QUARTERLY` and `YEARLY`. `description` is trimmed after its 200-character limit is checked. The
+        `categoryId` is not checked against existing categories. Unknown fields are ignored.
+      operationId: createRecurring
+      x-token-access: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecurringInput'
+            examples:
+              monthly:
+                summary: A monthly bill on the 1st
+                value:
+                  type: EXPENSE
+                  categoryId: cat-mortgage
+                  amount: 90000
+                  description: Mortgage
+                  frequency: MONTHLY
+                  dayOfMonth: 1
+              weekly:
+                summary: A weekly payment counted from a date
+                value:
+                  type: EXPENSE
+                  categoryId: cat-personal-spending
+                  amount: 2500
+                  description: Cleaner
+                  frequency: WEEKLY
+                  anchorDate: '2026-11-02'
+                  leadDays: 2
+      responses:
+        '201':
+          description: The reminder was created.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [recurring]
+                properties:
+                  recurring:
+                    $ref: '#/components/schemas/Recurring'
+              example:
+                recurring:
+                  recurringId: 8a7e3c1d-5b2f-4e60-9d14-7c2b1a0f3e55
+                  type: EXPENSE
+                  categoryId: cat-mortgage
+                  amount: 90000
+                  description: Mortgage
+                  dayOfMonth: 1
+                  frequency: MONTHLY
+                  anchorDate: null
+                  leadDays: 3
+                  handledPeriod: null
+                  createdAt: '2026-10-30T09:15:00.000Z'
+                  updatedAt: '2026-10-30T09:15:00.000Z'
+        '400':
+          description: >-
+            The body is not a JSON object (`Invalid JSON body`) or a field breaks a rule. The messages are
+            `amount must be a positive integer representing pence/cents, at most 1000000000`,
+            `type must be EXPENSE, INCOME, SET_ASIDE, or TAKE_OUT`, `categoryId is required` (missing, empty or over 100
+            characters), `description must be a string of at most 200 characters`,
+            `frequency must be one of WEEKLY, FOUR_WEEKLY, MONTHLY, QUARTERLY, YEARLY`,
+            `leadDays must be an integer from 0 to <max> for <FREQUENCY> items`,
+            `dayOfMonth must be an integer from 1 to 31` (monthly) and
+            `anchorDate must be a valid YYYY-MM-DD date for <FREQUENCY> items` (other frequencies; `2026-02-30` is not
+            valid). The first rule broken, in that order, is reported.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: dayOfMonth must be an integer from 1 to 31
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/recurring/{recurringId}:
+    parameters:
+      - $ref: '#/components/parameters/recurringId'
+    put:
+      tags: [recurring]
+      summary: Replace a recurring reminder
+      description: >-
+        Replaces the editable fields of an existing reminder; the body and its rules are the same as for
+        `createRecurring`, so it is a full replacement: an omitted `frequency` becomes `MONTHLY`, an omitted
+        `description` becomes empty and an omitted `leadDays` goes back to 3. `recurringId`, `createdAt` and
+        `handledPeriod` are kept, even when the frequency changes, so after changing between monthly and another
+        frequency `handledPeriod` may still be in the old key format; clear it with `setRecurringHandled`.
+      operationId: updateRecurring
+      x-token-access: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecurringInput'
+            example:
+              type: EXPENSE
+              categoryId: cat-mortgage
+              amount: 95000
+              description: Mortgage
+              frequency: MONTHLY
+              dayOfMonth: 1
+              leadDays: 5
+      responses:
+        '200':
+          description: The updated reminder.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [recurring]
+                properties:
+                  recurring:
+                    $ref: '#/components/schemas/Recurring'
+              example:
+                recurring:
+                  recurringId: 8a7e3c1d-5b2f-4e60-9d14-7c2b1a0f3e55
+                  type: EXPENSE
+                  categoryId: cat-mortgage
+                  amount: 95000
+                  description: Mortgage
+                  dayOfMonth: 1
+                  frequency: MONTHLY
+                  anchorDate: null
+                  leadDays: 5
+                  handledPeriod: null
+                  createdAt: '2026-10-30T09:15:00.000Z'
+                  updatedAt: '2026-10-30T09:25:00.000Z'
+        '400':
+          description: The body is not a JSON object (`Invalid JSON body`) or breaks a rule listed under `createRecurring`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Invalid JSON body
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: No reminder has this id (`Recurring item not found`). The body is validated first, so an invalid body is a 400 even for an unknown id.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Recurring item not found
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    delete:
+      tags: [recurring]
+      summary: Delete a recurring reminder
+      description: >-
+        Moves the reminder to the trash, where `restoreFromTrash` can bring it back for 30 days (`entityType`
+        `RECURRING`, `id` the reminder's id). Deleting a reminder that does not exist still returns 204 and adds nothing
+        to the trash. Transactions made from the reminder keep their `recurringId`.
+      operationId: deleteRecurring
+      x-token-access: write
+      responses:
+        '204':
+          description: The reminder is deleted. No body.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/recurring/{recurringId}/handled:
+    parameters:
+      - $ref: '#/components/parameters/recurringId'
+    post:
+      tags: [recurring]
+      summary: Mark a reminder handled, or clear the mark
+      description: >-
+        Records the latest occurrence that has been dealt with, so the reminder stops showing for it. `period` is
+        `YYYY-MM` for a monthly reminder and the occurrence date `YYYY-MM-DD` (a real calendar date) for the other
+        frequencies, or `null` to clear the mark. The key is validated for shape only: it is not checked against the
+        reminder's frequency, and either format is accepted for any reminder. The field is required (an empty object is
+        a 400). Only `handledPeriod` and `updatedAt` change.
+      operationId: setRecurringHandled
+      x-token-access: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecurringHandledInput'
+            examples:
+              month:
+                summary: A monthly reminder handled for October
+                value:
+                  period: '2026-10'
+              occurrence:
+                summary: A weekly reminder handled for one date
+                value:
+                  period: '2026-11-02'
+              clear:
+                summary: Clear the mark
+                value:
+                  period: null
+      responses:
+        '200':
+          description: The updated reminder.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [recurring]
+                properties:
+                  recurring:
+                    $ref: '#/components/schemas/Recurring'
+              example:
+                recurring:
+                  recurringId: 8a7e3c1d-5b2f-4e60-9d14-7c2b1a0f3e55
+                  type: EXPENSE
+                  categoryId: cat-mortgage
+                  amount: 95000
+                  description: Mortgage
+                  dayOfMonth: 1
+                  frequency: MONTHLY
+                  anchorDate: null
+                  leadDays: 5
+                  handledPeriod: '2026-10'
+                  createdAt: '2026-10-30T09:15:00.000Z'
+                  updatedAt: '2026-10-30T09:30:00.000Z'
+        '400':
+          description: >-
+            The body is not a JSON object (`Invalid JSON body`), or `period` is missing or is not `YYYY-MM`, a real
+            `YYYY-MM-DD` date or null (`period must be YYYY-MM, YYYY-MM-DD or null`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: period must be YYYY-MM, YYYY-MM-DD or null
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: No reminder has this id (`Recurring item not found`). The body is validated first.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Recurring item not found
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
   /api/trash:
     get:
       tags: [trash]
@@ -737,8 +1358,8 @@ paths:
       description: >-
         Returns the deleted transactions, budgets (targets), recurring reminders and accounts that can still be
         restored, newest deletion first. An item stays for 30 days after deletion; expired items are not listed and
-        cannot be restored. Items are added by deleting a transaction, budget, reminder or account. Deleted categories
-        are not kept.
+        cannot be restored. Items are added by deleting a transaction, budget, reminder or account, and by archiving a
+        pot, which trashes that category's recurring reminders. Deleted categories are not kept.
       operationId: listTrash
       x-token-access: read
       responses:
@@ -828,7 +1449,8 @@ paths:
         '400':
           description: >-
             The body is not a JSON object (`Invalid JSON body`), has a field other than `entityType` and `id`
-            (`Only entityType and id are allowed`), has an unknown `entityType`, or has a missing or malformed `id`
+            (`Only entityType and id are allowed`), has a missing or unknown `entityType`
+            (`entityType must be one of TRANSACTION, TARGET, RECURRING, ACCOUNT`), or has a missing or malformed `id`
             (`id is missing or not in the expected format`).
           content:
             application/json:
@@ -880,10 +1502,10 @@ components:
       name: yearMonth
       in: path
       required: true
-      description: The month a transaction belongs to, as `YYYY-MM`.
+      description: The month a transaction belongs to, as `YYYY-MM`. Only the shape is checked, so `2026-13` is accepted and matches nothing.
       schema:
         type: string
-        pattern: '^\d{4}-(0[1-9]|1[0-2])$'
+        pattern: '^\d{4}-\d{2}$'
         examples: ['2026-10']
     categoryId:
       name: categoryId
@@ -900,6 +1522,14 @@ components:
       schema:
         type: string
         examples: ['6f1d2c8e-3b4a-4c5d-8e9f-0a1b2c3d4e5f']
+    potCategoryId:
+      name: categoryId
+      in: path
+      required: true
+      description: The id of a pot category, built-in (such as `cat-holidays`) or custom.
+      schema:
+        type: string
+        examples: [cat-holidays]
     recurringId:
       name: recurringId
       in: path
@@ -907,6 +1537,7 @@ components:
       description: The id of a recurring reminder.
       schema:
         type: string
+        examples: ['8a7e3c1d-5b2f-4e60-9d14-7c2b1a0f3e55']
     accountId:
       name: accountId
       in: path
@@ -929,7 +1560,7 @@ components:
           schema:
             $ref: '#/components/schemas/Error'
           example:
-            error: Request body must be a JSON object
+            error: Invalid JSON body
     Unauthorized:
       description: The credential is missing, invalid, expired or revoked.
       content:
@@ -1228,6 +1859,287 @@ components:
           maxLength: 100
           pattern: '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
           description: Links the transaction to a recurring reminder (a UUID). Not checked against existing reminders.
+    PotAutoEntry:
+      type: object
+      additionalProperties: false
+      description: One step in a pot's automatic contribution history.
+      required: [from, amount]
+      properties:
+        from:
+          type: string
+          pattern: '^\d{4}-(0[1-9]|1[0-2])$'
+          description: The first month the amount applies to, `YYYY-MM`. It applies until the next entry's month.
+        amount:
+          type: integer
+          minimum: 0
+          maximum: 1000000000
+          description: Pence added to the pot each month. `0` means automatic contributions are off.
+    PotSettings:
+      type: object
+      additionalProperties: false
+      description: A pot's stored settings, without storage keys.
+      required: [categoryId, monthlyAmount, goalAmount, autoContribute, archivedAt, updatedAt]
+      properties:
+        categoryId:
+          type: string
+        monthlyAmount:
+          type: [integer, 'null']
+          minimum: 1
+          maximum: 1000000000
+          description: Pence the household plans to put in each month. Null means no plan.
+        goalAmount:
+          type: [integer, 'null']
+          minimum: 1
+          maximum: 1000000000
+          description: Pence the pot is saving towards. Null means no goal.
+        autoContribute:
+          type: array
+          maxItems: 120
+          description: The history of automatic contributions, oldest first. Empty when never turned on.
+          items:
+            $ref: '#/components/schemas/PotAutoEntry'
+        archivedAt:
+          type: [string, 'null']
+          format: date-time
+          description: When the pot was archived. Null for an active pot.
+        updatedAt:
+          type: string
+          format: date-time
+    PotInput:
+      type: object
+      required: [monthlyAmount, goalAmount, autoContribute, month]
+      properties:
+        monthlyAmount:
+          type: [integer, 'null']
+          minimum: 1
+          maximum: 1000000000
+          description: Positive integer pence, or null for none. Required, but may be null.
+        goalAmount:
+          type: [integer, 'null']
+          minimum: 1
+          maximum: 1000000000
+          description: Positive integer pence, or null for no goal. Required, but may be null.
+        autoContribute:
+          type: boolean
+          description: Add `monthlyAmount` to the pot automatically every month from `month`. Needs a non-null `monthlyAmount`.
+        month:
+          type: string
+          pattern: '^\d{4}-(0[1-9]|1[0-2])$'
+          description: >-
+            The first month the automatic contribution change applies to, `YYYY-MM`. Within one month either side of the
+            server's current month (UTC).
+    PotArchiveInput:
+      type: object
+      additionalProperties: false
+      required: [month]
+      properties:
+        month:
+          type: string
+          pattern: '^\d{4}-(0[1-9]|1[0-2])$'
+          description: The month the pot is emptied by, `YYYY-MM`. Within one month either side of the server's current month (UTC).
+    PotMonth:
+      type: object
+      additionalProperties: false
+      description: One month of a pot's history. All amounts are integer pence.
+      required: [yearMonth, opening, setAside, autoAdded, takeOut, spent, closing]
+      properties:
+        yearMonth:
+          type: string
+          pattern: '^\d{4}-(0[1-9]|1[0-2])$'
+        opening:
+          type: integer
+          description: The balance carried in from the previous month (0 for the first month).
+        setAside:
+          type: integer
+          minimum: 0
+          description: Total of `SET_ASIDE` (Add to pot) transactions in the month.
+        autoAdded:
+          type: integer
+          minimum: 0
+          description: The automatic contribution for the month.
+        takeOut:
+          type: integer
+          minimum: 0
+          description: Total of `TAKE_OUT` (Take from pot) transactions in the month.
+        spent:
+          type: integer
+          minimum: 0
+          description: Total of `EXPENSE` (Spend) transactions in the month.
+        closing:
+          type: integer
+          description: '`opening + setAside + autoAdded - takeOut - spent`. Can be negative when overdrawn.'
+    PotSummary:
+      type: object
+      additionalProperties: false
+      description: A pot with its settings and monthly history up to the requested month. All amounts are integer pence.
+      required: [categoryId, monthlyAmount, goalAmount, autoAmountNow, archivedAt, balance, thisMonth, months]
+      properties:
+        categoryId:
+          type: string
+        monthlyAmount:
+          type: [integer, 'null']
+          description: The planned monthly amount from the settings; null when never set or cleared.
+        goalAmount:
+          type: [integer, 'null']
+          description: The goal from the settings; null when never set or cleared.
+        autoAmountNow:
+          type: integer
+          minimum: 0
+          description: The automatic contribution in force in the `asOf` month. 0 when off.
+        archivedAt:
+          type: [string, 'null']
+          format: date-time
+        balance:
+          type: integer
+          description: The closing balance of the `asOf` month. 0 when the pot has no activity. Negative when overdrawn.
+        thisMonth:
+          type: object
+          additionalProperties: false
+          description: The movements in the `asOf` month (all zero when the pot has no activity).
+          required: [setAside, autoAdded, takeOut, spent]
+          properties:
+            setAside:
+              type: integer
+              minimum: 0
+            autoAdded:
+              type: integer
+              minimum: 0
+            takeOut:
+              type: integer
+              minimum: 0
+            spent:
+              type: integer
+              minimum: 0
+        months:
+          type: array
+          description: >-
+            Every month from the pot's first activity (a transaction, or the start of an automatic contribution) up to and
+            including `asOf`, oldest first, with no gaps. Empty when the pot has no activity.
+          items:
+            $ref: '#/components/schemas/PotMonth'
+    RecurringFrequency:
+      type: string
+      description: >-
+        How often the reminder repeats. `WEEKLY` every 7 days and `FOUR_WEEKLY` every 28 days, both counted from
+        `anchorDate`; `MONTHLY` on `dayOfMonth`; `QUARTERLY` every three months and `YEARLY` every year, both
+        counted from `anchorDate`.
+      enum: [WEEKLY, FOUR_WEEKLY, MONTHLY, QUARTERLY, YEARLY]
+    Recurring:
+      type: object
+      additionalProperties: false
+      description: A reminder for a bill or income that repeats. Responses never include storage keys.
+      required:
+        - recurringId
+        - type
+        - categoryId
+        - amount
+        - description
+        - dayOfMonth
+        - frequency
+        - anchorDate
+        - leadDays
+        - handledPeriod
+        - createdAt
+        - updatedAt
+      properties:
+        recurringId:
+          type: string
+          description: A UUID.
+        type:
+          $ref: '#/components/schemas/TransactionType'
+        categoryId:
+          type: string
+        amount:
+          type: integer
+          minimum: 1
+          maximum: 1000000000
+          description: Integer pence (or cents).
+        description:
+          type: string
+          maxLength: 200
+          description: Trimmed. An empty string when none was given.
+        dayOfMonth:
+          type: integer
+          minimum: 1
+          maximum: 31
+          description: For `MONTHLY`, the day it falls due. For the other frequencies, the day of the month of `anchorDate`.
+        frequency:
+          $ref: '#/components/schemas/RecurringFrequency'
+        anchorDate:
+          type: [string, 'null']
+          pattern: '^\d{4}-\d{2}-\d{2}$'
+          description: The date a non-monthly schedule is counted from, `YYYY-MM-DD`. Null for `MONTHLY`.
+        leadDays:
+          type: integer
+          minimum: 0
+          maximum: 60
+          description: >-
+            How many days before the due date the reminder starts showing. At most 14 for `WEEKLY` and `FOUR_WEEKLY`, 30
+            for `MONTHLY` and 60 for `QUARTERLY` and `YEARLY`.
+        handledPeriod:
+          type: [string, 'null']
+          pattern: '^\d{4}-\d{2}(-\d{2})?$'
+          description: >-
+            The latest occurrence marked handled. By convention `YYYY-MM` for a monthly reminder and the occurrence date
+            `YYYY-MM-DD` for the others; null when none. The server accepts either format for any frequency.
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    RecurringInput:
+      type: object
+      required: [type, categoryId, amount]
+      description: >-
+        `dayOfMonth` is required when `frequency` is `MONTHLY` or omitted; `anchorDate` is required for every other
+        frequency.
+      properties:
+        type:
+          $ref: '#/components/schemas/TransactionType'
+        categoryId:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Not checked against existing categories.
+        amount:
+          type: integer
+          minimum: 1
+          maximum: 1000000000
+          description: Positive integer pence (or cents).
+        description:
+          type: [string, 'null']
+          maxLength: 200
+          description: Optional, at most 200 characters before trimming. Null or omitted is stored as an empty string.
+        frequency:
+          description: Defaults to `MONTHLY` when omitted or null.
+          anyOf:
+            - $ref: '#/components/schemas/RecurringFrequency'
+            - type: 'null'
+        dayOfMonth:
+          type: integer
+          minimum: 1
+          maximum: 31
+          description: Required for `MONTHLY`. Ignored for the other frequencies.
+        anchorDate:
+          type: string
+          pattern: '^\d{4}-\d{2}-\d{2}$'
+          description: Required for the non-monthly frequencies, a real calendar date. Ignored for `MONTHLY`.
+        leadDays:
+          type: [integer, 'null']
+          minimum: 0
+          maximum: 60
+          description: Defaults to 3 when omitted or null. The maximum depends on `frequency` (see `Recurring`).
+    RecurringHandledInput:
+      type: object
+      required: [period]
+      properties:
+        period:
+          type: [string, 'null']
+          pattern: '^\d{4}-\d{2}(-\d{2})?$'
+          description: >-
+            `YYYY-MM` (for monthly reminders), a real `YYYY-MM-DD` date (for the others) or null to clear. Required, but
+            may be null.
     TrashEntityType:
       type: string
       description: >-
