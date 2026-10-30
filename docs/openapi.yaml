@@ -18,6 +18,12 @@ info:
     - A budget is a category target.
     - A pot is a category whose balance carries over from month to month.
 
+    ## Examples and the clock
+
+    Pot and recurring examples assume the server clock is in October 2026 (UTC). `listPots`, `putPot` and
+    `archivePot` reject a month more than one month away from the server's current UTC month, so the `2026-10`
+    values in those examples fail outside September to November 2026.
+
     ## Authentication
 
     There are two ways to authenticate, and every operation accepts either unless its `x-token-access` says otherwise.
@@ -749,7 +755,7 @@ paths:
           required: true
           description: >-
             The month to work out balances for, as `YYYY-MM`. It may be in the past, and at most one month after the
-            server's current month (UTC).
+            server's current month (UTC). The example assumes the server clock is in October 2026 (UTC).
           schema:
             type: string
             pattern: '^\d{4}-(0[1-9]|1[0-2])$'
@@ -830,8 +836,8 @@ paths:
         before `month` is different (the amount is `monthlyAmount` when on, `0` when off). The history may hold at
         most 120 entries. `month` is the first month the change applies to and must be within one month of the
         server's current month (UTC). An existing `archivedAt` is kept, and saving does not unarchive the pot.
-        `categoryId` must be a built-in or custom category of type `POT`. Unknown body fields are ignored. A body that
-        is valid JSON but not an object (for example `null`) returns 500, not 400.
+        `categoryId` must be a built-in or custom category of type `POT`. Unknown body fields are ignored. A body of
+        `null` returns 500, not 400 (a string, number or array gives a 400 about `monthlyAmount`).
       operationId: putPot
       x-token-access: write
       requestBody:
@@ -911,7 +917,8 @@ paths:
         automatic contributions made before `month`, must be exactly zero, otherwise the call is a 409 with the
         balance. On success the pot is marked archived (`archivedAt`, kept if it was already archived), automatic
         contributions stop from `month` (history entries that start in `month` or later are removed, so `month` itself
-        gets no automatic contribution), the monthly amount and goal are kept, and every recurring reminder in this
+        gets no automatic contribution; if a non-zero contribution was in force before `month`, `{from: month, amount: 0}`
+        is appended, otherwise `autoContribute` can end up empty), the monthly amount and goal are kept, and every recurring reminder in this
         category is moved to the trash (`cancelledRecurring` counts them; `restoreFromTrash` can bring them back for 30
         days). The body must be exactly `{ "month": "YYYY-MM" }` with `month` within one month of the server's current
         month (UTC). Archiving is not atomic: the settings are saved before the reminders are trashed.
@@ -1927,7 +1934,7 @@ components:
           pattern: '^\d{4}-(0[1-9]|1[0-2])$'
           description: >-
             The first month the automatic contribution change applies to, `YYYY-MM`. Within one month either side of the
-            server's current month (UTC).
+            server's current month (UTC). The example assumes the server clock is in October 2026 (UTC).
     PotArchiveInput:
       type: object
       additionalProperties: false
@@ -1936,7 +1943,9 @@ components:
         month:
           type: string
           pattern: '^\d{4}-(0[1-9]|1[0-2])$'
-          description: The month the pot is emptied by, `YYYY-MM`. Within one month either side of the server's current month (UTC).
+          description: >-
+            The month the pot is emptied by, `YYYY-MM`. Within one month either side of the server's current month (UTC).
+            The example assumes the server clock is in October 2026 (UTC).
     PotMonth:
       type: object
       additionalProperties: false
