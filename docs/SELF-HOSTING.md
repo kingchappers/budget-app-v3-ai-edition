@@ -152,7 +152,7 @@ docker compose exec hoardwise sh -c 'STORE=sqlite node build/store-cli/store-cli
 
 On an install from before 0.3.0, use `budget.sqlite` in place of `hoardwise.sqlite` in this command if that is the file in your data folder.
 
-It prompts for the new password (never taken from arguments), ends every session and clears any login lock-out.
+It prompts for the new password (never taken from arguments), ends every session and access token and clears any login lock-out.
 
 ## Moving your data from AWS
 

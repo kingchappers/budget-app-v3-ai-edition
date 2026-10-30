@@ -130,7 +130,7 @@ describe('runCli', () => {
     it('sets the new password, ends every session and clears the lock-out', async () => {
       await seedAccount();
       const message = await runCli(['reset-password'], env, { readPassword: async () => 'the new password 22' });
-      expect(message).toMatch(/all sessions/i);
+      expect(message).toMatch(/all sessions and access tokens/i);
 
       const store = new SqliteStore(env.SQLITE_PATH as string);
       expect(await verifyPassword('the new password 22', (await getAccount(store))!)).toBe(true);
