@@ -36,7 +36,7 @@ function Figure({ label, pence, previousPence, previousLabel, higherIsGood }: Fi
   const percent = percentChange(deltaPence, previousPence);
   const up = deltaPence >= 0;
   const good = up === higherIsGood;
-  const color = good ? 'success' : 'attention';
+  const color = good ? 'success' : 'ember';
   const Arrow = up ? IconArrowUp : IconArrowDown;
   return (
     <Paper withBorder p="sm">

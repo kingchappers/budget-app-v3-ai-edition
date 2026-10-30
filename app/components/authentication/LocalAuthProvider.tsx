@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
-import { Modal } from '@mantine/core';
+import { Group, Modal } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { LocalAuthContext } from '~/lib/auth';
 import type { AuthState } from '~/lib/auth';
@@ -8,6 +8,7 @@ import {
   ensureLocalAuth, getLocalAuthState, loginLocal, logoutLocal, recoverLocal, refreshLocalAuth, setupLocal, subscribeLocalAuth,
 } from '~/lib/localAuth';
 import { LocalAuthForm } from './LocalAuthForm';
+import { Logo } from '../layout/Logo';
 
 type FormMode = 'recovery' | 'setup' | 'login';
 
@@ -66,6 +67,9 @@ export function LocalAuthProvider({ children }: { children: React.ReactNode }) {
     <LocalAuthContext.Provider value={value}>
       {children}
       <Modal opened={formOpen && snapshot.status === 'signedOut'} onClose={() => setFormOpen(false)} title={FORM_TITLES[mode]} centered>
+        {snapshot.status === 'signedOut' && (
+          <Group justify="center" mb="md"><Logo height={48} /></Group>
+        )}
         {snapshot.status === 'signedOut' && (
           <LocalAuthForm
             key={mode}

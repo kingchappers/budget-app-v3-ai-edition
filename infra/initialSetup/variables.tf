@@ -45,3 +45,9 @@ variable "custom_domain" {
   type        = string
   default     = "budget.scgrid.xyz"
 }
+
+variable "additional_custom_domains" {
+  description = "Further custom domain names in API Gateway that the deploy role may manage (INFRA-01). Keep in step with app_domain in infra/."
+  type        = list(string)
+  default     = ["app.hoardwise.xyz"]
+}

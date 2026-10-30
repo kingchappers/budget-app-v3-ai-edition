@@ -45,9 +45,9 @@ describe('CategoryProgressRow wording', () => {
 
   it('uses the attention colour, never the danger colour, when over', () => {
     renderRow(progress({ spent: 26200, percent: 105, isOver: true }));
-    expect(screen.getByText('£12.00 over')).toHaveStyle({ color: 'var(--mantine-color-attention-text)' });
+    expect(screen.getByText('£12.00 over')).toHaveStyle({ color: 'var(--mantine-color-ember-text)' });
     const row = screen.getByText('Groceries').closest('.mantine-Stack-root') as HTMLElement;
-    expect(row.innerHTML).toContain('--mantine-color-attention-filled'); // the bar
+    expect(row.innerHTML).toContain('--mantine-color-ember-filled'); // the bar
     expect(row.innerHTML).not.toMatch(/danger/);
   });
 
@@ -68,7 +68,7 @@ describe('CategoryProgressRow edges', () => {
   it('shows an empty bar, without the warning colour, for a target of nothing', () => {
     renderRow(progress({ spent: 500, target: 0, rawTarget: 0 }));
     expect(screen.getByRole('progressbar', { name: 'Groceries progress' })).toHaveAttribute('aria-valuenow', '0');
-    expect(screen.getByText('£5.00 over')).not.toHaveStyle({ color: 'var(--mantine-color-attention-text)' });
+    expect(screen.getByText('£5.00 over')).not.toHaveStyle({ color: 'var(--mantine-color-ember-text)' });
   });
 });
 

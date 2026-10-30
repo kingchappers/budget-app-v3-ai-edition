@@ -3,6 +3,7 @@ import { IconLock } from '@tabler/icons-react';
 import { useAuth } from '~/lib/auth';
 import { Link } from 'react-router';
 import { SESSION_LIFETIME_TEXT } from '~/lib/sessionLifetime';
+import { Logo } from './Logo';
 
 export interface SignedOutPanelProps {
   sessionEnded: boolean;
@@ -21,6 +22,7 @@ export function SignedOutPanel({ sessionEnded }: SignedOutPanelProps) {
 
   return (
     <Stack align="center" gap="md" py={48} maw={420} mx="auto" ta="center">
+      <Logo height={64} />
       <IconLock size={40} stroke={1.5} aria-hidden="true" />
       <Title order={1} size="h2">{sessionEnded ? 'Your session has ended' : "You're signed out"}</Title>
       <Text>Your data is safe. Sign in to see it.</Text>

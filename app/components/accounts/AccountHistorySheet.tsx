@@ -37,7 +37,7 @@ export function AccountHistorySheet({
                 h={160}
                 data={account.balances.map(entry => ({ date: formatShortDate(entry.date), Balance: entry.pence }))}
                 dataKey="date"
-                series={[{ name: 'Balance', color: 'teal.6' }]}
+                series={[{ name: 'Balance', color: 'hoard.6' }]}
                 valueFormatter={formatPence}
                 withDots={false}
               />

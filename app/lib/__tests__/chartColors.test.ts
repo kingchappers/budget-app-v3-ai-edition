@@ -1,9 +1,10 @@
 import { DEFAULT_THEME, mergeMantineTheme } from '@mantine/core';
 import { describe, expect, it } from 'vitest';
 import { theme } from '../../root';
+import { BRAND } from '../brand';
 import { CHART_COLORS } from '../chartColors';
 
-// Uses the app's own palette (success, primary and the rest are its custom ramps).
+// Uses the app's own palette (success, hoard and the rest are its custom ramps).
 const colors = mergeMantineTheme(DEFAULT_THEME, theme).colors;
 
 function luminance(hex: string): number {
@@ -25,9 +26,9 @@ function hexFor(token: string): string {
 describe('chart colours', () => {
   const shaded = Object.entries(CHART_COLORS).filter(([, token]) => !token.startsWith('var('));
 
-  it.each(shaded)('%s is at least 3:1 on the light and dark page', (_name, token) => {
-    expect(contrast(hexFor(token), '#ffffff')).toBeGreaterThanOrEqual(3);
-    expect(contrast(hexFor(token), '#242424')).toBeGreaterThanOrEqual(3);
+  it.each(shaded)('%s is at least 3:1 on the light page (mist) and the dark page', (_name, token) => {
+    expect(contrast(hexFor(token), BRAND.mist)).toBeGreaterThanOrEqual(3);
+    expect(contrast(hexFor(token), BRAND.surface)).toBeGreaterThanOrEqual(3);
   });
 
   it('draws spending in the page\'s own text colour, never red', () => {

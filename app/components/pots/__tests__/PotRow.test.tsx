@@ -26,7 +26,7 @@ describe('PotRow below zero', () => {
   it('says so in words and uses the attention colour, never danger', () => {
     const { container } = renderRow(-1200);
     expect(screen.getByText('Below zero')).toBeInTheDocument();
-    expect(screen.getByText('−£12.00')).toHaveStyle({ color: 'var(--mantine-color-attention-text)' });
+    expect(screen.getByText('−£12.00')).toHaveStyle({ color: 'var(--mantine-color-ember-text)' });
     const card = container.querySelector('.mantine-Card-root') as HTMLElement;
     expect(card.innerHTML).not.toMatch(/danger/);
   });

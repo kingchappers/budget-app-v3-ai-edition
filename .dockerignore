@@ -6,6 +6,7 @@ node_modules
 build
 infra
 docs
+!docs/brand/logo
 **/*.sqlite
 **/*.sqlite-shm
 **/*.sqlite-wal

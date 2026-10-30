@@ -19,7 +19,7 @@ function SyncStatus({ label, saving, pending, pendingError, onRetry }: {
   if (pending && pendingError) {
     return (
       <Group gap={6} mt={2}>
-        <IconClock size={12} color="var(--mantine-color-warning-6)" aria-hidden />
+        <IconClock size={12} color="var(--mantine-color-ember-text)" aria-hidden />
         <Text size="sm">Not synced. Tap to retry.</Text>
         {onRetry && (
           <Button size="compact-sm" variant="light" aria-label={`Retry syncing ${label}`} onClick={onRetry}>Retry</Button>
@@ -83,7 +83,7 @@ export function TransactionRow({
 
   const summary = (
     <Group gap="sm" wrap="nowrap" style={{ minWidth: 0 }}>
-      <ThemeIcon variant="light" color="primary" radius="xl" size={32}>
+      <ThemeIcon variant="light" color="hoard" radius="xl" size={32}>
         <CategoryIcon icon={categoryIcon} />
       </ThemeIcon>
       <div style={{ minWidth: 0 }}>

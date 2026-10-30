@@ -43,7 +43,7 @@ describe('BiggestMoversList', () => {
       up: [{ categoryId: 'cat-a', name: 'A', currentPence: 10000, previousPence: 2000, deltaPence: 8000 }],
       down: [{ categoryId: 'cat-b', name: 'B', currentPence: 1000, previousPence: 9000, deltaPence: -8000 }],
     });
-    expect(screen.getByText('£80.00 more')).toHaveStyle({ color: 'var(--mantine-color-attention-text)' });
+    expect(screen.getByText('£80.00 more')).toHaveStyle({ color: 'var(--mantine-color-ember-text)' });
     expect(screen.getByText('£80.00 less')).toHaveStyle({ color: 'var(--mantine-color-success-text)' });
   });
 });

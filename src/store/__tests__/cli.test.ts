@@ -73,6 +73,50 @@ describe('runCli', () => {
     expect(existsSync(out)).toBe(false);
   });
 
+  describe('a missing SQLite database', () => {
+    it.each([
+      ['export', ['export', 'auth0|abc', '--out', 'out.jsonl']],
+      ['backup', ['backup', '--out', 'copy.sqlite']],
+      ['reset-password', ['reset-password']],
+    ])('is not created by %s', async (_name, args) => {
+      const argv = args.map(arg => (arg.endsWith('.jsonl') || arg.endsWith('.sqlite') ? join(dir, arg) : arg));
+
+      await expect(runCli(argv, env)).rejects.toThrow(/No SQLite database at .*budget\.sqlite/);
+
+      expect(readdirSync(dir)).toEqual([]);
+    });
+
+    it('is still created by import, which is how a fresh instance gets its first data', async () => {
+      const input = join(dir, 'in.jsonl');
+      writeFileSync(input, '{"PK":"USER#auth0|abc","SK":"CAT#c1","name":"Garden"}\n');
+
+      await runCli(['import', '--in', input, '--as-user', 'local-1'], env);
+
+      expect(existsSync(env.SQLITE_PATH as string)).toBe(true);
+    });
+  });
+
+  describe('finding the database from DATA_DIR', () => {
+    it('uses the legacy budget.sqlite when it is the only database', async () => {
+      await seedDatabase();
+      const out = join(dir, 'copy.sqlite');
+
+      await runCli(['backup', '--out', out], { STORE: 'sqlite', DATA_DIR: dir });
+
+      expect(existsSync(out)).toBe(true);
+      expect(existsSync(join(dir, 'hoardwise.sqlite'))).toBe(false);
+    });
+
+    it('lets an explicit SQLITE_PATH win over DATA_DIR', async () => {
+      await seedDatabase();
+      const out = join(dir, 'copy.sqlite');
+
+      await runCli(['backup', '--out', out], { ...env, DATA_DIR: join(dir, 'elsewhere') });
+
+      expect(existsSync(out)).toBe(true);
+    });
+  });
+
   describe('reset-password', () => {
     async function seedAccount(): Promise<void> {
       const store = new SqliteStore(env.SQLITE_PATH as string);
@@ -104,6 +148,7 @@ describe('runCli', () => {
     });
 
     it('refuses when no account exists yet', async () => {
+      await seedDatabase();
       await expect(runCli(['reset-password'], env, { readPassword: async () => 'the new password 22' })).rejects.toThrow(/No account/);
     });
 

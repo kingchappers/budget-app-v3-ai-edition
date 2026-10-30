@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Button, Group, Loader, Stack, Text, Title } from '@mantine/core';
 import { LoadError } from '~/components/layout/LoadError';
 import { notifications } from '@mantine/notifications';
+import { Mark } from '~/components/layout/Logo';
 import { DefaultLayout } from '~/components/layout/DefaultLayout';
 import { usePreferences } from '~/lib/preferences';
 import { pageTitle } from '~/lib/pageTitle';
@@ -91,7 +92,12 @@ function DeletedContent() {
   return (
     <Stack>
       {intro}
-      {groups.length === 0 && <Text c="dimmed">Nothing deleted in the last 30 days.</Text>}
+      {groups.length === 0 && (
+        <Stack align="center" gap="xs" py="xl">
+          <Mark size={48} />
+          <Text c="dimmed">Nothing deleted in the last 30 days.</Text>
+        </Stack>
+      )}
       {groups.map(group => (
         <div key={group.entityType}>
           <Title order={2} size="h5" mt="md" mb="xs">{group.label}</Title>
