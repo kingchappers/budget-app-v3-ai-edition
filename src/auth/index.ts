@@ -30,7 +30,8 @@ async function createAuth(env: NodeJS.ProcessEnv): Promise<AuthProvider> {
   throw new Error(`Unknown AUTH_MODE "${mode}": expected "auth0" or "local"`);
 }
 
-// Loads only the chosen provider, so the Lambda never loads the local-login code.
+// Creates only the chosen provider. The Lambda still bundles local-login modules (the token routes import them), but it
+// never creates the local-login provider, so its start-up work (setup code, recovery) never runs there.
 export function initAuth(env: NodeJS.ProcessEnv = process.env): Promise<AuthProvider> {
   if (current) return Promise.resolve(current);
   pending ??= createAuth(env).then(

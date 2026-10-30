@@ -30,8 +30,8 @@ Security requirements for this React + Auth0 + Lambda project. Reference control
 | AUTH-12 | WEB-A01, WEB-A07, API2, CWE-287 | Personal API tokens are random (at least 128 bits, here 256), stored only as hashes outside `USER#`, shown once, expiring by user choice, revocable, and never logged or exported |
 | AUTH-13 | WEB-A01, API1, API5, CWE-862, CWE-863 | Token requests are read-only unless the stored scope allows writes; enforcement is central and deny by default; scope and expiry come only from the stored record |
 | AUTH-14 | WEB-A01, API5, CWE-863 | A token may not call token management, `/api/auth/*` or push-subscription routes |
-| AUTH-15 | WEB-A07, API2 | A password reset revokes every token (local mode) |
-| AUTH-16 | WEB-A07, API2, API4 | Failed token lookups are rate limited in the container |
+| AUTH-15 | WEB-A07, API2 | A password reset revokes every token. Local mode only: Auth0 mode has no local password reset to hook |
+| AUTH-16 | WEB-A07, API2, API4 | Failed token lookups are rate limited per client address: exact in the container, best-effort per instance on AWS |
 
 **Framework mapping:** WEB-A01 (Broken Access Control), WEB-A07 (Auth Failures), FE-02 (Auth State)
 
@@ -42,7 +42,7 @@ Security requirements for this React + Auth0 + Lambda project. Reference control
 - Personal API tokens are read-only by default. In self-hosted (local) mode, creating a write token needs the account password again.
 - That password check shares the login throttle and one serialising queue with the login route, so password guesses are made one at a time across both.
 - The 25-token cap is a soft limit (check, then write): concurrent creates can slightly exceed it.
-- The failed-lookup limiter is keyed by the client address the server sees. It is exact in the container and best-effort per instance on AWS, where API Gateway throttling is the main limit. Behind a reverse proxy that appends to `X-Forwarded-For` instead of overwriting it, a client can rotate the header to evade the limiter, so use `TRUST_PROXY` only behind a proxy that sets the header itself (the bundled Caddy does).
+- The failed-lookup limiter is keyed by the client address the server sees. It is exact in the container and best-effort per instance on AWS, where API Gateway throttling is the main limit. Behind a reverse proxy that appends to `X-Forwarded-For` instead of overwriting it, a client can rotate the header to evade the limiter, so use `TRUST_PROXY` only behind a proxy that sets the header itself (the bundled Caddy does). Behind a reverse proxy without `TRUST_PROXY`, every client shares the proxy's address, so while one misbehaving client is blocked every token client gets 429s, valid tokens included.
 - A password reset, including `store-cli reset-password`, revokes every token.
 
 **Built-in login (`AUTH_MODE=local`) notes:**

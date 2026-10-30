@@ -128,6 +128,8 @@ Stopping: a clean shutdown stops taking new requests (they get a 503), lets open
 
   A file brought in with `docker cp` is owned by root, which the app cannot write; if you used it, fix the owner with `docker compose run --rm --no-deps -u 0 --entrypoint chown hoardwise 10001:10001 /data/hoardwise.sqlite` (or `docker compose exec -u 0 hoardwise chown 10001:10001 /data/hoardwise.sqlite` while it is running).
 
+  A restore also brings back any access token that was revoked after the backup was taken. After restoring, review the token list in Settings (once it exists), or reset the password, which revokes every token.
+
 ### Check your backups are working
 
 After the first start, run `docker compose exec hoardwise ls -l /data/backups`. A file named `hoardwise-YYYYMMDD-HHMMSS.sqlite` (`budget-…` for older backups) should exist, written at start-up. If the directory is empty or `docker compose logs hoardwise` shows "Backup failed", the likely cause is volume ownership (the app runs as uid 10001 and cannot write a root-owned volume). Repair it with:
