@@ -428,6 +428,438 @@ paths:
           $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
+  /api/transactions:
+    get:
+      tags: [transactions]
+      summary: List a month's transactions
+      description: >-
+        Returns every transaction stored under the given month, as raw stored records that include the storage keys
+        `PK` and `SK` (`USER#<id>` and `TXN#<yearMonth>#<transactionId>`). `month` is zero-padded, so `3` and `03` both
+        mean March. The values are parsed leniently: the handler only checks that both parse as integers, with `month`
+        1 to 12 and `year` at least 2000. A `year` or `month` with trailing characters (such as `2026x`) passes the check
+        and is used as given, so it matches nothing and returns an empty list. A transaction belongs to the month in its
+        `yearMonth` field, which is the first 7 characters of its `date`.
+      operationId: listTransactions
+      x-token-access: read
+      parameters:
+        - name: year
+          in: query
+          required: true
+          description: The four-digit year, 2000 or later.
+          schema:
+            type: integer
+            minimum: 2000
+          example: 2026
+        - name: month
+          in: query
+          required: true
+          description: The month number, 1 to 12.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 12
+          example: 10
+      responses:
+        '200':
+          description: The month's transactions (an empty list when there are none).
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [transactions]
+                properties:
+                  transactions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/StoredTransaction'
+              example:
+                transactions:
+                  - PK: USER#user-1
+                    SK: TXN#2026-10#6f1d2c8e-3b4a-4c5d-8e9f-0a1b2c3d4e5f
+                    transactionId: 6f1d2c8e-3b4a-4c5d-8e9f-0a1b2c3d4e5f
+                    yearMonth: '2026-10'
+                    amount: 1250
+                    type: EXPENSE
+                    categoryId: cat-groceries
+                    description: Weekly shop
+                    date: '2026-10-29'
+                    createdAt: '2026-10-29T18:30:00.000Z'
+        '400':
+          description: '`year` or `month` is missing (`year and month query parameters are required`) or out of range (`Invalid year or month`).'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: year and month query parameters are required
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      tags: [transactions]
+      summary: Add a transaction
+      description: >-
+        Stores a transaction in the month given by the first 7 characters of `date`. The server sets `yearMonth` and
+        `createdAt`. The id is a server-generated UUID unless the client supplies `transactionId`, which lets a client
+        retry safely; supplying an id that already exists in that month silently replaces that transaction. The
+        `categoryId` and `recurringId` are not checked against existing records. `date` is checked by shape only, so
+        `2026-13-45` is accepted. `description` may be omitted or null and is stored as an empty string. Unknown fields
+        are ignored. A body that is valid JSON but not an object (for example `null`) returns 500, not 400.
+      operationId: createTransaction
+      x-token-access: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransactionInput'
+            examples:
+              expense:
+                summary: A grocery shop
+                value:
+                  transactionId: 6f1d2c8e-3b4a-4c5d-8e9f-0a1b2c3d4e5f
+                  amount: 1250
+                  type: EXPENSE
+                  categoryId: cat-groceries
+                  description: Weekly shop
+                  date: '2026-10-29'
+              income:
+                summary: Salary, with the id left to the server
+                value:
+                  amount: 250000
+                  type: INCOME
+                  categoryId: cat-salary
+                  date: '2026-10-28'
+      responses:
+        '201':
+          description: The transaction was stored.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [transaction]
+                properties:
+                  transaction:
+                    $ref: '#/components/schemas/Transaction'
+              example:
+                transaction:
+                  transactionId: 6f1d2c8e-3b4a-4c5d-8e9f-0a1b2c3d4e5f
+                  yearMonth: '2026-10'
+                  amount: 1250
+                  type: EXPENSE
+                  categoryId: cat-groceries
+                  description: Weekly shop
+                  date: '2026-10-29'
+                  createdAt: '2026-10-29T18:30:00.000Z'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/transactions/range:
+    get:
+      tags: [transactions]
+      summary: List transactions across several months
+      description: >-
+        Returns the raw stored records (with `PK` and `SK`, as in `listTransactions`) whose `yearMonth` falls from
+        `from` to `to` inclusive. The range is at most 24 months. Months are compared as `YYYY-MM` strings.
+      operationId: listTransactionsRange
+      x-token-access: read
+      parameters:
+        - name: from
+          in: query
+          required: true
+          description: The first month, as `YYYY-MM`.
+          schema:
+            type: string
+            pattern: '^\d{4}-(0[1-9]|1[0-2])$'
+          example: '2026-08'
+        - name: to
+          in: query
+          required: true
+          description: The last month, as `YYYY-MM`. Must not be before `from`, and at most 24 months from it inclusive.
+          schema:
+            type: string
+            pattern: '^\d{4}-(0[1-9]|1[0-2])$'
+          example: '2026-10'
+      responses:
+        '200':
+          description: The transactions in the range (an empty list when there are none).
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [transactions]
+                properties:
+                  transactions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/StoredTransaction'
+              example:
+                transactions:
+                  - PK: USER#user-1
+                    SK: TXN#2026-10#6f1d2c8e-3b4a-4c5d-8e9f-0a1b2c3d4e5f
+                    transactionId: 6f1d2c8e-3b4a-4c5d-8e9f-0a1b2c3d4e5f
+                    yearMonth: '2026-10'
+                    amount: 1250
+                    type: EXPENSE
+                    categoryId: cat-groceries
+                    description: Weekly shop
+                    date: '2026-10-29'
+                    createdAt: '2026-10-29T18:30:00.000Z'
+        '400':
+          description: >-
+            `from` or `to` is missing or not a month (`from and to must be months in YYYY-MM format`), `from` is after
+            `to` (`from must not be after to`), or the range is over 24 months (`the range must be at most 24 months`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: from must not be after to
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/transactions/{yearMonth}/{transactionId}:
+    parameters:
+      - $ref: '#/components/parameters/yearMonth'
+      - $ref: '#/components/parameters/transactionId'
+    put:
+      tags: [transactions]
+      summary: Replace a transaction
+      description: >-
+        Replaces every field of an existing transaction; the body is the same as for `createTransaction` (a
+        `transactionId` in the body is ignored, the path id is kept). The path `yearMonth` is where the transaction is
+        found. If the new `date` is in a different month, the transaction is moved there in one step: it keeps its id and
+        `createdAt`, and the response carries the new `yearMonth`, so the old `yearMonth/transactionId` path stops
+        working. `recurringId` keeps its stored value when omitted and cannot be cleared. The path month is checked by
+        shape only (`YYYY-MM`, so `2026-13` is accepted and finds nothing).
+      operationId: updateTransaction
+      x-token-access: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransactionInput'
+            example:
+              amount: 1400
+              type: EXPENSE
+              categoryId: cat-groceries
+              description: Weekly shop and milk
+              date: '2026-10-29'
+      responses:
+        '200':
+          description: The updated transaction.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [transaction]
+                properties:
+                  transaction:
+                    $ref: '#/components/schemas/Transaction'
+              example:
+                transaction:
+                  transactionId: 6f1d2c8e-3b4a-4c5d-8e9f-0a1b2c3d4e5f
+                  yearMonth: '2026-10'
+                  amount: 1400
+                  type: EXPENSE
+                  categoryId: cat-groceries
+                  description: Weekly shop and milk
+                  date: '2026-10-29'
+                  createdAt: '2026-10-29T18:30:00.000Z'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: No transaction with this id exists in the path month (`Transaction not found`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Transaction not found
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    delete:
+      tags: [transactions]
+      summary: Delete a transaction
+      description: >-
+        Moves the transaction to the trash, where `restoreFromTrash` can bring it back for 30 days. In the trash its
+        `entityType` is `TRANSACTION` and its `id` is `<yearMonth>#<transactionId>`. Deleting a transaction that does
+        not exist still returns 204 and adds nothing to the trash. The path month is checked by shape only (`YYYY-MM`).
+      operationId: deleteTransaction
+      x-token-access: write
+      responses:
+        '204':
+          description: The transaction is deleted. No body.
+        '400':
+          description: The path `yearMonth` is not in `YYYY-MM` format (`yearMonth must be in YYYY-MM format`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: yearMonth must be in YYYY-MM format
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/trash:
+    get:
+      tags: [trash]
+      summary: List recently deleted items
+      description: >-
+        Returns the deleted transactions, budgets (targets), recurring reminders and accounts that can still be
+        restored, newest deletion first. An item stays for 30 days after deletion; expired items are not listed and
+        cannot be restored. Items are added by deleting a transaction, budget, reminder or account. Deleted categories
+        are not kept.
+      operationId: listTrash
+      x-token-access: read
+      responses:
+        '200':
+          description: The restorable items.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TrashItem'
+              example:
+                items:
+                  - entityType: TRANSACTION
+                    id: '2026-10#6f1d2c8e-3b4a-4c5d-8e9f-0a1b2c3d4e5f'
+                    item:
+                      transactionId: 6f1d2c8e-3b4a-4c5d-8e9f-0a1b2c3d4e5f
+                      yearMonth: '2026-10'
+                      amount: 1250
+                      type: EXPENSE
+                      categoryId: cat-groceries
+                      description: Weekly shop
+                      date: '2026-10-29'
+                      createdAt: '2026-10-29T18:30:00.000Z'
+                    deletedAt: '2026-10-30T09:15:00.000Z'
+                    expiresAt: 1795943700
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/trash/restore:
+    post:
+      tags: [trash]
+      summary: Restore a deleted item
+      description: >-
+        Puts a trashed item back exactly as it was stored and removes it from the trash. Only `entityType` and `id`
+        are accepted; any other field is a 400. The item is restored under its original key, so it is not restored if
+        something now occupies that key.
+      operationId: restoreFromTrash
+      x-token-access: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RestoreInput'
+            example:
+              entityType: TRANSACTION
+              id: '2026-10#6f1d2c8e-3b4a-4c5d-8e9f-0a1b2c3d4e5f'
+      responses:
+        '200':
+          description: The item was restored.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [entityType, id, item]
+                properties:
+                  entityType:
+                    $ref: '#/components/schemas/TrashEntityType'
+                  id:
+                    type: string
+                  item:
+                    type: object
+                    description: The restored record, without storage keys. Same shape as `item` in `listTrash`.
+                    additionalProperties: true
+              example:
+                entityType: TRANSACTION
+                id: '2026-10#6f1d2c8e-3b4a-4c5d-8e9f-0a1b2c3d4e5f'
+                item:
+                  transactionId: 6f1d2c8e-3b4a-4c5d-8e9f-0a1b2c3d4e5f
+                  yearMonth: '2026-10'
+                  amount: 1250
+                  type: EXPENSE
+                  categoryId: cat-groceries
+                  description: Weekly shop
+                  date: '2026-10-29'
+                  createdAt: '2026-10-29T18:30:00.000Z'
+        '400':
+          description: >-
+            The body is not a JSON object (`Invalid JSON body`), has a field other than `entityType` and `id`
+            (`Only entityType and id are allowed`), has an unknown `entityType`, or has a missing or malformed `id`
+            (`id is missing or not in the expected format`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Only entityType and id are allowed
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Nothing with this type and id is in the trash, or it has expired or was just restored by another request (`This item is no longer in Recently deleted`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: This item is no longer in Recently deleted
+        '409':
+          description: A record already exists at the original key, so nothing was restored and the item stays in the trash (`This item is already in place, so it was not restored`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: This item is already in place, so it was not restored
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
 components:
   securitySchemes:
     bearerToken:
@@ -467,6 +899,7 @@ components:
       description: The id of a transaction.
       schema:
         type: string
+        examples: ['6f1d2c8e-3b4a-4c5d-8e9f-0a1b2c3d4e5f']
     recurringId:
       name: recurringId
       in: path
@@ -685,3 +1118,155 @@ components:
           description: Positive integer pence (or cents).
         period:
           $ref: '#/components/schemas/TargetPeriod'
+    TransactionType:
+      type: string
+      description: >-
+        What kind of movement this is. `EXPENSE` is Spend, `INCOME` is Income, `SET_ASIDE` is Add to pot and
+        `TAKE_OUT` is Take from pot.
+      enum: [EXPENSE, INCOME, SET_ASIDE, TAKE_OUT]
+    Transaction:
+      type: object
+      additionalProperties: false
+      required: [transactionId, yearMonth, amount, type, categoryId, description, date, createdAt]
+      properties:
+        transactionId:
+          type: string
+          description: A UUID.
+        yearMonth:
+          type: string
+          pattern: '^\d{4}-\d{2}$'
+          description: The month, `YYYY-MM`. Always equal to the first 7 characters of `date`.
+        amount:
+          type: integer
+          minimum: 1
+          maximum: 1000000000
+          description: Integer pence (or cents).
+        type:
+          $ref: '#/components/schemas/TransactionType'
+        categoryId:
+          type: string
+        description:
+          type: string
+          maxLength: 200
+          description: Trimmed. An empty string when none was given.
+        date:
+          type: string
+          pattern: '^\d{4}-\d{2}-\d{2}$'
+          description: The day, `YYYY-MM-DD`.
+        createdAt:
+          type: string
+          format: date-time
+        recurringId:
+          type: string
+          description: The recurring reminder this transaction was made from. Present only when linked.
+    StoredTransaction:
+      type: object
+      additionalProperties: false
+      description: A transaction as listed by `listTransactions` and `listTransactionsRange`, including its storage keys.
+      required: [PK, SK, transactionId, yearMonth, amount, type, categoryId, description, date, createdAt]
+      properties:
+        PK:
+          type: string
+          description: '`USER#<id>`.'
+        SK:
+          type: string
+          description: '`TXN#<yearMonth>#<transactionId>`.'
+        transactionId:
+          type: string
+        yearMonth:
+          type: string
+          pattern: '^\d{4}-\d{2}$'
+        amount:
+          type: integer
+          minimum: 1
+          maximum: 1000000000
+        type:
+          $ref: '#/components/schemas/TransactionType'
+        categoryId:
+          type: string
+        description:
+          type: string
+          maxLength: 200
+        date:
+          type: string
+          pattern: '^\d{4}-\d{2}-\d{2}$'
+        createdAt:
+          type: string
+          format: date-time
+        recurringId:
+          type: string
+    TransactionInput:
+      type: object
+      required: [amount, type, categoryId, date]
+      properties:
+        transactionId:
+          type: string
+          pattern: '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+          description: Create only, a client-chosen UUID. Ignored when updating.
+        amount:
+          type: integer
+          minimum: 1
+          maximum: 1000000000
+          description: Positive integer pence (or cents).
+        type:
+          $ref: '#/components/schemas/TransactionType'
+        categoryId:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Not checked against existing categories.
+        description:
+          type: [string, 'null']
+          maxLength: 200
+          description: Optional, at most 200 characters before trimming. Null or omitted is stored as an empty string.
+        date:
+          type: string
+          pattern: '^\d{4}-\d{2}-\d{2}$'
+          description: '`YYYY-MM-DD`. Only the shape is checked.'
+        recurringId:
+          type: string
+          maxLength: 100
+          pattern: '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+          description: Links the transaction to a recurring reminder (a UUID). Not checked against existing reminders.
+    TrashEntityType:
+      type: string
+      description: >-
+        What was deleted. `TRANSACTION` is a transaction, `TARGET` a budget, `RECURRING` a recurring reminder and
+        `ACCOUNT` an account.
+      enum: [TRANSACTION, TARGET, RECURRING, ACCOUNT]
+    TrashItem:
+      type: object
+      additionalProperties: false
+      required: [entityType, id, item, deletedAt, expiresAt]
+      properties:
+        entityType:
+          $ref: '#/components/schemas/TrashEntityType'
+        id:
+          type: string
+          description: >-
+            The id to send to `restoreFromTrash`. For `TRANSACTION` it is `<yearMonth>#<transactionId>`; for the other
+            types it is the target's category id, the recurring id or the account id.
+        item:
+          type: object
+          additionalProperties: true
+          description: >-
+            The deleted record as it was stored, without storage keys: a `Transaction`, a target, a recurring reminder
+            or an account, according to `entityType`.
+        deletedAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: integer
+          description: When the item stops being restorable, in Unix seconds (30 days after `deletedAt`).
+    RestoreInput:
+      type: object
+      additionalProperties: false
+      required: [entityType, id]
+      properties:
+        entityType:
+          $ref: '#/components/schemas/TrashEntityType'
+        id:
+          type: string
+          description: >-
+            The `id` from `listTrash`. For `TRANSACTION`, `YYYY-MM#<transactionId>`; otherwise 1 to 100 letters, digits,
+            `_` or `-`. The transaction id part has the same character rules.
