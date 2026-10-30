@@ -5,6 +5,10 @@ type Reader = (path: string, params?: URLSearchParams) => Record<string, unknown
 
 const yearMonth = (date: Date): string => date.toISOString().slice(0, 7);
 
+// The fixtures count in UTC fields but the app asks for the visitor's local month, so shift the clock until the UTC fields
+// read the local date. Without it the seed lands in the wrong month for the hour either side of local midnight.
+const localCalendar = (real: Date): Date => new Date(real.getTime() - real.getTimezoneOffset() * 60_000);
+
 async function must(send: Send, method: string, path: string, body?: unknown): Promise<Record<string, unknown>> {
   const response = await send(method, path, body);
   if (response.status < 200 || response.status >= 300) {
@@ -28,7 +32,9 @@ function giftsSetAsides(now: Date): Record<string, unknown>[] {
 // Replays the invented household that the About-page screenshots use (scripts/screenshots/fixtures.mjs) as ordinary API
 // requests, so the data is valid by construction whenever the data model changes. Nothing here is real.
 export async function seedHousehold(send: Send, real: Date = new Date()): Promise<void> {
-  const now = referenceNow(real);
+  // From the 26th the household is dated the 15th (referenceNow): the screenshots rely on that rule, and a bill three
+  // days ahead has to stay inside the month, so the demo keeps it rather than forking the fixtures.
+  const now = referenceNow(localCalendar(real));
   const fixtures = createStore(now);
   const read: Reader = (path, params = new URLSearchParams()) => fixtures.handle('GET', path, params).json as Record<string, unknown>;
   const month = yearMonth(now);

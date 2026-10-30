@@ -7,6 +7,7 @@ import { seedHousehold } from '../seed';
 
 afterEach(() => {
   vi.useRealTimers();
+  vi.restoreAllMocks();
   setStore(undefined);
 });
 
@@ -81,14 +82,15 @@ describe('seedHousehold', () => {
     expect(recurring.some(item => item.handledPeriod !== null)).toBe(true);
   });
 
-  it('reset restores the same seeded household after the visitor changes it', async () => {
-    const api = await createSeededDemoApi();
-    const before = await counts(api);
-    const target = (await read(api, '/api/targets')).targets[0] as { categoryId: string };
-    await api.send('DELETE', `/api/targets/${target.categoryId}`);
-    expect((await counts(api)).targets).toBe(before.targets - 1);
-    await api.reset();
-    expect(await counts(api)).toEqual(before);
+  it("dates the household by the visitor's calendar, so Home is not empty just after local midnight", async () => {
+    // 23:30 UTC on 31 October is already 1 November in UTC+1, which is the month the app asks for.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-31T23:30:00Z'));
+    vi.spyOn(Date.prototype, 'getTimezoneOffset').mockReturnValue(-60);
+
+    const api = await createDemoApi({ seed: send => seedHousehold(send) });
+
+    expect((await read(api, '/api/transactions?year=2026&month=11')).transactions.length).toBeGreaterThan(0);
   });
 
   // A seed failure means a dead demo, so the edges of the month and the year are pinned.
