@@ -53,7 +53,7 @@ function DueRow({ item, label, icon, match, onAdd, onEdit, onSkip, onSnooze, onC
     <Stack gap={4} py={4}>
       <Group justify="space-between" wrap="wrap">
         <Group gap="sm" wrap="nowrap" style={{ minWidth: 0, flex: '1 1 10rem' }}>
-          <ThemeIcon variant="light" color="primary" radius="xl" size={32}>
+          <ThemeIcon variant="light" color="hoard" radius="xl" size={32}>
             <CategoryIcon icon={icon} />
           </ThemeIcon>
           <div style={{ minWidth: 0 }}>

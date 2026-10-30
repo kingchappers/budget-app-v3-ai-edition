@@ -1,8 +1,27 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif,
-    "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  --font-sans: "Lora Variable", Georgia, "Times New Roman", serif;
+}
+
+/* Hoardwise brand tokens (docs/brand.md). The dark overrides follow the app's own colour scheme
+   (Mantine's data attribute), not the device setting, because Settings can override the device. */
+:root {
+  --hw-pine: #10302B;      /* headings, dark surfaces, theme-color */
+  --hw-hoard: #1E5F57;     /* primary actions and links (7.4:1 on white) */
+  --hw-gold: #D9A441;      /* logo and illustration only, never body text on light */
+  --hw-gold-text: #86601A; /* gold text on light backgrounds (5.7:1 on white) */
+  --hw-mist: #F2F5F3;      /* app background */
+  --hw-ember: #A4492A;     /* attention, always with an icon or label */
+  --hw-muted: #4A5C57;     /* secondary text (6.5:1 on mist) */
+}
+
+:root[data-mantine-color-scheme='dark'] {
+  --hw-surface: #0C1F1C;
+  --hw-text: #DDE7E3;      /* 13.5:1 */
+  --hw-hoard: #5FB3A6;     /* 6.9:1 */
+  --hw-gold-text: #E3B65C; /* 9.1:1 */
+  --hw-ember: #E08A68;     /* 6.5:1 */
 }
 
 html,
@@ -12,7 +31,7 @@ body {
 }
 
 :focus-visible {
-  outline: 2px solid var(--mantine-color-primary-6);
+  outline: 2px solid var(--mantine-color-hoard-text);
   outline-offset: 2px;
 }
 
@@ -99,7 +118,7 @@ html[data-text-size='largest'] .tab-label {
   border-radius: var(--mantine-radius-sm);
   background: var(--mantine-color-body);
   color: var(--mantine-color-text);
-  border: 2px solid var(--mantine-color-primary-6);
+  border: 2px solid var(--mantine-color-hoard-text);
   text-decoration: none;
   font-weight: 600;
 }
@@ -108,12 +127,22 @@ html[data-text-size='largest'] .tab-label {
   top: 8px;
 }
 
-/* A phone header cannot hold the name and four controls at the larger text sizes. The name is
-   the one that goes; every control stays. */
+/* The mark stands in for the lockup where the lockup is hidden (below). */
+.app-mark {
+  display: none;
+}
+
+/* A phone header cannot hold the name and four controls at the larger text sizes. The lockup
+   is the one that goes, leaving the mark; every control stays. */
 @media (max-width: 30em) {
   html[data-text-size='large'] .app-wordmark,
   html[data-text-size='largest'] .app-wordmark {
     display: none;
+  }
+
+  html[data-text-size='large'] .app-mark,
+  html[data-text-size='largest'] .app-mark {
+    display: inline-flex;
   }
 }
 

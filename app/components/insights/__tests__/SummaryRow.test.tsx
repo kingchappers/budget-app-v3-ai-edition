@@ -61,7 +61,7 @@ describe('SummaryRow', () => {
   it('uses the calm attention colour for a rise in spending and the positive colour for a rise in income, never danger', () => {
     renderRow(totals({ spent: 11000, income: 11000 }), totals({ spent: 10000, income: 10000 }));
     const [incomeChange, spentChange] = screen.getAllByText('£10.00 more (10%)');
-    expect(spentChange).toHaveStyle({ color: 'var(--mantine-color-attention-text)' });
+    expect(spentChange).toHaveStyle({ color: 'var(--mantine-color-ember-text)' });
     expect(incomeChange).toHaveStyle({ color: 'var(--mantine-color-success-text)' });
   });
 

@@ -6,8 +6,8 @@ Releases of the self-hosted container image (`ghcr.io/kingchappers/hoardwise`; r
 
 Not in the image yet, or not part of it:
 
-- **Browser demo.** A separate static build of the app with an invented household, running entirely in the visitor's browser. It is published at https://demo.budget.scgrid.xyz and is not part of the container image.
-- **Store CLI no longer creates an empty database.** `backup`, `export` and `reset-password` stop with "No SQLite database at ..." when the file is missing, instead of creating an empty one that the app then starts on. Without `SQLITE_PATH` the CLI opens the database in `DATA_DIR` the way the app does, so the documented commands no longer name a file. Only `import` still creates a missing database.
+- **Browser demo.** A separate static build of the app with an invented household, running entirely in the visitor's browser. It is published at https://demo.hoardwise.xyz (the original https://demo.budget.scgrid.xyz keeps working for now) and is not part of the container image.
+- **Brand kit.** The app has its logo, icons, favicons, link-preview image and Lora typeface, and a green and gold palette in light and dark mode. The lockup is in the header, the sign-in screens and the demo banner.
 - **Weekly image scan.** The published `latest` and `edge` images are scanned for high and critical vulnerabilities every Monday.
 
 ## 0.3.0 - 2026-10-27

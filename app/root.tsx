@@ -2,6 +2,7 @@ import '@mantine/core/styles.css';
 import '@mantine/dates/styles.css';
 import '@mantine/notifications/styles.css';
 import '@mantine/charts/styles.css';
+import '@fontsource-variable/lora/wght.css';
 
 import {
   isRouteErrorResponse,
@@ -14,13 +15,15 @@ import {
 
 import type { Route } from "./+types/root";
 import "./app.css";
-import { APP_NAME, APP_DESCRIPTION, pageTitle } from "./lib/pageTitle";
+import { APP_NAME, APP_DESCRIPTION, SITE_URL, pageTitle } from "./lib/pageTitle";
+import { BRAND, dark, ember, gold, gray, hoard } from "./lib/brand";
+import { Mark } from "./components/layout/Logo";
 import { ReduceMotion } from "./components/layout/ReduceMotion";
 import { TextSize } from "./components/layout/TextSize";
 import { TEXT_SIZE_SCRIPT } from "./lib/textSize";
 import { isDemo } from "./demo/flag";
 
-import { Button, ColorSchemeScript, Group, MantineProvider, Stack, Text, Title, mantineHtmlProps, createTheme, useMantineTheme, type CSSVariablesResolver } from '@mantine/core';
+import { Button, ColorSchemeScript, Progress, Tabs, Group, MantineProvider, Stack, Text, Title, mantineHtmlProps, createTheme, useMantineTheme, type CSSVariablesResolver } from '@mantine/core';
 import { DatesProvider } from '@mantine/dates';
 import { useMediaQuery } from '@mantine/hooks';
 import { Notifications } from '@mantine/notifications';
@@ -33,71 +36,63 @@ const queryClient = new QueryClient({
 });
 
 export const theme = createTheme({
-  primaryColor: 'primary',
+  primaryColor: 'hoard',
   respectReducedMotion: true,
-  // Mantine's autoContrast text-color decision for a color used without an
-  // explicit shade (e.g. color="primary") always reads primaryShade.light's
-  // luminance, even when the button is actually rendering in dark mode —
-  // it does not re-check colorScheme. Shade 6 (luminance ~0.23-0.28 across
-  // primary/danger/warning/success) sits under the default 0.3 threshold,
-  // so autoContrast picks white text — but white-on-shade-6 only reaches
-  // ~3.2-3.8:1 contrast, below WCAG AA's 4.5:1 for normal text. Shade 7
-  // (luminance ~0.11-0.16) keeps white text correctly chosen by the same
-  // scheme-blind check while actually passing contrast at ~5.0-6.5:1, and
-  // leaves dark mode (which uses primaryShade.dark's own shade 8) untouched.
-  primaryShade: { light: 7, dark: 8 },
+  // Mantine's autoContrast text-color decision for a color used without an explicit shade (e.g.
+  // color="hoard") reads primaryShade.light's luminance even when the button renders in dark mode.
+  // Using shade 6 in both modes keeps that scheme-blind check right: white on hoard.6 is 7.4:1.
+  // Dark-mode text and links do not use shade 6; see the -text overrides in cssVariablesResolver.
+  primaryShade: { light: 6, dark: 6 },
   autoContrast: true,
+  black: BRAND.pine,
+  fontFamily: '"Lora Variable", Georgia, "Times New Roman", serif',
+  headings: { fontFamily: '"Lora Variable", Georgia, serif', fontWeight: '600' },
+  defaultRadius: 'md',
+  // Bars and the active-tab line are non-text parts that need 3:1; the -text shade is the one that is
+  // lighter in dark mode, where the button fill (shade 6) would be 2.3:1 on the page.
+  components: {
+    Progress: Progress.extend({ defaultProps: { color: 'var(--mantine-color-hoard-text)' } }),
+    Tabs: Tabs.extend({ defaultProps: { color: 'var(--mantine-color-hoard-text)' } }),
+  },
   colors: {
-    // Deepened/completed version of the app's existing teal — same hue,
-    // now a real 10-shade ramp so hover/active/dark-mode states resolve
-    // to different shades instead of one flat repeated hex.
-    primary: [
-      '#f0fdfa', '#ccfbf1', '#99f6e4', '#5eead4', '#2dd4bf',
-      '#14b8a6', '#0d9488', '#0f766e', '#115e59', '#134e4a',
-    ],
+    hoard,
+    gold,
+    // Something worth a look (a category over its target, a pot below zero, a pending save).
+    // Deliberately not red: red is for real errors and destructive actions.
+    ember,
+    dark,
     danger: [
       '#fef2f2', '#fee2e2', '#fecaca', '#fca5a5', '#f87171',
       '#ef4444', '#dc2626', '#b91c1c', '#991b1b', '#7f1d1d',
-    ],
-    warning: [
-      '#fffbeb', '#fef3c7', '#fde68a', '#fcd34d', '#fbbf24',
-      '#f59e0b', '#d97706', '#b45309', '#92400e', '#78350f',
     ],
     success: [
       '#f0fdf4', '#dcfce7', '#bbf7d0', '#86efac', '#4ade80',
       '#22c55e', '#16a34a', '#15803d', '#166534', '#14532d',
     ],
-    // Something worth a look (a category over its target, a pot below zero).
-    // Deliberately not red: red is for real errors and destructive actions.
-    attention: [
-      '#eef2ff', '#e0e7ff', '#c7d2fe', '#a5b4fc', '#818cf8',
-      '#6366f1', '#4f46e5', '#4338ca', '#3730a3', '#312e81',
-    ],
-    gray: [
-      '#f8fafc', '#f1f5f9', '#e2e8f0', '#cbd5e1', '#94a3b8',
-      '#64748b', '#475569', '#334155', '#1e293b', '#0f172a',
-    ],
+    gray,
   },
 });
 
-// This theme customizes gray/primary/danger/warning/success but leaves `dark`
-// as Mantine's own default palette, whose dark.2 backs --mantine-color-dimmed
-// in dark mode. That default (#828282) only reaches ~4.0:1 against this app's
-// dark body background (dark.7, #242424) — under WCAG AA's 4.5:1 for normal
-// text. Override just the CSS variable rather than redefining the whole dark
-// palette, so borders/backgrounds/disabled colors keep Mantine's defaults.
-// #9a9a9a also clears 4.5:1 on a card (#2e2e2e), where #909090 only reached 4.25:1.
-// Mantine's default error red is 3.3:1 on white at 12px, under the 4.5:1 that small text needs,
-// and the one message a stressed person must read is the one that is smallest. The error text is
-// darker in light mode, lighter in dark mode, and 14px.
-export const cssVariablesResolver: CSSVariablesResolver = () => ({
+// Page and text colours come from the brand: Mist behind cards in light mode, and the Pine-tinted `dark`
+// palette in dark mode. Mantine's default error red is 3.3:1 on white at 12px, under the 4.5:1 that small
+// text needs, so the error text is darker in light mode, lighter in dark mode, and 14px.
+// Dark mode points the -text variables at the brand's lighter shades: the default shade 4 of hoard is only
+// 4.1:1 on a card, and Mantine reads shade 6 (the button fill) for nothing else in that mode.
+export const cssVariablesResolver: CSSVariablesResolver = (theme) => ({
   variables: {},
   light: {
-    '--mantine-color-error': '#b91c1c',
+    '--mantine-color-body': BRAND.mist,
+    '--mantine-color-dimmed': BRAND.muted,
+    '--mantine-color-error': theme.colors.danger[7],
   },
   dark: {
-    '--mantine-color-dimmed': '#9a9a9a',
-    '--mantine-color-error': '#fca5a5',
+    '--mantine-color-dimmed': theme.colors.dark[2],
+    '--mantine-color-error': theme.colors.danger[3],
+    '--mantine-color-hoard-text': BRAND.darkHoardText,
+    '--mantine-color-anchor': BRAND.darkHoardText,
+    '--mantine-color-ember-text': BRAND.darkEmberText,
+    '--mantine-color-ember-filled': BRAND.darkEmberText,
+    '--mantine-color-gold-text': BRAND.darkGoldText,
   },
 });
 
@@ -109,9 +104,25 @@ function ResponsiveNotifications() {
 
 export const meta: Route.MetaFunction = () => [{ title: pageTitle() }];
 
+// Portrait iOS launch images: the file's pixel size, then the device's CSS size and pixel ratio.
+const APPLE_SPLASH_SCREENS = [
+  { file: '1290x2796', width: 430, height: 932, ratio: 3 },
+  { file: '1179x2556', width: 393, height: 852, ratio: 3 },
+  { file: '1170x2532', width: 390, height: 844, ratio: 3 },
+  { file: '750x1334', width: 375, height: 667, ratio: 2 },
+  { file: '2048x2732', width: 1024, height: 1366, ratio: 2 },
+];
+
 export const links: Route.LinksFunction = () => [
   ...(isDemo ? [] : [{ rel: "manifest", href: "/manifest.webmanifest" }]),
-  { rel: "apple-touch-icon", href: "/icons/apple-touch-icon.png" },
+  { rel: "icon", href: "/favicon.ico", sizes: "48x48" },
+  { rel: "icon", href: "/favicon.svg", type: "image/svg+xml" },
+  { rel: "apple-touch-icon", href: "/apple-touch-icon.png" },
+  ...APPLE_SPLASH_SCREENS.map(({ file, width, height, ratio }) => ({
+    rel: "apple-touch-startup-image",
+    href: `/splash/apple-splash-${file}.png`,
+    media: `(device-width: ${width}px) and (device-height: ${height}px) and (-webkit-device-pixel-ratio: ${ratio})`,
+  })),
 ];
 
 export function Layout({ children }: { children: React.ReactNode }) {
@@ -120,8 +131,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <meta name="theme-color" media="(prefers-color-scheme: light)" content="#0f766e" />
-        <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#134e4a" />
+        <meta name="theme-color" media="(prefers-color-scheme: light)" content={BRAND.pine} />
+        <meta name="theme-color" media="(prefers-color-scheme: dark)" content={BRAND.surface} />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-title" content={APP_NAME} />
@@ -131,6 +142,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <meta property="og:type" content="website" />
         <meta property="og:title" content={APP_NAME} />
         <meta property="og:description" content={APP_DESCRIPTION} />
+        <meta property="og:url" content={`${SITE_URL}/`} />
+        <meta property="og:image" content={`${SITE_URL}/og-image.png`} />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
+        <meta property="og:image:alt" content="The Hoardwise logo: a gold dragon curled around a coin" />
+        <meta name="twitter:card" content="summary_large_image" />
         {isDemo && <meta name="robots" content="noindex" />}
         <ColorSchemeScript defaultColorScheme="auto" />
         <script dangerouslySetInnerHTML={{ __html: TEXT_SIZE_SCRIPT }} />
@@ -164,6 +181,7 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
   return (
     <main className="pt-16 p-4 container mx-auto">
       <Stack maw={560}>
+        <Mark size={56} />
         <Title order={1} size="h2">
           {notFound ? "We couldn't find that page" : "Something didn't load. Your data is safe."}
         </Title>
