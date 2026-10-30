@@ -1,11 +1,18 @@
 import 'fake-indexeddb/auto';
 import '@testing-library/jest-dom/vitest';
+import { notifications } from '@mantine/notifications';
 import { cleanup, configure } from '@testing-library/react';
 import { createElement } from 'react';
 import { afterEach, vi } from 'vitest';
 
-// Vitest runs without `globals`, so Testing Library's auto-cleanup never registers.
-afterEach(cleanup);
+// Vitest runs without `globals`, so Testing Library's auto-cleanup never registers. Unmount first, then empty the
+// notification store: clearing it while <Notifications /> is still mounted starts exit transitions whose timers
+// can fire after the test environment is torn down. Test files must not clean notifications themselves, because
+// their own afterEach hooks run before this one.
+afterEach(() => {
+  cleanup();
+  notifications.clean();
+});
 
 // Mantine menus, dialogs and drawers animate open and closed. CI runs the
 // whole suite in parallel on a slower machine, which can push findBy* and

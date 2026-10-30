@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MantineProvider } from '@mantine/core';
-import { Notifications, notifications } from '@mantine/notifications';
+import { Notifications } from '@mantine/notifications';
 import { MemoryRouter } from 'react-router';
 import { addDaysIso, todayIso } from '~/lib/months';
 import { PREFERENCES_KEY, readPreferences } from '~/lib/preferences';
@@ -29,7 +29,6 @@ function renderCard() {
 
 // The card stays away on the 1st of a month, so pin "today" to a day that is not.
 beforeEach(() => {
-  notifications.clean();
   window.localStorage.clear();
   vi.useFakeTimers({ toFake: ['Date'] });
   vi.setSystemTime(new Date(2026, 8, 28, 12));

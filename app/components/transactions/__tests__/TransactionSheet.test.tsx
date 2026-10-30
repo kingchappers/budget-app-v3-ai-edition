@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MantineProvider } from '@mantine/core';
-import { Notifications, notifications } from '@mantine/notifications';
+import { Notifications } from '@mantine/notifications';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { addDaysIso, formatDayLabel, todayIso, yesterdayIso } from '~/lib/months';
 import { PREFERENCES_KEY } from '~/lib/preferences';
@@ -135,7 +135,6 @@ describe('TransactionSheet', () => {
 
   afterEach(() => {
     cleanup();
-    notifications.clean();
     localStorage.removeItem(PREFERENCES_KEY);
   });
 
