@@ -155,6 +155,7 @@ export function createStore(now = new Date()) {
       case 'GET /api/recurring': return { status: 200, json: { recurring: state.recurring } };
       case 'GET /api/accounts': return { status: 200, json: { accounts: state.accounts } };
       case 'GET /api/trash': return { status: 200, json: { items: [] } };
+      case 'GET /api/tokens': return { status: 200, json: { tokens: [] } };
       case 'GET /api/transactions': {
         const wanted = `${params.get('year')}-${String(params.get('month')).padStart(2, '0')}`;
         return { status: 200, json: { transactions: transactions.filter(row => row.yearMonth === wanted) } };
