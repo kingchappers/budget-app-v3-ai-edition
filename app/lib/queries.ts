@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient, type QueryClient, type QueryKey 
 import { useMemo } from 'react';
 import { useAuth } from '~/lib/auth';
 import { useProtectedApi } from '~/hooks/useProtectedApi';
+import { ApiError } from '~/lib/apiError';
 import { createApi, type AccessTokenInput, type RecurringInput, type TransactionInput } from './api';
 import { clearPendingEntry, OFFLINE_QUEUE_KEY, pendingRowsForMonth, type PendingMap } from './pendingEntries';
 import type { TrashEntityType, TrashRef } from './trash';
@@ -553,7 +554,15 @@ export function useRevokeAccessToken() {
   const api = useApi();
   const qc = useQueryClient();
   return useMutation<void, Error, string>({
-    mutationFn: (tokenId) => api.revokeAccessToken(tokenId),
-    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.accessTokens }),
+    mutationFn: async (tokenId) => {
+      try {
+        await api.revokeAccessToken(tokenId);
+      } catch (error) {
+        // 404: already revoked elsewhere or purged after expiry. The token is gone either way.
+        if (error instanceof ApiError && error.status === 404) return;
+        throw error;
+      }
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: queryKeys.accessTokens }),
   });
 }

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
@@ -11,7 +11,7 @@ const auth0 = {
 vi.mock('@auth0/auth0-react', () => ({ useAuth0: () => auth0 }));
 
 import { onlineManager } from '@tanstack/react-query';
-import { queryKeys, useCategories, useCreateTransaction, useTransactions } from '../queries';
+import { queryKeys, useAccessTokens, useCategories, useCreateTransaction, useRevokeAccessToken, useTransactions } from '../queries';
 
 function wrapper({ children }: { children: React.ReactNode }) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -180,5 +180,59 @@ describe('useCreateTransaction', () => {
     } finally {
       onlineManager.setOnline(true);
     }
+  });
+});
+
+describe('useRevokeAccessToken', () => {
+  const TOKEN = { tokenId: 'tok-1', name: 'Claude desktop', scope: 'read', createdAt: 1, expiresAt: null, lastUsedAt: null, prefix: 'hwr_Ab12' };
+
+  function stubTokensApi(revokeStatus: number): void {
+    let tokens = [TOKEN];
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+      if (init?.method !== 'DELETE') return new Response(JSON.stringify({ tokens }));
+      tokens = [];
+      return new Response(revokeStatus === 204 ? null : JSON.stringify({ error: 'x' }), { status: revokeStatus });
+    }));
+  }
+
+  function renderTokenHooks() {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    function localWrapper({ children }: { children: React.ReactNode }) {
+      return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+    }
+    return renderHook(() => ({ list: useAccessTokens(), revoke: useRevokeAccessToken() }), { wrapper: localWrapper });
+  }
+
+  beforeEach(() => {
+    auth0.isAuthenticated = true;
+    auth0.isLoading = false;
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('treats a token that is already gone (404) as revoked and refreshes the list', async () => {
+    stubTokensApi(404);
+    const { result } = renderTokenHooks();
+    await waitFor(() => expect(result.current.list.data).toHaveLength(1));
+
+    await act(async () => { await result.current.revoke.mutateAsync('tok-1'); });
+
+    await waitFor(() => expect(result.current.list.data).toEqual([]));
+    expect(result.current.revoke.isError).toBe(false);
+  });
+
+  it('still fails on a server error, and refreshes the list anyway', async () => {
+    stubTokensApi(500);
+    const { result } = renderTokenHooks();
+    await waitFor(() => expect(result.current.list.data).toHaveLength(1));
+
+    await act(async () => {
+      await expect(result.current.revoke.mutateAsync('tok-1')).rejects.toMatchObject({ status: 500 });
+    });
+
+    await waitFor(() => expect(result.current.list.data).toEqual([]));
   });
 });
