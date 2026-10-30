@@ -80,7 +80,354 @@ tags:
 security:
   - bearerToken: []
   - sessionCookie: []
-paths: {}
+paths:
+  /api/categories:
+    get:
+      tags: [categories]
+      summary: List categories
+      description: >-
+        Returns the 21 built-in default categories followed by the household's custom categories (in id order). A pot
+        category that has been archived carries `archived: true`; other categories omit the field.
+      operationId: listCategories
+      x-token-access: read
+      responses:
+        '200':
+          description: The default and custom categories.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [categories]
+                properties:
+                  categories:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Category'
+              example:
+                categories:
+                  - categoryId: cat-groceries
+                    name: Groceries
+                    type: EXPENSE
+                    icon: 🛒
+                    group: EVERYDAY
+                    isDefault: true
+                    createdAt: '2026-01-01T00:00:00.000Z'
+                  - categoryId: cat-salary
+                    name: Salary
+                    type: INCOME
+                    icon: briefcase
+                    isDefault: true
+                    createdAt: '2026-01-01T00:00:00.000Z'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      tags: [categories]
+      summary: Create a custom category
+      description: >-
+        Creates a category with a server-generated UUID id. When `group` is omitted it defaults to `SINKING_FUNDS` for
+        a `POT`, nothing for `INCOME` and `EVERYDAY` for an `EXPENSE`. `name` is trimmed before it is stored.
+      operationId: createCategory
+      x-token-access: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CategoryInput'
+            examples:
+              expense:
+                summary: A bills category
+                value:
+                  name: Gym membership
+                  type: EXPENSE
+                  icon: 🏋️
+                  group: BILLS
+              pot:
+                summary: A pot with the default group
+                value:
+                  name: New bike
+                  type: POT
+      responses:
+        '201':
+          description: The category was created.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [category]
+                properties:
+                  category:
+                    $ref: '#/components/schemas/Category'
+              example:
+                category:
+                  categoryId: 3f0c1a52-6d1e-4c53-9a3e-0a2d6a4f8b11
+                  name: Gym membership
+                  type: EXPENSE
+                  icon: 🏋️
+                  group: BILLS
+                  isDefault: false
+                  createdAt: '2026-10-30T09:15:00.000Z'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/categories/{categoryId}:
+    parameters:
+      - $ref: '#/components/parameters/categoryId'
+    put:
+      tags: [categories]
+      summary: Rename a custom category
+      description: >-
+        Only the name can change. Default categories (ids starting `cat-` that ship with the app) cannot be renamed.
+        The `categoryId` must be a custom category, for example the id returned by `createCategory`.
+      operationId: renameCategory
+      x-token-access: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CategoryRenameInput'
+            example:
+              name: Fitness
+      responses:
+        '200':
+          description: The renamed category.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [category]
+                properties:
+                  category:
+                    $ref: '#/components/schemas/Category'
+              example:
+                category:
+                  categoryId: 3f0c1a52-6d1e-4c53-9a3e-0a2d6a4f8b11
+                  name: Fitness
+                  type: EXPENSE
+                  icon: 🏋️
+                  group: BILLS
+                  isDefault: false
+                  createdAt: '2026-10-30T09:15:00.000Z'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: A default category cannot be renamed (`Cannot rename a default category`), or the credential may not make this request (see the shared `Forbidden` response).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Cannot rename a default category
+        '404':
+          description: No custom category has this id (`Category not found`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Category not found
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    delete:
+      tags: [categories]
+      summary: Delete a custom category
+      description: >-
+        Removes the category for good (it is not moved to the trash). Transactions and reminders that use it are not
+        changed; use `reassignCategory` first to move them. Deleting an id that does not exist still returns 204.
+        Default categories cannot be deleted.
+      operationId: deleteCategory
+      x-token-access: write
+      responses:
+        '204':
+          description: The category is gone. No body.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: A default category cannot be deleted (`Cannot delete a default category`), or the credential may not make this request (see the shared `Forbidden` response).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Cannot delete a default category
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/categories/{categoryId}/reassign:
+    parameters:
+      - $ref: '#/components/parameters/categoryId'
+    post:
+      tags: [categories]
+      summary: Move a category's transactions and reminders to another category
+      description: >-
+        Re-points every transaction and recurring reminder that uses `categoryId` at `toCategoryId`. The source id is
+        not checked, so an id with no records returns zero counts. The destination must be a default category or an
+        existing custom category.
+      operationId: reassignCategory
+      x-token-access: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReassignInput'
+            example:
+              toCategoryId: cat-groceries
+      responses:
+        '200':
+          description: How many records were moved.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [reassigned, recurringReassigned]
+                properties:
+                  reassigned:
+                    type: integer
+                    minimum: 0
+                    description: Transactions moved.
+                  recurringReassigned:
+                    type: integer
+                    minimum: 0
+                    description: Recurring reminders moved.
+              example:
+                reassigned: 3
+                recurringReassigned: 1
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/targets:
+    get:
+      tags: [targets]
+      summary: List budgets
+      description: >-
+        Returns every category target. Unlike the single-target response, each item also carries the storage keys
+        `PK` and `SK` (`USER#<id>` and `TARGET#<categoryId>`).
+      operationId: listTargets
+      x-token-access: read
+      responses:
+        '200':
+          description: All targets.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [targets]
+                properties:
+                  targets:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/StoredTarget'
+              example:
+                targets:
+                  - PK: USER#user-1
+                    SK: TARGET#cat-groceries
+                    categoryId: cat-groceries
+                    targetAmount: 30000
+                    period: MONTHLY
+                    updatedAt: '2026-10-30T09:15:00.000Z'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/targets/{categoryId}:
+    parameters:
+      - $ref: '#/components/parameters/categoryId'
+    put:
+      tags: [targets]
+      summary: Set a category's budget
+      description: >-
+        Creates or replaces the target for the category. The category id is not checked against the household's
+        categories, so any id is accepted.
+      operationId: putTarget
+      x-token-access: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TargetInput'
+            example:
+              targetAmount: 30000
+              period: MONTHLY
+      responses:
+        '200':
+          description: The stored target.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [target]
+                properties:
+                  target:
+                    $ref: '#/components/schemas/Target'
+              example:
+                target:
+                  categoryId: cat-groceries
+                  targetAmount: 30000
+                  period: MONTHLY
+                  updatedAt: '2026-10-30T09:15:00.000Z'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    delete:
+      tags: [targets]
+      summary: Remove a category's budget
+      description: >-
+        Moves the target to the trash, where it can be restored. Removing a target that does not exist still returns
+        204.
+      operationId: deleteTarget
+      x-token-access: write
+      responses:
+        '204':
+          description: The target is removed. No body.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
 components:
   securitySchemes:
     bearerToken:
@@ -217,3 +564,124 @@ components:
           type: string
           description: A short message that is safe to show to the user.
       additionalProperties: true
+    CategoryType:
+      type: string
+      enum: [EXPENSE, INCOME, POT]
+    CategoryGroup:
+      type: string
+      enum: [BILLS, SINKING_FUNDS, EVERYDAY, SAVING_INVESTMENT]
+    Category:
+      type: object
+      additionalProperties: false
+      required: [categoryId, name, type, icon, isDefault, createdAt]
+      properties:
+        categoryId:
+          type: string
+          description: A fixed id such as `cat-groceries` for a default category, a UUID for a custom one.
+        name:
+          type: string
+        type:
+          $ref: '#/components/schemas/CategoryType'
+        icon:
+          type: string
+          description: An emoji or an icon name. `default` when none was given.
+        group:
+          $ref: '#/components/schemas/CategoryGroup'
+          description: Absent for `INCOME` categories.
+        isDefault:
+          type: boolean
+          description: True for the built-in categories, which cannot be renamed or deleted.
+        createdAt:
+          type: string
+          description: ISO 8601 timestamp; the built-in categories share one fixed date.
+        archived:
+          type: boolean
+          description: Present and true only for an archived pot category.
+    CategoryInput:
+      type: object
+      required: [name, type]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 50
+          description: Trimmed, then 1 to 50 characters.
+        type:
+          $ref: '#/components/schemas/CategoryType'
+        icon:
+          type: string
+          description: An emoji or icon name, cut to 50 characters. A non-string is ignored and `default` is stored.
+        group:
+          $ref: '#/components/schemas/CategoryGroup'
+          description: >-
+            Not allowed for `INCOME`. A `POT` must use `SINKING_FUNDS` or `SAVING_INVESTMENT`; an `EXPENSE` must use
+            `BILLS` or `EVERYDAY`.
+    CategoryRenameInput:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 50
+          description: Trimmed, then 1 to 50 characters.
+    ReassignInput:
+      type: object
+      required: [toCategoryId]
+      properties:
+        toCategoryId:
+          type: string
+          minLength: 1
+          description: The category to move records to. It must exist and differ from the path `categoryId`.
+    TargetPeriod:
+      type: string
+      enum: [MONTHLY, WEEKLY]
+    Target:
+      type: object
+      additionalProperties: false
+      required: [categoryId, targetAmount, period, updatedAt]
+      properties:
+        categoryId:
+          type: string
+        targetAmount:
+          type: integer
+          minimum: 1
+          maximum: 1000000000
+          description: The budget in pence (or cents).
+        period:
+          $ref: '#/components/schemas/TargetPeriod'
+        updatedAt:
+          type: string
+          format: date-time
+    StoredTarget:
+      type: object
+      additionalProperties: false
+      description: A target as listed by `listTargets`, including its storage keys.
+      required: [PK, SK, categoryId, targetAmount, period, updatedAt]
+      properties:
+        PK:
+          type: string
+        SK:
+          type: string
+        categoryId:
+          type: string
+        targetAmount:
+          type: integer
+          minimum: 1
+          maximum: 1000000000
+        period:
+          $ref: '#/components/schemas/TargetPeriod'
+        updatedAt:
+          type: string
+          format: date-time
+    TargetInput:
+      type: object
+      required: [targetAmount, period]
+      properties:
+        targetAmount:
+          type: integer
+          minimum: 1
+          maximum: 1000000000
+          description: Positive integer pence (or cents).
+        period:
+          $ref: '#/components/schemas/TargetPeriod'
