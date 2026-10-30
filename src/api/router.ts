@@ -10,6 +10,7 @@ type Handler = (
 
 interface Route {
   method: string;
+  template: string;
   pattern: RegExp;
   paramNames: string[];
   handler: Handler;
@@ -21,6 +22,7 @@ export interface Router {
   put(path: string, handler: Handler): void;
   delete(path: string, handler: Handler): void;
   dispatch(event: APIGatewayProxyEventV2, userId: string): Promise<ApiResponse>;
+  routes(): { method: string; template: string }[];
 }
 
 export function createRouter(): Router {
@@ -32,7 +34,7 @@ export function createRouter(): Router {
       paramNames.push(name);
       return '([^/]+)';
     });
-    routes.push({ method, pattern: new RegExp(`^${regexStr}$`), paramNames, handler });
+    routes.push({ method, template: pathTemplate, pattern: new RegExp(`^${regexStr}$`), paramNames, handler });
   }
 
   async function dispatch(event: APIGatewayProxyEventV2, userId: string): Promise<ApiResponse> {
@@ -65,5 +67,6 @@ export function createRouter(): Router {
     put: (path, handler) => register('PUT', path, handler),
     delete: (path, handler) => register('DELETE', path, handler),
     dispatch,
+    routes: () => routes.map(({ method, template }) => ({ method, template })),
   };
 }

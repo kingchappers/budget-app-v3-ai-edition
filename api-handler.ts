@@ -5,21 +5,14 @@ import { initAuth } from './src/auth';
 import { SECURITY_HEADERS } from './src/api/constants';
 import { err } from './src/api/http';
 import type { ApiResponse } from './src/api/types';
-import { registerCoreRoutes } from './src/api/routes';
+import { registerApiRoutes } from './src/api/apiRoutes';
 import { createTokenRouter } from './src/api/tokenRouter';
-import { createPushSubscription, deletePushSubscription } from './src/api/push';
-import { createAccessToken, listAccessTokens, revokeAccessToken } from './src/api/tokens';
 import { authenticateToken, presentsAccessToken, tokenAccessRejection } from './src/auth/tokenAuth';
 import { touchToken } from './src/auth/tokens';
 import { createFailureLimiter } from './src/auth/failureLimiter';
 
 const router = createRouter();
-registerCoreRoutes(router);
-router.post('/api/push/subscriptions', createPushSubscription);
-router.delete('/api/push/subscriptions', deletePushSubscription);
-router.post('/api/tokens', createAccessToken);
-router.get('/api/tokens', listAccessTokens);
-router.delete('/api/tokens/{tokenId}', revokeAccessToken);
+registerApiRoutes(router);
 
 const tokenRouter = createTokenRouter();
 

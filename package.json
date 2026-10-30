@@ -43,6 +43,7 @@
     "@aws-sdk/client-ssm": "^3.1144.0",
     "@aws-sdk/lib-dynamodb": "^3.1085.0",
     "@react-router/dev": "^8.3.0",
+    "@seriousme/openapi-schema-validator": "2.11.0",
     "@tailwindcss/vite": "^4.1.13",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^7.0.0",
@@ -54,6 +55,8 @@
     "@types/react-dom": "^19.1.9",
     "@types/web-push": "^3.6.4",
     "@vitest/coverage-v8": "^4.1.11",
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1",
     "axe-core": "^4.13.0",
     "fake-indexeddb": "^6.2.5",
     "ical.js": "^2.2.1",
@@ -68,7 +71,8 @@
     "vite": "^7.3.7",
     "vite-tsconfig-paths": "^5.1.4",
     "vitest": "^4.1.11",
-    "web-push": "^3.6.7"
+    "web-push": "^3.6.7",
+    "yaml": "2.9.1"
   },
   "resolutions": {
     "lodash": "^4.18.0",
