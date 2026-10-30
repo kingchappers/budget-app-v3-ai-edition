@@ -3,6 +3,7 @@ import { Button, Card, Input, Radio, SegmentedControl, Select, Stack, Switch, Te
 import { IconChevronRight } from '@tabler/icons-react';
 import { DefaultLayout } from '~/components/layout/DefaultLayout';
 import { isDemo } from '~/demo/flag';
+import { AccessTokens } from '~/components/settings/AccessTokens';
 import { BillReminders } from '~/components/settings/BillReminders';
 import { TOUR_PARAM } from '~/components/layout/GuidedTour';
 import { usePreferences, type TextSize, type UndoDuration } from '~/lib/preferences';
@@ -48,6 +49,8 @@ function SettingsContent() {
         <Title order={2} size="h4" mb="sm">Signing in</Title>
         <Text size="sm">{SESSION_LIFETIME_TEXT}</Text>
       </Card>
+
+      {!isDemo && <AccessTokens />}
 
       <Card withBorder>
         <Title order={2} size="h4" mb="sm">Display</Title>

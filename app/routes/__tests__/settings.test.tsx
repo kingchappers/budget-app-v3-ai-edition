@@ -8,7 +8,16 @@ vi.mock('~/components/layout/DefaultLayout', () => ({
   DefaultLayout: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
-vi.mock('~/lib/queries', () => ({ useApi: () => ({}) }));
+const demo = vi.hoisted(() => ({ isDemo: false }));
+vi.mock('~/demo/flag', () => ({ get isDemo() { return demo.isDemo; } }));
+
+vi.mock('~/lib/queries', () => ({
+  useApi: () => ({}),
+  useAccessTokens: () => ({ data: [], isLoading: false, error: null, refetch: vi.fn() }),
+  useCreateAccessToken: () => ({ mutateAsync: vi.fn(), reset: vi.fn(), isPending: false }),
+  useRevokeAccessToken: () => ({ mutateAsync: vi.fn(), isPending: false }),
+}));
+vi.mock('~/lib/auth', () => ({ useAuth: () => ({ mode: 'auth0' }) }));
 
 import Settings from '../settings';
 import { SESSION_LIFETIME_TEXT } from '~/lib/sessionLifetime';
@@ -27,6 +36,7 @@ function renderSettings() {
 }
 
 beforeEach(() => {
+  demo.isDemo = false;
   window.localStorage.clear();
 });
 
@@ -138,10 +148,10 @@ describe('Settings page', () => {
   });
 
   describe('grouping', () => {
-    it('groups the controls under Signing in, Display, Messages, Money, Keyboard and launch, Reminders, Manage and Help, in that order', () => {
+    it('groups the controls under Signing in, Access tokens, Display, Messages, Money, Keyboard and launch, Reminders, Manage and Help, in that order', () => {
       renderSettings();
       const headings = screen.getAllByRole('heading', { level: 2 }).map(heading => heading.textContent);
-      expect(headings).toEqual(['Signing in', 'Display', 'Messages', 'Money', 'Keyboard and launch', 'Reminders', 'Manage', 'Help']);
+      expect(headings).toEqual(['Signing in', 'Access tokens', 'Display', 'Messages', 'Money', 'Keyboard and launch', 'Reminders', 'Manage', 'Help']);
     });
 
     it('keeps to a handful of controls, each with a line of plain help', () => {
@@ -258,6 +268,17 @@ describe('Accessibility', () => {
     renderSettings();
     expect(screen.getByRole('heading', { name: 'Signing in' })).toBeInTheDocument();
     expect(screen.getByText(SESSION_LIFETIME_TEXT)).toBeInTheDocument();
+  });
+
+  it('has an Access tokens section', () => {
+    renderSettings();
+    expect(screen.getByRole('heading', { level: 2, name: 'Access tokens' })).toBeInTheDocument();
+  });
+
+  it('hides the Access tokens section in the demo, which has no token routes', () => {
+    demo.isDemo = true;
+    renderSettings();
+    expect(screen.queryByRole('heading', { name: 'Access tokens' })).not.toBeInTheDocument();
   });
 
   it('has a Reminders section with bill reminders off', () => {
