@@ -1,9 +1,9 @@
 import { useId, useRef, useState } from 'react';
 import { Button, Group, Paper, Stack, Text } from '@mantine/core';
-import { IconEye, IconPencil } from '@tabler/icons-react';
+import { IconClockX, IconEye, IconPencil } from '@tabler/icons-react';
 import { useAccessTokens, useRevokeAccessToken } from '~/lib/queries';
 import type { AccessToken, AccessTokenScope } from '~/lib/types';
-import { SCOPE_LABELS, expiryText, formatTokenDate, lastUsedText } from './accessTokenText';
+import { SCOPE_LABELS, expiryText, formatTokenDate, isExpired, lastUsedText } from './accessTokenText';
 
 const REVOKE_FAILED = "Couldn't revoke that token. Try again.";
 
@@ -13,6 +13,16 @@ function ScopeLabel({ scope }: { scope: AccessTokenScope }): React.JSX.Element {
     <Group gap={6} wrap="nowrap">
       <Icon size={18} aria-hidden="true" />
       <Text size="sm">{SCOPE_LABELS[scope]}</Text>
+    </Group>
+  );
+}
+
+function ExpiryLabel({ token }: { token: AccessToken }): React.JSX.Element {
+  if (!isExpired(token)) return <Text size="sm">{expiryText(token)}</Text>;
+  return (
+    <Group gap={6} wrap="nowrap">
+      <IconClockX size={18} aria-hidden="true" />
+      <Text size="sm">{expiryText(token)}</Text>
     </Group>
   );
 }
@@ -36,7 +46,12 @@ function RevokeConfirmation({ name, busy, onConfirm, onCancel }: RevokeConfirmat
   );
 }
 
-function AccessTokenRow({ token }: { token: AccessToken }): React.JSX.Element {
+interface AccessTokenRowProps {
+  token: AccessToken;
+  onRevoked: () => void;
+}
+
+function AccessTokenRow({ token, onRevoked }: AccessTokenRowProps): React.JSX.Element {
   const revoke = useRevokeAccessToken();
   const nameId = useId();
   const revokeButton = useRef<HTMLButtonElement>(null);
@@ -54,6 +69,7 @@ function AccessTokenRow({ token }: { token: AccessToken }): React.JSX.Element {
     setFailed(false);
     try {
       await revoke.mutateAsync(token.tokenId);
+      onRevoked();
     } catch (error) {
       console.error('Revoking an access token failed', { tokenId: token.tokenId, error });
       setFailed(true);
@@ -72,7 +88,7 @@ function AccessTokenRow({ token }: { token: AccessToken }): React.JSX.Element {
           </Group>
           <ScopeLabel scope={token.scope} />
           <Text size="sm">Created {formatTokenDate(token.createdAt)}</Text>
-          <Text size="sm">{expiryText(token)}</Text>
+          <ExpiryLabel token={token} />
           <Text size="sm">{lastUsedText(token)}</Text>
         </Stack>
         <Button ref={revokeButton} variant="default" aria-label={`Revoke ${token.name}`} onClick={() => setConfirming(true)}>
@@ -85,7 +101,11 @@ function AccessTokenRow({ token }: { token: AccessToken }): React.JSX.Element {
   );
 }
 
-export function AccessTokenList(): React.JSX.Element {
+interface AccessTokenListProps {
+  onRevoked: () => void;
+}
+
+export function AccessTokenList({ onRevoked }: AccessTokenListProps): React.JSX.Element {
   const { data, isLoading, error, refetch } = useAccessTokens();
 
   if (isLoading) return <Text size="sm">Loading your access tokens…</Text>;
@@ -103,7 +123,7 @@ export function AccessTokenList(): React.JSX.Element {
 
   return (
     <Stack component="ul" gap="sm" p={0} m={0} style={{ listStyle: 'none' }}>
-      {data.map(token => <AccessTokenRow key={token.tokenId} token={token} />)}
+      {data.map(token => <AccessTokenRow key={token.tokenId} token={token} onRevoked={onRevoked} />)}
     </Stack>
   );
 }

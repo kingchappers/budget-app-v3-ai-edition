@@ -28,8 +28,18 @@ export function formatTokenDate(epochSeconds: number): string {
   return `${formatShortDate(todayIso(date))} ${date.getFullYear()}`;
 }
 
-export function expiryText(token: AccessToken): string {
+function nowInSeconds(): number {
+  return Date.now() / 1000;
+}
+
+// The list still returns expired tokens until they are purged, and they still count toward the limit.
+export function isExpired(token: AccessToken, nowSeconds: number = nowInSeconds()): boolean {
+  return token.expiresAt !== null && token.expiresAt <= nowSeconds;
+}
+
+export function expiryText(token: AccessToken, nowSeconds: number = nowInSeconds()): string {
   if (token.expiresAt === null) return 'Never expires';
+  if (isExpired(token, nowSeconds)) return `Expired ${formatTokenDate(token.expiresAt)}`;
   return `Expires ${formatTokenDate(token.expiresAt)}`;
 }
 

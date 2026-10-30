@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MantineProvider } from '@mantine/core';
 import { ApiError } from '~/lib/apiError';
@@ -450,5 +450,120 @@ describe('AccessTokens storage', () => {
     await waitFor(() => expect(screen.getByDisplayValue(SECRET)).toBeInTheDocument());
     expect(setItem.mock.calls.flat().join('\n')).not.toContain(SECRET);
     setItem.mockRestore();
+  });
+});
+
+describe('AccessTokens fixes', () => {
+  describe('expired tokens', () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    function at(year: number, month: number, day: number): void {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(new Date(year, month - 1, day, 12));
+    }
+
+    it('words a past expiry as Expired, with an icon, and still offers Revoke', () => {
+      at(2027, 3, 10);
+      state.list = { ...state.list, data: [{ ...CLAUDE, expiresAt: seconds(2027, 1, 3) }] };
+      renderSection();
+      const row = screen.getByRole('listitem', { name: 'Claude desktop' });
+      const expired = within(row).getByText('Expired 3 Jan 2027');
+      expect(expired.parentElement?.querySelector('svg')).not.toBeNull();
+      expect(row).not.toHaveTextContent('Expires');
+      expect(within(row).getByRole('button', { name: 'Revoke Claude desktop' })).toBeInTheDocument();
+    });
+
+    it('words a future expiry as Expires', () => {
+      at(2027, 3, 10);
+      renderSection();
+      expect(screen.getByRole('listitem', { name: 'Claude desktop' })).toHaveTextContent('Expires 14 May 2027');
+    });
+
+    it('words an expiry at exactly now as Expired', () => {
+      at(2027, 3, 10);
+      state.list = { ...state.list, data: [{ ...CLAUDE, expiresAt: seconds(2027, 3, 10) }] };
+      renderSection();
+      expect(screen.getByRole('listitem', { name: 'Claude desktop' })).toHaveTextContent('Expired 10 Mar 2027');
+    });
+  });
+
+  it('keeps password managers from saving the password field as a login', async () => {
+    const user = userEvent.setup();
+    state.mode = 'local';
+    renderSection();
+    await user.click(screen.getByRole('radio', { name: 'Read and write' }));
+    expect(screen.getByLabelText('Your password')).toHaveAttribute('autocomplete', 'off');
+  });
+
+  // The hook is mocked, so this asserts the component drops the mutation state (variables include the password) via reset().
+  it('drops the mutation state as soon as a create succeeds', async () => {
+    const user = userEvent.setup();
+    renderSection();
+    await user.type(screen.getByLabelText(/^Name/), 'New one');
+    await user.click(createButton());
+    await screen.findByRole('region', { name: 'Your new token' });
+    expect(state.reset).toHaveBeenCalledTimes(1);
+  });
+
+  it('drops the mutation state when a create fails', async () => {
+    state.create.mockRejectedValue(new ApiError(403, 'Forbidden'));
+    const user = userEvent.setup();
+    renderSection();
+    await user.type(screen.getByLabelText(/^Name/), 'New one');
+    await user.click(createButton());
+    await screen.findByRole('alert');
+    expect(state.reset).toHaveBeenCalledTimes(1);
+  });
+
+  it('hides an earlier token when another create starts, so a failure does not sit beside it', async () => {
+    const user = userEvent.setup();
+    renderSection();
+    await user.type(screen.getByLabelText(/^Name/), 'First');
+    await user.click(createButton());
+    await screen.findByRole('region', { name: 'Your new token' });
+
+    state.create.mockRejectedValue(new ApiError(500, 'Server Error'));
+    await user.type(screen.getByLabelText(/^Name/), 'Second');
+    await user.click(createButton());
+
+    await screen.findByRole('alert');
+    expect(screen.queryByRole('region', { name: 'Your new token' })).not.toBeInTheDocument();
+    expect(document.body.innerHTML).not.toContain(SECRET);
+  });
+
+  it('sends one create when the form is submitted twice', async () => {
+    state.create.mockReturnValue(new Promise(() => undefined));
+    const user = userEvent.setup();
+    renderSection();
+    await user.type(screen.getByLabelText(/^Name/), 'New one');
+    const form = createButton().closest('form') as HTMLFormElement;
+
+    fireEvent.submit(form);
+    fireEvent.submit(form);
+
+    expect(state.create).toHaveBeenCalledTimes(1);
+  });
+
+  it('moves focus to the Name field after Done', async () => {
+    const user = userEvent.setup();
+    renderSection();
+    await user.type(screen.getByLabelText(/^Name/), 'New one');
+    await user.click(createButton());
+    await screen.findByRole('region', { name: 'Your new token' });
+
+    await user.click(screen.getByRole('button', { name: 'Done' }));
+
+    expect(document.activeElement).toBe(screen.getByLabelText(/^Name/));
+  });
+
+  it('moves focus to the section heading after a revoke', async () => {
+    const user = userEvent.setup();
+    renderSection();
+    await user.click(screen.getByRole('button', { name: 'Revoke Claude desktop' }));
+    await user.click(screen.getByRole('button', { name: 'Revoke token' }));
+
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('heading', { level: 2, name: 'Access tokens' })));
   });
 });

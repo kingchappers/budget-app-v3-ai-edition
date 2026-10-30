@@ -1,4 +1,4 @@
-import { useId, useState } from 'react';
+import { useId, useRef, useState, type Ref } from 'react';
 import { Button, Group, Input, PasswordInput, SegmentedControl, Select, Stack, Text, TextInput, Title } from '@mantine/core';
 import { IconAlertTriangle } from '@tabler/icons-react';
 import { useAuth } from '~/lib/auth';
@@ -24,9 +24,10 @@ function Warning({ children }: { children: string }): React.JSX.Element {
 
 interface CreateAccessTokenFormProps {
   onCreate: (input: AccessTokenInput) => Promise<void>;
+  nameRef?: Ref<HTMLInputElement>;
 }
 
-export function CreateAccessTokenForm({ onCreate }: CreateAccessTokenFormProps): React.JSX.Element {
+export function CreateAccessTokenForm({ onCreate, nameRef }: CreateAccessTokenFormProps): React.JSX.Element {
   const { mode } = useAuth();
   const headingId = useId();
   const [name, setName] = useState('');
@@ -37,6 +38,7 @@ export function CreateAccessTokenForm({ onCreate }: CreateAccessTokenFormProps):
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const pending = useRef(false);
 
   const asksForPassword = mode === 'local' && scope === 'write';
 
@@ -62,10 +64,12 @@ export function CreateAccessTokenForm({ onCreate }: CreateAccessTokenFormProps):
 
   async function submit(event: React.FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
+    if (pending.current) return;
     setFailure(null);
     const input = inputFromForm();
     if (!input) return;
 
+    pending.current = true;
     setBusy(true);
     try {
       await onCreate(input);
@@ -75,6 +79,7 @@ export function CreateAccessTokenForm({ onCreate }: CreateAccessTokenFormProps):
       setFailure(createErrorText(error));
       setPassword('');
     } finally {
+      pending.current = false;
       setBusy(false);
     }
   }
@@ -84,6 +89,7 @@ export function CreateAccessTokenForm({ onCreate }: CreateAccessTokenFormProps):
       <Stack gap="md">
         <Title order={3} size="h5" id={headingId}>Create a token</Title>
         <TextInput
+          ref={nameRef}
           label="Name"
           description="So you can tell your tokens apart, for example the tool that uses it."
           required
@@ -115,7 +121,7 @@ export function CreateAccessTokenForm({ onCreate }: CreateAccessTokenFormProps):
           <PasswordInput
             label="Your password"
             description="Needed to create a token that can change your data."
-            autoComplete="current-password"
+            autoComplete="off"
             value={password}
             error={passwordError}
             onChange={event => setPassword(event.currentTarget.value)}
