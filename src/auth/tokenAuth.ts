@@ -12,7 +12,7 @@ export type TokenAuthResult =
 const BEARER_PREFIX = 'Bearer ';
 const TOKEN_PREFIXES = ['Bearer hwr_', 'Bearer hww_'];
 const READ_ONLY_METHODS = new Set(['GET', 'HEAD']);
-const NON_TOKEN_PATHS = ['/api/auth/', '/api/tokens', '/api/push/'];
+const NON_TOKEN_PATHS = ['/api/auth', '/api/tokens', '/api/push'];
 
 function authorizationHeader(event: APIGatewayProxyEventV2): string {
   return event.headers?.authorization ?? '';

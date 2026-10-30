@@ -108,6 +108,14 @@ describe('tokenAccessRejection', () => {
     }
   });
 
+  it.each(['read', 'write'] as const)('refuses bare /api/auth and /api/push for a %s token', (scope) => {
+    for (const path of ['/api/auth', '/api/push']) {
+      const rejection = tokenAccessRejection(scope, 'GET', path);
+      expect(rejection?.statusCode).toBe(403);
+      expect(rejection?.body).toBe('{"error":"Not available to access tokens"}');
+    }
+  });
+
   it('checks the path rule before the read-only rule', () => {
     expect(tokenAccessRejection('read', 'POST', '/api/tokens')?.body).toBe('{"error":"Not available to access tokens"}');
   });
