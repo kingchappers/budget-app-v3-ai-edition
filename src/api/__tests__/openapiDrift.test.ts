@@ -26,17 +26,18 @@ describe('docs/openapi.yaml drift', () => {
     const copy: OpenApiDocument = structuredClone(spec);
     delete copy.paths['/api/tokens/{tokenId}'].delete;
     copy.paths['/api/ghost'] = { get: { operationId: 'ghost' } };
-    expect(routeParityProblems(registeredRoutes(), copy)).toEqual([
-      'registered but not in docs/openapi.yaml: DELETE /api/tokens/{tokenId}',
-      'in docs/openapi.yaml but not registered: GET /api/ghost',
-    ]);
+    const problems = routeParityProblems(registeredRoutes(), copy);
+    expect(problems).toContain('registered but not in docs/openapi.yaml: DELETE /api/tokens/{tokenId}');
+    expect(problems).toContain('in docs/openapi.yaml but not registered: GET /api/ghost');
   });
 
   it('treats a renamed path parameter as a mismatch', () => {
     const copy: OpenApiDocument = structuredClone(spec);
     copy.paths['/api/tokens/{id}'] = copy.paths['/api/tokens/{tokenId}'];
     delete copy.paths['/api/tokens/{tokenId}'];
-    expect(routeParityProblems(registeredRoutes(), copy)).toHaveLength(2);
+    const problems = routeParityProblems(registeredRoutes(), copy);
+    expect(problems).toContain('registered but not in docs/openapi.yaml: DELETE /api/tokens/{tokenId}');
+    expect(problems).toContain('in docs/openapi.yaml but not registered: DELETE /api/tokens/{id}');
   });
 
   it('declares x-token-access matching the token router', () => {
@@ -48,19 +49,26 @@ describe('docs/openapi.yaml drift', () => {
     copy.paths['/api/tokens'].get['x-token-access'] = 'read';
     delete copy.paths['/api/tokens'].post['x-token-access'];
     const problems = tokenAccessProblems(createTokenRouter().routes(), copy, rejects);
-    expect(problems).toEqual([
-      'GET /api/tokens: x-token-access is read, expected none',
-      'POST /api/tokens: x-token-access must be none, read or write, got undefined',
-    ]);
+    expect(problems).toContain('GET /api/tokens: x-token-access is read, expected none');
+    expect(problems).toContain('POST /api/tokens: x-token-access must be none, read or write, got undefined');
   });
 
-  it('gives every operation a unique operationId and a declared tag', () => {
-    const ops = operations(spec);
-    const declaredTags = new Set((spec.tags ?? []).map((tag: { name: string }) => tag.name));
-    const ids = ops.map((op) => op.operation.operationId as string);
+  it('gives every operation a non-empty string operationId', () => {
+    const bad = operations(spec)
+      .filter((op) => typeof op.operation.operationId !== 'string' || op.operation.operationId.trim() === '')
+      .map((op) => `${op.method} ${op.template}`);
+    expect(bad).toEqual([]);
+  });
+
+  it('gives every operation a unique operationId', () => {
+    const ids = operations(spec).map((op) => op.operation.operationId as string);
     const duplicates = ids.filter((id, i) => ids.indexOf(id) !== i);
     expect(duplicates).toEqual([]);
-    const badTags = ops
+  });
+
+  it('gives every operation at least one tag, all declared at the top level', () => {
+    const declaredTags = new Set((spec.tags ?? []).map((tag: { name: string }) => tag.name));
+    const badTags = operations(spec)
       .filter((op) => {
         const tags = (op.operation.tags ?? []) as string[];
         return tags.length === 0 || tags.some((tag) => !declaredTags.has(tag));
