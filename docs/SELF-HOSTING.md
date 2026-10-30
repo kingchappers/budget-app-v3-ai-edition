@@ -92,7 +92,7 @@ Stopping: a clean shutdown stops taking new requests (they get a 503), lets open
 
 ## Backups and restore
 
-> **Check which file your data folder holds first.** Run `docker compose exec hoardwise ls /data`. Use the name you see, `hoardwise.sqlite` or `budget.sqlite`, in every command that follows and in "Forgot your password" and "Moving your data from AWS". On an install from before 0.3.0, running a command with the wrong name creates an empty file with that name, and the app then starts on the empty file and looks like it has lost your data. Your data is still in the other file: stop the app, delete the empty file, and start again.
+> **No file name needed.** These commands find your database in the data folder the same way the app does, so they work on an install from before 0.3.0 (`budget.sqlite`) as well as a newer one (`hoardwise.sqlite`). If the database is somewhere else, they stop with "No SQLite database at ..." and create nothing, rather than leaving an empty file for the app to start on. Only `import` creates a database that does not exist yet.
 
 - A backup is taken automatically at the first hourly check at or after `BACKUP_HOUR` (03:00 by default, in `TZ`, default UTC; the check runs hourly from when the container started) once the newest backup is older than that hour on the current day. That gives one backup per day, and a missed hour or a skipped day is made up at the next check. A backup taken before `BACKUP_HOUR` (a catch-up at start, say) counts as the previous day's, so the check at `BACKUP_HOUR` takes another. Backups go into `/data/backups`. The newest `BACKUP_KEEP` (default 7) are kept. Each is integrity-checked before it counts, so a corrupt copy never causes a good one to be pruned, and is owner-only. `BACKUP_KEEP=0` turns this off.
 - File names are `hoardwise-YYYYMMDD-HHMMSS.sqlite` in local time (`TZ`). Backups made before 0.3.0 are named `budget-…`; they are kept, restored and pruned in the same way.
@@ -101,7 +101,7 @@ Stopping: a clean shutdown stops taking new requests (they get a 503), lets open
 - For a backup on demand (the file is never overwritten, so use a new name):
 
   ```bash
-  docker compose exec hoardwise sh -c 'STORE=sqlite SQLITE_PATH=/data/hoardwise.sqlite node build/store-cli/store-cli.js backup --out /data/manual-backup.sqlite'
+  docker compose exec hoardwise sh -c 'STORE=sqlite node build/store-cli/store-cli.js backup --out /data/manual-backup.sqlite'
   ```
 
 - **Backups on the same volume do not protect you from losing the volume or the disk.** Copy them somewhere else regularly. The compose examples put backups on their own volume to make that easy, for example:
@@ -147,7 +147,7 @@ If the app cannot delete `RESET_PASSWORD` (for example the folder is read-only) 
 **With a shell.** The same effect from the command line:
 
 ```bash
-docker compose exec hoardwise sh -c 'STORE=sqlite SQLITE_PATH=/data/hoardwise.sqlite node build/store-cli/store-cli.js reset-password'
+docker compose exec hoardwise sh -c 'STORE=sqlite node build/store-cli/store-cli.js reset-password'
 ```
 
 On an install from before 0.3.0, use `budget.sqlite` in place of `hoardwise.sqlite` in this command if that is the file in your data folder.
@@ -165,7 +165,7 @@ Export and import only touch your own data, never the login records, so the step
 
    ```bash
    docker compose exec -T hoardwise sh -c 'umask 077; cat > /tmp/hoardwise-export.jsonl' < hoardwise-export.jsonl
-   docker compose exec -e STORE=sqlite -e SQLITE_PATH=/data/hoardwise.sqlite hoardwise node build/store-cli/store-cli.js import --in /tmp/hoardwise-export.jsonl --as-user 'local|<uuid>'
+   docker compose exec -e STORE=sqlite hoardwise node build/store-cli/store-cli.js import --in /tmp/hoardwise-export.jsonl --as-user 'local|<uuid>'
    docker compose exec hoardwise rm /tmp/hoardwise-export.jsonl
    ```
 
