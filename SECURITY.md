@@ -27,6 +27,11 @@ Security requirements for this React + Auth0 + Lambda project. Reference control
 | AUTH-09 | WEB-A01 | The setup route is protected by a one-time code printed to the server log, and closes permanently once an account exists, except for AUTH-11 recovery; the setup code (and the AUTH-11 recovery code) is the only credential permitted in the log; the code may also be saved in an owner-only `SETUP_CODE.txt` in the data directory, removed when the code is used, at shutdown and at the next start |
 | AUTH-10 | WEB-A01, WEB-A07 | Session IDs are random, stored only as hashes, revocable (logout, password reset) and rejected once expired; state-changing requests must carry a same-host `Origin`; when `APP_ORIGIN` is configured the `Origin` must match it exactly (scheme, host and port) and the `Host` header is ignored |
 | AUTH-11 | WEB-A01, WEB-A07 | Password recovery without a shell is armed only by creating a regular file named `RESET_PASSWORD` in the data directory (write access there already means full control of the data). The marker is deleted before recovery opens and recovery stays closed if it cannot be deleted; a directory or symlink with that name is ignored; opening recovery ends every session and clears the lock-out; completing it replaces only the password (same account, same data), ends every session again and spends the one-time recovery code, which follows AUTH-09 |
+| AUTH-12 | WEB-A01, WEB-A07, API2, CWE-287 | Personal API tokens are random (at least 128 bits, here 256), stored only as hashes outside `USER#`, shown once, expiring by user choice, revocable, and never logged or exported |
+| AUTH-13 | WEB-A01, API1, API5, CWE-862, CWE-863 | Token requests are read-only unless the stored scope allows writes; enforcement is central and deny by default; scope and expiry come only from the stored record |
+| AUTH-14 | WEB-A01, API5, CWE-863 | A token may not call token management, `/api/auth/*` or push-subscription routes |
+| AUTH-15 | WEB-A07, API2 | A password reset revokes every token (local mode) |
+| AUTH-16 | WEB-A07, API2, API4 | Failed token lookups are rate limited in the container |
 
 **Framework mapping:** WEB-A01 (Broken Access Control), WEB-A07 (Auth Failures), FE-02 (Auth State)
 
@@ -34,6 +39,11 @@ Security requirements for this React + Auth0 + Lambda project. Reference control
 - Maintain separation between public function (static files) and protected function (API with JWT or session validation)
 - Rate limit auth endpoints (WEB-A04)
 - Handle token expiration gracefully in UI
+- Personal API tokens are read-only by default. In self-hosted (local) mode, creating a write token needs the account password again.
+- That password check shares the login throttle and one serialising queue with the login route, so password guesses are made one at a time across both.
+- The 25-token cap is a soft limit (check, then write): concurrent creates can slightly exceed it.
+- The failed-lookup limiter is keyed by the client address the server sees. It is exact in the container and best-effort per instance on AWS, where API Gateway throttling is the main limit. Behind a reverse proxy that appends to `X-Forwarded-For` instead of overwriting it, a client can rotate the header to evade the limiter, so use `TRUST_PROXY` only behind a proxy that sets the header itself (the bundled Caddy does).
+- A password reset, including `store-cli reset-password`, revokes every token.
 
 **Built-in login (`AUTH_MODE=local`) notes:**
 - The login throttle is global, not per client: anyone who can reach the instance can lock the owner out for up to 15 minutes by failing repeatedly. `store-cli reset-password` clears the throttle and revokes every session.
@@ -228,6 +238,7 @@ Run before creating a PR:
 | SANS-## | [SANS Top 25 (CWE)](https://www.sans.org/top25-software-errors/) |
 | FE-## | Frontend-Specific Controls |
 | API-## | API-Specific Controls |
+| API1, API2, API4, API5 | [OWASP API Security Top 10 (2023)](https://owasp.org/API-Security/editions/2023/en/0x00-header/): API1 Broken Object Level Authorization, API2 Broken Authentication, API4 Unrestricted Resource Consumption, API5 Broken Function Level Authorization |
 
 ### Detailed Framework Mapping
 
@@ -249,5 +260,8 @@ Run before creating a PR:
 - CWE-78 (Command Injection) → IO-03
 - CWE-20 (Input Validation) → IO-01
 - CWE-22 (Path Traversal) → IO-08
+- CWE-287 (Improper Authentication) → AUTH-12
+- CWE-862 (Missing Authorization) → AUTH-13
+- CWE-863 (Incorrect Authorization) → AUTH-13, AUTH-14
 - CWE-352 (CSRF) → Mitigated by Bearer token auth
 - CWE-434 (File Upload) → (validate if implemented)
