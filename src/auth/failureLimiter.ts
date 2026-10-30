@@ -33,6 +33,18 @@ export function createFailureLimiter(
     return entry.blockedUntil > now();
   }
 
+  function pickVictim(time: number): string | undefined {
+    let oldestUnblocked: string | undefined;
+    let oldest: string | undefined;
+    for (const [key, entry] of entries) {
+      const blocked = entry.blockedUntil > time;
+      if (!blocked && time - entry.windowStart >= windowSeconds) return key;
+      if (!blocked && oldestUnblocked === undefined) oldestUnblocked = key;
+      if (oldest === undefined) oldest = key;
+    }
+    return oldestUnblocked ?? oldest;
+  }
+
   function recordFailure(key: string): void {
     const time = now();
     const existing = entries.get(key);
@@ -46,8 +58,8 @@ export function createFailureLimiter(
     if (existing) {
       entries.delete(key);
     } else if (entries.size >= maxKeys) {
-      const oldest = entries.keys().next().value;
-      if (oldest !== undefined) entries.delete(oldest);
+      const victim = pickVictim(time);
+      if (victim !== undefined) entries.delete(victim);
     }
     entries.set(key, { windowStart: time, failures: 1, blockedUntil: existing?.blockedUntil ?? 0 });
   }

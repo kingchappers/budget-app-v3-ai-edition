@@ -52,4 +52,27 @@ describe('createFailureLimiter', () => {
     fail(limiter, 'key-10000', 30);
     expect(limiter.isBlocked('key-10000')).toBe(true);
   });
+
+  it('keeps a blocked key when a flood of other keys fills the table', () => {
+    const limiter = createFailureLimiter({ maxKeys: 5, maxFailures: 2 }, clock().now);
+    fail(limiter, 'A', 3);
+    for (let i = 0; i < 10; i++) limiter.recordFailure(`other-${i}`);
+    expect(limiter.isBlocked('A')).toBe(true);
+    expect(limiter.size()).toBeLessThanOrEqual(5);
+  });
+
+  it('evicts an expired entry before an unexpired one', () => {
+    const c = clock();
+    const limiter = createFailureLimiter(
+      { maxKeys: 3, maxFailures: 1, windowSeconds: 60, blockSeconds: 1000 },
+      c.now,
+    );
+    fail(limiter, 'A', 2);
+    limiter.recordFailure('B');
+    c.advance(61);
+    limiter.recordFailure('C');
+    limiter.recordFailure('D');
+    expect(limiter.isBlocked('A')).toBe(true);
+    expect(limiter.size()).toBe(3);
+  });
 });
