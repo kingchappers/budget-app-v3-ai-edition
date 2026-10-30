@@ -6,13 +6,22 @@ import type { CategoryTarget, ApiResponse } from './types';
 import { ok, err, parseJsonObject } from './http';
 import { moveToTrash } from './trash';
 
+function toTarget(item: Record<string, unknown>): CategoryTarget {
+  return {
+    categoryId: item.categoryId as string,
+    targetAmount: item.targetAmount as number,
+    period: item.period as CategoryTarget['period'],
+    updatedAt: item.updatedAt as string,
+  };
+}
+
 export async function getTargets(
   _event: APIGatewayProxyEventV2,
   userId: string,
   _params: Record<string, string>,
 ): Promise<ApiResponse> {
   const targets = await getStore().query(pk(userId), { skPrefix: 'TARGET#' });
-  return ok({ targets });
+  return ok({ targets: targets.map(toTarget) });
 }
 
 export async function upsertTarget(

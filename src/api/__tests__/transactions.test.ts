@@ -31,6 +31,32 @@ describe('getTransactions', () => {
     expect(JSON.parse(res.body).transactions).toHaveLength(1);
   });
 
+  it('returns only the public transaction fields, without storage keys', async () => {
+    await seedUser(store, 'user-1', [{
+      SK: 'TXN#2025-01#txn-1', transactionId: 'txn-1', yearMonth: '2025-01', amount: 1250, type: 'EXPENSE',
+      categoryId: 'cat-a', description: 'Shop', date: '2025-01-05', createdAt: '2025-01-05T10:00:00.000Z',
+      recurringId: 'rec-1',
+    }]);
+    const res = await getTransactions(makeEvent({ query: { year: '2025', month: '1' } }), 'user-1', {});
+    expect(JSON.parse(res.body).transactions).toEqual([{
+      transactionId: 'txn-1', yearMonth: '2025-01', amount: 1250, type: 'EXPENSE', categoryId: 'cat-a',
+      description: 'Shop', date: '2025-01-05', createdAt: '2025-01-05T10:00:00.000Z', recurringId: 'rec-1',
+    }]);
+  });
+
+  it('maps legacy rows without a recurringId or with an empty createdAt', async () => {
+    const base = { yearMonth: '2025-01', amount: 100, type: 'EXPENSE', categoryId: 'cat-a', description: '', date: '2025-01-05' };
+    await seedUser(store, 'user-1', [
+      { SK: 'TXN#2025-01#txn-1', transactionId: 'txn-1', ...base, createdAt: '' },
+      { SK: 'TXN#2025-01#txn-2', transactionId: 'txn-2', ...base, createdAt: '2025-01-05T10:00:00.000Z' },
+    ]);
+    const res = await getTransactions(makeEvent({ query: { year: '2025', month: '1' } }), 'user-1', {});
+    expect(JSON.parse(res.body).transactions).toEqual([
+      { transactionId: 'txn-1', ...base, createdAt: '' },
+      { transactionId: 'txn-2', ...base, createdAt: '2025-01-05T10:00:00.000Z' },
+    ]);
+  });
+
   it('returns 400 when year or month is missing', async () => {
     const spy = vi.spyOn(store, 'query');
     const res = await getTransactions(makeEvent({ query: { year: '2025' } }), 'user-1', {});

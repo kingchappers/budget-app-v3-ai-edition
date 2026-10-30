@@ -15,7 +15,7 @@ function getEvent(from?: string, to?: string): APIGatewayProxyEventV2 {
 }
 
 function txnItem(yearMonth: string, categoryId: string, amount = 100) {
-  return { SK: `TXN#${yearMonth}#${categoryId}${amount}`, yearMonth, amount, type: 'EXPENSE', categoryId, description: '', date: `${yearMonth}-10`, createdAt: '' };
+  return { SK: `TXN#${yearMonth}#${categoryId}${amount}`, transactionId: `${categoryId}${amount}`, yearMonth, amount, type: 'EXPENSE', categoryId, description: '', date: `${yearMonth}-10`, createdAt: '' };
 }
 
 beforeEach(() => { store = useTestStore(); });
@@ -58,6 +58,19 @@ describe('getTransactionsRange', () => {
     const res = await getTransactionsRange(getEvent('2026-07', '2026-08'), 'user-1', {});
     const body = JSON.parse(res.body);
     expect(body.transactions.map((t: { yearMonth: string }) => t.yearMonth).sort()).toEqual(['2026-07', '2026-08']);
+  });
+
+  it('returns only the public transaction fields, without storage keys', async () => {
+    await seedUser(store, 'user-1', [
+      txnItem('2026-07', 'cat-a'),
+      { ...txnItem('2026-07', 'cat-b', 200), createdAt: '2026-07-10T10:00:00.000Z', recurringId: 'rec-1' },
+    ]);
+    const res = await getTransactionsRange(getEvent('2026-07', '2026-07'), 'user-1', {});
+    const byId = (a: { transactionId: string }, b: { transactionId: string }) => a.transactionId.localeCompare(b.transactionId);
+    expect(JSON.parse(res.body).transactions.sort(byId)).toEqual([
+      { transactionId: 'cat-a100', yearMonth: '2026-07', amount: 100, type: 'EXPENSE', categoryId: 'cat-a', description: '', date: '2026-07-10', createdAt: '' },
+      { transactionId: 'cat-b200', yearMonth: '2026-07', amount: 200, type: 'EXPENSE', categoryId: 'cat-b', description: '', date: '2026-07-10', createdAt: '2026-07-10T10:00:00.000Z', recurringId: 'rec-1' },
+    ]);
   });
 
   it('scopes the query to the caller, not another user', async () => {

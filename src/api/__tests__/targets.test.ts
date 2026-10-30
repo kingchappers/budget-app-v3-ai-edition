@@ -25,6 +25,16 @@ describe('getTargets', () => {
     expect(res.statusCode).toBe(200);
     expect(JSON.parse(res.body).targets).toHaveLength(1);
   });
+
+  it('returns only the public target fields, without storage keys', async () => {
+    await seedUser(store, 'user-1', [
+      { SK: 'TARGET#cat-food', categoryId: 'cat-food', targetAmount: 30000, period: 'MONTHLY', updatedAt: '2026-10-30T09:15:00.000Z' },
+    ]);
+    const res = await getTargets(makeEvent(), 'user-1', {});
+    expect(JSON.parse(res.body).targets).toEqual([
+      { categoryId: 'cat-food', targetAmount: 30000, period: 'MONTHLY', updatedAt: '2026-10-30T09:15:00.000Z' },
+    ]);
+  });
 });
 
 describe('upsertTarget', () => {

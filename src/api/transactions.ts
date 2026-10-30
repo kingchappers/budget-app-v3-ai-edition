@@ -8,6 +8,21 @@ import { moveToTrash } from './trash';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+export function toTransaction(item: Record<string, unknown>): Transaction {
+  const transaction: Transaction = {
+    transactionId: item.transactionId as string,
+    yearMonth: item.yearMonth as string,
+    amount: item.amount as number,
+    type: item.type as Transaction['type'],
+    categoryId: item.categoryId as string,
+    description: item.description as string,
+    date: item.date as string,
+    createdAt: typeof item.createdAt === 'string' ? item.createdAt : '',
+  };
+  if (typeof item.recurringId === 'string') transaction.recurringId = item.recurringId;
+  return transaction;
+}
+
 export async function getTransactions(
   event: APIGatewayProxyEventV2,
   userId: string,
@@ -29,7 +44,7 @@ export async function getTransactions(
   const yearMonth = `${year}-${month.padStart(2, '0')}`;
 
   const transactions = await getStore().query(pk(userId), { skPrefix: `TXN#${yearMonth}` });
-  return ok({ transactions });
+  return ok({ transactions: transactions.map(toTransaction) });
 }
 
 export interface ValidTransactionInput {

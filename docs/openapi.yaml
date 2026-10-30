@@ -340,8 +340,7 @@ paths:
       tags: [targets]
       summary: List budgets
       description: >-
-        Returns every category target. Unlike the single-target response, each item also carries the storage keys
-        `PK` and `SK` (`USER#<id>` and `TARGET#<categoryId>`).
+        Returns every category target.
       operationId: listTargets
       x-token-access: read
       responses:
@@ -357,12 +356,10 @@ paths:
                   targets:
                     type: array
                     items:
-                      $ref: '#/components/schemas/StoredTarget'
+                      $ref: '#/components/schemas/Target'
               example:
                 targets:
-                  - PK: USER#user-1
-                    SK: TARGET#cat-groceries
-                    categoryId: cat-groceries
+                  - categoryId: cat-groceries
                     targetAmount: 30000
                     period: MONTHLY
                     updatedAt: '2026-10-30T09:15:00.000Z'
@@ -444,8 +441,7 @@ paths:
       tags: [transactions]
       summary: List a month's transactions
       description: >-
-        Returns every transaction stored under the given month, as raw stored records that include the storage keys
-        `PK` and `SK` (`USER#<id>` and `TXN#<yearMonth>#<transactionId>`). `month` is zero-padded, so `3` and `03` both
+        Returns every transaction stored under the given month. `month` is zero-padded, so `3` and `03` both
         mean March. The values are parsed leniently: the handler only checks that both parse as integers, with `month`
         1 to 12 and `year` at least 2000. A `year` or `month` with trailing characters (such as `2026x`) passes the check
         and is used as given, so it matches nothing and returns an empty list. A transaction belongs to the month in its
@@ -483,12 +479,10 @@ paths:
                   transactions:
                     type: array
                     items:
-                      $ref: '#/components/schemas/StoredTransaction'
+                      $ref: '#/components/schemas/Transaction'
               example:
                 transactions:
-                  - PK: USER#user-1
-                    SK: TXN#2026-10#6f1d2c8e-3b4a-4c5d-8e9f-0a1b2c3d4e5f
-                    transactionId: 6f1d2c8e-3b4a-4c5d-8e9f-0a1b2c3d4e5f
+                  - transactionId: 6f1d2c8e-3b4a-4c5d-8e9f-0a1b2c3d4e5f
                     yearMonth: '2026-10'
                     amount: 1250
                     type: EXPENSE
@@ -582,8 +576,7 @@ paths:
       tags: [transactions]
       summary: List transactions across several months
       description: >-
-        Returns the raw stored records (with `PK` and `SK`, as in `listTransactions`) whose `yearMonth` falls from
-        `from` to `to` inclusive. The range is at most 24 months. Months are compared as `YYYY-MM` strings.
+        Returns the transactions whose `yearMonth` falls from `from` to `to` inclusive. The range is at most 24 months. Months are compared as `YYYY-MM` strings.
       operationId: listTransactionsRange
       x-token-access: read
       parameters:
@@ -616,12 +609,10 @@ paths:
                   transactions:
                     type: array
                     items:
-                      $ref: '#/components/schemas/StoredTransaction'
+                      $ref: '#/components/schemas/Transaction'
               example:
                 transactions:
-                  - PK: USER#user-1
-                    SK: TXN#2026-10#6f1d2c8e-3b4a-4c5d-8e9f-0a1b2c3d4e5f
-                    transactionId: 6f1d2c8e-3b4a-4c5d-8e9f-0a1b2c3d4e5f
+                  - transactionId: 6f1d2c8e-3b4a-4c5d-8e9f-0a1b2c3d4e5f
                     yearMonth: '2026-10'
                     amount: 1250
                     type: EXPENSE
@@ -2384,27 +2375,6 @@ components:
         updatedAt:
           type: string
           format: date-time
-    StoredTarget:
-      type: object
-      additionalProperties: false
-      description: A target as listed by `listTargets`, including its storage keys.
-      required: [PK, SK, categoryId, targetAmount, period, updatedAt]
-      properties:
-        PK:
-          type: string
-        SK:
-          type: string
-        categoryId:
-          type: string
-        targetAmount:
-          type: integer
-          minimum: 1
-          maximum: 1000000000
-        period:
-          $ref: '#/components/schemas/TargetPeriod'
-        updatedAt:
-          type: string
-          format: date-time
     TargetInput:
       type: object
       required: [targetAmount, period]
@@ -2457,42 +2427,6 @@ components:
         recurringId:
           type: string
           description: The recurring reminder this transaction was made from. Present only when linked.
-    StoredTransaction:
-      type: object
-      additionalProperties: false
-      description: A transaction as listed by `listTransactions` and `listTransactionsRange`, including its storage keys.
-      required: [PK, SK, transactionId, yearMonth, amount, type, categoryId, description, date, createdAt]
-      properties:
-        PK:
-          type: string
-          description: '`USER#<id>`.'
-        SK:
-          type: string
-          description: '`TXN#<yearMonth>#<transactionId>`.'
-        transactionId:
-          type: string
-        yearMonth:
-          type: string
-          pattern: '^\d{4}-\d{2}$'
-        amount:
-          type: integer
-          minimum: 1
-          maximum: 1000000000
-        type:
-          $ref: '#/components/schemas/TransactionType'
-        categoryId:
-          type: string
-        description:
-          type: string
-          maxLength: 200
-        date:
-          type: string
-          pattern: '^\d{4}-\d{2}-\d{2}$'
-        createdAt:
-          type: string
-          format: date-time
-        recurringId:
-          type: string
     TransactionInput:
       type: object
       required: [amount, type, categoryId, date]
