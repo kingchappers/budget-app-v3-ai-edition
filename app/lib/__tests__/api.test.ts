@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { createApi } from '../api';
-import type { Category, Recurring } from '../types';
+import type { AccessToken, Category, Recurring } from '../types';
 
 const recurring: Recurring = {
   recurringId: 'r1', type: 'INCOME', categoryId: 'cat-salary', amount: 240000, description: 'Salary',
@@ -84,5 +84,31 @@ describe('trash API calls', () => {
       method: 'POST',
       body: JSON.stringify({ entityType: 'TRANSACTION', id: '2026-09#t1' }),
     });
+  });
+});
+
+describe('access token API calls', () => {
+  const record: AccessToken = {
+    tokenId: 'tok/1', name: 'Script', scope: 'read', createdAt: 1700000000, expiresAt: null, lastUsedAt: null, prefix: 'hw_abcd',
+  };
+
+  it('lists tokens', async () => {
+    const request = vi.fn().mockResolvedValue({ tokens: [record] });
+    expect(await createApi(request).listAccessTokens()).toEqual([record]);
+    expect(request).toHaveBeenCalledWith('/api/tokens');
+  });
+
+  it('creates a token and returns the secret with its record', async () => {
+    const created = { token: 'hw_secret', record };
+    const request = vi.fn().mockResolvedValue(created);
+    const body = { name: 'Script', scope: 'write' as const, expiryDays: 90 as const, password: 'pw' };
+    expect(await createApi(request).createAccessToken(body)).toEqual(created);
+    expect(request).toHaveBeenCalledWith('/api/tokens', { method: 'POST', body: JSON.stringify(body) });
+  });
+
+  it('revokes a token with the id encoded', async () => {
+    const request = vi.fn().mockResolvedValue({});
+    expect(await createApi(request).revokeAccessToken('tok/1')).toBeUndefined();
+    expect(request).toHaveBeenCalledWith('/api/tokens/tok%2F1', { method: 'DELETE' });
   });
 });

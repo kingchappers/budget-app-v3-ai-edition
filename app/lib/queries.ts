@@ -2,10 +2,11 @@ import { useMutation, useQuery, useQueryClient, type QueryClient, type QueryKey 
 import { useMemo } from 'react';
 import { useAuth } from '~/lib/auth';
 import { useProtectedApi } from '~/hooks/useProtectedApi';
-import { createApi, type RecurringInput, type TransactionInput } from './api';
+import { ApiError } from '~/lib/apiError';
+import { createApi, type AccessTokenInput, type RecurringInput, type TransactionInput } from './api';
 import { clearPendingEntry, OFFLINE_QUEUE_KEY, pendingRowsForMonth, type PendingMap } from './pendingEntries';
 import type { TrashEntityType, TrashRef } from './trash';
-import type { Account, Category, CategoryGroup, CategoryTarget, PotSettingsInput, Recurring, TargetPeriod, Transaction } from './types';
+import type { AccessToken, Account, Category, CategoryGroup, CategoryTarget, PotSettingsInput, Recurring, TargetPeriod, Transaction } from './types';
 
 export const queryKeys = {
   categories: ['categories'] as const,
@@ -17,6 +18,7 @@ export const queryKeys = {
   offlineQueue: OFFLINE_QUEUE_KEY,
   accounts: ['accounts'] as const,
   trash: ['trash'] as const,
+  accessTokens: ['accessTokens'] as const,
 };
 
 // What is already loaded, for text that should not wait on a request.
@@ -524,5 +526,43 @@ export function useRestoreFromTrash() {
       qc.invalidateQueries({ queryKey: queryKeys.trash });
       RESTORED_LISTS[ref.entityType].forEach(queryKey => qc.invalidateQueries({ queryKey }));
     },
+  });
+}
+
+export function useAccessTokens() {
+  const api = useApi();
+  const enabled = useAuthReady();
+  return useQuery({
+    queryKey: queryKeys.accessTokens,
+    queryFn: () => api.listAccessTokens(),
+    enabled,
+  });
+}
+
+// The new token string only travels in the mutation result to the caller; it is never written to the query cache, and gcTime 0 drops the mutation (result and password) once the component unmounts.
+export function useCreateAccessToken() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation<{ token: string; record: AccessToken }, Error, AccessTokenInput>({
+    mutationFn: (input) => api.createAccessToken(input),
+    gcTime: 0,
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.accessTokens }),
+  });
+}
+
+export function useRevokeAccessToken() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation<void, Error, string>({
+    mutationFn: async (tokenId) => {
+      try {
+        await api.revokeAccessToken(tokenId);
+      } catch (error) {
+        // 404: already revoked elsewhere or purged after expiry. The token is gone either way.
+        if (error instanceof ApiError && error.status === 404) return;
+        throw error;
+      }
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: queryKeys.accessTokens }),
   });
 }

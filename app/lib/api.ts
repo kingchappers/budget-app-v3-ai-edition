@@ -1,5 +1,5 @@
 import type { TrashEntityType, TrashEntry } from './trash';
-import type { Account, AccountKind, AccountType, Category, CategoryGroup, CategoryTarget, PotSettingsInput, PotSummary, Recurring, RecurringFrequency, TargetPeriod, Transaction, TransactionType } from './types';
+import type { AccessToken, AccessTokenExpiryDays, AccessTokenScope, Account, AccountKind, AccountType, Category, CategoryGroup, CategoryTarget, PotSettingsInput, PotSummary, Recurring, RecurringFrequency, TargetPeriod, Transaction, TransactionType } from './types';
 
 type Request = (endpoint: string, options?: RequestInit) => Promise<unknown>;
 
@@ -204,7 +204,25 @@ export function createApi(request: Request) {
         body: JSON.stringify({ entityType, id }),
       });
     },
+
+    listAccessTokens: async (): Promise<AccessToken[]> => {
+      const res = await request('/api/tokens') as { tokens: AccessToken[] };
+      return res.tokens;
+    },
+    createAccessToken: async (input: AccessTokenInput): Promise<{ token: string; record: AccessToken }> => {
+      return await request('/api/tokens', { method: 'POST', body: JSON.stringify(input) }) as { token: string; record: AccessToken };
+    },
+    revokeAccessToken: async (tokenId: string): Promise<void> => {
+      await request(`/api/tokens/${encodeURIComponent(tokenId)}`, { method: 'DELETE' });
+    },
   };
+}
+
+export interface AccessTokenInput {
+  name: string;
+  scope: AccessTokenScope;
+  expiryDays: AccessTokenExpiryDays;
+  password?: string;
 }
 
 export type Api = ReturnType<typeof createApi>;
