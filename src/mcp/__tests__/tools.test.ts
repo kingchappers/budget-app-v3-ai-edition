@@ -316,16 +316,30 @@ describe('chart_data', () => {
     expect(result.accessibleSummary).toContain('Transport');
   });
 
-  it('category-share groups everything beyond eight', async () => {
-    for (let i = 1; i <= 10; i += 1) {
+  async function addCategories(count: number): Promise<void> {
+    for (let i = 1; i <= count; i += 1) {
       const id = `cat-x${i}`;
       await store.put({ PK: pk('user-a'), SK: catSk(id), categoryId: id, name: `Cat ${i}`, type: 'EXPENSE', icon: 'x', isDefault: false, createdAt: '' });
       await addTx('user-a', '2026-10-02', 'EXPENSE', id, i * 100);
     }
+  }
+
+  it('category-share groups everything beyond seven when there are more than eight', async () => {
+    await addCategories(10);
     const result = await data('chart_data', { view: 'category-share' });
-    expect(result.series).toHaveLength(9);
+    expect(result.series).toHaveLength(8);
     expect(result.series[0]).toEqual({ label: 'Cat 10', value: 1000 });
-    expect(result.series[8]).toEqual({ label: 'Everything else', value: 300 });
+    expect(result.series[6]).toEqual({ label: 'Cat 4', value: 400 });
+    expect(result.series[7]).toEqual({ label: 'Everything else', value: 600 });
+    expect(result.accessibleSummary).toContain('Cat 10');
+  });
+
+  it('category-share names all eight when there are exactly eight', async () => {
+    await addCategories(8);
+    const result = await data('chart_data', { view: 'category-share' });
+    expect(result.series).toHaveLength(8);
+    expect(result.series.map((p: { label: string }) => p.label)).not.toContain('Everything else');
+    expect(result.series[7]).toEqual({ label: 'Cat 1', value: 100 });
   });
 
   it('monthly-trend gives one spending total per month, oldest first', async () => {

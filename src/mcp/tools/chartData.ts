@@ -12,7 +12,8 @@ interface Point {
 
 const DEFAULT_MONTHS = 6;
 const MAX_MONTHS = 12;
-const MAX_SLICES = 8;
+// Points in the chart, in total: more categories than this are grouped.
+const MAX_POINTS = 8;
 // Months before the month, so the review has the same history as month_review.
 const REVIEW_LOOKBACK = 6;
 
@@ -42,9 +43,12 @@ function categoryShare(review: MonthReview): { series: Point[]; summary: string 
     .filter((c) => c.type === 'EXPENSE' && c.thisMonth > 0)
     .sort((a, b) => b.thisMonth - a.thisMonth);
   if (spending.length === 0) return nothingLogged(review.month);
-  const series: Point[] = spending.slice(0, MAX_SLICES).map((c) => ({ label: clip(c.name), value: c.thisMonth }));
-  const rest = spending.slice(MAX_SLICES).reduce((sum, c) => sum + c.thisMonth, 0);
-  if (spending.length > MAX_SLICES) series.push({ label: 'Everything else', value: rest });
+  const grouped = spending.length > MAX_POINTS;
+  const named = grouped ? spending.slice(0, MAX_POINTS - 1) : spending;
+  const series: Point[] = named.map((c) => ({ label: clip(c.name), value: c.thisMonth }));
+  if (grouped) {
+    series.push({ label: 'Everything else', value: spending.slice(MAX_POINTS - 1).reduce((sum, c) => sum + c.thisMonth, 0) });
+  }
   const total = spending.reduce((sum, c) => sum + c.thisMonth, 0);
   return {
     series,
