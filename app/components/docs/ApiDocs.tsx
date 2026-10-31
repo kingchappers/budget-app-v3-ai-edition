@@ -25,7 +25,7 @@ export function ApiDocs(): React.JSX.Element {
         <Text c="dimmed">Nothing matches that. Try a shorter word.</Text>
       ) : (
         <Accordion order={2} variant="separated">
-          {groups.map((group, index) => <TagSection key={group.tag} spec={spec.data} group={group} index={index} />)}
+          {groups.map((group) => <TagSection key={group.tag} spec={spec.data} group={group} />)}
         </Accordion>
       )}
     </Stack>

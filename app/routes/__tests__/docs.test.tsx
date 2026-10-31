@@ -199,6 +199,42 @@ describe('Docs page', () => {
     expect(screen.getByRole('button', { name: /Pots/ })).toBeInTheDocument();
   });
 
+  it('keeps other sections collapsed while filtering', async () => {
+    const user = setupUser();
+    renderDocs();
+    await openCategories(user);
+    await user.type(screen.getByRole('textbox', { name: 'Filter' }), 'pot');
+    expect(screen.getByRole('button', { name: /Pots/ })).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('keeps other operations collapsed while filtering', async () => {
+    const user = setupUser();
+    renderDocs();
+    await openCategories(user);
+    await user.click(await screen.findByRole('button', { name: /List categories/ }));
+    await user.type(screen.getByRole('textbox', { name: 'Filter' }), 'create');
+    expect(await screen.findByRole('button', { name: /Create a category/ })).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('shows hostile spec text as literal text', async () => {
+    const user = setupUser();
+    const hostile = '<img src=x onerror=alert(1)> [x](javascript:alert(1))';
+    state.spec = {
+      data: {
+        tags: [{ name: 'Evil', description: hostile }],
+        paths: { '/api/evil': { get: { tags: ['Evil'], summary: hostile, description: hostile, responses: { '200': { description: hostile } } } } },
+      } satisfies ApiSpec,
+      isLoading: false, error: null, refetch: vi.fn(),
+    };
+    const { container } = renderDocs();
+    await user.click(screen.getByRole('button', { name: /Evil/ }));
+    await user.click(await screen.findByRole('button', { name: /onerror/ }));
+    expect(container.querySelector('img')).toBeNull();
+    expect(container.querySelector('a')).toBeNull();
+    expect(container.textContent).toContain('<img src=x onerror=alert(1)>');
+    expect(container.textContent).toContain('[x](javascript:alert(1))');
+  });
+
   it('shows a calm message when nothing matches', async () => {
     const user = setupUser();
     renderDocs();

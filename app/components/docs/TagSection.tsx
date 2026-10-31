@@ -1,5 +1,6 @@
 import { Accordion, Group, Text } from '@mantine/core';
 import type { ApiSpec, OperationEntry, OperationGroup } from '~/lib/apiDocs';
+import { accordionValue } from './accordionValue';
 import { InlineText } from './InlineText';
 import { OperationView } from './OperationView';
 
@@ -23,15 +24,15 @@ function OperationLabel({ entry }: { entry: OperationEntry }): React.JSX.Element
   );
 }
 
-export function TagSection({ spec, group, index }: { spec: ApiSpec; group: OperationGroup; index: number }): React.JSX.Element {
+export function TagSection({ spec, group }: { spec: ApiSpec; group: OperationGroup }): React.JSX.Element {
   return (
-    <Accordion.Item value={`section-${index}`}>
+    <Accordion.Item value={accordionValue(group.tag)}>
       <Accordion.Control>{group.tag}</Accordion.Control>
       <Accordion.Panel>
         {group.description && <div><InlineText text={group.description} /></div>}
         <Accordion order={3} variant="separated">
-          {group.operations.map((entry, opIndex) => (
-            <Accordion.Item key={`${entry.method} ${entry.path}`} value={`section-${index}-operation-${opIndex}`}>
+          {group.operations.map((entry) => (
+            <Accordion.Item key={`${entry.method} ${entry.path}`} value={accordionValue(entry.method, entry.path)}>
               <Accordion.Control><OperationLabel entry={entry} /></Accordion.Control>
               <Accordion.Panel><OperationView spec={spec} entry={entry} /></Accordion.Panel>
             </Accordion.Item>
