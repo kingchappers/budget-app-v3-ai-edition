@@ -555,6 +555,11 @@ describe('install instructions', () => {
     expect(section).toMatch(NO_TOKEN_IN_CHAT);
   });
 
+  it('points to the in-app Docs page and the agent guide route', () => {
+    expect(section).toContain('GET /api/docs/agents');
+    expect(section).toMatch(/Docs page/);
+  });
+
   it('says which tag to pin and how to set the token without shell history', () => {
     expect(section).toContain(PIN_SENTENCE);
     expect(section).toMatch(HISTORY_LINE);

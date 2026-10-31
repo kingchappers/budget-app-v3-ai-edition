@@ -6,6 +6,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const MARKER_FILE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../src/demo/marker.ts');
+const SPEC_FILE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../src/api/generated/openapi.json');
 const MARKER_EXTENSIONS = new Set(['.js', '.html', '.css', '.json', '.txt', '.map']);
 
 // Plain substrings. Bare `node:` is matched only as an import specifier (below): UI libraries carry the text in ordinary strings.
@@ -34,6 +35,19 @@ export function readMarker(markerSourceText) {
 
 export function findMarkerFiles(dir, marker) {
   return filesWithExtension(dir, MARKER_EXTENSIONS).filter(file => readFileSync(path.join(dir, file), 'utf8').includes(marker));
+}
+
+// The API docs routes are registered outside the shared core routes, so the browser demo must never bundle the generated spec.
+export function readApiSpecNeedle(specText) {
+  const description = JSON.parse(specText)?.info?.description;
+  if (typeof description !== 'string') throw new Error('Could not read info.description from the generated API spec.');
+  const needle = /^[^`\n]{20,}/.exec(description)?.[0].trim();
+  if (!needle) throw new Error('The generated API spec description has no plain opening to search for.');
+  return needle;
+}
+
+export function findApiSpecFiles(dir, needle) {
+  return filesWithExtension(dir, MARKER_EXTENSIONS).filter(file => readFileSync(path.join(dir, file), 'utf8').includes(needle));
 }
 
 export function findServerOnlyCode(dir) {
@@ -141,6 +155,13 @@ function checkDemo(dir) {
     return false;
   }
   console.log('PASS  no server-only code and no external references');
+
+  const specFiles = findApiSpecFiles(dir, readApiSpecNeedle(readFileSync(SPEC_FILE, 'utf8')));
+  if (specFiles.length > 0) {
+    console.error(`FAIL  the generated API spec (src/api/generated/openapi.json) is in the demo build, which must not serve the API docs:\n  ${specFiles.join('\n  ')}`);
+    return false;
+  }
+  console.log('PASS  the API spec is not in the demo build');
 
   const hashes = inlineScriptHashes(readFileSync(path.join(dir, 'index.html'), 'utf8'));
   const headerFile = path.join(dir, '..', 'csp-header.txt');

@@ -231,6 +231,8 @@ The `budget` skill teaches an AI coding agent to review your month in a calm, sh
 
 The skill works with Claude Code and, as plain markdown, with other coding agents. The Claude desktop, web and mobile assistants will connect through MCP later. The full API description is [`docs/openapi.yaml`](docs/openapi.yaml).
 
+Logged-in users can read the API reference in the app on the Docs page (Settings > API docs). The same description is served at `GET /api/openapi.json`, and `GET /api/docs/agents` returns a short guide written for AI agents. Both need your login or an access token.
+
 For maintainers: change the skill only through a pull request, and bump `version` in `plugins/hoardwise/.claude-plugin/plugin.json` whenever the skill changes, because people only receive a new copy when that number changes. Anyone who wants a fixed version can add the marketplace at a tag, as `kingchappers/hoardwise#<tag>`, using a release tag from the first one that includes the plugin.
 
 ## Decisions
