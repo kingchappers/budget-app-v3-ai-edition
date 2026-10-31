@@ -260,9 +260,9 @@ paths:
       tags: [categories]
       summary: Delete a custom category
       description: >-
-        Removes the category for good (it is not moved to the trash). Transactions and reminders that use it are not
-        changed; use `reassignCategory` first to move them. Deleting an id that does not exist still returns 204.
-        Default categories cannot be deleted.
+        A hard delete: the category is removed for good and nothing goes to the trash. Transactions and reminders that
+        use it are not changed; use `reassignCategory` first to move them. Deleting is idempotent by design: an id that
+        does not exist is a deliberate 204. Default categories cannot be deleted.
       operationId: deleteCategory
       x-token-access: write
       responses:
@@ -374,8 +374,9 @@ paths:
       tags: [targets]
       summary: Set a category's budget
       description: >-
-        Creates or replaces the target for the category. The category id is not checked against the household's
-        categories, so any id is accepted.
+        Creates or replaces the target for the category. The category must exist, as a built-in default or one of the
+        household's custom categories. The category is looked up first, so an unknown id is a 404 even when the body is
+        invalid.
       operationId: putTarget
       x-token-access: write
       requestBody:
@@ -411,6 +412,14 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '404':
+          description: No category has this id (`Category not found`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Category not found
         '429':
           $ref: '#/components/responses/TooManyRequests'
         '500':
@@ -419,8 +428,8 @@ paths:
       tags: [targets]
       summary: Remove a category's budget
       description: >-
-        Moves the target to the trash, where it can be restored. Removing a target that does not exist still returns
-        204.
+        Moves the target to the trash, where it can be restored. Deleting is idempotent by design: removing a target
+        that does not exist is a deliberate 204, and adds nothing to the trash.
       operationId: deleteTarget
       x-token-access: write
       responses:

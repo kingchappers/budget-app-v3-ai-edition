@@ -323,6 +323,7 @@ const ERROR_CASES: ErrorCase[] = [
   { key: 'DELETE /api/categories/{categoryId} 403', run: async () => ({ path: { categoryId: 'cat-groceries' } }) },
   { key: 'POST /api/categories/{categoryId}/reassign 400', run: async () => ({ path: { categoryId: 'cat-groceries' }, body: {} }) },
   { key: 'PUT /api/targets/{categoryId} 400', run: async () => ({ path: { categoryId: 'cat-groceries' }, body: { targetAmount: 0, period: 'MONTHLY' } }) },
+  { key: 'PUT /api/targets/{categoryId} 404', run: async () => ({ path: { categoryId: UNKNOWN_UUID }, body: { targetAmount: 30000, period: 'MONTHLY' } }) },
   { key: 'GET /api/transactions 400', run: async () => ({}) },
   { key: 'POST /api/transactions 400', run: async () => ({ body: {} }) },
   { key: 'GET /api/transactions/range 400', run: async () => ({ query: { from: '2026-10', to: '2026-08' } }) },
