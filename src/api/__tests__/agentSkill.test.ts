@@ -22,6 +22,11 @@ const RANGE_LIMIT_PHRASE = /at most 24 months/i;
 const CONVERT_PHRASE = /dividing by 100/i;
 const CURRENCY_WORDS = ['currency', 'pounds'];
 const SHOWS_PENCE = /\b(show|display|report|give|print|tell|say|write)\b[^.\n]*\bin pence\b/i;
+const DISPLAY_PREFERENCE_TIMING = /never before the first answer/i;
+const DISPLAY_PREFERENCE_TRIGGER = /only when a chart, or extra detail, first comes up/i;
+const NO_INCOME_ORDER = /give the review first[^\n]*the one question at the end is the income question/i;
+const LIKE_FOR_LIKE = /same day of the month/i;
+const POT_SPEND_RULE = /counts in the month's spending as well as under the pot/i;
 const FORBIDS = /\b(never|don't|do not)\b/i;
 
 const PORTABLE_FIELDS = ['name', 'description', 'license', 'compatibility', 'metadata'];
@@ -230,6 +235,24 @@ describe('review guidance', () => {
     for (const word of CURRENCY_WORDS) expect(all).toContain(word);
     const sentences = all.split(/(?<=[.!?])\s+|\n/);
     expect(sentences.filter((sentence) => SHOWS_PENCE.test(sentence) && !FORBIDS.test(sentence))).toEqual([]);
+  });
+
+  it('asks about display preference only when a chart or detail first comes up', () => {
+    expect(all).toMatch(DISPLAY_PREFERENCE_TIMING);
+    expect(all).toMatch(DISPLAY_PREFERENCE_TRIGGER);
+  });
+
+  it('gives the review before asking the income question', () => {
+    expect(all).toMatch(NO_INCOME_ORDER);
+  });
+
+  it('compares a month in progress like for like', () => {
+    expect(all).toMatch(LIKE_FOR_LIKE);
+    expect(all).not.toMatch(/under your usual month so far/i);
+  });
+
+  it('says how Spend in a pot category is counted', () => {
+    expect(all).toMatch(POT_SPEND_RULE);
   });
 
   it('links only to files that exist', () => {

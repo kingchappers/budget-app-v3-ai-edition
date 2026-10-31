@@ -13,17 +13,19 @@ Follow these steps when the user asks how their month is going. The tone and ans
    - **Totals.** Income (`INCOME`) and spending (`EXPENSE`) for the month, and the same for each earlier month.
    - **Usual.** For income, spending and each category, the median of the previous three to six months that have data. A month counts as having data if it has entries on at least a quarter of its days (the app treats a month below that as partly tracked and leaves it out of comparisons). The month under review is not part of its own usual.
    - **Categories.** For each spending and income category, this month against its target (if it has one) and against its own usual.
+   - **Spend in a pot category.** A Spend in a pot (`POT`) category counts in the month's spending as well as under the pot (its `spent`), as in the app. Do not compare it with a spending target.
    - **Pots.** Money added (`setAside` plus `autoAdded`), money taken out (`takeOut`) and money spent from the pot (`spent`), from each active pot's `thisMonth`.
    - **Notable items.** See the next section.
-7. If the month is still in progress, say "so far" and compare with the whole of earlier months, not with a part of them. Do not guess the month's end unless the user gave an expected income and you say it is an estimate.
+7. If the month is still in progress, compare like for like, as the app does: set this month so far against each earlier month up to the same day of the month, using the transaction dates, and say "so far". Never set part of this month against whole earlier months, because that makes spending look low early on. In the first week, say it is early and make few or no claims about totals. Do not guess the month's end.
 8. Pick what is worth knowing, then answer in the shape in SKILL.md: a headline, at most three points, and one offer of more detail.
 
 ## Income
 
 - If the month has at least one `INCOME` transaction, use what is logged.
-- If it has none, ask the user how much they expect this month before you give estimates. Do not guess.
-- If the earlier months show a regular amount (the same, or very close, each month), offer it as the suggested answer: "You usually have about £2,300 in. Is that right for this month?"
-- If there is no regular amount, or no earlier months, ask without suggesting a number.
+- If it has none, give the review first, with what is known. Make no claim that depends on income: no "doing well overall" from income against spending, and no savings estimate. Then the one question at the end is the income question. Leave out the detail offer until they have answered, so there is one question at a time.
+- If the earlier months show a regular amount (the same, or very close, each month), put the usual amount in the question: "How much do you expect to have coming in this month? You usually have about £2,300."
+- If there is no regular amount, or no earlier months, ask "How much do you expect to have coming in this month?" without suggesting a number.
+- After they answer, you may offer detail as usual.
 - Use the answer as an estimate only, and say so. Do not write it into Hoardwise unless the user asks you to log it.
 
 ## Big spends and unusual months
@@ -51,7 +53,7 @@ Give as much as the user asks for, in simple terms, with the same tone. If they 
 
 ## Visuals
 
-- Ask once, early: "How do you like things shown? Short and plain, with a chart now and then, or lots of detail?" Remember the answer for the rest of the session and follow it. Do not ask again.
+- Ask how the user likes things shown only when a chart, or extra detail, first comes up, never before the first answer. For example, when they say yes to the offer or ask for a chart: "How do you like things shown? Short and plain, with a chart now and then, or lots of detail?" Ask once, remember the answer for the rest of the session and follow it. The first answer's offer may still name "a chart" as one thing available.
 - If they prefer no charts, do not draw any and do not offer them again.
 - When you draw a chart, or hand data to a design tool, keep it calm and small: one or two series, labelled directly, sorted largest first, plenty of space.
 - Follow the Hoardwise brand rules: no flashing or motion; colour never carries meaning alone, so pair it with a label, an icon or a + or − sign; calm colours.

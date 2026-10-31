@@ -40,10 +40,10 @@ The routes, parameters and fields the recipes use are in [reference.md](referenc
 Use this when the user asks how their month is going, or about their spending in general. Follow [review.md](review.md) for the steps. In short:
 
 1. Read the categories, the last six months of transactions, the targets and the pots.
-2. If no Income is logged this month, ask what they expect before you give any estimates.
-3. Compare this month with the user's own usual month: income, spending, each category, the pots.
+2. Compare this month with the user's own usual month: income, spending, each category, the pots. For a month still in progress, compare with earlier months up to the same day of the month.
+3. If no Income is logged this month, give the review first, make no claim that depends on income, and make the income question the one question at the end.
 4. Pick what is worth knowing, using the user's own history and never a fixed amount.
-5. Answer in the shape below.
+5. Answer in the shape below. With no Income logged, the shape changes: the headline and points, then the income question instead of the detail offer (see Income in [review.md](review.md)).
 
 Every number comes from the data. Never invent an amount, a trend or a "usual".
 
@@ -57,7 +57,7 @@ Keep the first answer to this and no more:
 
 ## Offer more detail, don't show it
 
-Do not put detail in the first answer. No tables, no lists of transactions, no category-by-category rundown. Offer it and ask, naming what is available: "Would you like to see the items in Eating out, the last six months side by side, or a chart?" Ask once, and wait.
+Do not put detail in the first answer. No tables, no lists of transactions, no category-by-category rundown. Offer it and ask, naming what is available: "Would you like to see the items in Eating out, the last six months side by side, or a chart?" Ask once, and wait. Never ask how the user likes things shown before the first answer.
 
 When the user says yes, give what they asked for and no more, then offer the next step. Give as much detail as they want, one step at a time, in simple terms. [review.md](review.md) lists the steps on the ladder.
 
@@ -71,7 +71,7 @@ When the user says yes, give what they asked for and no more, then offer the nex
 
 An example only, with invented numbers. Do not reuse them:
 
-> Things look steady this month. Your Income is in and your spending is a little under your usual month so far.
+> Things look steady this month. Your Income is in, and by the 20th your spending is close to where it was by the 20th in earlier months.
 > - Eating out is about £40 above its usual, mostly one £65 meal on the 12th.
 > - Your Holidays pot had £50 added.
 > - Groceries is close to its budget.
