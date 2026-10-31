@@ -32,6 +32,7 @@ Security requirements for this React + Auth0 + Lambda project. Reference control
 | AUTH-14 | WEB-A01, API5, CWE-863 | A token may not call token management, `/api/auth/*` or push-subscription routes; the token-access rules in `docs/openapi.yaml` (`x-token-access`) are checked against the router by CI |
 | AUTH-15 | WEB-A07, API2 | A password reset revokes every token. Local mode only: Auth0 mode has no local password reset to hook |
 | AUTH-16 | WEB-A07, API2, API4 | Failed token lookups are rate limited per client address: exact in the container, best-effort per instance on AWS |
+| AUTH-17 | WEB-A01, API1, API5 | `GET /api/openapi.json` and `GET /api/docs/agents` sit behind the same authentication as every other route (AUTH-01, AUTH-04); a read token may fetch them (AUTH-13); the generated files hold no user data; they are registered outside `registerCoreRoutes`, so the browser demo bundle never contains them |
 
 **Framework mapping:** WEB-A01 (Broken Access Control), WEB-A07 (Auth Failures), FE-02 (Auth State)
 

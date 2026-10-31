@@ -208,7 +208,11 @@ function replyProblems(op: SpecOperation, reply: Reply): string[] {
   if (!response) return [`status ${status} is not documented (documented: ${documentedStatuses(op).join(', ')}); body ${reply.text}`];
   const problems: string[] = [];
   const content = response.content?.['application/json'];
-  if (!content) {
+  const markdown = response.content?.['text/markdown'];
+  if (markdown) {
+    if (reply.text === '') problems.push(`${status} should have a Markdown body but returned none`);
+    if (!reply.headers['Content-Type']?.startsWith('text/markdown')) problems.push(`${status} should be text/markdown`);
+  } else if (!content) {
     if (reply.text !== '') problems.push(`${status} is documented without a body but returned ${reply.text}`);
   } else if (reply.json === undefined) {
     problems.push(`${status} should have a JSON body but returned ${JSON.stringify(reply.text)}`);
@@ -278,6 +282,8 @@ const STEPS: Step[] = [
   { key: 'POST /api/accounts/{accountId}/balances', example: 'example', path: (ctx) => ({ accountId: ctx.assetId }) },
   { key: 'POST /api/push/subscriptions', example: 'example' },
   { key: 'DELETE /api/push/subscriptions', example: 'example' },
+  { key: 'GET /api/openapi.json' },
+  { key: 'GET /api/docs/agents' },
   { key: 'POST /api/tokens', example: 'read', capture: (body, ctx) => { ctx.tokenId = body.record.tokenId; } },
   { key: 'POST /api/tokens', example: 'write' },
   { key: 'GET /api/tokens' },
@@ -570,7 +576,8 @@ describe('docs/openapi.yaml contract: the real handlers', () => {
         get: (target, property) => (typeof (target as any)[property] === 'function' ? async () => { throw new Error('store down'); } : (target as any)[property]),
       }) as Store;
       setStore(failing);
-      for (const op of ops) {
+      // The docs routes read no store, so they have no 500 to document.
+      for (const op of ops.filter((candidate) => responseOf(candidate, '500') !== undefined)) {
         const request = requestFromSpec(op, Object.keys(requestExamples(op))[0]);
         const reply = await send(op, request);
         expect(replyProblems(op, reply), keyOf(op)).toEqual([]);

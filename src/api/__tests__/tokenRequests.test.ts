@@ -350,6 +350,8 @@ describe('route table', () => {
     expect(getPaths).toEqual([
       '/api/accounts',
       '/api/categories',
+      '/api/docs/agents',
+      '/api/openapi.json',
       '/api/pots',
       '/api/recurring',
       '/api/targets',
