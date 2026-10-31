@@ -155,6 +155,12 @@ export async function addBalance(
     return err(400, 'accountId is required');
   }
 
+  const existingItem = await queryOne(userId, accountSk(accountId));
+  if (!existingItem) {
+    return err(404, 'Account not found');
+  }
+  const existing = toAccount(existingItem);
+
   const body = parseJsonObject(event);
   if (!body) return err(400, 'Invalid JSON body');
 
@@ -165,12 +171,6 @@ export async function addBalance(
   if (!isValidPence(pence)) {
     return err(400, `pence must be a whole number between -${MAX_AMOUNT_PENCE} and ${MAX_AMOUNT_PENCE}`);
   }
-
-  const existingItem = await queryOne(userId, accountSk(accountId));
-  if (!existingItem) {
-    return err(404, 'Account not found');
-  }
-  const existing = toAccount(existingItem);
 
   const balances = applyBalanceEntry(existing.balances ?? [], date, pence);
   if (balances.length > MAX_BALANCE_ENTRIES) {

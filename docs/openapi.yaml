@@ -1734,8 +1734,8 @@ paths:
         or negative (an overdrawn account), with a magnitude of at most 1,000,000,000. Recording a date that already
         has an entry replaces that entry; otherwise the entry is added. The history is kept sorted by date and holds at
         most 500 entries. `date` must be a real calendar date and no later than tomorrow (UTC), so the example assumes
-        the server clock is no earlier than 28 October 2026 (UTC). The body is validated before the account is looked up.
-        Unknown body fields are ignored.
+        the server clock is no earlier than 28 October 2026 (UTC). The account is looked up first (an unknown account is a 404
+        even when the body is invalid), then the body is validated (400). Unknown body fields are ignored.
       operationId: addAccountBalance
       x-token-access: write
       requestBody:
@@ -1995,12 +1995,13 @@ paths:
         Creates a personal API token. Not available to access tokens: a request with an access token is refused with
         403 `Not available to access tokens`. The secret (`token`) is in the 201 response only; it is stored as a hash
         and cannot be shown again, so keep it somewhere safe. The response carries `Cache-Control: no-store`. A read
-        token (`hwr_`) can only make `GET` (and `HEAD`) requests; a read-write token (`hww_`) can use every method. A household can
-        have at most 25 tokens (409); revoke one first. `expiryDays` is required: send 90, 180, 365 or 730, or `null`
-        for a token that never expires. In local mode (the built-in login), creating a `write` token also needs the
+        token (`hwr_`) can only make `GET` (and `HEAD`) requests; a read-write token (`hww_`) can use every method. `expiryDays` is
+        required: send 90, 180, 365 or 730, or `null` for a token that never expires. A household can have at most 25
+        tokens (409); revoke one first. In local mode (the built-in login), creating a `write` token also needs the
         account `password`: a missing password is a 403 `Password required`, a wrong one a 403 `Incorrect password`,
         and repeated wrong guesses (shared with the login screen) are throttled with a 429. `password` is ignored for
-        a `read` token and in Auth0 mode. It is checked before the token cap, and is never stored or logged. Unknown
+        a `read` token and in Auth0 mode. The password is checked before the 25-token cap, so a missing or wrong password is refused with 403/429 even when the
+        cap is reached. It is never stored or logged. Unknown
         body fields are rejected.
       operationId: createAccessToken
       x-token-access: none
@@ -2129,26 +2130,20 @@ paths:
       summary: Revoke an access token
       description: >-
         Revokes the token for good; requests that present it are refused from then on. Not available to access tokens: a
-        request with an access token is refused with 403 `Not available to access tokens`. The response is 200 with an
-        empty JSON object and carries `Cache-Control: no-store`. An id that is not a UUID, does not exist or belongs to
+        request with an access token is refused with 403 `Not available to access tokens`. The response is 204 with no
+        body and carries `Cache-Control: no-store`. An id that is not a UUID, does not exist or belongs to
         another household is a 404.
       operationId: revokeAccessToken
       x-token-access: none
       responses:
-        '200':
-          description: The token is revoked.
+        '204':
+          description: The token is revoked. No body.
           headers:
             Cache-Control:
               description: Always `no-store`.
               schema:
                 type: string
                 const: no-store
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: false
-              example: {}
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':

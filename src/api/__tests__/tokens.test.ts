@@ -334,8 +334,10 @@ describe('DELETE /api/tokens/{tokenId}', () => {
   it('revokes the token so it no longer authenticates', async () => {
     const { token, record } = JSON.parse((await create(VALID)).body);
     const res = await revoke(record.tokenId);
-    expect(res.statusCode).toBe(200);
-    expect(JSON.parse(res.body)).toEqual({});
+    expect(res.statusCode).toBe(204);
+    expect(res.body).toBe('');
+    expect(res.headers?.['Cache-Control']).toBe('no-store');
+    expect(res.headers?.['X-Content-Type-Options']).toBe('nosniff');
     expect(await findToken(store, token, NOW)).toBeUndefined();
     expect(await listTokens(store, 'user-a')).toEqual([]);
   });
@@ -391,7 +393,7 @@ describe('Cache-Control', () => {
     responses.push(await create({ ...VALID, scope: 'write' }));
     for (let i = 0; i < 4; i += 1) responses.push(await create({ ...VALID, scope: 'write', password: 'wrong' }));
 
-    expect(responses.map((res) => res.statusCode)).toEqual([201, 400, 200, 200, 404, 409, 403, 403, 403, 403, 403]);
+    expect(responses.map((res) => res.statusCode)).toEqual([201, 400, 200, 204, 404, 409, 403, 403, 403, 403, 403]);
     responses.push(await create({ ...VALID, scope: 'write', password: 'wrong' }));
     expect(responses.at(-1)?.statusCode).toBe(429);
     for (const res of responses) expect(res.headers?.['Cache-Control']).toBe('no-store');
@@ -431,7 +433,7 @@ describe('through the API handler', () => {
     expect(JSON.parse(listed.body).tokens.map((t: { tokenId: string }) => t.tokenId)).toEqual([record.tokenId]);
 
     const revoked = await invoke(apiEvent('DELETE', `/api/tokens/${record.tokenId}`));
-    expect(revoked.statusCode).toBe(200);
+    expect(revoked.statusCode).toBe(204);
     expect(JSON.parse((await invoke(apiEvent('GET', '/api/tokens'))).body).tokens).toEqual([]);
   });
 });

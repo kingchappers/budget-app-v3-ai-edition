@@ -403,8 +403,15 @@ const ERROR_CASES: ErrorCase[] = [
     },
   },
   { key: 'PUT /api/accounts/{accountId} 404', run: async () => ({ path: { accountId: UNKNOWN_UUID }, body: { name: 'Savings' } }) },
-  { key: 'POST /api/accounts/{accountId}/balances 400', run: async () => ({ path: { accountId: UNKNOWN_UUID }, body: { date: '2027-01-01', pence: 100 } }) },
-  { key: 'POST /api/accounts/{accountId}/balances 404', run: async () => ({ path: { accountId: UNKNOWN_UUID }, body: { date: '2026-10-29', pence: 100 } }) },
+  {
+    key: 'POST /api/accounts/{accountId}/balances 400',
+    run: async (arrange) => {
+      const created = await arrange.call('POST /api/accounts', 'asset');
+      return { path: { accountId: created.account.accountId }, body: { date: '2027-01-01', pence: 100 } };
+    },
+  },
+  // The account is looked up before the body is checked, so an unknown account is a 404 even with an invalid body.
+  { key: 'POST /api/accounts/{accountId}/balances 404', run: async () => ({ path: { accountId: UNKNOWN_UUID }, body: { date: '2027-01-01', pence: 1.5 } }) },
   { key: 'POST /api/push/subscriptions 400', run: async () => ({ body: { ...PUSH_BODY('https://fcm.googleapis.com/fcm/send/a'), settings: { hour: 24, quietStart: 22, quietEnd: 7, timeZone: 'Europe/London' } } }) },
   {
     key: 'POST /api/push/subscriptions 409',

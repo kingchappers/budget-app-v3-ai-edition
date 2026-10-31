@@ -146,6 +146,11 @@ describe('updateAccount', () => {
     const res = await updateAccount(event({ name: 'X', type: 'CASH' }), 'user-1', { accountId: 'acc-missing' });
     expect(res.statusCode).toBe(404);
   });
+
+  it('looks the account up before the body: 404 for a missing account with an invalid body', async () => {
+    const res = await updateAccount(event({ name: '' }), 'user-1', { accountId: 'acc-missing' });
+    expect(res.statusCode).toBe(404);
+  });
 });
 
 describe('deleteAccount', () => {
@@ -216,6 +221,15 @@ describe('addBalance', () => {
   it('returns 404 for a missing account', async () => {
     const res = await addBalance(event(valid), 'user-1', { accountId: 'acc-missing' });
     expect(res.statusCode).toBe(404);
+  });
+
+  it.each([
+    ['a bad pence', { date: '2026-09-15', pence: 1.5 }],
+    ['a bad date', { date: 'soon', pence: 100 }],
+  ])('looks the account up before the body: 404 for a missing account with %s', async (_label, body) => {
+    const res = await addBalance(event(body), 'user-1', { accountId: 'acc-missing' });
+    expect(res.statusCode).toBe(404);
+    expect(JSON.parse(res.body).error).toBe('Account not found');
   });
 
   it('returns 400 when the entry would push the history over the cap', async () => {
