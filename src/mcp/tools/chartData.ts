@@ -1,7 +1,7 @@
-import { loadBudgetWithHistory, shiftMonth } from '../data';
+import { loadBudget, shiftMonth } from '../data';
 import { buildMonthReview, type MonthReview } from '../review';
 import type { McpTool } from '../types';
-import { READ_ONLY, clip, monthIsTooFarAhead, monthOf, potsFor, readMonth } from './shared';
+import { READ_ONLY, clip, monthIsTooFarAhead, monthOf, readMonth } from './shared';
 
 const VIEWS = ['month-summary', 'category-share', 'monthly-trend', 'category-vs-target'] as const;
 type View = (typeof VIEWS)[number];
@@ -105,17 +105,18 @@ export const chartDataTool: McpTool = {
       return { ok: false, message: 'month must be at most one month ahead' };
     }
 
-    const budget = await loadBudgetWithHistory(context.userId, {
+    const budget = await loadBudget(context.userId, {
       from: shiftMonth(month, -Math.max(REVIEW_LOOKBACK, months - 1)),
       to: month,
     });
+    // No view draws pots, so the full history that pot balances need is never read.
     const review = buildMonthReview({
       month,
       now: context.now,
       categories: budget.categories,
       transactions: budget.transactions,
       targets: budget.targets,
-      pots: potsFor(budget, month),
+      pots: [],
     });
 
     const built = buildView(view, review, budget.transactions, month, months);

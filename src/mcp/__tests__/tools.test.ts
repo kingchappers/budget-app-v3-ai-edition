@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { pk, txnSk, targetSk, catSk } from '../../api/db';
 import { setStore } from '../../store';
 import { MemoryStore } from '../../store/memory';
@@ -101,6 +101,24 @@ describe('loadBudget', () => {
     const budget = await loadBudget('user-a', { from: '2026-02', to: '2026-03' });
     expect(budget.transactions.map((t) => t.amount)).toEqual([200]);
     expect(budget.categories.some((c) => c.categoryId === 'cat-groceries')).toBe(true);
+  });
+
+  it('reads transactions one month at a time, only for the months asked for', async () => {
+    const query = vi.spyOn(store, 'query');
+    await loadBudget('user-a', { from: '2026-02', to: '2026-04' });
+    const prefixes = query.mock.calls.map(([, opts]) => opts?.skPrefix).filter((p) => p?.startsWith('TXN#'));
+    expect(prefixes).toEqual(['TXN#2026-02#', 'TXN#2026-03#', 'TXN#2026-04#']);
+  });
+
+  it.each([
+    ['category_detail', { categoryId: 'cat-groceries' }],
+    ['chart_data', { view: 'monthly-trend' }],
+    ['chart_data', { view: 'category-share' }],
+  ])('%s never reads the whole transaction history', async (name, args) => {
+    await addTx('user-a', '2020-01-05', 'EXPENSE', 'cat-groceries', 100);
+    const query = vi.spyOn(store, 'query');
+    await data(name, args);
+    expect(query.mock.calls.map(([, opts]) => opts?.skPrefix)).not.toContain('TXN#');
   });
 });
 

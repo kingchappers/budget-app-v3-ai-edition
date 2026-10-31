@@ -38,30 +38,48 @@ function toTarget(item: Record<string, unknown>): CategoryTarget {
   };
 }
 
-export async function loadBudgetWithHistory(
-  userId: string,
-  months: { from: string; to: string },
-): Promise<BudgetWithHistory> {
+function checkSpan(months: { from: string; to: string }): void {
   if (monthIndex(months.to) - monthIndex(months.from) + 1 > MAX_SPAN_MONTHS) {
     throw new RangeError(`the range must be at most ${MAX_SPAN_MONTHS} months`);
   }
-  const [customCategories, targetItems, settingsItems, transactionItems] = await Promise.all([
+}
+
+async function loadSettings(userId: string): Promise<Omit<Budget, 'transactions'>> {
+  const [customCategories, targetItems, settingsItems] = await Promise.all([
     queryAll(userId, 'CAT#'),
     queryAll(userId, 'TARGET#'),
     queryAll(userId, 'POT#'),
-    queryAll(userId, 'TXN#'),
   ]);
-  const history = transactionItems.map(toTransaction);
   return {
     categories: [...DEFAULT_CATEGORIES, ...(customCategories as unknown as Category[])],
-    history,
-    transactions: history.filter((t) => t.yearMonth >= months.from && t.yearMonth <= months.to),
     targets: targetItems.map(toTarget),
     settings: settingsItems.map(toSettings),
   };
 }
 
+// Only the months asked for: one query per month on the TXN#<yyyy-mm># sort key, at most 24.
 export async function loadBudget(userId: string, months: { from: string; to: string }): Promise<Budget> {
-  const { history: _history, ...budget } = await loadBudgetWithHistory(userId, months);
-  return budget;
+  checkSpan(months);
+  const count = monthIndex(months.to) - monthIndex(months.from) + 1;
+  const keys = Array.from({ length: Math.max(count, 0) }, (_, i) => shiftMonth(months.from, i));
+  const [settings, perMonth] = await Promise.all([
+    loadSettings(userId),
+    Promise.all(keys.map((m) => queryAll(userId, `TXN#${m}#`))),
+  ]);
+  return { ...settings, transactions: perMonth.flat().map(toTransaction) };
+}
+
+// Every transaction, as GET /api/pots reads them: only for tools that show pot balances.
+export async function loadBudgetWithHistory(
+  userId: string,
+  months: { from: string; to: string },
+): Promise<BudgetWithHistory> {
+  checkSpan(months);
+  const [settings, transactionItems] = await Promise.all([loadSettings(userId), queryAll(userId, 'TXN#')]);
+  const history = transactionItems.map(toTransaction);
+  return {
+    ...settings,
+    history,
+    transactions: history.filter((t) => t.yearMonth >= months.from && t.yearMonth <= months.to),
+  };
 }
