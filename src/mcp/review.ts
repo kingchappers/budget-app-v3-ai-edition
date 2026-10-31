@@ -124,14 +124,21 @@ export function buildMonthReview(input: ReviewInput): MonthReview {
   const isIncome: Keep = (t) => t.type === 'INCOME';
   const income = compare(isIncome);
   const spending = compare((t) => t.type === 'EXPENSE');
-  const hasLogged = current.some(isIncome);
+  // review.md: a month with any INCOME entry uses what is logged, so a payday dated
+  // after today counts as logged even though it is not in the total so far.
+  const wholeMonth = byMonth.get(month) ?? [];
+  const hasLogged = wholeMonth.some(isIncome);
+  // Not paid yet is not below usual, so these categories are never flagged as such.
+  const paidLater = new Set(
+    wholeMonth.filter((t) => isIncome(t) && day !== null && dayOf(t) > day).map((t) => t.categoryId),
+  );
   // The income question is about the whole month, so the regular amount uses whole earlier months.
   const regular = regularAmount(earlierSums(isIncome, null), month, dataMonths);
 
   const categoryLines = buildCategoryLines(categories, targets, month, compare);
   const dataLevel = dataLevelFor(current, month, day);
   const notable =
-    dataLevel === 'ok' ? pickNotable(categoryLines, current, byMonth, dataMonths, hasLogged) : [];
+    dataLevel === 'ok' ? pickNotable(categoryLines, current, byMonth, dataMonths, paidLater) : [];
 
   return {
     month,
@@ -182,15 +189,17 @@ function pickNotable(
   current: Transaction[],
   byMonth: Map<string, Transaction[]>,
   dataMonths: Set<string>,
-  hasLogged: boolean,
+  paidLater: Set<string>,
 ): Notable[] {
+  // With no income logged so far, review.md says make no claim that depends on income.
+  const incomeSoFar = current.some((t) => t.type === 'INCOME');
   const found: Notable[] = [];
   for (const line of lines) {
     if (line.type === 'EXPENSE' && line.aboveUsual && line.usual !== null) {
       found.push({ kind: 'category-above-usual', categoryId: line.categoryId, amount: line.thisMonth, gap: line.thisMonth - line.usual, text: '' });
     }
-    // With no income logged, review.md says make no claim that depends on income.
-    if (line.type === 'INCOME' && hasLogged && isBelowUsual(line.thisMonth, line.usual) && line.usual !== null) {
+    const incomeCheck = line.type === 'INCOME' && incomeSoFar && !paidLater.has(line.categoryId);
+    if (incomeCheck && isBelowUsual(line.thisMonth, line.usual) && line.usual !== null) {
       found.push({ kind: 'income-below-usual', categoryId: line.categoryId, amount: line.thisMonth, gap: line.usual - line.thisMonth, text: '' });
     }
   }

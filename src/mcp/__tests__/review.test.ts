@@ -228,6 +228,49 @@ describe('buildMonthReview', () => {
     ]);
   });
 
+  it('counts income dated after today as logged but not in the total so far', () => {
+    const transactions = [...filler('2026-10'), tx('2026-10-28', 'INCOME', 'salary', 230000)];
+    const result = review({ month: '2026-10', now: new Date('2026-10-12T12:00:00Z'), transactions });
+    expect(result).toMatchObject({
+      income: { logged: 0, hasLogged: true },
+      incomeQuestion: { ask: false },
+    });
+  });
+
+  it('makes no income-below-usual claim when no income is logged', () => {
+    const transactions = [
+      ...each(PRIOR, (m) => [...filler(m), tx(`${m}-25`, 'INCOME', 'salary', 230000)]),
+      ...filler('2026-09'),
+    ];
+    expect(review({ transactions }).notable).toEqual([]);
+  });
+
+  it('does not flag income below usual when this month is paid only after today', () => {
+    const transactions = [
+      ...each(PRIOR.concat('2026-09'), (m) => [...filler(m), tx(`${m}-05`, 'INCOME', 'salary', 230000)]),
+      ...filler('2026-10'),
+      tx('2026-10-28', 'INCOME', 'salary', 230000),
+    ];
+    const result = review({ month: '2026-10', now: new Date('2026-10-12T12:00:00Z'), transactions });
+    expect(result.notable).toEqual([]);
+  });
+
+  it('does not flag an income category paid after today when another is paid so far', () => {
+    const transactions = [
+      ...each(PRIOR.concat('2026-09'), (m) => [
+        ...filler(m),
+        tx(`${m}-05`, 'INCOME', 'salary', 230000),
+        tx(`${m}-03`, 'INCOME', 'side', 20000),
+      ]),
+      ...filler('2026-10'),
+      tx('2026-10-03', 'INCOME', 'side', 20000),
+      tx('2026-10-28', 'INCOME', 'salary', 230000),
+    ];
+    const categories = [cat('food'), cat('salary', 'INCOME'), cat('side', 'INCOME')];
+    const result = review({ month: '2026-10', now: new Date('2026-10-12T12:00:00Z'), transactions, categories });
+    expect(result.notable).toEqual([]);
+  });
+
   it('keeps at most three notable entries, largest gap first', () => {
     const ids = ['a', 'b', 'c', 'd'];
     const halves = [1500, 2000, 2500, 3000];
