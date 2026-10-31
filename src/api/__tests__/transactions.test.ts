@@ -424,3 +424,121 @@ describe('createTransaction without a recurring link', () => {
     expect(await store.get({ PK: 'USER#user-1', SK: 'TXN#2026-10#t1' })).toMatchObject({ yearMonth: '2026-10', createdAt: '2026-09-30T00:00:00.000Z' });
   });
 });
+
+describe('strict month and date validation (HOA-46)', () => {
+  const base = { amount: 1500, type: 'EXPENSE', categoryId: 'cat-food', description: 'Rent', date: '2026-09-01' };
+  const recurringId = '3f2b8c1e-9a4d-4e7f-b1c2-0d9e8f7a6b5c';
+  const otherId = '8a7e3c1d-5b2f-4e60-9d14-7c2b1a0f3e55';
+  const stored = { transactionId: 'txn-1', yearMonth: '2026-09', ...base, createdAt: '2026-09-01T09:00:00.000Z' };
+  const params = { yearMonth: '2026-09', transactionId: 'txn-1' };
+
+  it.each([
+    ['2026x', '10'], ['2026', '1x'], ['26', '10'], ['1999', '10'], ['2026', '0'], ['2026', '013'], [' 2026', '10'], ['2026', '1.5'],
+  ])('lists nothing and returns 400 for year %s month %s', async (year, month) => {
+    const spy = vi.spyOn(store, 'query');
+    const res = await getTransactions(makeEvent({ query: { year, month } }), 'user-1', {});
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toBe('Invalid year or month');
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it.each([['2026', '9'], ['2026', '09']])('accepts year %s month %s', async (year, month) => {
+    const res = await getTransactions(makeEvent({ query: { year, month } }), 'user-1', {});
+    expect(res.statusCode).toBe(200);
+  });
+
+  it.each(['2026-13-45', '2026-02-30', '2026-00-10'])('rejects the date %s on create', async (date) => {
+    const spy = vi.spyOn(store, 'put');
+    const res = await createTransaction(makeEvent({ body: { ...base, date } }), 'user-1', {});
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toBe('date must be a real date in YYYY-MM-DD format');
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it.each(['2026-13-45', '2026-02-30'])('rejects the date %s on update', async (date) => {
+    await seedUser(store, 'user-1', [{ SK: 'TXN#2026-09#txn-1', ...stored }]);
+    const res = await updateTransaction(makeEvent({ body: { ...base, date } }), 'user-1', params);
+    expect(res.statusCode).toBe(400);
+    expect(await store.get({ PK: 'USER#user-1', SK: 'TXN#2026-09#txn-1' })).toMatchObject({ date: '2026-09-01' });
+  });
+
+  it('accepts a leap day', async () => {
+    const res = await createTransaction(makeEvent({ body: { ...base, date: '2028-02-29' } }), 'user-1', {});
+    expect(res.statusCode).toBe(201);
+  });
+
+  it.each(['2026-13', '2026-00', '2026-1', 'October'])('rejects the yearMonth %s on update and delete', async (yearMonth) => {
+    const put = await updateTransaction(makeEvent({ body: base }), 'user-1', { yearMonth, transactionId: 'txn-1' });
+    expect(put.statusCode).toBe(400);
+    expect(JSON.parse(put.body).error).toBe('yearMonth must be in YYYY-MM format');
+    const del = await deleteTransaction(makeEvent(), 'user-1', { yearMonth, transactionId: 'txn-1' });
+    expect(del.statusCode).toBe(400);
+    expect(JSON.parse(del.body).error).toBe('yearMonth must be in YYYY-MM format');
+  });
+
+  it('still lists a stored transaction whose date is not a real date', async () => {
+    await seedUser(store, 'user-1', [{ SK: 'TXN#2026-09#txn-1', ...stored, date: '2026-09-45' }]);
+    const res = await getTransactions(makeEvent({ query: { year: '2026', month: '9' } }), 'user-1', {});
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body).transactions[0].date).toBe('2026-09-45');
+  });
+
+  describe('recurringId on update', () => {
+    const linked = { ...stored, recurringId };
+
+    it('unlinks when recurringId is null', async () => {
+      await seedUser(store, 'user-1', [{ SK: 'TXN#2026-09#txn-1', ...linked }]);
+      const res = await updateTransaction(makeEvent({ body: { ...base, recurringId: null } }), 'user-1', params);
+      expect(res.statusCode).toBe(200);
+      expect(JSON.parse(res.body).transaction).not.toHaveProperty('recurringId');
+      expect(await store.get({ PK: 'USER#user-1', SK: 'TXN#2026-09#txn-1' })).not.toHaveProperty('recurringId');
+    });
+
+    it('keeps the link when recurringId is omitted', async () => {
+      await seedUser(store, 'user-1', [{ SK: 'TXN#2026-09#txn-1', ...linked }]);
+      const res = await updateTransaction(makeEvent({ body: base }), 'user-1', params);
+      expect(JSON.parse(res.body).transaction.recurringId).toBe(recurringId);
+    });
+
+    it('replaces the link when a UUID is sent', async () => {
+      await seedUser(store, 'user-1', [{ SK: 'TXN#2026-09#txn-1', ...linked }]);
+      const res = await updateTransaction(makeEvent({ body: { ...base, recurringId: otherId } }), 'user-1', params);
+      expect(JSON.parse(res.body).transaction.recurringId).toBe(otherId);
+    });
+
+    it('unlinks when the update also moves the month', async () => {
+      await seedUser(store, 'user-1', [{ SK: 'TXN#2026-09#txn-1', ...linked }]);
+      const res = await updateTransaction(makeEvent({ body: { ...base, date: '2026-10-01', recurringId: null } }), 'user-1', params);
+      expect(res.statusCode).toBe(200);
+      expect(await store.get({ PK: 'USER#user-1', SK: 'TXN#2026-10#txn-1' })).not.toHaveProperty('recurringId');
+    });
+  });
+
+  describe('create semantics', () => {
+    it('treats recurringId null on create as no link', async () => {
+      const res = await createTransaction(makeEvent({ body: { ...base, recurringId: null } }), 'user-1', {});
+      expect(res.statusCode).toBe(201);
+      expect(JSON.parse(res.body).transaction).not.toHaveProperty('recurringId');
+      const [item] = await store.query('USER#user-1', { skPrefix: 'TXN#2026-09' });
+      expect(item).not.toHaveProperty('recurringId');
+    });
+
+    it('replaces a transaction when the client id already exists and still returns 201', async () => {
+      const transactionId = '6f1d2c8e-3b4a-4c5d-8e9f-0a1b2c3d4e5f';
+      const first = await createTransaction(makeEvent({ body: { ...base, transactionId } }), 'user-1', {});
+      const second = await createTransaction(makeEvent({ body: { ...base, amount: 2000, transactionId } }), 'user-1', {});
+      expect(first.statusCode).toBe(201);
+      expect(second.statusCode).toBe(201);
+      const items = await store.query('USER#user-1', { skPrefix: 'TXN#2026-09' });
+      expect(items).toHaveLength(1);
+      expect(items[0].amount).toBe(2000);
+    });
+
+    it('accepts a categoryId and recurringId that match no record', async () => {
+      const res = await createTransaction(
+        makeEvent({ body: { ...base, categoryId: 'no-such-category', recurringId: otherId } }), 'user-1', {},
+      );
+      expect(res.statusCode).toBe(201);
+    });
+  });
+});

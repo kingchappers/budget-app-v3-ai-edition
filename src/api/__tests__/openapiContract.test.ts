@@ -335,7 +335,7 @@ const ERROR_CASES: ErrorCase[] = [
       body: { amount: 1400, type: 'EXPENSE', categoryId: 'cat-groceries', date: '2026-10-29' },
     }),
   },
-  { key: 'DELETE /api/transactions/{yearMonth}/{transactionId} 400', run: async () => ({ path: { yearMonth: 'October', transactionId: UUID } }) },
+  { key: 'DELETE /api/transactions/{yearMonth}/{transactionId} 400', run: async () => ({ path: { yearMonth: '2026-13', transactionId: UUID } }) },
   { key: 'GET /api/pots 400', run: async () => ({ query: { asOf: '2030-01' } }) },
   {
     key: 'PUT /api/pots/{categoryId} 400',
