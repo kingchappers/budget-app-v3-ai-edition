@@ -43,7 +43,7 @@ Write the body to a fresh temporary file first (see "Send it" in [recipes.md](re
 ```
 
 ```sh
-body=$(mktemp)   # write the JSON to this path with your file tool, then:
+body=$(mktemp) && echo "$body"   # prints the path: write the JSON to exactly that path, then:
 curl -sS -w '\nHTTP %{http_code}\n' -X POST -H "Authorization: Bearer $HOARDWISE_TOKEN" -H "Content-Type: application/json" \
   --data @"$body" "$HOARDWISE_URL/api/transactions"
 rm -f "$body"

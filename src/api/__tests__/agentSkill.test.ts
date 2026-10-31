@@ -58,6 +58,7 @@ const NOT_HANDLED_PHRASE = /not yet handled/i;
 const INCOME_QUESTION_POINTER = /when no income is logged, the one question is the income question; see income/i;
 const NO_USER_TEXT_IN_SHELL = /never put (user-supplied|user) text inside a shell-quoted string/i;
 const BODY_FROM_TEMP_FILE = /body=\$\(mktemp\)[\s\S]*--data @"\$body"[\s\S]*rm -f "\$body"/;
+const BODY_PATH_PRINTED = /^\s*body=\$\(mktemp\) && echo "\$body"/m;
 const BANNED_BODY_ROUTES = [/body\.json/, /<<'?EOF'?/, /\bjq\b/];
 const CURL_STATUS_FLAG = "-w '\\nHTTP %{http_code}\\n'";
 const NO_TRANSACTIONS_QUESTION = 'Was this month tracked somewhere else?';
@@ -485,6 +486,11 @@ describe('recipes: logging, pay-day view and safety', () => {
     for (const banned of BANNED_BODY_ROUTES) {
       expect(skillFiles().filter((file) => banned.test(readSkillFile(file)))).toEqual([]);
     }
+  });
+
+  it('prints the temp file path in both POST examples so the agent can write to it', () => {
+    expect(recipes).toMatch(BODY_PATH_PRINTED);
+    expect(readSkillFile('reference.md')).toMatch(BODY_PATH_PRINTED);
   });
 
   it('has no single-quoted JSON literal after -d in any skill file', () => {
