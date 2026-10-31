@@ -1,6 +1,6 @@
 // Mirrors the app: app/lib/summary.ts (daysInMonth, normaliseTargetToMonth)
 // and app/lib/insights.ts (SPARSE_BELOW). Rules: plugins/hoardwise/skills/budget/review.md.
-const SPARSE_BELOW = 0.25;
+export const SPARSE_BELOW = 0.25;
 const MAX_USUAL_MONTHS = 6;
 const MIN_USUAL_MONTHS = 3;
 const REGULAR_SPREAD = 0.05;
