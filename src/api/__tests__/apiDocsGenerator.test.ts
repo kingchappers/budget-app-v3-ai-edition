@@ -95,4 +95,50 @@ describe('API docs generator', () => {
     expect(markdown).toMatch(/- `legs` \(integer, optional\)/);
     expect(markdown).toMatch(/- 404: No such ant\./);
   });
+
+  it('keeps full response text with balanced code spans on every line', () => {
+    const markdown = renderAgentDocs(loadSpec());
+    for (const line of markdown.split('\n')) {
+      expect((line.match(/`/g) ?? []).length % 2, line).toBe(0);
+    }
+    expect(markdown).toContain('You can have at most 25 access tokens. Revoke one first.`');
+    expect(markdown).not.toMatch(/\.\.\.$/m);
+  });
+
+  it('renders nullable enums and composed schemas with their real types', () => {
+    const spec = {
+      openapi: '3.1.0',
+      info: { title: 'T', version: '1', description: 'D' },
+      tags: [{ name: 't' }],
+      paths: {
+        '/api/x': {
+          post: {
+            tags: ['t'],
+            requestBody: {
+              content: { 'application/json': { schema: { $ref: '#/components/schemas/In' } } },
+            },
+            responses: { '200': { description: 'Ok (see `a. b`). Then more.' } },
+          },
+        },
+      },
+      components: {
+        schemas: {
+          Freq: { type: 'string', enum: ['A', 'B'] },
+          In: {
+            type: 'object',
+            properties: {
+              days: { type: ['integer', 'null'], enum: [90, 180, null] },
+              freq: { anyOf: [{ $ref: '#/components/schemas/Freq' }, { type: 'null' }] },
+              wrapped: { allOf: [{ $ref: '#/components/schemas/Freq' }] },
+            },
+          },
+        },
+      },
+    };
+    const markdown = renderAgentDocs(spec);
+    expect(markdown).toContain('`days` (integer|null (90|180|null), optional)');
+    expect(markdown).toContain('`freq` (one of: string (A|B), null, optional)');
+    expect(markdown).toContain('`wrapped` (string (A|B), optional)');
+    expect(markdown).toContain('- 200: Ok (see `a. b`). Then more.');
+  });
 });

@@ -24,21 +24,37 @@ function resolveRef(spec, node) {
 
 function shortType(spec, schema) {
   const node = resolveRef(spec, schema);
-  if (node.enum) return `${node.type ?? 'string'} (${node.enum.join('|')})`;
+  const branches = node.oneOf ?? node.anyOf ?? node.allOf;
+  if (branches) {
+    const types = [...new Set(branches.map((branch) => shortType(spec, branch)))];
+    return types.length === 1 ? types[0] : `one of: ${types.join(', ')}`;
+  }
+  const type = Array.isArray(node.type) ? node.type.join('|') : node.type;
+  if (node.enum) return `${type ?? 'string'} (${node.enum.map((value) => (value === null ? 'null' : value)).join('|')})`;
   if (node.type === 'array') return `array of ${shortType(spec, node.items ?? {})}`;
   if (node.type === 'object' || node.properties) return 'object';
-  if (Array.isArray(node.type)) return node.type.join('|');
-  return node.type ?? 'any';
+  return type ?? 'any';
 }
 
 function oneLine(text) {
   return String(text ?? '').replace(/\s+/g, ' ').trim();
 }
 
+// First sentence, ignoring full stops inside backticks or parentheses.
 function firstSentence(text) {
   const flat = oneLine(text);
-  const end = flat.search(/[.!?](\s|$)/);
-  return end === -1 ? flat : flat.slice(0, end + 1);
+  let inCode = false;
+  let depth = 0;
+  for (let i = 0; i < flat.length; i += 1) {
+    const char = flat[i];
+    if (char === '`') inCode = !inCode;
+    else if (!inCode && char === '(') depth += 1;
+    else if (!inCode && char === ')') depth = Math.max(0, depth - 1);
+    else if (!inCode && depth === 0 && '.!?'.includes(char) && (i + 1 === flat.length || flat[i + 1] === ' ')) {
+      return flat.slice(0, i + 1);
+    }
+  }
+  return flat;
 }
 
 function fieldLines(spec, schema, depth) {
@@ -85,7 +101,7 @@ function renderOperation(spec, method, template, pathItem, operation) {
   if (responses.length > 0) {
     lines.push('Responses:');
     for (const [status, response] of responses) {
-      lines.push(`- ${status}: ${firstSentence(resolveRef(spec, response).description)}`);
+      lines.push(`- ${status}: ${oneLine(resolveRef(spec, response).description)}`);
     }
     lines.push('');
   }
