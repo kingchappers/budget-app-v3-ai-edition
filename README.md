@@ -207,6 +207,32 @@ The publishing tool is pinned: `deploy/demo/package.json` and its lockfile fix t
 
 Run your own copy as a single container with SQLite and the built-in login: see [`docs/SELF-HOSTING.md`](docs/SELF-HOSTING.md).
 
+## Use Hoardwise with an AI assistant
+
+The `budget` skill teaches an AI coding agent to review your month in a calm, short way, looking at categories, pots and trends. If you ask it to, it will also log a spend.
+
+1. Create a read token in the app under Settings > Access tokens.
+2. Set `HOARDWISE_URL` (the address of your Hoardwise) and `HOARDWISE_TOKEN` in the environment of the shell that starts your agent. Never paste the token into a chat.
+3. Install the plugin in Claude Code:
+
+   ```bash
+   claude plugin install hoardwise --marketplace kingchappers/hoardwise
+   ```
+
+   Inside a session, `/plugin install hoardwise --marketplace kingchappers/hoardwise` does the same. The two-step form is:
+
+   ```bash
+   claude plugin marketplace add kingchappers/hoardwise
+   claude plugin install hoardwise@hoardwise
+   ```
+
+   To install by hand instead, copy `plugins/hoardwise/skills/budget` to `~/.claude/skills/budget` (all projects) or `.claude/skills/budget` (one project).
+4. Ask: "How am I doing this month?"
+
+The skill works with Claude Code and, as plain markdown, with other coding agents. The Claude desktop, web and mobile assistants will connect through MCP later. The full API description is [`docs/openapi.yaml`](docs/openapi.yaml).
+
+For maintainers: change the skill only through a pull request, and bump `version` in `plugins/hoardwise/.claude-plugin/plugin.json` whenever the skill changes, because people only receive a new copy when that number changes. Anyone who wants a fixed version can add the marketplace at a tag, as `kingchappers/hoardwise#<tag>`.
+
 ## Decisions
 
 Notable architecture/product decisions — including things that were tried and reverted — are recorded in [`docs/DECISIONS.md`](docs/DECISIONS.md). Check there before re-attempting something that looks unbuilt but was actually tried before (e.g. automatic bank sync).

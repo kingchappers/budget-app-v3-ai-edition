@@ -180,6 +180,7 @@ Export and import only touch your own data, never the login records, so the step
 - The login throttle is global: anyone who can reach the login can lock you out for up to 15 minutes. `reset-password` clears it.
 - The recovery code and the first-run setup code are the only plaintext credentials ever written to the log or to disk; the file (`SETUP_CODE.txt`) is owner-only and removed when the code is used, at shutdown and at the next start.
 - Backups on the same volume are not off-site; see above.
+- Personal access tokens (Settings > Access tokens) let scripts and AI assistants use the API. To set up an assistant, see [Use Hoardwise with an AI assistant](../README.md#use-hoardwise-with-an-ai-assistant); the routes are described in [`docs/openapi.yaml`](openapi.yaml).
 - Run it behind HTTPS (or on a network you trust). See [HTTPS](#https) for what plain HTTP gives up.
 
 ## For maintainers: releasing

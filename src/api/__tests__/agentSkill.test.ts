@@ -7,6 +7,14 @@ import { loadSpec, operations } from './openapiSpec';
 const REPO_ROOT = resolve(__dirname, '../../..');
 const PLUGIN_DIR = resolve(REPO_ROOT, 'plugins/hoardwise');
 const SKILL_DIR = resolve(PLUGIN_DIR, 'skills/budget');
+const PRIMARY_INSTALL = 'claude plugin install hoardwise --marketplace kingchappers/hoardwise';
+const IN_SESSION_INSTALL = '/plugin install hoardwise --marketplace kingchappers/hoardwise';
+const MARKETPLACE_ADD = 'claude plugin marketplace add kingchappers/hoardwise';
+const PINNED_MARKETPLACE_SOURCE = 'kingchappers/hoardwise#<tag>';
+const MANUAL_COPY_PATHS = ['plugins/hoardwise/skills/budget', '~/.claude/skills/budget', '.claude/skills/budget'];
+const NO_TOKEN_IN_CHAT = /never paste the token into a chat/i;
+const BUMP_VERSION = /bump `version` in `plugins\/hoardwise\/\.claude-plugin\/plugin\.json`/i;
+const CHANGELOG_BULLET = /^- \*\*Agent skill\.\*\*/m;
 // Wording-sensitive assertions live here so a wording edit is a one-line change.
 const REVIEW_HEADINGS: Record<string, string> = {
   'review recipe': 'monthly review',
@@ -378,5 +386,51 @@ describe('recipes: logging, pay-day view and safety', () => {
 
   it('retries a failed create once only', () => {
     expect(recipes).toMatch(RETRY_ONCE);
+  });
+});
+
+describe('install instructions', () => {
+  const readme = readFileSync(resolve(REPO_ROOT, 'README.md'), 'utf8');
+  const section = readme.split(/^## /m).find((part) => part.startsWith('Use Hoardwise with an AI assistant')) ?? '';
+  const readJson = (path: string): { name: string } => JSON.parse(readFileSync(resolve(REPO_ROOT, path), 'utf8'));
+  const marketplace = readJson('.claude-plugin/marketplace.json').name;
+  const plugin = readJson('plugins/hoardwise/.claude-plugin/plugin.json').name;
+
+  it('has its own README section after Self-hosting', () => {
+    expect(section).not.toBe('');
+    expect(readme.indexOf('## Self-hosting')).toBeLessThan(readme.indexOf('## Use Hoardwise with an AI assistant'));
+  });
+
+  it('gives the one-command install', () => {
+    expect(section).toContain(PRIMARY_INSTALL);
+    expect(section).toContain(IN_SESSION_INSTALL);
+  });
+
+  it('gives the two-step install, built from the real names', () => {
+    expect(section).toContain(MARKETPLACE_ADD);
+    expect(section).toContain(`claude plugin install ${plugin}@${marketplace}`);
+    expect(PRIMARY_INSTALL).toContain(`install ${plugin} --marketplace`);
+  });
+
+  it('gives the manual copy routes', () => {
+    for (const path of MANUAL_COPY_PATHS) expect(section).toContain(path);
+  });
+
+  it('names the environment variables, the API description and the token rule', () => {
+    expect(section).toContain('HOARDWISE_URL');
+    expect(section).toContain('HOARDWISE_TOKEN');
+    expect(section).toContain('docs/openapi.yaml');
+    expect(section).toMatch(NO_TOKEN_IN_CHAT);
+  });
+
+  it('tells maintainers to bump the version and how to pin a tag', () => {
+    expect(section).toMatch(BUMP_VERSION);
+    expect(section).toContain(PINNED_MARKETPLACE_SOURCE);
+  });
+
+  it('lists the skill in the changelog under Unreleased', () => {
+    const changelog = readFileSync(resolve(REPO_ROOT, 'CHANGELOG.md'), 'utf8');
+    const unreleased = changelog.split(/^## /m).find((part) => part.startsWith('Unreleased')) ?? '';
+    expect(unreleased).toMatch(CHANGELOG_BULLET);
   });
 });
