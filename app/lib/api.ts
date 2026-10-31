@@ -1,3 +1,4 @@
+import type { ApiSpec } from './apiDocs';
 import type { TrashEntityType, TrashEntry } from './trash';
 import type { AccessToken, AccessTokenExpiryDays, AccessTokenScope, Account, AccountKind, AccountType, Category, CategoryGroup, CategoryTarget, PotSettingsInput, PotSummary, Recurring, RecurringFrequency, TargetPeriod, Transaction, TransactionType } from './types';
 
@@ -188,6 +189,9 @@ export function createApi(request: Request) {
       return res.account;
     },
 
+    getApiSpec: async (): Promise<ApiSpec> => {
+      return await request('/api/openapi.json') as ApiSpec;
+    },
     getTrash: async (): Promise<TrashEntry[]> => {
       const res = await request('/api/trash') as { items: TrashEntry[] };
       return res.items;

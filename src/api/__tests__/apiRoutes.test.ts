@@ -8,7 +8,12 @@ describe('registerApiRoutes', () => {
   const routes = router.routes();
 
   it('registers every API route', () => {
-    expect(routes).toHaveLength(34);
+    expect(routes).toHaveLength(36);
+  });
+
+  it('includes the docs routes', () => {
+    expect(routes).toContainEqual({ method: 'GET', template: '/api/openapi.json' });
+    expect(routes).toContainEqual({ method: 'GET', template: '/api/docs/agents' });
   });
 
   it('includes the push and token routes', () => {

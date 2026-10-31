@@ -185,6 +185,21 @@ function SettingsContent() {
           </span>
           <IconChevronRight size={18} aria-hidden />
         </Link>
+        {!isDemo && (
+          <Link
+            to="/docs"
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+              minHeight: 44, padding: '8px 0', textDecoration: 'none', color: 'inherit',
+            }}
+          >
+            <span>
+              <Text fw={500}>API docs</Text>
+              <Text size="sm" c="dimmed">How to read your data with an access token.</Text>
+            </span>
+            <IconChevronRight size={18} aria-hidden />
+          </Link>
+        )}
       </Card>
     </Stack>
   );

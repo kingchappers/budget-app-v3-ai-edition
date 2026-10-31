@@ -86,6 +86,8 @@ tags:
     description: Web push reminder subscriptions. Not available to access tokens.
   - name: tokens
     description: Personal API token management. Not available to access tokens.
+  - name: docs
+    description: This API's own documentation, for scripts and agents. A read token can fetch it.
 security:
   - bearerToken: []
   - sessionCookie: []
@@ -2168,6 +2170,51 @@ paths:
           $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
+  /api/openapi.json:
+    get:
+      tags: [docs]
+      summary: Get the OpenAPI document
+      description: >-
+        Returns this API's OpenAPI 3.1 document as JSON. It describes every route and holds no household data. A read
+        token is enough.
+      operationId: getOpenApiDocument
+      x-token-access: read
+      responses:
+        '200':
+          description: The OpenAPI document.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [openapi]
+                properties:
+                  openapi:
+                    type: string
+                    examples: ['3.1.0']
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+  /api/docs/agents:
+    get:
+      tags: [docs]
+      summary: Get the agent reference
+      description: >-
+        Returns a compact Markdown reference to this API, grouped by topic, for an agent or a script. It holds no
+        household data. A read token is enough.
+      operationId: getAgentDocs
+      x-token-access: read
+      responses:
+        '200':
+          description: The agent reference.
+          content:
+            text/markdown:
+              schema:
+                type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
 components:
   securitySchemes:
     bearerToken:

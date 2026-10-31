@@ -9,7 +9,9 @@ import {
   buildCspHeader,
   buildHeadersFile,
   findExternalReferences,
+  findApiSpecFiles,
   findMarkerFiles,
+  readApiSpecNeedle,
   findServerOnlyCode,
   inlineScriptHashes,
   readMarker,
@@ -58,6 +60,30 @@ describe('findMarkerFiles', () => {
 
   it('ignores file types it does not scan', () => {
     expect(findMarkerFiles(fixture({ 'a.png': 'MARK-1' }), 'MARK-1')).toEqual([]);
+  });
+});
+
+describe('findApiSpecFiles', () => {
+  const needle = 'The Hoardwise budget API. Every route is under';
+
+  it('lists the files that hold the spec text', () => {
+    const dir = fixture({ 'assets/a.js': `var d="${needle} /api";`, 'assets/b.js': 'var b=1;', 'x.json': needle });
+    expect(findApiSpecFiles(dir, needle).sort()).toEqual(['assets/a.js', 'x.json']);
+  });
+
+  it('passes a build without the spec text', () => {
+    expect(findApiSpecFiles(fixture({ 'assets/b.js': 'var b=1;' }), needle)).toEqual([]);
+  });
+});
+
+describe('readApiSpecNeedle', () => {
+  it('reads the opening of the description from the generated spec', () => {
+    const spec = JSON.stringify({ info: { description: 'The Hoardwise budget API. Every route is under `/api`.\n\nMore.' } });
+    expect(readApiSpecNeedle(spec)).toBe('The Hoardwise budget API. Every route is under');
+  });
+
+  it('throws when the description is missing', () => {
+    expect(() => readApiSpecNeedle('{"info":{}}')).toThrow(/description/);
   });
 });
 
@@ -192,6 +218,13 @@ describe('check-demo-build CLI', () => {
   it('--demo fails on server-only code even with the marker present', () => {
     const dir = fixture({ 'index.html': page, 'assets/app.js': `var m="${DEMO_MARKER}";import"node:fs";` });
     expect(run('--demo', dir).status).toBe(1);
+  });
+
+  it('--demo fails and names the file when the API spec is in the build', () => {
+    const dir = fixture({ 'index.html': page, 'assets/app.js': `var m="${DEMO_MARKER}";`, 'assets/spec.js': 'var d="The Hoardwise budget API. Every route is under /api";' });
+    const result = run('--demo', dir);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('assets/spec.js');
   });
 
   it('--demo passes a clean demo build and writes the CSP header beside it', () => {
