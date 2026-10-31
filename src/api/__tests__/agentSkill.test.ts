@@ -1,7 +1,8 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { basename, resolve } from 'node:path';
 import { describe, it, expect } from 'vitest';
 import { parse } from 'yaml';
+import { loadSpec, operations } from './openapiSpec';
 
 const REPO_ROOT = resolve(__dirname, '../../..');
 const PLUGIN_DIR = resolve(REPO_ROOT, 'plugins/hoardwise');
@@ -76,5 +77,73 @@ describe('budget skill', () => {
 
   it('is at most 500 lines', () => {
     expect(skill.split('\n').length).toBeLessThanOrEqual(500);
+  });
+});
+
+const SPEC_URL = 'https://github.com/kingchappers/hoardwise/blob/main/docs/openapi.yaml';
+
+function mentionedEndpoints(markdown: string): { method: string; path: string }[] {
+  const pattern = /\b(GET|POST|PUT|DELETE)\s+(\/api\/[^\s`)]+)/g;
+  return [...markdown.matchAll(pattern)].map((match) => ({ method: match[1], path: match[2] }));
+}
+
+const normalise = (path: string): string => path.replace(/\{[^}]*\}/g, '{}');
+
+function skillFiles(): string[] {
+  return readdirSync(SKILL_DIR, { recursive: true, encoding: 'utf8' }).filter((file) => file.endsWith('.md'));
+}
+
+describe('endpoints and facts', () => {
+  const spec = operations(loadSpec());
+  const findOperation = (method: string, path: string) =>
+    spec.find((op) => op.method === method && normalise(op.template) === normalise(path));
+  const mentions = skillFiles().flatMap((file) =>
+    mentionedEndpoints(readSkillFile(file)).map((mention) => ({ ...mention, file })),
+  );
+
+  it('mentions at least one endpoint', () => {
+    expect(mentions.length).toBeGreaterThan(0);
+  });
+
+  it('only mentions endpoints that exist in the OpenAPI spec', () => {
+    const missing = mentions.filter((m) => !findOperation(m.method, m.path)).map((m) => `${m.file}: ${m.method} ${m.path}`);
+    expect(missing).toEqual([]);
+  });
+
+  it('marks every mentioned write method as needing a write token', () => {
+    const notWrite = mentions
+      .filter((m) => m.method !== 'GET')
+      .filter((m) => findOperation(m.method, m.path)?.operation['x-token-access'] !== 'write')
+      .map((m) => `${m.file}: ${m.method} ${m.path}`);
+    expect(notWrite).toEqual([]);
+  });
+
+  it('states the money, date and type facts in reference.md', () => {
+    const reference = readSkillFile('reference.md');
+    expect(reference).toMatch(/integer pence/i);
+    expect(reference).toContain('YYYY-MM-DD');
+    expect(reference).toContain('YYYY-MM`');
+    for (const name of ['EXPENSE', 'INCOME', 'SET_ASIDE', 'TAKE_OUT', 'Spend', 'Income', 'Add to pot', 'Take from pot']) {
+      expect(reference).toContain(name);
+    }
+  });
+
+  it('contains no token-looking value except the examples', () => {
+    const found = skillFiles().flatMap((file) => readSkillFile(file).match(/hw[rw]_[A-Za-z0-9_-]{6,}/g) ?? []);
+    expect(found.filter((value) => value !== 'hwr_EXAMPLE' && value !== 'hww_EXAMPLE')).toEqual([]);
+  });
+
+  it('reads the token from the environment on every Authorization line', () => {
+    const lines = skillFiles()
+      .flatMap((file) => readSkillFile(file).split('\n'))
+      .filter((line) => line.includes('Authorization'));
+    expect(lines.length).toBeGreaterThan(0);
+    expect(lines.filter((line) => !/\$\{?HOARDWISE_TOKEN\}?/.test(line))).toEqual([]);
+  });
+
+  it('links SKILL.md to reference.md and the full spec', () => {
+    const skill = readSkillFile('SKILL.md');
+    expect(skill).toContain('](reference.md)');
+    expect(skill).toContain(SPEC_URL);
   });
 });
