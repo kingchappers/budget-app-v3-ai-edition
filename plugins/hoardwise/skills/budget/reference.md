@@ -36,8 +36,13 @@ A transaction has `transactionId`, `yearMonth`, `amount`, `type`, `categoryId`, 
 
 - `POST /api/transactions` adds a transaction and returns `{ transaction }` with status 201. Body: `amount` (integer pence, at least 1), `type`, `categoryId`, `date` (`YYYY-MM-DD`), and optionally `description` (up to 200 characters). `categoryId` is not checked against existing categories, so take it from `GET /api/categories`. Sending the same `transactionId` (a UUID) again replaces that transaction instead of adding a second.
 
+Write the body to a file first (see "Send it" in [recipes.md](recipes.md#log-a-spend)), for example `body.json`:
+
+```json
+{"amount":1250,"type":"EXPENSE","categoryId":"cat-groceries","description":"Weekly shop","date":"2026-10-29"}
+```
+
 ```sh
 curl -sS -X POST -H "Authorization: Bearer $HOARDWISE_TOKEN" -H "Content-Type: application/json" \
-  -d '{"amount":1250,"type":"EXPENSE","categoryId":"cat-groceries","description":"Weekly shop","date":"2026-10-29"}' \
-  "$HOARDWISE_URL/api/transactions"
+  --data @body.json "$HOARDWISE_URL/api/transactions"
 ```

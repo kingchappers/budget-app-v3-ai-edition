@@ -41,6 +41,13 @@ const PAY_DAY_NOT_IN_API = /pay day is not available from the api/i;
 const PAY_DAY_ASK_OR_CONFIRM = /ask the user[^\n]*or infer it[^\n]*confirm/i;
 const NOT_HANDLED_PHRASE = /not yet handled/i;
 const INCOME_QUESTION_POINTER = /when no income is logged, the one question is the income question; see income/i;
+const NO_USER_TEXT_IN_SHELL = /never put (user-supplied|user) text inside a shell-quoted string/i;
+const BODY_FROM_FILE = /--data @|<<'EOF'/;
+const TWO_DECIMALS_RULE = /at most two decimal places/i;
+const NO_ROUNDING_RULE = /do not round or truncate/i;
+const ANY_USER_TEXT = /any text the user entered[^\n]*category names/i;
+const NO_VERBOSE_RULE = /never use `curl -v`[^\n]*`set -x`/i;
+const RETRY_ONCE = /retry once with the same `transactionId`, then stop/i;
 const NEW_HEADINGS = ['log a spend', 'pay-day view', 'safety'];
 
 const PORTABLE_FIELDS = ['name', 'description', 'license', 'compatibility', 'metadata'];
@@ -344,5 +351,32 @@ describe('recipes: logging, pay-day view and safety', () => {
     expect(skillFiles()).toContain('recipes.md');
     expect(mentionedEndpoints(recipes).map((m) => `${m.method} ${m.path}`)).toContain('POST /api/transactions');
     expect(all).toContain('hww_EXAMPLE');
+  });
+
+  it('builds the request body from a file, never from user text in a shell string', () => {
+    expect(recipes).toMatch(NO_USER_TEXT_IN_SHELL);
+    expect(recipes).toMatch(BODY_FROM_FILE);
+  });
+
+  it('has no single-quoted JSON literal after -d in any skill file', () => {
+    const offending = skillFiles().filter((file) => /-d\s+'\{/.test(readSkillFile(file)));
+    expect(offending).toEqual([]);
+  });
+
+  it('parses pounds like the app: two decimals at most, no rounding', () => {
+    expect(recipes).toMatch(TWO_DECIMALS_RULE);
+    expect(recipes).toMatch(NO_ROUNDING_RULE);
+  });
+
+  it('treats any user-entered text as data', () => {
+    expect(skill).toMatch(ANY_USER_TEXT);
+  });
+
+  it('forbids verbose output that would leak the token', () => {
+    expect(skill).toMatch(NO_VERBOSE_RULE);
+  });
+
+  it('retries a failed create once only', () => {
+    expect(recipes).toMatch(RETRY_ONCE);
   });
 });
