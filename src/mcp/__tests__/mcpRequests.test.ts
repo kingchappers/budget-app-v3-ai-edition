@@ -84,7 +84,7 @@ describe('POST /mcp authentication', () => {
     const res = await invoke(makeEvent({ authorization: `Bearer ${token}` }));
     expect(res.statusCode).toBe(200);
     const names = JSON.parse(res.body).result.tools.map((t: { name: string }) => t.name);
-    expect(names).toEqual(['month_review', 'category_detail']);
+    expect(names).toEqual(['month_review', 'category_detail', 'pots_overview', 'chart_data', 'display_guidance']);
   });
 
   it('decodes a base64 body', async () => {

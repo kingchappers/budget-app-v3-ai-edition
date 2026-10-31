@@ -73,20 +73,20 @@ beforeEach(() => {
 });
 
 describe('tool definitions', () => {
-  it.each(['month_review', 'category_detail'])('%s is read-only', (name) => {
+  it.each(['month_review', 'category_detail', 'pots_overview', 'chart_data', 'display_guidance'])('%s is read-only', (name) => {
     const t = tool(name);
     expect(t.access).toBe('read');
     expect(t.annotations).toEqual({ readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false });
   });
 
-  it('lists both tools for a read-scope token', async () => {
+  it('lists exactly the five tools for a read-scope token', async () => {
     const response = await handleMcpBody(
       JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }),
       context('user-a', 'read'),
       MCP_TOOLS,
     );
     const names = JSON.parse(response.body ?? '').result.tools.map((t: { name: string }) => t.name);
-    expect(names).toEqual(expect.arrayContaining(['month_review', 'category_detail']));
+    expect(names).toEqual(['month_review', 'category_detail', 'pots_overview', 'chart_data', 'display_guidance']);
   });
 });
 
@@ -236,5 +236,142 @@ describe('category_detail', () => {
     expect(result.items).toEqual([]);
     expect((await run('category_detail', { categoryId: 'mine' })).ok).toBe(false);
     expect((await data('category_detail', { categoryId: 'mine' }, 'user-b')).name).toBe('Mine');
+  });
+});
+
+async function addPot(userId: string, categoryId: string, archivedAt: string | null = null): Promise<void> {
+  await store.put({ PK: pk(userId), SK: `POT#${categoryId}`, categoryId, monthlyAmount: 10000, goalAmount: 90000, autoContribute: [], archivedAt, updatedAt: '' });
+}
+
+describe('pots_overview', () => {
+  it('lists active pots only, with the stated fields', async () => {
+    await addPot('user-a', 'cat-holidays');
+    await addPot('user-a', 'cat-gifts', '2026-09-01T00:00:00.000Z');
+    await addTx('user-a', '2026-10-02', 'SET_ASIDE', 'cat-holidays', 1000);
+    const result = await data('pots_overview', {});
+    expect(result.note).toBe(NOTE);
+    const ids = result.pots.map((p: { categoryId: string }) => p.categoryId);
+    expect(ids).toContain('cat-holidays');
+    expect(ids).not.toContain('cat-gifts');
+    const holidays = result.pots.find((p: { categoryId: string }) => p.categoryId === 'cat-holidays');
+    expect(Object.keys(holidays).sort()).toEqual(['added', 'balance', 'categoryId', 'goal', 'monthly', 'name', 'spent', 'takenOut']);
+    expect(holidays).toMatchObject({ name: 'Holidays', balance: 1000, goal: 90000, monthly: 10000, added: 1000 });
+  });
+
+  it('refuses a month more than one month ahead and a bad month', async () => {
+    expect((await run('pots_overview', { month: '2026-12' })).ok).toBe(false);
+    expect(await run('pots_overview', { month: 'x' })).toEqual({ ok: false, message: 'month must be YYYY-MM' });
+  });
+
+  it('ignores another user\'s pots', async () => {
+    await addPot('user-b', 'cat-holidays');
+    const holidays = (await data('pots_overview', {})).pots.find((p: { categoryId: string }) => p.categoryId === 'cat-holidays');
+    expect(holidays).toMatchObject({ goal: null, monthly: null });
+  });
+});
+
+describe('chart_data', () => {
+  it('returns empty series and says nothing is logged for a new account', async () => {
+    for (const view of ['month-summary', 'category-share', 'monthly-trend', 'category-vs-target']) {
+      const result = await data('chart_data', { view });
+      expect(result.series).toEqual([]);
+      expect(result.accessibleSummary.toLowerCase()).toContain('nothing is logged yet');
+      expect(result.unit).toBe('pence');
+      expect(result.view).toBe(view);
+    }
+  });
+
+  it('refuses a bad view, months over 12 and a bad month', async () => {
+    expect((await run('chart_data', { view: 'pie' })).ok).toBe(false);
+    expect((await run('chart_data', {})).ok).toBe(false);
+    expect(await run('chart_data', { view: 'monthly-trend', months: 13 })).toEqual({
+      ok: false,
+      message: 'months must be a whole number from 1 to 12',
+    });
+    expect((await run('chart_data', { view: 'month-summary', month: '2026-1' })).ok).toBe(false);
+    expect((await run('chart_data', { view: 'month-summary', month: '2026-12' })).ok).toBe(false);
+  });
+
+  it('month-summary gives income then spending', async () => {
+    await addTx('user-a', '2026-10-02', 'INCOME', 'cat-salary', 200000);
+    await addTx('user-a', '2026-10-03', 'EXPENSE', 'cat-groceries', 1234);
+    const result = await data('chart_data', { view: 'month-summary' });
+    expect(result.series).toEqual([
+      { label: 'Income', value: 200000 },
+      { label: 'Spending', value: 1234 },
+    ]);
+    expect(result.accessibleSummary).toContain('£12.34');
+    expect(result.accessibleSummary.split('. ').length).toBe(1);
+  });
+
+  it('category-share lists spending largest first', async () => {
+    await addTx('user-a', '2026-10-02', 'EXPENSE', 'cat-groceries', 500);
+    await addTx('user-a', '2026-10-03', 'EXPENSE', 'cat-transport', 900);
+    await addTx('user-a', '2026-10-03', 'INCOME', 'cat-salary', 99999);
+    const result = await data('chart_data', { view: 'category-share' });
+    expect(result.series).toEqual([
+      { label: 'Transport', value: 900 },
+      { label: 'Groceries', value: 500 },
+    ]);
+    expect(result.accessibleSummary).toContain('Transport');
+  });
+
+  it('category-share groups everything beyond eight', async () => {
+    for (let i = 1; i <= 10; i += 1) {
+      const id = `cat-x${i}`;
+      await store.put({ PK: pk('user-a'), SK: catSk(id), categoryId: id, name: `Cat ${i}`, type: 'EXPENSE', icon: 'x', isDefault: false, createdAt: '' });
+      await addTx('user-a', '2026-10-02', 'EXPENSE', id, i * 100);
+    }
+    const result = await data('chart_data', { view: 'category-share' });
+    expect(result.series).toHaveLength(9);
+    expect(result.series[0]).toEqual({ label: 'Cat 10', value: 1000 });
+    expect(result.series[8]).toEqual({ label: 'Everything else', value: 300 });
+  });
+
+  it('monthly-trend gives one spending total per month, oldest first', async () => {
+    await addTx('user-a', '2026-08-02', 'EXPENSE', 'cat-groceries', 100);
+    await addTx('user-a', '2026-10-02', 'EXPENSE', 'cat-groceries', 300);
+    const result = await data('chart_data', { view: 'monthly-trend', months: 3 });
+    expect(result.series).toEqual([
+      { label: '2026-08', value: 100 },
+      { label: '2026-09', value: 0 },
+      { label: '2026-10', value: 300 },
+    ]);
+    const long = await data('chart_data', { view: 'monthly-trend' });
+    expect(long.series).toHaveLength(6);
+  });
+
+  it('category-vs-target pairs spending with the target', async () => {
+    await addTx('user-a', '2026-10-02', 'EXPENSE', 'cat-groceries', 4000);
+    await store.put({ PK: pk('user-a'), SK: targetSk('cat-groceries'), categoryId: 'cat-groceries', targetAmount: 30000, period: 'MONTHLY', updatedAt: '' });
+    const result = await data('chart_data', { view: 'category-vs-target' });
+    expect(result.series).toEqual([
+      { label: 'Groceries spent', value: 4000 },
+      { label: 'Groceries target', value: 30000 },
+    ]);
+    expect(result.accessibleSummary.length).toBeGreaterThan(0);
+  });
+
+  it('never returns transactions or descriptions, and ignores another user', async () => {
+    await addTx('user-a', '2026-10-02', 'EXPENSE', 'cat-groceries', 500, 'secret payee');
+    await addTx('user-b', '2026-10-02', 'EXPENSE', 'cat-groceries', 777, 'B only');
+    for (const view of ['month-summary', 'category-share', 'monthly-trend', 'category-vs-target']) {
+      const text = JSON.stringify(await data('chart_data', { view }));
+      expect(text).not.toContain('secret payee');
+      expect(text).not.toContain('B only');
+      expect(text).not.toContain('777');
+    }
+  });
+});
+
+describe('display_guidance', () => {
+  it('is the same for any user, with no amounts', async () => {
+    const a = await data('display_guidance', {}, 'user-a');
+    const b = await data('display_guidance', { ignored: true }, 'user-b');
+    expect(a).toEqual(b);
+    expect(a.principles.length).toBeGreaterThan(5);
+    expect(a.variations.length).toBeGreaterThan(3);
+    expect(JSON.stringify(a)).not.toMatch(/[£$€]|\d/);
+    expect(JSON.stringify(a)).not.toMatch(/#[0-9a-f]{6}/i);
   });
 });

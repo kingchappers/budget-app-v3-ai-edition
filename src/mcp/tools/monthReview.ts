@@ -1,8 +1,7 @@
-import { computePots } from '../../api/potsCalc';
 import { loadBudgetWithHistory, shiftMonth } from '../data';
 import { buildMonthReview, type MonthReview } from '../review';
 import type { McpTool } from '../types';
-import { PRIVACY_NOTE, READ_ONLY, monthIsTooFarAhead, monthOf, readMonth } from './shared';
+import { PRIVACY_NOTE, READ_ONLY, monthIsTooFarAhead, monthOf, potsFor, readMonth } from './shared';
 
 // The month and the six before it.
 const MONTHS_BACK = 6;
@@ -41,19 +40,13 @@ export const monthReviewTool: McpTool = {
     }
 
     const budget = await loadBudgetWithHistory(context.userId, { from: shiftMonth(month, -MONTHS_BACK), to: month });
-    const pots = computePots({
-      transactions: budget.history,
-      potCategoryIds: budget.categories.filter((c) => c.type === 'POT').map((c) => c.categoryId),
-      settings: budget.settings,
-      asOfMonth: month,
-    });
     const review = buildMonthReview({
       month,
       now: context.now,
       categories: budget.categories,
       transactions: budget.transactions,
       targets: budget.targets,
-      pots,
+      pots: potsFor(budget, month),
     });
     return { ok: true, data: { note: PRIVACY_NOTE, ...review, guidance: guidanceFor(review) } };
   },
