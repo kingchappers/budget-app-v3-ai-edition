@@ -40,7 +40,7 @@ function monthSummary(review: MonthReview): { series: Point[]; summary: string }
 
 function categoryShare(review: MonthReview): { series: Point[]; summary: string } {
   const spending = review.categories
-    .filter((c) => c.type === 'EXPENSE' && c.thisMonth > 0)
+    .filter((c) => c.type !== 'INCOME' && c.thisMonth > 0)
     .sort((a, b) => b.thisMonth - a.thisMonth);
   if (spending.length === 0) return nothingLogged(review.month);
   const grouped = spending.length > MAX_POINTS;

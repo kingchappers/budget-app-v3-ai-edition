@@ -1,4 +1,4 @@
-import { monthHasData, monthlyTarget, usualFor } from '../calc';
+import { monthHasData, monthlyTarget, sumToDay, throughDay, usualFor } from '../calc';
 import { loadBudget, shiftMonth } from '../data';
 import type { McpTool } from '../types';
 import { PRIVACY_NOTE, READ_ONLY, clip, monthOf, readMonth } from './shared';
@@ -13,7 +13,7 @@ export const categoryDetailTool: McpTool = {
   name: 'category_detail',
   title: 'Category detail',
   description:
-    "Shows one category: this month's items newest first (up to 50), a total for each recent month, what is usual and the target. Amounts are in pence (integers). Read-only.",
+    "Shows one category: this month's items newest first (up to 50), a total for each recent month (this month so far while it is in progress), what is usual up to the same day, and the target. Amounts are in pence (integers). Read-only.",
   access: 'read',
   inputSchema: {
     type: 'object',
@@ -46,7 +46,12 @@ export const categoryDetailTool: McpTool = {
     if (!category) return { ok: false, message: 'Unknown category.' };
 
     const mine = budget.transactions.filter((t) => t.categoryId === category.categoryId);
-    const totalFor = (m: string): number => mine.filter((t) => t.yearMonth === m).reduce((sum, t) => sum + t.amount, 0);
+    // As in month_review: an income category totals its income, any other its spends (a pot's set-asides are not spending).
+    const counted = category.type === 'INCOME' ? 'INCOME' : 'EXPENSE';
+    const totalTo = (m: string, toDay: number | null): number =>
+      sumToDay(mine.filter((t) => t.yearMonth === m && t.type === counted), toDay);
+    // A month in progress is set against earlier months up to the same day (review.md, step 7).
+    const day = throughDay(month, context.now);
     const items = mine
       .filter((t) => t.yearMonth === month)
       .sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt));
@@ -54,7 +59,7 @@ export const categoryDetailTool: McpTool = {
     // A month counts for "usual" when the person logged on enough days, in any category.
     const allMonths = new Set(budget.transactions.map((t) => t.yearMonth));
     const dataMonths = new Set([...allMonths].filter((m) => m < month && monthHasData(budget.transactions.filter((t) => t.yearMonth === m), m)));
-    const usual = usualFor(new Map([...dataMonths].map((m) => [m, totalFor(m)])), month, dataMonths);
+    const usual = usualFor(new Map([...dataMonths].map((m) => [m, totalTo(m, day)])), month, dataMonths);
 
     const target = budget.targets.find((t) => t.categoryId === category.categoryId);
     return {
@@ -65,12 +70,14 @@ export const categoryDetailTool: McpTool = {
         name: clip(category.name),
         type: category.type,
         month,
+        inProgress: day !== null,
+        throughDay: day,
         unit: 'pence',
         itemCount: items.length,
-        items: items.slice(0, MAX_ITEMS).map((t) => ({ date: t.date, amount: t.amount, text: clip(t.description) })),
+        items: items.slice(0, MAX_ITEMS).map((t) => ({ date: t.date, type: t.type, amount: t.amount, text: clip(t.description) })),
         monthlyTotals: Array.from({ length: months }, (_, i) => shiftMonth(month, i - (months - 1))).map((m) => ({
           month: m,
-          total: totalFor(m),
+          total: totalTo(m, m === month ? day : null),
         })),
         usual,
         target: target ? monthlyTarget(target, month) : null,

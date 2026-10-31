@@ -29,7 +29,7 @@ export interface ReviewInput {
 export interface CategoryLine {
   categoryId: string;
   name: string;
-  type: 'EXPENSE' | 'INCOME';
+  type: Category['type'];
   thisMonth: number;
   usual: number | null;
   target: number | null;
@@ -164,8 +164,9 @@ function buildCategoryLines(
   const targetById = new Map(targets.map((t) => [t.categoryId, t]));
   const lines: CategoryLine[] = [];
   for (const category of categories) {
-    const type = category.type === 'INCOME' ? 'INCOME' : 'EXPENSE';
-    const { thisMonth, usual } = compare((t) => t.categoryId === category.categoryId && t.type === type);
+    // A pot category's line is its spends, which count in the month's spending.
+    const counted = category.type === 'INCOME' ? 'INCOME' : 'EXPENSE';
+    const { thisMonth, usual } = compare((t) => t.categoryId === category.categoryId && t.type === counted);
     const listedAlways = category.type !== 'POT' && !category.archived;
     if (!listedAlways && thisMonth === 0) continue;
     // A spend in a pot category is never compared with a target.
@@ -174,7 +175,7 @@ function buildCategoryLines(
     lines.push({
       categoryId: category.categoryId,
       name: clip(category.name),
-      type,
+      type: category.type,
       thisMonth,
       usual,
       target,
@@ -196,7 +197,7 @@ function pickNotable(
   const incomeSoFar = current.some((t) => t.type === 'INCOME');
   const found: Notable[] = [];
   for (const line of lines) {
-    if (line.type === 'EXPENSE' && line.aboveUsual && line.usual !== null) {
+    if (line.type !== 'INCOME' && line.aboveUsual && line.usual !== null) {
       found.push({ kind: 'category-above-usual', categoryId: line.categoryId, amount: line.thisMonth, gap: line.thisMonth - line.usual, text: '' });
     }
     const incomeCheck = line.type === 'INCOME' && incomeSoFar && !paidLater.has(line.categoryId);

@@ -320,7 +320,19 @@ describe('buildMonthReview', () => {
     ];
     const transactions = [...filler('2026-09'), tx('2026-09-12', 'EXPENSE', 'holiday', 4000)];
     const result = review({ transactions, targets, categories: [cat('food'), cat('holiday', 'POT')] });
-    expect(line(result, 'holiday')).toMatchObject({ type: 'EXPENSE', thisMonth: 4000, target: null, overTarget: false });
+    expect(line(result, 'holiday')).toMatchObject({ type: 'POT', thisMonth: 4000, target: null, overTarget: false });
+  });
+
+  it('still notes a pot category spend well above its usual', () => {
+    const transactions = [
+      ...each(PRIOR, (m) => [...filler(m), tx(`${m}-10`, 'EXPENSE', 'holiday', 1000)]),
+      ...filler('2026-09'),
+      tx('2026-09-10', 'EXPENSE', 'holiday', 1600),
+    ];
+    const result = review({ transactions, categories: [cat('food'), cat('holiday', 'POT')] });
+    expect(result.notable).toEqual([
+      { kind: 'category-above-usual', categoryId: 'holiday', amount: 1600, gap: 600, text: '' },
+    ]);
   });
 
   it('lists a pot with movement this month', () => {
