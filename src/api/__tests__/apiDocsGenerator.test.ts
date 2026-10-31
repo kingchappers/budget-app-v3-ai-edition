@@ -102,7 +102,9 @@ describe('API docs generator', () => {
       expect((line.match(/`/g) ?? []).length % 2, line).toBe(0);
     }
     expect(markdown).toContain('You can have at most 25 access tokens. Revoke one first.`');
-    expect(markdown).not.toMatch(/\.\.\.$/m);
+    expect(markdown).toContain(
+      "(`type must match the account's existing kind: CASH, SAVINGS, INVESTMENT` for an asset, `... CREDIT_CARD, LOAN` for a liability).",
+    );
   });
 
   it('renders nullable enums and composed schemas with their real types', () => {
