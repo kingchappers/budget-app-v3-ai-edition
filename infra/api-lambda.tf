@@ -108,6 +108,13 @@ resource "aws_apigatewayv2_route" "api_put" {
   target    = "integrations/${aws_apigatewayv2_integration.api_lambda.id}"
 }
 
+# Route POST /mcp (access tokens only, scope checked per tool) to the API Lambda
+resource "aws_apigatewayv2_route" "mcp" {
+  api_id    = aws_apigatewayv2_api.app.id
+  route_key = "POST /mcp"
+  target    = "integrations/${aws_apigatewayv2_integration.api_lambda.id}"
+}
+
 # Lambda permission for API Gateway to invoke API Lambda
 resource "aws_lambda_permission" "api_gateway_api" {
   statement_id  = "AllowAPIGatewayInvokeApi"
