@@ -10,6 +10,7 @@ Not in the image yet, or not part of it:
 - **Brand kit.** The app has its logo, icons, favicons, link-preview image and Lora typeface, and a green and gold palette in light and dark mode. The lockup is in the header, the sign-in screens and the demo banner.
 - **Personal API tokens.** The API accepts personal access tokens. They are read-only by default, with optional write tokens (self-hosted write tokens need your password), expire after 90, 180, 365 or 730 days or never, can be revoked, and are all revoked by a password reset. Create and revoke them under Settings > Access tokens.
 - **API description.** `docs/openapi.yaml` describes every route (OpenAPI 3.1); tests fail if it drifts from the code.
+- **Agent skill.** A Claude Code plugin, installable from this repository, teaches an agent to review your month through the API in a calm, short way, and to log a spend when you ask.
 - **Weekly image scan.** The published `latest` and `edge` images are scanned for high and critical vulnerabilities every Monday.
 
 ## 0.3.0 - 2026-10-27

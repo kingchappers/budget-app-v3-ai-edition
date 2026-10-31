@@ -1,0 +1,14 @@
+{
+  "name": "hoardwise",
+  "description": "Claude Code plugins for Hoardwise, the calm budget tracker.",
+  "owner": {
+    "name": "Hoardwise"
+  },
+  "plugins": [
+    {
+      "name": "hoardwise",
+      "source": "./plugins/hoardwise",
+      "description": "Review your Hoardwise month and log spends through the Hoardwise API."
+    }
+  ]
+}

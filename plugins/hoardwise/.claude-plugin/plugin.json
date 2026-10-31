@@ -1,0 +1,12 @@
+{
+  "name": "hoardwise",
+  "version": "0.1.0",
+  "description": "A skill that helps an agent review your Hoardwise month calmly and use the Hoardwise API with a personal token.",
+  "author": {
+    "name": "Hoardwise"
+  },
+  "homepage": "https://github.com/kingchappers/hoardwise",
+  "repository": "https://github.com/kingchappers/hoardwise",
+  "license": "AGPL-3.0-or-later",
+  "keywords": ["budget", "hoardwise", "personal-finance", "skill"]
+}
