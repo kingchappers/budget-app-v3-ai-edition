@@ -129,6 +129,8 @@ export async function putPot(
 
   const existingItem = await queryOne(userId, potSk(categoryId));
   const existing = existingItem ? toSettings(existingItem) : undefined;
+  if (existing?.archivedAt) return err(409, 'Unarchive this pot before changing it');
+
   const entries = applyAutoContribute(existing?.autoContribute ?? [], autoContribute, monthlyAmount, month);
   if (entries.length > MAX_AUTO_ENTRIES) {
     return err(400, 'Too many auto-contribute changes for this pot');
@@ -139,7 +141,7 @@ export async function putPot(
     monthlyAmount,
     goalAmount,
     autoContribute: entries,
-    archivedAt: existing?.archivedAt ?? null,
+    archivedAt: null,
     updatedAt: new Date().toISOString(),
   };
   await getStore().put({ PK: pk(userId), SK: potSk(categoryId), ...settings });

@@ -843,7 +843,7 @@ paths:
         every entry that starts in `month` or later, then adds `{from: month, amount}` only if the amount in force
         before `month` is different (the amount is `monthlyAmount` when on, `0` when off). The history may hold at
         most 120 entries. `month` is the first month the change applies to and must be within one month of the
-        server's current month (UTC). An existing `archivedAt` is kept, and saving does not unarchive the pot.
+        server's current month (UTC). An archived pot cannot be changed: call `unarchivePot` first (409).
         `categoryId` must be a built-in or custom category of type `POT`. Unknown body fields are ignored.
       operationId: putPot
       x-token-access: write
@@ -909,6 +909,14 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '409':
+          description: The pot is archived (`Unarchive this pot before changing it`). Nothing was changed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Unarchive this pot before changing it
         '429':
           $ref: '#/components/responses/TooManyRequests'
         '500':
@@ -924,11 +932,15 @@ paths:
         automatic contributions made before `month`, must be exactly zero, otherwise the call is a 409 with the
         balance. On success the pot is marked archived (`archivedAt`, kept if it was already archived), automatic
         contributions stop from `month` (history entries that start in `month` or later are removed, so `month` itself
-        gets no automatic contribution; if a non-zero contribution was in force before `month`, `{from: month, amount: 0}`
+        gets no automatic contribution, which is deliberate because the pot is being closed and the balance must
+        already be settled; if a non-zero contribution was in force before `month`, `{from: month, amount: 0}`
         is appended, otherwise `autoContribute` can end up empty), the monthly amount and goal are kept, and every recurring reminder in this
         category is moved to the trash (`cancelledRecurring` counts them; `restoreFromTrash` can bring them back for 30
         days). The body must be exactly `{ "month": "YYYY-MM" }` with `month` within one month of the server's current
-        month (UTC). Archiving is not atomic: the settings are saved before the reminders are trashed.
+        month (UTC). The balance check comes first, so a pot with a balance trashes nothing. The reminders are then
+        trashed one by one before the archived settings are saved: if that fails part-way (a 500) the pot is still
+        active, and calling archive again trashes the reminders that are left and archives the pot. Reminders already
+        trashed are not listed again, so `cancelledRecurring` on the retry counts only those the retry trashed.
       operationId: archivePot
       x-token-access: write
       requestBody:
@@ -1009,8 +1021,8 @@ paths:
       description: >-
         Clears `archivedAt`. The request needs no body, and any body is ignored. Nothing else is restored: the
         automatic contribution stays stopped (turn it on again with `putPot`) and reminders trashed by archiving stay in
-        the trash. Unarchiving a pot that is not archived succeeds and just refreshes `updatedAt`; for a pot with no
-        stored settings it creates them with no monthly amount or goal.
+        the trash until they are restored with `restoreFromTrash`. A pot that is not archived, including one with no
+        stored settings, is a 409 and nothing is created or changed.
       operationId: unarchivePot
       x-token-access: write
       responses:
@@ -1045,6 +1057,14 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '409':
+          description: The pot is not archived (`This pot is not archived`). Nothing was changed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: This pot is not archived
         '429':
           $ref: '#/components/responses/TooManyRequests'
         '500':

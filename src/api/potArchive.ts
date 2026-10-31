@@ -85,8 +85,8 @@ export async function archivePot(
     return err(409, 'Take the balance out of this pot before archiving it', { balance });
   }
 
-  await savePotSettings(userId, stopped);
   const cancelledRecurring = await cancelRecurring(userId, categoryId);
+  await savePotSettings(userId, stopped);
   return ok({ settings: stopped, cancelledRecurring });
 }
 
@@ -102,11 +102,10 @@ export async function unarchivePot(
   if (!category || category.type !== 'POT') return err(400, 'categoryId must be an existing pot category');
 
   const existing = await loadPotSettings(userId, categoryId);
+  if (!existing?.archivedAt) return err(409, 'This pot is not archived');
+
   const settings: PotSettings = {
-    categoryId,
-    monthlyAmount: existing?.monthlyAmount ?? null,
-    goalAmount: existing?.goalAmount ?? null,
-    autoContribute: existing?.autoContribute ?? [],
+    ...existing,
     archivedAt: null,
     updatedAt: new Date().toISOString(),
   };

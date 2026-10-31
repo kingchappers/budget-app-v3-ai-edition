@@ -170,6 +170,35 @@ describe('archivePot', () => {
     expect(res.statusCode).toBe(400);
   });
 
+  it('saves nothing when trashing a reminder fails part-way, and a retry finishes the job', async () => {
+    await seed({
+      customCategories: [gardenPot],
+      recurring: [
+        { recurringId: 'r1', categoryId: 'cat-garden' },
+        { recurringId: 'r2', categoryId: 'cat-garden' },
+      ],
+    });
+    mockMoveToTrash.mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error('store down'));
+    await expect(archivePot(event({ month: '2026-10' }), 'user-1', { categoryId: 'cat-garden' })).rejects.toThrow('store down');
+    expect(await storedPot('cat-garden')).toBeUndefined();
+
+    mockMoveToTrash.mockReset();
+    const retry = await archivePot(event({ month: '2026-10' }), 'user-1', { categoryId: 'cat-garden' });
+    expect(retry.statusCode).toBe(200);
+    expect(mockMoveToTrash).toHaveBeenCalledWith('user-1', 'RECURRING', 'RECUR#r2');
+    expect(await storedPot('cat-garden')).toMatchObject({ archivedAt: expect.any(String) });
+  });
+
+  it('trashes reminders before it saves the archived settings', async () => {
+    await seed({ customCategories: [gardenPot], recurring: [{ recurringId: 'r1', categoryId: 'cat-garden' }] });
+    mockMoveToTrash.mockImplementation(async () => {
+      expect(await storedPot('cat-garden')).toBeUndefined();
+    });
+    const res = await archivePot(event({ month: '2026-10' }), 'user-1', { categoryId: 'cat-garden' });
+    expect(res.statusCode).toBe(200);
+    expect(mockMoveToTrash).toHaveBeenCalledTimes(1);
+  });
+
   it('is safe to run again on an already archived pot', async () => {
     await seed({
       customCategories: [gardenPot],
@@ -201,8 +230,38 @@ describe('unarchivePot', () => {
     });
   });
 
-  it('does not bring cancelled recurring items back', async () => {
+  it('refuses a pot with no stored settings and creates nothing', async () => {
     await seed({ customCategories: [gardenPot] });
+    const res = await unarchivePot(event({}), 'user-1', { categoryId: 'cat-garden' });
+    expect(res.statusCode).toBe(409);
+    expect(JSON.parse(res.body)).toEqual({ error: 'This pot is not archived' });
+    expect(await storedPot('cat-garden')).toBeUndefined();
+  });
+
+  it('refuses an active pot and leaves its settings untouched', async () => {
+    await seed({
+      customCategories: [gardenPot],
+      settings: [{ categoryId: 'cat-garden', monthlyAmount: 5000, goalAmount: null, autoContribute: [], archivedAt: null, updatedAt: 'u' }],
+    });
+    const res = await unarchivePot(event({}), 'user-1', { categoryId: 'cat-garden' });
+    expect(res.statusCode).toBe(409);
+    expect(await storedPot('cat-garden')).toMatchObject({ updatedAt: 'u', archivedAt: null });
+  });
+
+  it('returns archivedAt as null in the response for an archived pot', async () => {
+    await seed({
+      customCategories: [gardenPot],
+      settings: [{ categoryId: 'cat-garden', monthlyAmount: null, goalAmount: null, autoContribute: [], archivedAt: '2026-10-01T00:00:00.000Z', updatedAt: 'u' }],
+    });
+    const res = await unarchivePot(event({}), 'user-1', { categoryId: 'cat-garden' });
+    expect(JSON.parse(res.body).settings.archivedAt).toBeNull();
+  });
+
+  it('does not bring cancelled recurring items back', async () => {
+    await seed({
+      customCategories: [gardenPot],
+      settings: [{ categoryId: 'cat-garden', monthlyAmount: null, goalAmount: null, autoContribute: [], archivedAt: '2026-10-01T00:00:00.000Z', updatedAt: 'u' }],
+    });
     await unarchivePot(event({}), 'user-1', { categoryId: 'cat-garden' });
     expect(mockMoveToTrash).not.toHaveBeenCalled();
   });

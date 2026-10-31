@@ -341,6 +341,13 @@ const ERROR_CASES: ErrorCase[] = [
     key: 'PUT /api/pots/{categoryId} 400',
     run: async () => ({ path: { categoryId: POT }, body: { monthlyAmount: null, goalAmount: null, autoContribute: true, month: '2026-10' } }),
   },
+  {
+    key: 'PUT /api/pots/{categoryId} 409',
+    run: async (arrange) => {
+      await arrange.callWith('POST /api/pots/{categoryId}/archive', { path: { categoryId: POT }, body: { month: '2026-10' } });
+      return { path: { categoryId: POT }, body: { monthlyAmount: 5000, goalAmount: null, autoContribute: false, month: '2026-10' } };
+    },
+  },
   { key: 'POST /api/pots/{categoryId}/archive 400', run: async () => ({ path: { categoryId: POT }, body: { month: 'soon' } }) },
   {
     key: 'POST /api/pots/{categoryId}/archive 409',
@@ -351,6 +358,7 @@ const ERROR_CASES: ErrorCase[] = [
       return { path: { categoryId: POT }, body: { month: '2026-10' } };
     },
   },
+  { key: 'POST /api/pots/{categoryId}/unarchive 409', run: async () => ({ path: { categoryId: POT } }) },
   { key: 'POST /api/pots/{categoryId}/unarchive 400', run: async () => ({ path: { categoryId: 'cat-groceries' } }) },
   { key: 'POST /api/recurring 400', run: async () => ({ body: { type: 'EXPENSE', categoryId: 'cat-mortgage', amount: 90000, frequency: 'MONTHLY', dayOfMonth: 40 } }) },
   { key: 'PUT /api/recurring/{recurringId} 400', run: async () => ({ path: { recurringId: UNKNOWN_UUID }, body: '{not json' }) },
