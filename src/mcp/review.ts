@@ -1,7 +1,7 @@
 // The month review behind the month_review tool. Rules: plugins/hoardwise/skills/budget/review.md.
 import type { Category, CategoryTarget, PotSummary, Transaction } from '../api/types';
 import { SPARSE_BELOW, median, monthHasData, monthlyTarget, regularAmount, sumToDay, throughDay, usualFor } from './calc';
-import { clip } from './tools/shared';
+import { MAX_TEXT, clip } from './tools/shared';
 
 // review.md gives rules of thumb ("about half again", "a small minimum, such as £5",
 // "several times the median item"); these are the values we chose for them.
@@ -15,7 +15,6 @@ const MIN_ITEMS_FOR_MEDIAN = 3;
 const MAX_NOTABLE = 3;
 // review.md: in the first week, say it is early and make few or no claims.
 const EARLY_DAYS = 7;
-const MAX_TEXT = 200;
 
 export interface ReviewInput {
   month: string;
@@ -232,7 +231,7 @@ function bigItems(current: Transaction[], byMonth: Map<string, Transaction[]>, d
       categoryId: t.categoryId,
       amount: t.amount,
       gap: t.amount - usualItem,
-      text: `${t.date}: ${t.description}`.slice(0, MAX_TEXT),
+      text: `${t.date}: ${clip(t.description)}`.slice(0, MAX_TEXT),
     });
   }
   return found;

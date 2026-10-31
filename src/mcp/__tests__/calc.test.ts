@@ -59,16 +59,17 @@ describe('usualFor', () => {
     expect(usualFor(values, '2026-10', data)).toBe(300);
   });
   it('uses only the six most recent months with data', () => {
+    // Six months give a median of 1500; wrongly adding the seventh, oldest month makes it 1000.
     const many = monthMap([
       ['2026-01', 1],
       ['2026-02', 1000],
       ['2026-03', 1000],
       ['2026-04', 1000],
-      ['2026-05', 1000],
-      ['2026-06', 1000],
-      ['2026-07', 1000],
+      ['2026-05', 2000],
+      ['2026-06', 2000],
+      ['2026-07', 2000],
     ]);
-    expect(usualFor(many, '2026-08', new Set(many.keys()))).toBe(1000);
+    expect(usualFor(many, '2026-08', new Set(many.keys()))).toBe(1500);
   });
   it('ignores later months', () => {
     expect(usualFor(values, '2026-08', new Set(values.keys()))).toBe(200);
@@ -117,6 +118,10 @@ describe('regularAmount', () => {
   };
   it('accepts close amounts', () => expect(run([230000, 230000, 231000])).toBe(230000));
   it('rejects amounts that vary', () => expect(run([200000, 230000, 260000])).toBeNull());
+  it('accepts a spread of exactly 5% and rejects a penny more', () => {
+    expect(run([200000, 200000, 210000])).toBe(200000);
+    expect(run([200000, 200000, 210001])).toBeNull();
+  });
   it('needs three months', () => expect(run([230000, 230000])).toBeNull());
   it('ignores months without income', () => {
     expect(run([230000, 0, 230000, 230000])).toBe(230000);

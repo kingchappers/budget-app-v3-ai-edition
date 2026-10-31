@@ -3,7 +3,8 @@
 export const SPARSE_BELOW = 0.25;
 const MAX_USUAL_MONTHS = 6;
 const MIN_USUAL_MONTHS = 3;
-const REGULAR_SPREAD = 0.05;
+// Regular income varies by at most 1/20 (5%) of its median, compared in whole numbers.
+const REGULAR_SPREAD_PARTS = 20;
 
 export function median(values: number[]): number | null {
   if (values.length === 0) return null;
@@ -76,6 +77,6 @@ export function regularAmount(
   if (values.length < MIN_USUAL_MONTHS) return null;
   const mid = median(values);
   if (mid === null || mid <= 0) return null;
-  if (Math.max(...values) - Math.min(...values) > mid * REGULAR_SPREAD) return null;
+  if ((Math.max(...values) - Math.min(...values)) * REGULAR_SPREAD_PARTS > mid) return null;
   return mid;
 }

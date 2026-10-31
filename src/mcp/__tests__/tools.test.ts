@@ -454,6 +454,13 @@ describe('chart_data', () => {
     expect(long.series).toHaveLength(6);
   });
 
+  it('monthly-trend says nothing is logged when the months hold income but no spending', async () => {
+    await addTx('user-a', '2026-10-02', 'INCOME', 'cat-salary', 200000);
+    const result = await data('chart_data', { view: 'monthly-trend', months: 3 });
+    expect(result.series).toEqual([]);
+    expect(result.accessibleSummary).toBe('Nothing is logged yet for 2026-10.');
+  });
+
   it('category-vs-target pairs spending with the target', async () => {
     await addTx('user-a', '2026-10-02', 'EXPENSE', 'cat-groceries', 4000);
     await store.put({ PK: pk('user-a'), SK: targetSk('cat-groceries'), categoryId: 'cat-groceries', targetAmount: 30000, period: 'MONTHLY', updatedAt: '' });

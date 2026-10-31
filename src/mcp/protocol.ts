@@ -51,21 +51,21 @@ async function callTool(id: RpcId, params: unknown, context: McpContext, tools: 
     return rpcError(id, INVALID_PARAMS, 'That tool is not available to this connection.');
   }
 
-  let outcome;
+  // Serialising is inside the try too, so a result JSON cannot hold is a tool error, not a 500.
   try {
-    outcome = await tool.run(args, context);
+    const outcome = await tool.run(args, context);
+    if (!outcome.ok) return toolError(id, outcome.message);
+
+    const text = JSON.stringify(outcome.data);
+    if (text.length > MCP_MAX_RESULT_CHARS) {
+      return toolError(id, 'That result is too large to return. Ask for a narrower request, such as a shorter date range.');
+    }
+    return rpcResult(id, { content: [{ type: 'text', text }], structuredContent: outcome.data });
   } catch (error) {
     // Name only: messages can carry the person's data.
     console.error('mcp tool failed', { tool: tool.name, error: error instanceof Error ? error.name : 'unknown' });
     return toolError(id, 'That request failed. Please try again.');
   }
-  if (!outcome.ok) return toolError(id, outcome.message);
-
-  const text = JSON.stringify(outcome.data);
-  if (text.length > MCP_MAX_RESULT_CHARS) {
-    return toolError(id, 'That result is too large to return. Ask for a narrower request, such as a shorter date range.');
-  }
-  return rpcResult(id, { content: [{ type: 'text', text }], structuredContent: outcome.data });
 }
 
 export async function handleMcpBody(

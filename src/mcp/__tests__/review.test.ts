@@ -205,6 +205,17 @@ describe('buildMonthReview', () => {
     expect(big?.text).toHaveLength(200);
   });
 
+  it('gives a big item with no description just its date', () => {
+    const old = { ...tx('2026-09-15', 'EXPENSE', 'fun', 5000), description: undefined } as unknown as Transaction;
+    const transactions = [
+      ...each(PRIOR, (m) => [...filler(m), tx(`${m}-10`, 'EXPENSE', 'fun', 1000)]),
+      ...filler('2026-09'),
+      old,
+    ];
+    const big = review({ transactions }).notable.find((n) => n.kind === 'big-item');
+    expect(big?.text).toBe('2026-09-15: ');
+  });
+
   it('needs three earlier items before calling an item big', () => {
     const transactions = [
       ...each(PRIOR, filler),

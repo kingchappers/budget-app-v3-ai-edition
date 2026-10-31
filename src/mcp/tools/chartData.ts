@@ -147,12 +147,12 @@ function monthlyTrend(
   months: number,
 ): { series: Point[]; summary: string } {
   const labels = Array.from({ length: months }, (_, i) => shiftMonth(month, i - (months - 1)));
-  const window = new Set(labels);
-  if (!transactions.some((t) => window.has(t.yearMonth))) return nothingLogged(month);
   const series = labels.map((label) => ({
     label,
     value: transactions.filter((t) => t.yearMonth === label && t.type === 'EXPENSE').reduce((sum, t) => sum + t.amount, 0),
   }));
+  // No spending in any month: say so, rather than "highest at £0.00".
+  if (series.every((point) => point.value === 0)) return nothingLogged(month);
   const top = series.reduce((a, b) => (b.value > a.value ? b : a));
   return {
     series,

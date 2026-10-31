@@ -169,6 +169,19 @@ describe('tools/call', () => {
     expect(json.result.content[0].text).toContain('narrower');
     expect(json.result.structuredContent).toBeUndefined();
   });
+  it.each([
+    ['a value JSON cannot hold', async () => ({ ok: true, data: { amount: BigInt(1) } })],
+    ['undefined data', async () => ({ ok: true, data: undefined })],
+    ['no outcome at all', async () => undefined],
+  ])('turns a result with %s into isError, logging only the tool name', async (_, run) => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const tool = fakeTool({ run: run as unknown as McpTool['run'] });
+    const { res, json } = await call({ name: 'echo' }, readContext, [tool]);
+    expect(res.statusCode).toBe(200);
+    expect(json.result.isError).toBe(true);
+    expect(json.result.content[0].text).toContain('That request failed');
+    expect(spy.mock.calls[0][1]).toEqual({ tool: 'echo', error: 'TypeError' });
+  });
 });
 
 describe('malformed JSON-RPC', () => {
