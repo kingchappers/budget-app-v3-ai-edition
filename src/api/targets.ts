@@ -5,6 +5,7 @@ import { MAX_AMOUNT_PENCE, SECURITY_HEADERS, VALID_PERIODS } from './constants';
 import type { CategoryTarget, ApiResponse } from './types';
 import { ok, err, parseJsonObject } from './http';
 import { moveToTrash } from './trash';
+import { findCategory } from './pots';
 
 function toTarget(item: Record<string, unknown>): CategoryTarget {
   return {
@@ -33,6 +34,10 @@ export async function upsertTarget(
 
   if (!categoryId) {
     return err(400, 'categoryId is required');
+  }
+
+  if (!(await findCategory(userId, categoryId))) {
+    return err(404, 'Category not found');
   }
 
   const body = parseJsonObject(event);

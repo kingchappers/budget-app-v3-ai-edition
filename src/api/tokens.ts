@@ -146,5 +146,5 @@ export async function revokeAccessToken(
     return noStore(err(404, 'Token not found'));
   }
   console.log('Access token revoked:', tokenId);
-  return noStore(ok({}));
+  return noStore({ statusCode: 204, headers: SECURITY_HEADERS, body: '' });
 }

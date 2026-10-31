@@ -181,6 +181,7 @@ describe('updateRecurring', () => {
   });
 
   it('rejects invalid input with 400 and writes nothing', async () => {
+    await seedUser(store, 'user-1', [storedItem]);
     const spy = vi.spyOn(store, 'patch');
     const res = await updateRecurring(makeEvent({ ...validBody, dayOfMonth: 40 }), 'user-1', { recurringId: 'r1' });
     expect(res.statusCode).toBe(400);
@@ -188,11 +189,52 @@ describe('updateRecurring', () => {
   });
 
   it('rejects a missing id and malformed JSON with 400', async () => {
+    await seedUser(store, 'user-1', [storedItem]);
     expect((await updateRecurring(makeEvent(validBody), 'user-1', {})).statusCode).toBe(400);
     expect((await updateRecurring(makeEvent(undefined, '{'), 'user-1', { recurringId: 'r1' })).statusCode).toBe(400);
   });
 
+  it('answers 404 before validating the body when the id is unknown', async () => {
+    const bad = await updateRecurring(makeEvent({ ...validBody, dayOfMonth: 40 }), 'user-1', { recurringId: 'missing' });
+    const malformed = await updateRecurring(makeEvent(undefined, '{'), 'user-1', { recurringId: 'missing' });
+    expect(bad.statusCode).toBe(404);
+    expect(malformed.statusCode).toBe(404);
+  });
+
+  it('clears handledPeriod when the frequency changes', async () => {
+    await seedUser(store, 'user-1', [{ ...storedItem, frequency: 'MONTHLY', handledPeriod: '2026-10' }]);
+    const res = await updateRecurring(makeEvent({ ...validBody, frequency: 'WEEKLY', anchorDate: '2026-10-05' }), 'user-1', { recurringId: 'r1' });
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body).recurring.handledPeriod).toBeNull();
+    expect(await store.get(r1Key)).toMatchObject({ frequency: 'WEEKLY', handledPeriod: null });
+  });
+
+  it('clears handledPeriod when a weekly item becomes four-weekly', async () => {
+    await seedUser(store, 'user-1', [{ ...storedItem, frequency: 'WEEKLY', anchorDate: '2026-10-05', handledPeriod: '2026-10-12' }]);
+    await updateRecurring(makeEvent({ ...validBody, frequency: 'FOUR_WEEKLY', anchorDate: '2026-10-05' }), 'user-1', { recurringId: 'r1' });
+    expect(await store.get(r1Key)).toMatchObject({ frequency: 'FOUR_WEEKLY', handledPeriod: null });
+  });
+
+  it('keeps handledPeriod when the frequency is unchanged', async () => {
+    await seedUser(store, 'user-1', [{ ...storedItem, frequency: 'WEEKLY', anchorDate: '2026-10-05', handledPeriod: '2026-10-12' }]);
+    await updateRecurring(makeEvent({ ...validBody, frequency: 'WEEKLY', anchorDate: '2026-10-05', amount: 1 }), 'user-1', { recurringId: 'r1' });
+    expect(await store.get(r1Key)).toMatchObject({ amount: 1, handledPeriod: '2026-10-12' });
+  });
+
+  it('treats a stored item without a frequency as monthly when comparing', async () => {
+    await seedUser(store, 'user-1', [storedItem]);
+    await updateRecurring(makeEvent({ ...validBody, frequency: 'MONTHLY' }), 'user-1', { recurringId: 'r1' });
+    expect(await store.get(r1Key)).toMatchObject({ handledPeriod: '2026-08' });
+  });
+
+  it('is a full replace: an omitted frequency means monthly', async () => {
+    await seedUser(store, 'user-1', [{ ...storedItem, frequency: 'WEEKLY', anchorDate: '2026-10-05', handledPeriod: '2026-10-12' }]);
+    const res = await updateRecurring(makeEvent(validBody), 'user-1', { recurringId: 'r1' });
+    expect(JSON.parse(res.body).recurring).toMatchObject({ frequency: 'MONTHLY', anchorDate: null, handledPeriod: null });
+  });
+
   it('rethrows unexpected errors', async () => {
+    await seedUser(store, 'user-1', [storedItem]);
     vi.spyOn(store, 'patch').mockRejectedValueOnce(new Error('boom'));
     await expect(updateRecurring(makeEvent(validBody), 'user-1', { recurringId: 'r1' })).rejects.toThrow('boom');
   });
@@ -278,6 +320,7 @@ describe('setRecurringHandled', () => {
     ['text', { period: 'abc' }],
     ['a missing period', {}],
   ])('rejects %s with 400 and writes nothing', async (_label, body) => {
+    await seedUser(store, 'user-1', [storedItem]);
     const spy = vi.spyOn(store, 'patch');
     const res = await setRecurringHandled(makeEvent(body), 'user-1', { recurringId: 'r1' });
     expect(res.statusCode).toBe(400);
@@ -293,8 +336,59 @@ describe('setRecurringHandled', () => {
   });
 
   it('rejects a missing id and malformed JSON with 400', async () => {
+    await seedUser(store, 'user-1', [storedItem]);
     expect((await setRecurringHandled(makeEvent({ period: '2026-09' }), 'user-1', {})).statusCode).toBe(400);
     expect((await setRecurringHandled(makeEvent(undefined, '{'), 'user-1', { recurringId: 'r1' })).statusCode).toBe(400);
+  });
+
+  it('answers 404 before validating the body when the id is unknown', async () => {
+    const badPeriod = await setRecurringHandled(makeEvent({ period: 'soon' }), 'user-1', { recurringId: 'missing' });
+    const malformed = await setRecurringHandled(makeEvent(undefined, '{'), 'user-1', { recurringId: 'missing' });
+    expect(badPeriod.statusCode).toBe(404);
+    expect(malformed.statusCode).toBe(404);
+  });
+});
+
+describe('setRecurringHandled period format follows the frequency', () => {
+  const weekly = { ...storedItem, frequency: 'WEEKLY', anchorDate: '2026-10-05', handledPeriod: null };
+
+  it('accepts YYYY-MM and rejects a date for a monthly item', async () => {
+    await seedUser(store, 'user-1', [storedItem]);
+    const bad = await setRecurringHandled(makeEvent({ period: '2026-10-15' }), 'user-1', { recurringId: 'r1' });
+    expect(bad.statusCode).toBe(400);
+    expect(JSON.parse(bad.body).error).toBe('period must be a YYYY-MM month for a monthly item');
+    const good = await setRecurringHandled(makeEvent({ period: '2026-10' }), 'user-1', { recurringId: 'r1' });
+    expect(good.statusCode).toBe(200);
+  });
+
+  it('accepts a real date and rejects a month or an impossible date for a weekly item', async () => {
+    await seedUser(store, 'user-1', [weekly]);
+    const month = await setRecurringHandled(makeEvent({ period: '2026-10' }), 'user-1', { recurringId: 'r1' });
+    expect(month.statusCode).toBe(400);
+    expect(JSON.parse(month.body).error).toBe('period must be a real YYYY-MM-DD date for a weekly, four-weekly, quarterly or yearly item');
+    expect((await setRecurringHandled(makeEvent({ period: '2026-02-30' }), 'user-1', { recurringId: 'r1' })).statusCode).toBe(400);
+    expect((await setRecurringHandled(makeEvent({ period: '2026-10-15' }), 'user-1', { recurringId: 'r1' })).statusCode).toBe(200);
+  });
+
+  it.each(['FOUR_WEEKLY', 'QUARTERLY', 'YEARLY'])('requires a date for a %s item', async (frequency) => {
+    await seedUser(store, 'user-1', [{ ...weekly, frequency }]);
+    expect((await setRecurringHandled(makeEvent({ period: '2026-10' }), 'user-1', { recurringId: 'r1' })).statusCode).toBe(400);
+    expect((await setRecurringHandled(makeEvent({ period: '2026-10-05' }), 'user-1', { recurringId: 'r1' })).statusCode).toBe(200);
+  });
+
+  it('still clears the mark with null on any frequency', async () => {
+    await seedUser(store, 'user-1', [{ ...weekly, handledPeriod: '2026-10-05' }]);
+    const res = await setRecurringHandled(makeEvent({ period: null }), 'user-1', { recurringId: 'r1' });
+    expect(res.statusCode).toBe(200);
+    expect(await store.get(r1Key)).toMatchObject({ handledPeriod: null });
+  });
+
+  it('keeps the existing message for a missing or non-string period', async () => {
+    await seedUser(store, 'user-1', [storedItem]);
+    const res = await setRecurringHandled(makeEvent({}), 'user-1', { recurringId: 'r1' });
+    expect(JSON.parse(res.body).error).toBe('period must be YYYY-MM, YYYY-MM-DD or null');
+    const number = await setRecurringHandled(makeEvent({ period: 202610 }), 'user-1', { recurringId: 'r1' });
+    expect(JSON.parse(number.body).error).toBe('period must be YYYY-MM, YYYY-MM-DD or null');
   });
 });
 
@@ -400,8 +494,8 @@ describe('recurring schedules over the API', () => {
     expect(JSON.parse(res.body).recurring[0]).toMatchObject({ frequency: 'MONTHLY', anchorDate: null, handledPeriod: '2026-08' });
   });
 
-  it('accepts an occurrence date as the handled marker', async () => {
-    await seedUser(store, 'user-1', [storedItem]);
+  it('accepts an occurrence date as the handled marker on a dated item', async () => {
+    await seedUser(store, 'user-1', [{ ...storedItem, frequency: 'WEEKLY', anchorDate: '2026-09-07' }]);
     const res = await setRecurringHandled(makeEvent({ period: '2026-09-14' }), 'user-1', { recurringId: 'r1' });
     expect(res.statusCode).toBe(200);
     expect(await store.get(r1Key)).toMatchObject({ handledPeriod: '2026-09-14' });

@@ -323,6 +323,7 @@ const ERROR_CASES: ErrorCase[] = [
   { key: 'DELETE /api/categories/{categoryId} 403', run: async () => ({ path: { categoryId: 'cat-groceries' } }) },
   { key: 'POST /api/categories/{categoryId}/reassign 400', run: async () => ({ path: { categoryId: 'cat-groceries' }, body: {} }) },
   { key: 'PUT /api/targets/{categoryId} 400', run: async () => ({ path: { categoryId: 'cat-groceries' }, body: { targetAmount: 0, period: 'MONTHLY' } }) },
+  { key: 'PUT /api/targets/{categoryId} 404', run: async () => ({ path: { categoryId: UNKNOWN_UUID }, body: { targetAmount: 30000, period: 'MONTHLY' } }) },
   { key: 'GET /api/transactions 400', run: async () => ({}) },
   { key: 'POST /api/transactions 400', run: async () => ({ body: {} }) },
   { key: 'GET /api/transactions/range 400', run: async () => ({ query: { from: '2026-10', to: '2026-08' } }) },
@@ -334,11 +335,18 @@ const ERROR_CASES: ErrorCase[] = [
       body: { amount: 1400, type: 'EXPENSE', categoryId: 'cat-groceries', date: '2026-10-29' },
     }),
   },
-  { key: 'DELETE /api/transactions/{yearMonth}/{transactionId} 400', run: async () => ({ path: { yearMonth: 'October', transactionId: UUID } }) },
+  { key: 'DELETE /api/transactions/{yearMonth}/{transactionId} 400', run: async () => ({ path: { yearMonth: '2026-13', transactionId: UUID } }) },
   { key: 'GET /api/pots 400', run: async () => ({ query: { asOf: '2030-01' } }) },
   {
     key: 'PUT /api/pots/{categoryId} 400',
     run: async () => ({ path: { categoryId: POT }, body: { monthlyAmount: null, goalAmount: null, autoContribute: true, month: '2026-10' } }),
+  },
+  {
+    key: 'PUT /api/pots/{categoryId} 409',
+    run: async (arrange) => {
+      await arrange.callWith('POST /api/pots/{categoryId}/archive', { path: { categoryId: POT }, body: { month: '2026-10' } });
+      return { path: { categoryId: POT }, body: { monthlyAmount: 5000, goalAmount: null, autoContribute: false, month: '2026-10' } };
+    },
   },
   { key: 'POST /api/pots/{categoryId}/archive 400', run: async () => ({ path: { categoryId: POT }, body: { month: 'soon' } }) },
   {
@@ -350,9 +358,16 @@ const ERROR_CASES: ErrorCase[] = [
       return { path: { categoryId: POT }, body: { month: '2026-10' } };
     },
   },
+  { key: 'POST /api/pots/{categoryId}/unarchive 409', run: async () => ({ path: { categoryId: POT } }) },
   { key: 'POST /api/pots/{categoryId}/unarchive 400', run: async () => ({ path: { categoryId: 'cat-groceries' } }) },
   { key: 'POST /api/recurring 400', run: async () => ({ body: { type: 'EXPENSE', categoryId: 'cat-mortgage', amount: 90000, frequency: 'MONTHLY', dayOfMonth: 40 } }) },
-  { key: 'PUT /api/recurring/{recurringId} 400', run: async () => ({ path: { recurringId: UNKNOWN_UUID }, body: '{not json' }) },
+  {
+    key: 'PUT /api/recurring/{recurringId} 400',
+    run: async (arrange) => {
+      const created = await arrange.call('POST /api/recurring', 'monthly');
+      return { path: { recurringId: created.recurring.recurringId }, body: '{not json' };
+    },
+  },
   {
     key: 'PUT /api/recurring/{recurringId} 404',
     run: async () => ({
@@ -360,8 +375,14 @@ const ERROR_CASES: ErrorCase[] = [
       body: { type: 'EXPENSE', categoryId: 'cat-mortgage', amount: 95000, frequency: 'MONTHLY', dayOfMonth: 1 },
     }),
   },
-  { key: 'POST /api/recurring/{recurringId}/handled 400', run: async () => ({ path: { recurringId: UNKNOWN_UUID }, body: { period: 'soon' } }) },
-  { key: 'POST /api/recurring/{recurringId}/handled 404', run: async () => ({ path: { recurringId: UNKNOWN_UUID }, body: { period: '2026-10' } }) },
+  {
+    key: 'POST /api/recurring/{recurringId}/handled 400',
+    run: async (arrange) => {
+      const created = await arrange.call('POST /api/recurring', 'monthly');
+      return { path: { recurringId: created.recurring.recurringId }, body: { period: '2026-10-15' } };
+    },
+  },
+  { key: 'POST /api/recurring/{recurringId}/handled 404', run: async () => ({ path: { recurringId: UNKNOWN_UUID }, body: { period: 'soon' } }) },
   { key: 'POST /api/trash/restore 400', run: async () => ({ body: { entityType: 'TRANSACTION', id: 'x', extra: true } }) },
   { key: 'POST /api/trash/restore 404', run: async () => ({ body: { entityType: 'TRANSACTION', id: `2026-10#${UNKNOWN_UUID}` } }) },
   {
@@ -382,8 +403,15 @@ const ERROR_CASES: ErrorCase[] = [
     },
   },
   { key: 'PUT /api/accounts/{accountId} 404', run: async () => ({ path: { accountId: UNKNOWN_UUID }, body: { name: 'Savings' } }) },
-  { key: 'POST /api/accounts/{accountId}/balances 400', run: async () => ({ path: { accountId: UNKNOWN_UUID }, body: { date: '2027-01-01', pence: 100 } }) },
-  { key: 'POST /api/accounts/{accountId}/balances 404', run: async () => ({ path: { accountId: UNKNOWN_UUID }, body: { date: '2026-10-29', pence: 100 } }) },
+  {
+    key: 'POST /api/accounts/{accountId}/balances 400',
+    run: async (arrange) => {
+      const created = await arrange.call('POST /api/accounts', 'asset');
+      return { path: { accountId: created.account.accountId }, body: { date: '2027-01-01', pence: 100 } };
+    },
+  },
+  // The account is looked up before the body is checked, so an unknown account is a 404 even with an invalid body.
+  { key: 'POST /api/accounts/{accountId}/balances 404', run: async () => ({ path: { accountId: UNKNOWN_UUID }, body: { date: '2027-01-01', pence: 1.5 } }) },
   { key: 'POST /api/push/subscriptions 400', run: async () => ({ body: { ...PUSH_BODY('https://fcm.googleapis.com/fcm/send/a'), settings: { hour: 24, quietStart: 22, quietEnd: 7, timeZone: 'Europe/London' } } }) },
   {
     key: 'POST /api/push/subscriptions 409',

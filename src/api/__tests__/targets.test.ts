@@ -38,6 +38,10 @@ describe('getTargets', () => {
 });
 
 describe('upsertTarget', () => {
+  beforeEach(async () => {
+    await seedUser(store, 'user-1', [{ SK: 'CAT#cat-food', categoryId: 'cat-food', name: 'Food', type: 'EXPENSE' }]);
+  });
+
   it('creates or updates a target and returns 200', async () => {
     const res = await upsertTarget(
       makeEvent({ targetAmount: 30000, period: 'MONTHLY' }),
@@ -91,6 +95,31 @@ describe('upsertTarget', () => {
     expect(res.statusCode).toBe(400);
   });
 
+  it('returns 404 and stores nothing for a category that does not exist', async () => {
+    const res = await upsertTarget(
+      makeEvent({ targetAmount: 30000, period: 'MONTHLY' }),
+      'user-1',
+      { categoryId: 'cat-gone' },
+    );
+    expect(res.statusCode).toBe(404);
+    expect(JSON.parse(res.body)).toEqual({ error: 'Category not found' });
+    expect(await store.get({ PK: 'USER#user-1', SK: 'TARGET#cat-gone' })).toBeUndefined();
+  });
+
+  it('returns 404 before validating the body for an unknown category', async () => {
+    const res = await upsertTarget(makeEvent({ targetAmount: 0, period: 'YEARLY' }), 'user-1', { categoryId: 'cat-gone' });
+    expect(res.statusCode).toBe(404);
+  });
+
+  it('accepts a built-in default category that is not stored', async () => {
+    const res = await upsertTarget(
+      makeEvent({ targetAmount: 30000, period: 'WEEKLY' }),
+      'user-1',
+      { categoryId: 'cat-groceries' },
+    );
+    expect(res.statusCode).toBe(200);
+  });
+
   it('returns 400 when categoryId is missing', async () => {
     const res = await upsertTarget(
       makeEvent({ targetAmount: 30000, period: 'MONTHLY' }),
@@ -108,6 +137,11 @@ describe('deleteTarget', () => {
     expect(res.statusCode).toBe(204);
     expect(await store.get({ PK: 'USER#user-1', SK: 'TARGET#cat-food' })).toBeUndefined();
     expect(await store.get({ PK: 'USER#user-1', SK: 'TRASH#TARGET#cat-food' })).toMatchObject({ entityType: 'TARGET' });
+  });
+
+  it('returns 204 for a target that does not exist (idempotent delete)', async () => {
+    const res = await deleteTarget(makeEvent(), 'user-1', { categoryId: 'cat-gone' });
+    expect(res.statusCode).toBe(204);
   });
 
   it('returns 400 when categoryId is missing', async () => {

@@ -6,19 +6,9 @@ import { ASSET_TYPES, LIABILITY_TYPES, MAX_AMOUNT_PENCE, MAX_BALANCE_ENTRIES, SE
 import type { Account, AccountKind, AccountType, ApiResponse, BalanceEntry } from './types';
 import { ok, err, parseJsonObject } from './http';
 import { moveToTrash } from './trash';
+import { isCalendarDate } from './dates';
 
-const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const NAME_MAX_LENGTH = 50;
-
-function isValidDate(value: unknown): value is string {
-  if (typeof value !== 'string' || !DATE_PATTERN.test(value)) return false;
-  const date = new Date(`${value}T00:00:00Z`);
-  if (Number.isNaN(date.getTime())) return false;
-  // `new Date` rolls an out-of-range day/month over into the next one
-  // (2026-02-31 silently becomes 2026-03-03) rather than rejecting it, so
-  // round-trip through ISO formatting and require it to match verbatim.
-  return date.toISOString().slice(0, 10) === value;
-}
 
 function toAccount(item: Record<string, unknown>): Account {
   return {
@@ -165,22 +155,22 @@ export async function addBalance(
     return err(400, 'accountId is required');
   }
 
-  const body = parseJsonObject(event);
-  if (!body) return err(400, 'Invalid JSON body');
-
-  const { date, pence } = body;
-  if (!isValidDate(date) || date > tomorrowIso()) {
-    return err(400, 'date must be a YYYY-MM-DD date, at most one day ahead of today');
-  }
-  if (!isValidPence(pence)) {
-    return err(400, `pence must be a whole number between -${MAX_AMOUNT_PENCE} and ${MAX_AMOUNT_PENCE}`);
-  }
-
   const existingItem = await queryOne(userId, accountSk(accountId));
   if (!existingItem) {
     return err(404, 'Account not found');
   }
   const existing = toAccount(existingItem);
+
+  const body = parseJsonObject(event);
+  if (!body) return err(400, 'Invalid JSON body');
+
+  const { date, pence } = body;
+  if (!isCalendarDate(date) || date > tomorrowIso()) {
+    return err(400, 'date must be a YYYY-MM-DD date, at most one day ahead of today');
+  }
+  if (!isValidPence(pence)) {
+    return err(400, `pence must be a whole number between -${MAX_AMOUNT_PENCE} and ${MAX_AMOUNT_PENCE}`);
+  }
 
   const balances = applyBalanceEntry(existing.balances ?? [], date, pence);
   if (balances.length > MAX_BALANCE_ENTRIES) {

@@ -5,6 +5,7 @@ import { MAX_AMOUNT_PENCE, SECURITY_HEADERS, VALID_TRANSACTION_TYPES } from './c
 import type { Transaction, ApiResponse } from './types';
 import { ok, err, parseJsonObject } from './http';
 import { moveToTrash } from './trash';
+import { isCalendarDate, isYearMonth } from './dates';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -35,9 +36,12 @@ export async function getTransactions(
     return err(400, 'year and month query parameters are required');
   }
 
-  const yearNum = parseInt(year, 10);
-  const monthNum = parseInt(month, 10);
-  if (isNaN(yearNum) || isNaN(monthNum) || monthNum < 1 || monthNum > 12 || yearNum < 2000) {
+  if (!/^\d{4}$/.test(year) || !/^\d{1,2}$/.test(month)) {
+    return err(400, 'Invalid year or month');
+  }
+  const yearNum = Number(year);
+  const monthNum = Number(month);
+  if (monthNum < 1 || monthNum > 12 || yearNum < 2000) {
     return err(400, 'Invalid year or month');
   }
 
@@ -53,7 +57,8 @@ export interface ValidTransactionInput {
   categoryId: string;
   description: string;
   date: string;
-  recurringId?: string;
+  /** A UUID to link, `null` to unlink (PUT), absent to leave as it is. */
+  recurringId?: string | null;
 }
 
 function isValidRecurringId(value: unknown): value is string {
@@ -79,10 +84,10 @@ export function validateTransactionInput(
       return { ok: false, message: 'description must be a string of at most 200 characters' };
     }
   }
-  if (!date || typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-    return { ok: false, message: 'date must be in YYYY-MM-DD format' };
+  if (!isCalendarDate(date)) {
+    return { ok: false, message: 'date must be a real date in YYYY-MM-DD format' };
   }
-  if (recurringId !== undefined && !isValidRecurringId(recurringId)) {
+  if (recurringId !== undefined && recurringId !== null && !isValidRecurringId(recurringId)) {
     return { ok: false, message: 'recurringId must be a valid UUID' };
   }
 
@@ -129,7 +134,7 @@ export async function createTransaction(
     date,
     createdAt: new Date().toISOString(),
   };
-  if (recurringId !== undefined) transaction.recurringId = recurringId;
+  if (typeof recurringId === 'string') transaction.recurringId = recurringId;
 
   await getStore().put({ PK: pk(userId), SK: txnSk(yearMonth, transactionId), ...transaction });
 
@@ -143,7 +148,7 @@ export async function deleteTransaction(
 ): Promise<ApiResponse> {
   const { yearMonth, transactionId } = params;
 
-  if (!yearMonth || !/^\d{4}-\d{2}$/.test(yearMonth)) {
+  if (!isYearMonth(yearMonth)) {
     return err(400, 'yearMonth must be in YYYY-MM format');
   }
   if (!transactionId) {
@@ -162,7 +167,7 @@ export async function updateTransaction(
 ): Promise<ApiResponse> {
   const { yearMonth, transactionId } = params;
 
-  if (!yearMonth || !/^\d{4}-\d{2}$/.test(yearMonth)) {
+  if (!isYearMonth(yearMonth)) {
     return err(400, 'yearMonth must be in YYYY-MM format');
   }
   if (!transactionId) {
@@ -195,8 +200,8 @@ export async function updateTransaction(
     date,
     createdAt: existing.createdAt,
   };
-  const linkedRecurringId = recurringId ?? existing.recurringId;
-  if (linkedRecurringId !== undefined) transaction.recurringId = linkedRecurringId;
+  const linkedRecurringId = recurringId === undefined ? existing.recurringId : recurringId;
+  if (typeof linkedRecurringId === 'string') transaction.recurringId = linkedRecurringId;
 
   if (newYearMonth === yearMonth) {
     await store.put({ PK: pk(userId), SK: txnSk(yearMonth, transactionId), ...transaction });

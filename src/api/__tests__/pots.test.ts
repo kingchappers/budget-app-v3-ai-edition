@@ -200,10 +200,13 @@ describe('putPot', () => {
     expect(JSON.parse(res.body).settings.autoContribute).toEqual([{ from: '2026-09', amount: 5000 }]);
   });
 
-  it('keeps an archived pot archived when its settings are saved', async () => {
-    await seedUser(store, 'user-1', [{ SK: 'POT#cat-holidays', categoryId: 'cat-holidays', monthlyAmount: null, goalAmount: null, autoContribute: [], archivedAt: '2026-09-20T10:00:00.000Z' }]);
-    await putPot(putEvent(valid), 'user-1', { categoryId: 'cat-holidays' });
-    expect(await store.get({ PK: 'USER#user-1', SK: 'POT#cat-holidays' })).toMatchObject({ archivedAt: '2026-09-20T10:00:00.000Z' });
+  it('refuses to change an archived pot and leaves its settings alone', async () => {
+    const archived = { SK: 'POT#cat-holidays', categoryId: 'cat-holidays', monthlyAmount: null, goalAmount: null, autoContribute: [], archivedAt: '2026-09-20T10:00:00.000Z', updatedAt: 'u' };
+    await seedUser(store, 'user-1', [archived]);
+    const res = await putPot(putEvent(valid), 'user-1', { categoryId: 'cat-holidays' });
+    expect(res.statusCode).toBe(409);
+    expect(JSON.parse(res.body)).toEqual({ error: 'Unarchive this pot before changing it' });
+    expect(await store.get({ PK: 'USER#user-1', SK: 'POT#cat-holidays' })).toMatchObject({ archivedAt: '2026-09-20T10:00:00.000Z', updatedAt: 'u', monthlyAmount: null });
   });
 
   it('allows clearing both amounts', async () => {

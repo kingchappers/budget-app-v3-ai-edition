@@ -5,12 +5,10 @@ import { MAX_AMOUNT_PENCE, SECURITY_HEADERS, VALID_TRANSACTION_TYPES } from './c
 import type { ApiResponse, Recurring, RecurringFrequency, TransactionType } from './types';
 import { ok, err, parseJsonObject } from './http';
 import { moveToTrash } from './trash';
+import { isCalendarDate, isYearMonth } from './dates';
 
 const DEFAULT_LEAD_DAYS = 3;
 const MAX_NOTE_LENGTH = 200;
-const PERIOD_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
-const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
-
 export const RECURRING_FREQUENCIES: readonly RecurringFrequency[] = ['WEEKLY', 'FOUR_WEEKLY', 'MONTHLY', 'QUARTERLY', 'YEARLY'];
 
 // How far ahead a reminder may start: a week's bill needs a fortnight at most, a yearly one two months.
@@ -21,18 +19,6 @@ export const MAX_LEAD_DAYS: Record<RecurringFrequency, number> = {
   QUARTERLY: 60,
   YEARLY: 60,
 };
-
-function isRealDate(value: string): boolean {
-  if (!DATE_PATTERN.test(value)) return false;
-  const [year, month, day] = value.split('-').map(Number);
-  const date = new Date(Date.UTC(year, month - 1, day));
-  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
-}
-
-// A handled marker is a month for monthly items and an occurrence date for the others.
-function isOccurrenceKey(value: string): boolean {
-  return PERIOD_PATTERN.test(value) || isRealDate(value);
-}
 
 export interface ValidRecurringInput {
   type: TransactionType;
@@ -86,7 +72,7 @@ export function validateRecurringInput(body: Record<string, unknown>): Validatio
     }
     dayOfMonth = body.dayOfMonth;
   } else {
-    if (typeof body.anchorDate !== 'string' || !isRealDate(body.anchorDate)) {
+    if (typeof body.anchorDate !== 'string' || !isCalendarDate(body.anchorDate)) {
       return { ok: false, message: `anchorDate must be a valid YYYY-MM-DD date for ${schedule} items` };
     }
     anchorDate = body.anchorDate;
@@ -167,6 +153,10 @@ export async function updateRecurring(
   const { recurringId } = params;
   if (!recurringId) return err(400, 'recurringId is required');
 
+  const key = { PK: pk(userId), SK: recurringSk(recurringId) };
+  const stored = await getStore().get(key);
+  if (!stored) return err(404, 'Recurring item not found');
+
   const body = parseJsonObject(event);
   if (!body) return err(400, 'Invalid JSON body');
 
@@ -174,12 +164,12 @@ export async function updateRecurring(
   if (validation.ok === false) return err(400, validation.message);
   const { type, categoryId, amount, description, dayOfMonth, frequency, anchorDate, leadDays } = validation.value;
 
+  // A handled marker is a month for monthly items and a date for the others, so a new schedule invalidates it.
+  const fields: Record<string, unknown> = { type, categoryId, amount, description, dayOfMonth, frequency, anchorDate, leadDays, updatedAt: new Date().toISOString() };
+  if (frequency !== toRecurring(stored).frequency) fields.handledPeriod = null;
+
   try {
-    const item = await getStore().patch(
-      { PK: pk(userId), SK: recurringSk(recurringId) },
-      { type, categoryId, amount, description, dayOfMonth, frequency, anchorDate, leadDays, updatedAt: new Date().toISOString() },
-      { mustExist: true },
-    );
+    const item = await getStore().patch(key, fields, { mustExist: true });
     return ok({ recurring: toRecurring(item) });
   } catch (error) {
     if (error instanceof ConditionFailedError) return err(404, 'Recurring item not found');
@@ -200,6 +190,11 @@ export async function deleteRecurring(
   return { statusCode: 204, headers: SECURITY_HEADERS, body: '' };
 }
 
+function invalidPeriodMessage(frequency: RecurringFrequency): string {
+  if (frequency === 'MONTHLY') return 'period must be a YYYY-MM month for a monthly item';
+  return 'period must be a real YYYY-MM-DD date for a weekly, four-weekly, quarterly or yearly item';
+}
+
 export async function setRecurringHandled(
   event: APIGatewayProxyEventV2,
   userId: string,
@@ -208,17 +203,26 @@ export async function setRecurringHandled(
   const { recurringId } = params;
   if (!recurringId) return err(400, 'recurringId is required');
 
+  const key = { PK: pk(userId), SK: recurringSk(recurringId) };
+  const stored = await getStore().get(key);
+  if (!stored) return err(404, 'Recurring item not found');
+
   const body = parseJsonObject(event);
   if (!body) return err(400, 'Invalid JSON body');
 
   const { period } = body;
-  if (period !== null && !(typeof period === 'string' && isOccurrenceKey(period))) {
+  if (period !== null && typeof period !== 'string') {
     return err(400, 'period must be YYYY-MM, YYYY-MM-DD or null');
+  }
+  if (period !== null) {
+    const { frequency } = toRecurring(stored);
+    const matchesSchedule = frequency === 'MONTHLY' ? isYearMonth(period) : isCalendarDate(period);
+    if (!matchesSchedule) return err(400, invalidPeriodMessage(frequency));
   }
 
   try {
     const item = await getStore().patch(
-      { PK: pk(userId), SK: recurringSk(recurringId) },
+      key,
       { handledPeriod: period, updatedAt: new Date().toISOString() },
       { mustExist: true },
     );

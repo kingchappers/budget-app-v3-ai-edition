@@ -181,6 +181,17 @@ describe('deleteCategory', () => {
     expect(await store.get({ PK: 'USER#user-1', SK: 'CAT#custom-keep' })).toBeDefined();
   });
 
+  it('is a hard delete: nothing goes to the trash', async () => {
+    await seedUser(store, 'user-1', [{ SK: 'CAT#custom-abc', categoryId: 'custom-abc', name: 'Gone', type: 'EXPENSE' }]);
+    await deleteCategory(makeEvent(), 'user-1', { categoryId: 'custom-abc' });
+    expect(await store.query('USER#user-1', { skPrefix: 'TRASH#' })).toHaveLength(0);
+  });
+
+  it('returns 204 for a category that does not exist (idempotent delete)', async () => {
+    const res = await deleteCategory(makeEvent(), 'user-1', { categoryId: 'custom-gone' });
+    expect(res.statusCode).toBe(204);
+  });
+
   it('returns 403 when trying to delete a default category', async () => {
     const res = await deleteCategory(makeEvent(), 'user-1', { categoryId: 'cat-mortgage' });
     expect(res.statusCode).toBe(403);
