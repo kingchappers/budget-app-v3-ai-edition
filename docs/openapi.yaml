@@ -40,9 +40,8 @@ info:
 
     Token rules:
 
-    - A read token may only make `GET` and `HEAD` requests (`HEAD` passes the token check but is not served; see HEAD
-      below and HOA-45). Any other method returns 403 `This token is read-only`. A read-write token may use every
-      method.
+    - A read token may only make `GET` and `HEAD` requests. Any other method returns 403
+      `This token is read-only`. A read-write token may use every method.
     - A token can never reach `/api/tokens*`, `/api/push*` or `/api/auth/*`; those return 403
       `Not available to access tokens`. Each operation records this as `x-token-access`: `none` (no token),
       `read` (a read token is enough) or `write` (a read-write token is needed).
@@ -62,10 +61,9 @@ info:
 
     ## HEAD
 
-    `HEAD` is not served. The router matches the request method exactly and registers no `HEAD` handlers, so a `HEAD`
-    request to a `GET` route returns 404 `Endpoint not found`. A read token is nonetheless allowed to pass the token
-    check with `HEAD`, so "GET and HEAD" above describes the token rule, not what is served (tracked as HOA-45); use
-    `GET` to read.
+    `HEAD` on any `GET` operation returns the same status and headers as `GET` with no body. `HEAD` operations are not
+    listed separately. A path with no `GET` operation (for example `/api/categories/{categoryId}/reassign`) and an
+    unknown path answer `HEAD` with 404, as they do `GET`.
 servers:
   - url: /
     description: The same origin that serves the app.
@@ -1959,7 +1957,7 @@ paths:
         Creates a personal API token. Not available to access tokens: a request with an access token is refused with
         403 `Not available to access tokens`. The secret (`token`) is in the 201 response only; it is stored as a hash
         and cannot be shown again, so keep it somewhere safe. The response carries `Cache-Control: no-store`. A read
-        token (`hwr_`) can only make `GET` (and `HEAD`; see the HEAD note in the overview) requests; a read-write token (`hww_`) can use every method. A household can
+        token (`hwr_`) can only make `GET` (and `HEAD`) requests; a read-write token (`hww_`) can use every method. A household can
         have at most 25 tokens (409); revoke one first. `expiryDays` is required: send 90, 180, 365 or 730, or `null`
         for a token that never expires. In local mode (the built-in login), creating a `write` token also needs the
         account `password`: a missing password is a 403 `Password required`, a wrong one a 403 `Incorrect password`,
@@ -2958,7 +2956,7 @@ components:
         scope:
           type: string
           enum: [read, write]
-          description: '`read` tokens start `hwr_` and may only make `GET` (and `HEAD`; see the HEAD note in the overview) requests; `write` tokens start `hww_`.'
+          description: '`read` tokens start `hwr_` and may only make `GET` (and `HEAD`) requests; `write` tokens start `hww_`.'
         createdAt:
           type: integer
           description: When the token was created, in Unix seconds.

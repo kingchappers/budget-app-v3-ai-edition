@@ -578,6 +578,18 @@ describe('docs/openapi.yaml contract: the real handlers', () => {
       }
     });
 
+    it('answers HEAD to every GET operation with the status of GET and an empty body', async () => {
+      const reads = ops.filter((op) => op.method === 'GET');
+      expect(reads.length).toBeGreaterThan(0);
+      for (const op of reads) {
+        const request = requestFromSpec(op, undefined);
+        const get = await send(op, request);
+        const head = await send({ ...op, method: 'HEAD' }, request);
+        expect(head.status, `HEAD ${op.template}`).toBe(get.status);
+        expect(head.text, `HEAD ${op.template}`).toBe('');
+      }
+    });
+
     it('lists no case, and no x-untested marker, for a status the spec does not document', () => {
       const unknown = ERROR_CASES.map((c) => c.key).filter((key) => {
         const separator = key.lastIndexOf(' ');

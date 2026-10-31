@@ -122,6 +122,19 @@ describe('read and write scopes', () => {
     expect(JSON.parse(res.body).categories.length).toBeGreaterThan(0);
   });
 
+  it('a read token can HEAD categories and gets 200 with an empty body', async () => {
+    const token = await tokenFor('user-a', 'read');
+    const res = await invoke(makeEvent({ method: 'HEAD', authorization: `Bearer ${token}` }));
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toBe('');
+  });
+
+  it('a read token cannot HEAD the token list', async () => {
+    const token = await tokenFor('user-a', 'read');
+    const res = await invoke(makeEvent({ method: 'HEAD', path: '/api/tokens', authorization: `Bearer ${token}` }));
+    expect(res.statusCode).toBe(403);
+  });
+
   it('a read token cannot create a transaction', async () => {
     const token = await tokenFor('user-a', 'read');
     const res = await invoke(postTransaction({ authorization: `Bearer ${token}` }));
