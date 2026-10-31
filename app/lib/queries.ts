@@ -19,6 +19,7 @@ export const queryKeys = {
   accounts: ['accounts'] as const,
   trash: ['trash'] as const,
   accessTokens: ['accessTokens'] as const,
+  apiSpec: ['apiSpec'] as const,
 };
 
 // What is already loaded, for text that should not wait on a request.
@@ -48,6 +49,18 @@ export function useCategories() {
     queryKey: queryKeys.categories,
     queryFn: () => api.getCategories(),
     staleTime: 5 * 60_000,
+    enabled,
+  });
+}
+
+export function useApiSpec() {
+  const api = useApi();
+  const enabled = useAuthReady();
+  return useQuery({
+    queryKey: queryKeys.apiSpec,
+    queryFn: () => api.getApiSpec(),
+    staleTime: 60 * 60_000,
+    refetchOnWindowFocus: false,
     enabled,
   });
 }
