@@ -1,7 +1,7 @@
 import { loadBudget, shiftMonth } from '../data';
 import { buildMonthReview, type MonthReview } from '../review';
 import type { McpTool } from '../types';
-import { READ_ONLY, clip, monthIsTooFarAhead, monthOf, readMonth } from './shared';
+import { PRIVACY_NOTE, READ_ONLY, clip, monthIsTooFarAhead, monthOf, readMonth } from './shared';
 
 const VIEWS = ['month-summary', 'category-share', 'monthly-trend', 'category-vs-target'] as const;
 type View = (typeof VIEWS)[number];
@@ -52,7 +52,8 @@ function categoryShare(review: MonthReview): { series: Point[]; summary: string 
   const total = spending.reduce((sum, c) => sum + c.thisMonth, 0);
   return {
     series,
-    summary: `In ${review.month} the most went on ${series[0].label}, ${pounds(series[0].value)} of ${pounds(total)} spent.`,
+    // No name here: names are the person's own text, so they stay in the labels.
+    summary: `In ${review.month} the largest category took ${pounds(series[0].value)} of ${pounds(total)} spent.`,
   };
 }
 
@@ -78,7 +79,7 @@ export const chartDataTool: McpTool = {
   name: 'chart_data',
   title: 'Chart data',
   description:
-    'Gives figures ready to draw as a chart, with a plain sentence describing them: a month summary, spending by category, a monthly spending trend, or categories against their targets. Amounts are in pence. Never includes individual transactions. Read-only.',
+    'Gives figures ready to draw as a chart, with a plain sentence describing them: a month summary, spending by category, a monthly spending trend, or categories against their targets. Amounts are in pence (integers). Never includes individual transactions. Read-only.',
   access: 'read',
   inputSchema: {
     type: 'object',
@@ -122,7 +123,7 @@ export const chartDataTool: McpTool = {
     const built = buildView(view, review, budget.transactions, month, months);
     return {
       ok: true,
-      data: { view, unit: 'pence', series: built.series, accessibleSummary: built.summary },
+      data: { note: PRIVACY_NOTE, view, unit: 'pence', series: built.series, accessibleSummary: built.summary },
     };
   },
 };

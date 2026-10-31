@@ -6,7 +6,7 @@ export const potsOverviewTool: McpTool = {
   name: 'pots_overview',
   title: 'Pots overview',
   description:
-    "Lists the active pots: balance, goal, monthly amount, and what was added, taken out and spent in the month. Defaults to the current month. Read-only.",
+    "Lists the active pots: balance, goal, monthly amount, and what was added, taken out and spent in the month. Defaults to the current month. Amounts are in pence (integers). Read-only.",
   access: 'read',
   inputSchema: {
     type: 'object',
@@ -38,6 +38,6 @@ export const potsOverviewTool: McpTool = {
         takenOut: p.thisMonth.takeOut,
         spent: p.thisMonth.spent,
       }));
-    return { ok: true, data: { note: PRIVACY_NOTE, month, pots } };
+    return { ok: true, data: { note: PRIVACY_NOTE, month, unit: 'pence', pots } };
   },
 };

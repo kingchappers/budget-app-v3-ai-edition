@@ -1,6 +1,7 @@
 // The month review behind the month_review tool. Rules: plugins/hoardwise/skills/budget/review.md.
 import type { Category, CategoryTarget, PotSummary, Transaction } from '../api/types';
 import { SPARSE_BELOW, median, monthHasData, monthlyTarget, regularAmount, sumToDay, throughDay, usualFor } from './calc';
+import { clip } from './tools/shared';
 
 // review.md gives rules of thumb ("about half again", "a small minimum, such as £5",
 // "several times the median item"); these are the values we chose for them.
@@ -172,7 +173,7 @@ function buildCategoryLines(
     const target = rawTarget ? monthlyTarget(rawTarget, month) : null;
     lines.push({
       categoryId: category.categoryId,
-      name: category.name,
+      name: clip(category.name),
       type,
       thisMonth,
       usual,
@@ -242,7 +243,7 @@ function buildPotLines(pots: PotSummary[], categories: Category[]): PotLine[] {
     .filter((p) => !p.archivedAt)
     .map((p) => ({
       categoryId: p.categoryId,
-      name: nameById.get(p.categoryId) ?? '',
+      name: clip(nameById.get(p.categoryId)),
       added: p.thisMonth.setAside + p.thisMonth.autoAdded,
       takenOut: p.thisMonth.takeOut,
       spent: p.thisMonth.spent,

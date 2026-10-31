@@ -13,7 +13,7 @@ export const categoryDetailTool: McpTool = {
   name: 'category_detail',
   title: 'Category detail',
   description:
-    "Shows one category: this month's items newest first (up to 50), a total for each recent month, what is usual and the target. Read-only.",
+    "Shows one category: this month's items newest first (up to 50), a total for each recent month, what is usual and the target. Amounts are in pence (integers). Read-only.",
   access: 'read',
   inputSchema: {
     type: 'object',
@@ -62,9 +62,10 @@ export const categoryDetailTool: McpTool = {
       data: {
         note: PRIVACY_NOTE,
         categoryId: category.categoryId,
-        name: category.name,
+        name: clip(category.name),
         type: category.type,
         month,
+        unit: 'pence',
         itemCount: items.length,
         items: items.slice(0, MAX_ITEMS).map((t) => ({ date: t.date, amount: t.amount, text: clip(t.description) })),
         monthlyTotals: Array.from({ length: months }, (_, i) => shiftMonth(month, i - (months - 1))).map((m) => ({
