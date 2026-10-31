@@ -1,6 +1,6 @@
 # Recipes: logging a spend and the pay-day view
 
-The tone and answer shape are in [SKILL.md](SKILL.md). Routes and fields are in [reference.md](reference.md). Amounts are shown in £, never as pence.
+The tone and answer shape are in [SKILL.md](SKILL.md). Routes and fields are in [reference.md](reference.md). Amounts are shown in the user's currency, never as pence; see API essentials in [SKILL.md](SKILL.md).
 
 ## Log a spend
 
@@ -8,7 +8,7 @@ Log only when the user asks. Never suggest a transaction yourself, and never log
 
 1. **Check the token.** `POST /api/transactions` needs a write token. A read token gets 403. If that happens, say so calmly and explain that a write token can be created in the app under Settings > Access tokens. On a self-hosted instance, creating a write token asks for the user's password. They type it in the app, never to you. Then stop; do not ask for the token in the chat.
 2. **Collect the details.** Ask for what is missing and nothing else:
-   - **Amount.** In pounds, for example £4.20.
+   - **Amount.** In the user's currency, for example £4.20.
    - **What it was.** Becomes the `description`, at most 200 characters. It is optional.
    - **Category.** Read `GET /api/categories`. Offer the most likely one from the description and the user's own history ("Eating out?"). If unsure, ask. Use the `categoryId` from the list, because the API does not check it.
    - **Date.** Today unless they say otherwise, as `YYYY-MM-DD`. It must be a real date.
@@ -16,14 +16,16 @@ Log only when the user asks. Never suggest a transaction yourself, and never log
 3. **Convert to pence from the text, as the app does.** Remove a leading `£` and any commas. What is left must be digits with at most two decimal places. If there are more than two decimals, do not round or truncate: ask the user to confirm the amount. Then parse the decimal string: pounds times 100 plus the pence, padded to two digits, so £4.20 is 420, £4.2 is 420 and £12 is 1200. Never multiply a float by 100, because floating point gives wrong pennies. The result must be at least 1 (£0.01), so reject zero and negative amounts, and at most 1,000,000,000 pence (£10,000,000).
 4. **Read it back in plain words** and ask: "Log £4.20 for coffee in Eating out on 31 Oct. Shall I?" Name the type in Hoardwise's words if it is not a Spend.
 5. **Wait.** Send the request only after a clear yes. If the user changes anything, read it back again. A question, silence or "maybe" is not a yes.
-6. **Send it** with `POST /api/transactions`. Never put user-supplied text inside a shell-quoted string: a quote, `$(...)` or a backtick in a description would break or inject into the command. Build the body as a file with your file-writing tool (properly JSON-escaped), then send it with `--data @`. Use `$HOARDWISE_URL` and `$HOARDWISE_TOKEN` in the header only, as in the cheat sheet:
+6. **Send it** with `POST /api/transactions`. Never put user-supplied text inside a shell-quoted string: a quote, `$(...)` or a backtick in a description would break or inject into the command. Build the body in a fresh temporary file, never inside the working directory (it is often a code repository, and financial data must not be left behind or committed). Make the file with `mktemp`, write the JSON into it with your file-writing tool (properly JSON-escaped, no token in it), send it with `--data @`, and delete it straight after the call. Use `$HOARDWISE_URL` and `$HOARDWISE_TOKEN` in the header only, as in the cheat sheet:
 
    ```sh
-   curl -sS -X POST -H "Authorization: Bearer $HOARDWISE_TOKEN" -H "Content-Type: application/json" \
-     --data @body.json "$HOARDWISE_URL/api/transactions"
+   body=$(mktemp)   # write the JSON to this path with your file tool, then:
+   curl -sS -w '\nHTTP %{http_code}\n' -X POST -H "Authorization: Bearer $HOARDWISE_TOKEN" -H "Content-Type: application/json" \
+     --data @"$body" "$HOARDWISE_URL/api/transactions"
+   rm -f "$body"
    ```
 
-   `body.json` holds the fields, with a UUID `transactionId` that you make and keep. (A heredoc with a quoted delimiter, `<<'EOF'`, fed to `--data-binary @-`, is also safe. `jq -n --arg` is safe only when the value comes from a file or a quoted heredoc, never interpolated.) The same rule applies to a GET query built from user text: use values from the data, or `curl --get --data-urlencode`. Resending the same `transactionId` replaces the entry rather than adding a second, so after a network error retry once with the same `transactionId`, then stop and tell the user plainly. Without a `transactionId`, do not retry; read the month's transactions first to see whether it went in.
+   The file holds the fields, with a UUID `transactionId` that you make and keep. If the shell does not keep variables between calls, use the path `mktemp` printed. The same rule applies to a GET query built from user text: use values from the data, or `curl --get --data-urlencode`. Resending the same `transactionId` replaces the entry rather than adding a second, so after a network error retry once with the same `transactionId`, then stop and tell the user plainly. Without a `transactionId`, do not retry; read the month's transactions first to see whether it went in.
 7. **Report in one calm line:** "Logged £4.20 for coffee in Eating out on 31 Oct. You can delete it in the app if that is not right." The skill never deletes.
 
 A 400 means something in the request was not valid. Say what in plain words and ask the user to correct it. For 401, 403, 429 or 5xx, follow Safety in [SKILL.md](SKILL.md).

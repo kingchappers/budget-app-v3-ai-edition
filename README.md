@@ -212,7 +212,7 @@ Run your own copy as a single container with SQLite and the built-in login: see 
 The `budget` skill teaches an AI coding agent to review your month in a calm, short way, looking at categories, pots and trends. If you ask it to, it will also log a spend.
 
 1. Create a read token in the app under Settings > Access tokens.
-2. Set `HOARDWISE_URL` (the address of your Hoardwise) and `HOARDWISE_TOKEN` in the environment of the shell that starts your agent. Never paste the token into a chat.
+2. Set `HOARDWISE_URL` (the address of your Hoardwise) and `HOARDWISE_TOKEN` in the environment of the shell that starts your agent. Never paste the token into a chat. To keep the token out of your shell history, put the `export` lines in a profile file that is kept out of git, or use a secrets manager.
 3. Install the plugin in Claude Code:
 
    ```bash
@@ -231,7 +231,7 @@ The `budget` skill teaches an AI coding agent to review your month in a calm, sh
 
 The skill works with Claude Code and, as plain markdown, with other coding agents. The Claude desktop, web and mobile assistants will connect through MCP later. The full API description is [`docs/openapi.yaml`](docs/openapi.yaml).
 
-For maintainers: change the skill only through a pull request, and bump `version` in `plugins/hoardwise/.claude-plugin/plugin.json` whenever the skill changes, because people only receive a new copy when that number changes. Anyone who wants a fixed version can add the marketplace at a tag, as `kingchappers/hoardwise#<tag>`.
+For maintainers: change the skill only through a pull request, and bump `version` in `plugins/hoardwise/.claude-plugin/plugin.json` whenever the skill changes, because people only receive a new copy when that number changes. Anyone who wants a fixed version can add the marketplace at a tag, as `kingchappers/hoardwise#<tag>`, using a release tag from the first one that includes the plugin.
 
 ## Decisions
 

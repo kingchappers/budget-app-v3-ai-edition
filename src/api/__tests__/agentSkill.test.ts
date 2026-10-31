@@ -57,7 +57,21 @@ const PAY_DAY_ASK_OR_CONFIRM = /ask the user[^\n]*or infer it[^\n]*confirm/i;
 const NOT_HANDLED_PHRASE = /not yet handled/i;
 const INCOME_QUESTION_POINTER = /when no income is logged, the one question is the income question; see income/i;
 const NO_USER_TEXT_IN_SHELL = /never put (user-supplied|user) text inside a shell-quoted string/i;
-const BODY_FROM_FILE = /--data @|<<'EOF'/;
+const BODY_FROM_TEMP_FILE = /body=\$\(mktemp\)[\s\S]*--data @"\$body"[\s\S]*rm -f "\$body"/;
+const BANNED_BODY_ROUTES = [/body\.json/, /<<'?EOF'?/, /\bjq\b/];
+const CURL_STATUS_FLAG = "-w '\\nHTTP %{http_code}\\n'";
+const NO_TRANSACTIONS_QUESTION = 'Was this month tracked somewhere else?';
+const NO_LOG_OFFER = /log something/i;
+const DESIGN_TOOL_UNLESS_ASKED = /unless the user asks you to hand it to a tool they name/i;
+const DESIGN_TOOL_ONLY_IF_ASKED = /only if the user asks[^\n]*which tool/i;
+const RATE_LIMIT_STOP = /429[^\n]*try again in a little while/i;
+const HTTPS_SENTENCE = /should be https/i;
+const FIXTURE_WORDS = ['Eating out', 'Holidays', '£65', '£50', 'Groceries'];
+const PIN_SENTENCE = 'a release tag from the first one that includes the plugin';
+const HISTORY_LINE = /shell history/i;
+const CURRENCY_HOME = /show them in the user's currency/gi;
+const PENCE_HOME = /never show raw pence/gi;
+const CURRENCY_POINTER = /see API essentials/i;
 const TWO_DECIMALS_RULE = /at most two decimal places/i;
 const NO_ROUNDING_RULE = /do not round or truncate/i;
 const ANY_USER_TEXT = /any text the user entered[^\n]*category names/i;
@@ -155,6 +169,21 @@ function skillFiles(): string[] {
   return readdirSync(SKILL_DIR, { recursive: true, encoding: 'utf8' }).filter((file) => file.endsWith('.md'));
 }
 
+function nonReadMentions(markdown: string): string[] {
+  return mentionedEndpoints(markdown)
+    .filter((m) => m.method !== 'GET' && m.method !== 'HEAD')
+    .map((m) => `${m.method} ${m.path}`);
+}
+
+describe('nonReadMentions', () => {
+  it('lists every mutating mention, including a documented DELETE', () => {
+    expect(nonReadMentions('POST /api/transactions, DELETE /api/transactions/{yearMonth}/{transactionId}, GET /api/pots')).toEqual([
+      'POST /api/transactions',
+      'DELETE /api/transactions/{yearMonth}/{transactionId}',
+    ]);
+  });
+});
+
 describe('mentionedEndpoints', () => {
   it('ignores trailing punctuation and queries, and only matches upper-case methods', () => {
     const sample = 'Use `GET /api/pots?asOf=2026-10`, then POST /api/transactions. Also HEAD /api/x; PATCH /api/y: and get /api/z.';
@@ -192,6 +221,19 @@ describe('endpoints and facts', () => {
     expect(notWrite).toEqual([]);
   });
 
+  it('mentions no mutating call except POST /api/transactions', () => {
+    const found = skillFiles().flatMap((file) => nonReadMentions(readSkillFile(file)));
+    expect(found.filter((call) => call !== 'POST /api/transactions')).toEqual([]);
+  });
+
+  it('shows the HTTP status in every curl example', () => {
+    const curls = skillFiles()
+      .flatMap((file) => readSkillFile(file).split('\n').map((text) => ({ file, text })))
+      .filter((l) => l.text.includes('curl') && l.text.includes('Authorization'));
+    expect(curls.length).toBeGreaterThan(0);
+    expect(curls.filter((l) => !l.text.includes(CURL_STATUS_FLAG))).toEqual([]);
+  });
+
   it('states the money, date and type facts in reference.md', () => {
     const reference = readSkillFile('reference.md');
     expect(reference).toMatch(/integer pence/i);
@@ -203,7 +245,13 @@ describe('endpoints and facts', () => {
   });
 
   it('contains no token-looking value except the examples', () => {
-    const found = skillFiles().flatMap((file) => readSkillFile(file).match(/hw[rw]_[A-Za-z0-9_-]{6,}/g) ?? []);
+    const texts = [
+      ...skillFiles().map(readSkillFile),
+      ...['README.md', '.claude-plugin/marketplace.json', 'plugins/hoardwise/.claude-plugin/plugin.json'].map((path) =>
+        readFileSync(resolve(REPO_ROOT, path), 'utf8'),
+      ),
+    ];
+    const found = texts.flatMap((text) => text.match(/hw[rw]_[A-Za-z0-9_-]{6,}/g) ?? []);
     expect(found.filter((value) => value !== 'hwr_EXAMPLE' && value !== 'hww_EXAMPLE')).toEqual([]);
   });
 
@@ -311,6 +359,49 @@ describe('review guidance', () => {
     expect(readSkillFile('review.md')).toMatch(NO_LOG_MENTION);
   });
 
+  it('offers no logging and at most one neutral question for a month with no transactions', () => {
+    const line = readSkillFile('review.md').split('\n').find((l) => l.includes('A month with no transactions')) ?? '';
+    expect(line).not.toBe('');
+    expect(line).not.toMatch(NO_LOG_OFFER);
+    expect(line).toContain(NO_TRANSACTIONS_QUESTION);
+    expect(line.match(/\?/g)?.length).toBe(1);
+  });
+
+  it('allows handing data to a tool only when the user asks', () => {
+    expect(readSkillFile('SKILL.md')).toMatch(DESIGN_TOOL_UNLESS_ASKED);
+    expect(readSkillFile('review.md')).toMatch(DESIGN_TOOL_ONLY_IF_ASKED);
+  });
+
+  it('tells the user to try again later on 429 and never to wait on Retry-After', () => {
+    expect(all).toMatch(RATE_LIMIT_STOP);
+    expect(all).not.toMatch(/wait for the `?Retry-After/i);
+    expect(readSkillFile('SKILL.md')).toMatch(HTTPS_SENTENCE);
+  });
+
+  it('keeps the currency rule in one home', () => {
+    expect(all.match(CURRENCY_HOME)).toHaveLength(1);
+    expect(all.match(PENCE_HOME)).toHaveLength(1);
+    expect(readSkillFile('recipes.md')).toMatch(CURRENCY_POINTER);
+  });
+
+  it('documents recurringId on a transaction and a transactionId in the example body', () => {
+    const reference = readSkillFile('reference.md');
+    expect(reference).toMatch(/A transaction has[^\n]*`recurringId`/);
+    expect(reference.split('\n').find((l) => l.startsWith('{"')) ?? '').toContain('"transactionId"');
+  });
+
+  it('uses example categories and pots that are not in any fixture, and repeats no example headline', () => {
+    const skill = readSkillFile('SKILL.md');
+    const blocks = skill.split('\n\n').filter((block) => block.startsWith('>'));
+    expect(blocks.length).toBeGreaterThanOrEqual(2);
+    for (const word of FIXTURE_WORDS) expect(skill + readSkillFile('review.md')).not.toContain(word);
+    const outside = skill.split('\n\n').filter((block) => !block.startsWith('>')).join('\n\n');
+    for (const block of blocks) {
+      const headline = block.split('\n')[0].replace(/^>\s*/, '').split(/(?<=\.)\s/)[0];
+      expect(outside).not.toContain(headline);
+    }
+  });
+
   it('links only to files that exist', () => {
     const broken = files.flatMap(({ file, text }) =>
       [...text.matchAll(/\]\(([^)\s]+)\)/g)]
@@ -390,7 +481,10 @@ describe('recipes: logging, pay-day view and safety', () => {
 
   it('builds the request body from a file, never from user text in a shell string', () => {
     expect(recipes).toMatch(NO_USER_TEXT_IN_SHELL);
-    expect(recipes).toMatch(BODY_FROM_FILE);
+    expect(recipes).toMatch(BODY_FROM_TEMP_FILE);
+    for (const banned of BANNED_BODY_ROUTES) {
+      expect(skillFiles().filter((file) => banned.test(readSkillFile(file)))).toEqual([]);
+    }
   });
 
   it('has no single-quoted JSON literal after -d in any skill file', () => {
@@ -453,6 +547,11 @@ describe('install instructions', () => {
     expect(section).toContain('HOARDWISE_TOKEN');
     expect(section).toContain('docs/openapi.yaml');
     expect(section).toMatch(NO_TOKEN_IN_CHAT);
+  });
+
+  it('says which tag to pin and how to set the token without shell history', () => {
+    expect(section).toContain(PIN_SENTENCE);
+    expect(section).toMatch(HISTORY_LINE);
   });
 
   it('tells maintainers to bump the version and how to pin a tag', () => {
