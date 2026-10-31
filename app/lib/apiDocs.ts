@@ -144,7 +144,7 @@ export function schemaFields(spec: ApiSpec, schema: ApiSchema, depth: number = 2
       required: required.has(name),
       description: property.description ?? resolveRef(spec, property).description,
     };
-    if (depth > 1) {
+    if (depth > 0) {
       const children = schemaFields(spec, property, depth - 1);
       if (children.length > 0) row.children = children;
     }
@@ -178,4 +178,22 @@ export function filterOperations(groups: OperationGroup[], query: string): Opera
     );
     return operations.length > 0 ? [{ ...group, operations }] : [];
   });
+}
+
+const CODE_SPAN = /`[^`\n]+`/g;
+
+const UNSUPPORTED_MARKDOWN: { name: string; pattern: RegExp }[] = [
+  { name: 'bold (**)', pattern: /\*\*/ },
+  { name: 'bold (__)', pattern: /__/ },
+  { name: 'link [text](url)', pattern: /\[[^\]]*\]\(/ },
+  { name: 'heading other than ##', pattern: /^\s{0,3}(#|#{3,6})\s/m },
+  { name: 'fenced code block', pattern: /^\s*(```|~~~)/m },
+  { name: 'table row', pattern: /^\s*\|.*\|/m },
+  { name: 'raw tag', pattern: /<\/?[a-zA-Z][^>]*>/ },
+  { name: 'numbered list', pattern: /^\s*\d+[.)]\s/m },
+];
+
+export function findUnsupportedMarkdown(text: string): string[] {
+  const withoutCode = text.replace(CODE_SPAN, '');
+  return UNSUPPORTED_MARKDOWN.filter((u) => u.pattern.test(withoutCode)).map((u) => u.name);
 }

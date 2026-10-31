@@ -26,7 +26,8 @@ const spec: ApiSpec = {
   components: {
     schemas: {
       Kind: { type: 'string', enum: ['A', 'B'], description: 'Which kind.' },
-      Leaf: { type: 'object', properties: { deep: { type: 'string' } } },
+      Leaf: { type: 'object', properties: { deep: { $ref: '#/components/schemas/Deep' } } },
+      Deep: { type: 'object', properties: { bottom: { type: 'string' } } },
       Mid: { type: 'object', properties: { leaf: { $ref: '#/components/schemas/Leaf' } } },
       Thing: {
         type: 'object',
@@ -101,16 +102,21 @@ describe('schemaFields', () => {
     expect(byName.kind.description).toBe('Which kind.');
   });
 
-  it('nests object fields down to depth 2 and no further', () => {
+  it('shows two nested levels below the top and no more', () => {
     const mids = byName.mids;
     expect(mids.type).toBe('array of Mid');
-    expect(mids.children?.map((c) => c.name)).toEqual(['leaf']);
-    expect(mids.children?.[0].children).toBeUndefined();
+    const leaf = mids.children?.[0];
+    expect(leaf?.name).toBe('leaf');
+    const deep = leaf?.children?.[0];
+    expect(deep?.name).toBe('deep');
+    expect(deep?.children).toBeUndefined();
   });
 
   it('honours a smaller depth', () => {
     const shallow = schemaFields(spec, { $ref: '#/components/schemas/Thing' }, 0);
     expect(shallow.every((f) => f.children === undefined)).toBe(true);
+    const one = schemaFields(spec, { $ref: '#/components/schemas/Thing' }, 1);
+    expect(one.find((f) => f.name === 'mids')?.children?.[0].children).toBeUndefined();
   });
 
   it('describes the real TransactionInput', () => {

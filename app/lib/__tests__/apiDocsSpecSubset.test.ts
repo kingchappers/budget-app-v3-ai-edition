@@ -1,18 +1,6 @@
 import { describe, it, expect } from 'vitest';
+import { findUnsupportedMarkdown } from '../apiDocs';
 import { loadSpec } from '../../../src/api/__tests__/openapiSpec';
-
-const CODE_SPAN = /`[^`\n]*`/g;
-
-const UNSUPPORTED: { name: string; pattern: RegExp }[] = [
-  { name: 'bold (**)', pattern: /\*\*/ },
-  { name: 'bold (__)', pattern: /__/ },
-  { name: 'link [text](url)', pattern: /\[[^\]]*\]\(/ },
-  { name: 'heading other than ##', pattern: /^\s{0,3}(#|#{3,6})\s/m },
-  { name: 'fenced code block', pattern: /^\s*(```|~~~)/m },
-  { name: 'table row', pattern: /^\s*\|.*\|/m },
-  { name: 'raw tag', pattern: /<\/?[a-zA-Z][^>]*>/ },
-  { name: 'numbered list', pattern: /^\s*\d+[.)]\s/m },
-];
 
 function proseStrings(node: unknown, path: string, out: { path: string; text: string }[]): void {
   if (Array.isArray(node)) {
@@ -35,8 +23,29 @@ describe('docs/openapi.yaml prose', () => {
     const strings: { path: string; text: string }[] = [];
     proseStrings(loadSpec(), 'spec', strings);
     const problems = strings.flatMap(({ path, text }) =>
-      UNSUPPORTED.filter((u) => u.pattern.test(text.replace(CODE_SPAN, ''))).map((u) => `${path}: ${u.name} in ${JSON.stringify(text)}`),
+      findUnsupportedMarkdown(text).map((name) => `${path}: ${name} in ${JSON.stringify(text)}`),
     );
     expect(problems).toEqual([]);
+  });
+});
+
+describe('findUnsupportedMarkdown', () => {
+  it.each([
+    ['bold', '**bold**'],
+    ['underscore bold', '__x__'],
+    ['link', '[a](b)'],
+    ['# heading', '# Title'],
+    ['### heading', '### Title'],
+    ['fenced block', 'Before\n```\ncode\n```'],
+    ['table row', '| a | b |'],
+    ['raw tag', 'Hello <b>there</b>'],
+    ['numbered list', '1. first\n2. second'],
+  ])('flags %s', (_name, text) => {
+    expect(findUnsupportedMarkdown(text)).not.toEqual([]);
+  });
+
+  it('allows ## headings, bullets and code spans, even with markup inside backticks', () => {
+    const text = '## Heading\n\n- one with `<b>` and `__Host-x`\n- two\n\nUse `**` carefully.';
+    expect(findUnsupportedMarkdown(text)).toEqual([]);
   });
 });
