@@ -10,6 +10,7 @@
     "typecheck": "react-router typegen && tsc",
     "build:demo": "node scripts/build-demo.cjs && node scripts/check-demo-build.mjs --demo build/demo/client",
     "build:container": "node scripts/build-container.cjs",
+    "docs:generate": "node scripts/generate-api-docs.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "store-cli": "node scripts/build-store-cli.cjs && node build/store-cli/store-cli.js",
