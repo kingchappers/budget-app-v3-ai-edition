@@ -1210,10 +1210,12 @@ paths:
       summary: Replace a recurring reminder
       description: >-
         Replaces the editable fields of an existing reminder; the body and its rules are the same as for
-        `createRecurring`, so it is a full replacement: an omitted `frequency` becomes `MONTHLY`, an omitted
-        `description` becomes empty and an omitted `leadDays` goes back to 3. `recurringId`, `createdAt` and
-        `handledPeriod` are kept, even when the frequency changes, so after changing between monthly and another
-        frequency `handledPeriod` may still be in the old key format; clear it with `setRecurringHandled`.
+        `createRecurring`. This is deliberately a full replacement, not a patch: an omitted `frequency` means
+        `MONTHLY` (so a weekly reminder sent without `frequency` becomes monthly), an omitted `description` becomes
+        empty and an omitted `leadDays` goes back to 3. `recurringId` and `createdAt` are kept. `handledPeriod` is
+        kept when the frequency is unchanged and cleared to `null` when it changes, because its format depends on the
+        frequency; a reminder stored without a `frequency` counts as `MONTHLY`. The id is looked up first, so an
+        unknown id is a 404 whatever the body holds.
       operationId: updateRecurring
       x-token-access: write
       requestBody:
@@ -1257,7 +1259,7 @@ paths:
                   createdAt: '2026-10-30T09:15:00.000Z'
                   updatedAt: '2026-10-30T09:25:00.000Z'
         '400':
-          description: The body is not a JSON object (`Invalid JSON body`) or breaks a rule listed under `createRecurring`.
+          description: The reminder exists but the body is not a JSON object (`Invalid JSON body`) or breaks a rule listed under `createRecurring`.
           content:
             application/json:
               schema:
@@ -1269,7 +1271,7 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
-          description: No reminder has this id (`Recurring item not found`). The body is validated first, so an invalid body is a 400 even for an unknown id.
+          description: No reminder has this id (`Recurring item not found`). The id is checked before the body, so an invalid body for an unknown id is still a 404.
           content:
             application/json:
               schema:
@@ -1309,9 +1311,10 @@ paths:
       description: >-
         Records the latest occurrence that has been dealt with, so the reminder stops showing for it. `period` is
         `YYYY-MM` for a monthly reminder and the occurrence date `YYYY-MM-DD` (a real calendar date) for the other
-        frequencies, or `null` to clear the mark. The key is validated for shape only: it is not checked against the
-        reminder's frequency, and either format is accepted for any reminder. The field is required (an empty object is
-        a 400). Only `handledPeriod` and `updatedAt` change.
+        frequencies, or `null` to clear the mark. The format must match the reminder's frequency: a monthly reminder
+        rejects a date and every other frequency rejects a bare month (400 naming the expected format). The reminder
+        is looked up first, so an unknown id is a 404 whatever the body holds. The field is required (an empty object
+        is a 400). Only `handledPeriod` and `updatedAt` change.
       operationId: setRecurringHandled
       x-token-access: write
       requestBody:
@@ -1361,20 +1364,22 @@ paths:
                   updatedAt: '2026-10-30T09:30:00.000Z'
         '400':
           description: >-
-            The body is not a JSON object (`Invalid JSON body`), or `period` is missing or is not `YYYY-MM`, a real
-            `YYYY-MM-DD` date or null (`period must be YYYY-MM, YYYY-MM-DD or null`).
+            The reminder exists but the body is not a JSON object (`Invalid JSON body`), `period` is missing or is
+            neither a string nor null (`period must be YYYY-MM, YYYY-MM-DD or null`), or the string is the wrong
+            format for the reminder's frequency (`period must be a YYYY-MM month for a monthly item`, or `period must
+            be a real YYYY-MM-DD date for a weekly, four-weekly, quarterly or yearly item`).
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
               example:
-                error: period must be YYYY-MM, YYYY-MM-DD or null
+                error: period must be a YYYY-MM month for a monthly item
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
-          description: No reminder has this id (`Recurring item not found`). The body is validated first.
+          description: No reminder has this id (`Recurring item not found`). The id is checked before the body, so an invalid body for an unknown id is still a 404.
           content:
             application/json:
               schema:
@@ -2717,8 +2722,9 @@ components:
           type: [string, 'null']
           pattern: '^\d{4}-\d{2}(-\d{2})?$'
           description: >-
-            The latest occurrence marked handled. By convention `YYYY-MM` for a monthly reminder and the occurrence date
-            `YYYY-MM-DD` for the others; null when none. The server accepts either format for any frequency.
+            The latest occurrence marked handled: `YYYY-MM` for a monthly reminder and the occurrence date `YYYY-MM-DD` for
+            the others; null when none. `setRecurringHandled` enforces the format for the reminder's frequency, and
+            `updateRecurring` resets it to null when the frequency changes.
         createdAt:
           type: string
           format: date-time

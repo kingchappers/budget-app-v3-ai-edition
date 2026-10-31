@@ -361,7 +361,13 @@ const ERROR_CASES: ErrorCase[] = [
   { key: 'POST /api/pots/{categoryId}/unarchive 409', run: async () => ({ path: { categoryId: POT } }) },
   { key: 'POST /api/pots/{categoryId}/unarchive 400', run: async () => ({ path: { categoryId: 'cat-groceries' } }) },
   { key: 'POST /api/recurring 400', run: async () => ({ body: { type: 'EXPENSE', categoryId: 'cat-mortgage', amount: 90000, frequency: 'MONTHLY', dayOfMonth: 40 } }) },
-  { key: 'PUT /api/recurring/{recurringId} 400', run: async () => ({ path: { recurringId: UNKNOWN_UUID }, body: '{not json' }) },
+  {
+    key: 'PUT /api/recurring/{recurringId} 400',
+    run: async (arrange) => {
+      const created = await arrange.call('POST /api/recurring', 'monthly');
+      return { path: { recurringId: created.recurring.recurringId }, body: '{not json' };
+    },
+  },
   {
     key: 'PUT /api/recurring/{recurringId} 404',
     run: async () => ({
@@ -369,8 +375,14 @@ const ERROR_CASES: ErrorCase[] = [
       body: { type: 'EXPENSE', categoryId: 'cat-mortgage', amount: 95000, frequency: 'MONTHLY', dayOfMonth: 1 },
     }),
   },
-  { key: 'POST /api/recurring/{recurringId}/handled 400', run: async () => ({ path: { recurringId: UNKNOWN_UUID }, body: { period: 'soon' } }) },
-  { key: 'POST /api/recurring/{recurringId}/handled 404', run: async () => ({ path: { recurringId: UNKNOWN_UUID }, body: { period: '2026-10' } }) },
+  {
+    key: 'POST /api/recurring/{recurringId}/handled 400',
+    run: async (arrange) => {
+      const created = await arrange.call('POST /api/recurring', 'monthly');
+      return { path: { recurringId: created.recurring.recurringId }, body: { period: '2026-10-15' } };
+    },
+  },
+  { key: 'POST /api/recurring/{recurringId}/handled 404', run: async () => ({ path: { recurringId: UNKNOWN_UUID }, body: { period: 'soon' } }) },
   { key: 'POST /api/trash/restore 400', run: async () => ({ body: { entityType: 'TRANSACTION', id: 'x', extra: true } }) },
   { key: 'POST /api/trash/restore 404', run: async () => ({ body: { entityType: 'TRANSACTION', id: `2026-10#${UNKNOWN_UUID}` } }) },
   {
