@@ -46,6 +46,17 @@ describe('Settings page', () => {
     expect(screen.getByRole('link', { name: /^Help and about/ })).toHaveAttribute('href', '/about');
   });
 
+  it('links to the API docs', () => {
+    renderSettings();
+    expect(screen.getByRole('link', { name: /^API docs/ })).toHaveAttribute('href', '/docs');
+  });
+
+  it('hides the API docs link in the demo', () => {
+    demo.isDemo = true;
+    renderSettings();
+    expect(screen.queryByRole('link', { name: /^API docs/ })).not.toBeInTheDocument();
+  });
+
   it('has a Settings heading', () => {
     renderSettings();
     expect(screen.getByRole('heading', { name: 'Settings' })).toBeInTheDocument();
