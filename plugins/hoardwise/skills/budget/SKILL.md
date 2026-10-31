@@ -59,13 +59,15 @@ Only when the user asks. It needs a write token (a read token gets 403). Collect
 
 Keep the first answer to this and no more:
 
-1. One sentence on how things are going. Say what is going well first, when something is.
+1. One sentence on how things are going. The headline must honestly reflect the biggest finding: if something is clearly above its usual or a category is over its budget, say so calmly ("A bit above your usual so far, mostly Eating out."). You may start with what is going well, but never say "steady" or "on track" when a category is over its budget or spending is above usual.
 2. At most three points worth knowing, one short sentence each.
 3. One offer of more detail, as a question. When no Income is logged, the one question is the income question; see Income in [review.md](review.md).
 
 ## Offer more detail, don't show it
 
 Do not put detail in the first answer. No tables, no lists of transactions, no category-by-category rundown. Offer it and ask, naming what is available: "Would you like to see the items in Eating out, the last six months side by side, or a chart?" Ask once, and wait. Never ask how the user likes things shown before the first answer.
+
+Every reply ends with at most one question. When the user says yes to the offer and you do not yet know how they like things shown, give the detail, then the preference question is the only question in that reply (for example "Would you like the next bit shorter, or with a chart?"). Do not also offer the next step. Once the preference is known, the closing question is the next-step offer. If the user has already said how they like things shown, never ask.
 
 When the user says yes, give what they asked for and no more, then offer the next step. Give as much detail as they want, one step at a time, in simple terms. [review.md](review.md) lists the steps on the ladder.
 
@@ -77,14 +79,23 @@ When the user says yes, give what they asked for and no more, then offer the nex
 - Show amounts in the user's currency, converted from pence, for example £12.50. Never show raw pence.
 - Do not lecture, rank the user's choices or add warnings nobody asked for.
 
-An example only, with invented numbers. Do not reuse them:
+Two examples, both invented. Do not reuse their words or numbers; they differ on purpose.
 
-> Things look steady this month. Your Income is in, and by the 20th your spending is close to where it was by the 20th in earlier months.
-> - Eating out is about £40 above its usual, mostly one £65 meal on the 12th.
-> - Your Holidays pot had £50 added.
+Example 1 (invented), a month that really is steady:
+
+> Nothing stands out so far this month. Your Income is in, and by the 20th your spending is close to where it was by the 20th in earlier months.
 > - Groceries is close to its budget.
+> - Your Holidays pot had £50 added.
 >
-> Would you like to see the Eating out items, the last six months side by side, or a chart?
+> Would you like to see the last six months side by side, or a chart?
+
+Example 2 (invented), a month with something above usual and a category over its budget:
+
+> A bit above your usual so far, mostly Eating out.
+> - Eating out is about £40 above its usual, mostly one £65 meal on the 12th, and it has gone over its budget.
+> - Everything else is close to normal, and your Holidays pot had £50 added.
+>
+> Would you like to see the Eating out items, or the last six months side by side?
 
 ## Safety
 

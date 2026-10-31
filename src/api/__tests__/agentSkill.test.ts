@@ -35,6 +35,13 @@ const DISPLAY_PREFERENCE_TRIGGER = /only when a chart, or extra detail, first co
 const NO_INCOME_ORDER = /give the review first[^\n]*the one question at the end is the income question/i;
 const LIKE_FOR_LIKE = /same day of the month/i;
 const POT_SPEND_RULE = /counts in the month's spending as well as under the pot/i;
+const HEADLINE_HONESTY = /headline must honestly reflect the biggest finding/i;
+const AT_MOST_ONE_QUESTION = /at most one question/i;
+const PREFERENCE_ALONE = /preference question is the only question/i;
+const NO_LOG_MENTION = /do not mention logging/i;
+const EXAMPLE_ANCHOR = 'Things look steady this month';
+const README_VERSION_CLAUSE = 'needs a recent version of Claude Code (the CLI form from v2.1.292)';
+const README_PANEL = 'opens the install panel';
 const FORBIDS = /\b(never|don't|do not)\b/i;
 
 const WRITE_TOKEN_PHRASE = /write token/i;
@@ -284,6 +291,26 @@ describe('review guidance', () => {
     expect(all).toMatch(POT_SPEND_RULE);
   });
 
+  it('keeps the headline honest about the biggest finding', () => {
+    expect(all).toMatch(HEADLINE_HONESTY);
+  });
+
+  it('has at least two invented examples and none opens with the anchoring phrase', () => {
+    const blocks = readSkillFile('SKILL.md').split('\n\n').filter((block) => block.startsWith('>'));
+    expect(blocks.length).toBeGreaterThanOrEqual(2);
+    expect(blocks.filter((block) => block.includes(EXAMPLE_ANCHOR))).toEqual([]);
+    expect(readSkillFile('SKILL.md').match(/invented/gi)?.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('ends a reply with at most one question and asks the preference question alone', () => {
+    expect(all).toMatch(AT_MOST_ONE_QUESTION);
+    expect(all).toMatch(PREFERENCE_ALONE);
+  });
+
+  it('does not mention logging an expected income unless asked', () => {
+    expect(readSkillFile('review.md')).toMatch(NO_LOG_MENTION);
+  });
+
   it('links only to files that exist', () => {
     const broken = files.flatMap(({ file, text }) =>
       [...text.matchAll(/\]\(([^)\s]+)\)/g)]
@@ -404,6 +431,11 @@ describe('install instructions', () => {
   it('gives the one-command install', () => {
     expect(section).toContain(PRIMARY_INSTALL);
     expect(section).toContain(IN_SESSION_INSTALL);
+  });
+
+  it('says the one-command form needs a recent Claude Code and what the in-session command does', () => {
+    expect(section).toContain(README_VERSION_CLAUSE);
+    expect(section).toContain(README_PANEL);
   });
 
   it('gives the two-step install, built from the real names', () => {

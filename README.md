@@ -219,7 +219,7 @@ The `budget` skill teaches an AI coding agent to review your month in a calm, sh
    claude plugin install hoardwise --marketplace kingchappers/hoardwise
    ```
 
-   Inside a session, `/plugin install hoardwise --marketplace kingchappers/hoardwise` does the same. The two-step form is:
+   This needs a recent version of Claude Code (the CLI form from v2.1.292); if yours doesn't have it, update Claude Code or use the two-step form. Inside a session, `/plugin install hoardwise --marketplace kingchappers/hoardwise` opens the install panel for the same plugin, where you choose where to install it. The two-step form is:
 
    ```bash
    claude plugin marketplace add kingchappers/hoardwise
