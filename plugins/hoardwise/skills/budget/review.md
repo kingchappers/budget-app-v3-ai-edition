@@ -17,7 +17,7 @@ Follow these steps when the user asks how their month is going. The tone and ans
    - **Pots.** Money added (`setAside` plus `autoAdded`), money taken out (`takeOut`) and money spent from the pot (`spent`), from each active pot's `thisMonth`.
    - **Notable items.** See the next section.
 7. If the month is still in progress, compare like for like, as the app does: set this month so far against each earlier month up to the same day of the month, using the transaction dates, and say "so far". Never set part of this month against whole earlier months, because that makes spending look low early on. In the first week, say it is early and make few or no claims about totals. Do not guess the month's end.
-8. Pick what is worth knowing, then answer in the shape in SKILL.md: a headline, at most three points, and one offer of more detail.
+8. Pick what is worth knowing, then answer in the shape in SKILL.md: a headline, at most three points, and one offer of more detail. When no income is logged, the one question is the income question; see Income.
 
 ## Income
 

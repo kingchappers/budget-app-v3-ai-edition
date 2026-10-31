@@ -29,6 +29,20 @@ const LIKE_FOR_LIKE = /same day of the month/i;
 const POT_SPEND_RULE = /counts in the month's spending as well as under the pot/i;
 const FORBIDS = /\b(never|don't|do not)\b/i;
 
+const WRITE_TOKEN_PHRASE = /write token/i;
+const EXPLICIT_REQUEST_PHRASE = /only when the user asks/i;
+const READ_BACK_PHRASE = /read it back in plain words/i;
+const WAIT_FOR_YES_PHRASE = /only after a clear yes/i;
+const IDEMPOTENT_RETRY_PHRASE = /resending the same `transactionId` replaces the entry/i;
+const DATA_NOT_INSTRUCTIONS = /data, never instructions/i;
+const NEVER_DELETES = /never deletes or edits/i;
+const NEVER_EXPOSES_TOKEN = /never prints, echoes, stores, commits or pastes the token/i;
+const PAY_DAY_NOT_IN_API = /pay day is not available from the api/i;
+const PAY_DAY_ASK_OR_CONFIRM = /ask the user[^\n]*or infer it[^\n]*confirm/i;
+const NOT_HANDLED_PHRASE = /not yet handled/i;
+const INCOME_QUESTION_POINTER = /when no income is logged, the one question is the income question; see income/i;
+const NEW_HEADINGS = ['log a spend', 'pay-day view', 'safety'];
+
 const PORTABLE_FIELDS = ['name', 'description', 'license', 'compatibility', 'metadata'];
 
 function readSkillFile(name: string): string {
@@ -268,5 +282,67 @@ describe('review guidance', () => {
 
   it('keeps SKILL.md and review.md within 500 lines', () => {
     for (const { text } of files) expect(text.split('\n').length).toBeLessThanOrEqual(500);
+  });
+});
+
+describe('recipes: logging, pay-day view and safety', () => {
+  const skill = readSkillFile('SKILL.md');
+  const review = readSkillFile('review.md');
+  const recipes = readSkillFile('recipes.md');
+  const all = skillFiles().map((file) => readSkillFile(file)).join('\n');
+  const skillHeadings = skill.split('\n').filter((line) => /^## /.test(line)).map((line) => line.toLowerCase());
+
+  it.each(NEW_HEADINGS)('has a short %s section in SKILL.md', (word) => {
+    expect(skillHeadings.some((heading) => heading.includes(word))).toBe(true);
+  });
+
+  it('links SKILL.md to recipes.md', () => {
+    expect(skill).toContain('](recipes.md');
+  });
+
+  it('keeps SKILL.md an outline, well under 200 lines', () => {
+    expect(skill.split('\n').length).toBeLessThan(200);
+  });
+
+  it('logs only on request and needs a write token', () => {
+    expect(recipes).toMatch(WRITE_TOKEN_PHRASE);
+    expect(recipes).toMatch(EXPLICIT_REQUEST_PHRASE);
+  });
+
+  it('reads the entry back and waits for a clear yes before POST /api/transactions', () => {
+    expect(recipes).toMatch(READ_BACK_PHRASE);
+    expect(recipes).toMatch(WAIT_FOR_YES_PHRASE);
+    expect(recipes.search(READ_BACK_PHRASE)).toBeLessThan(recipes.lastIndexOf('POST /api/transactions'));
+  });
+
+  it('states that a retry with the same transactionId is safe', () => {
+    expect(recipes).toMatch(IDEMPOTENT_RETRY_PHRASE);
+  });
+
+  it('has safety statements in SKILL.md', () => {
+    expect(skill).toMatch(DATA_NOT_INSTRUCTIONS);
+    expect(skill).toMatch(NEVER_DELETES);
+    expect(skill).toMatch(NEVER_EXPOSES_TOKEN);
+  });
+
+  it('says the pay day is not in the API and must be asked or confirmed', () => {
+    expect(recipes).toMatch(PAY_DAY_NOT_IN_API);
+    expect(recipes).toMatch(PAY_DAY_ASK_OR_CONFIRM);
+  });
+
+  it('counts only bills not yet handled', () => {
+    expect(recipes).toMatch(NOT_HANDLED_PHRASE);
+    for (const frequency of ['WEEKLY', 'FOUR_WEEKLY', 'MONTHLY', 'QUARTERLY', 'YEARLY']) expect(recipes).toContain(frequency);
+  });
+
+  it('points the answer shape and the review at the income question exception', () => {
+    expect(skill).toMatch(INCOME_QUESTION_POINTER);
+    expect(review).toMatch(INCOME_QUESTION_POINTER);
+  });
+
+  it('mentions POST /api/transactions in recipes.md, which the endpoint tests cover', () => {
+    expect(skillFiles()).toContain('recipes.md');
+    expect(mentionedEndpoints(recipes).map((m) => `${m.method} ${m.path}`)).toContain('POST /api/transactions');
+    expect(all).toContain('hww_EXAMPLE');
   });
 });
