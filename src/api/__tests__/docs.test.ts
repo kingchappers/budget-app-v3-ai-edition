@@ -115,6 +115,14 @@ describe.each(ROUTES)('GET %s', (path) => {
     const res = await invoke(makeEvent(path, { method: 'HEAD' }));
     expect(res.statusCode).toBe(200);
     expect(res.body).toBe('');
+    expect(res.headers).toMatchObject({ 'Cache-Control': 'private' });
+  });
+
+  it('refuses a real local provider with no cookie and says nothing of the spec', async () => {
+    setAuth(await createLocalProvider({}));
+    const res = await invoke(makeEvent(path));
+    expect(res.statusCode).toBe(401);
+    expect(res.body).not.toContain('openapi');
   });
 
   it('is private and carries the security headers', async () => {

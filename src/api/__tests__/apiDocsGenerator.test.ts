@@ -22,7 +22,7 @@ describe('API docs generator', () => {
     const spec = loadSpec();
     const markdown = renderAgentDocs(spec);
     for (const { method, template } of operations(spec)) {
-      expect(markdown).toContain(`${method} ${template}`);
+      expect(markdown).toContain(`### ${method} ${template}`);
     }
   });
 

@@ -576,8 +576,13 @@ describe('docs/openapi.yaml contract: the real handlers', () => {
         get: (target, property) => (typeof (target as any)[property] === 'function' ? async () => { throw new Error('store down'); } : (target as any)[property]),
       }) as Store;
       setStore(failing);
-      // The docs routes read no store, so they have no 500 to document.
-      for (const op of ops.filter((candidate) => responseOf(candidate, '500') !== undefined)) {
+      // The docs routes read no store, so they have no 500 to document; every other route must.
+      const docsOps = ops.filter((candidate) => (candidate.operation as Json).tags?.includes('docs'));
+      expect(docsOps.length).toBeGreaterThan(0);
+      for (const op of ops.filter((candidate) => !docsOps.includes(candidate))) {
+        expect(responseOf(op, '500'), keyOf(op)).toBeDefined();
+      }
+      for (const op of ops.filter((candidate) => !docsOps.includes(candidate))) {
         const request = requestFromSpec(op, Object.keys(requestExamples(op))[0]);
         const reply = await send(op, request);
         expect(replyProblems(op, reply), keyOf(op)).toEqual([]);
