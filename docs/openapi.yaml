@@ -40,9 +40,8 @@ info:
 
     Token rules:
 
-    - A read token may only make `GET` and `HEAD` requests (`HEAD` passes the token check but is not served; see HEAD
-      below and HOA-45). Any other method returns 403 `This token is read-only`. A read-write token may use every
-      method.
+    - A read token may only make `GET` and `HEAD` requests. Any other method returns 403
+      `This token is read-only`. A read-write token may use every method.
     - A token can never reach `/api/tokens*`, `/api/push*` or `/api/auth/*`; those return 403
       `Not available to access tokens`. Each operation records this as `x-token-access`: `none` (no token),
       `read` (a read token is enough) or `write` (a read-write token is needed).
@@ -58,14 +57,13 @@ info:
     An error response has a JSON body `{ "error": "<message>" }`, and some add extra fields. The statuses are 400
     (invalid input), 401 (missing or invalid credential), 403 (forbidden, including token limits and protected
     default categories), 404 (unknown route or record), 409 (conflict with the current state), 429 (too many
-    requests; see `Retry-After`) and 500 (an unexpected server failure, with a generic message). A request body of JSON `null` makes several write routes answer 500 instead of 400 (tracked as HOA-42).
+    requests; see `Retry-After`) and 500 (an unexpected server failure, with a generic message).
 
     ## HEAD
 
-    `HEAD` is not served. The router matches the request method exactly and registers no `HEAD` handlers, so a `HEAD`
-    request to a `GET` route returns 404 `Endpoint not found`. A read token is nonetheless allowed to pass the token
-    check with `HEAD`, so "GET and HEAD" above describes the token rule, not what is served (tracked as HOA-45); use
-    `GET` to read.
+    `HEAD` on any `GET` operation returns the same status and headers as `GET` with no body. `HEAD` operations are not
+    listed separately. A path with no `GET` operation (for example `/api/categories/{categoryId}/reassign`) and an
+    unknown path answer `HEAD` with 404, as they do `GET`.
 servers:
   - url: /
     description: The same origin that serves the app.
@@ -340,8 +338,7 @@ paths:
       tags: [targets]
       summary: List budgets
       description: >-
-        Returns every category target. Unlike the single-target response, each item also carries the storage keys
-        `PK` and `SK` (`USER#<id>` and `TARGET#<categoryId>`).
+        Returns every category target.
       operationId: listTargets
       x-token-access: read
       responses:
@@ -357,12 +354,10 @@ paths:
                   targets:
                     type: array
                     items:
-                      $ref: '#/components/schemas/StoredTarget'
+                      $ref: '#/components/schemas/Target'
               example:
                 targets:
-                  - PK: USER#user-1
-                    SK: TARGET#cat-groceries
-                    categoryId: cat-groceries
+                  - categoryId: cat-groceries
                     targetAmount: 30000
                     period: MONTHLY
                     updatedAt: '2026-10-30T09:15:00.000Z'
@@ -444,8 +439,7 @@ paths:
       tags: [transactions]
       summary: List a month's transactions
       description: >-
-        Returns every transaction stored under the given month, as raw stored records that include the storage keys
-        `PK` and `SK` (`USER#<id>` and `TXN#<yearMonth>#<transactionId>`). `month` is zero-padded, so `3` and `03` both
+        Returns every transaction stored under the given month. `month` is zero-padded, so `3` and `03` both
         mean March. The values are parsed leniently: the handler only checks that both parse as integers, with `month`
         1 to 12 and `year` at least 2000. A `year` or `month` with trailing characters (such as `2026x`) passes the check
         and is used as given, so it matches nothing and returns an empty list. A transaction belongs to the month in its
@@ -483,12 +477,10 @@ paths:
                   transactions:
                     type: array
                     items:
-                      $ref: '#/components/schemas/StoredTransaction'
+                      $ref: '#/components/schemas/Transaction'
               example:
                 transactions:
-                  - PK: USER#user-1
-                    SK: TXN#2026-10#6f1d2c8e-3b4a-4c5d-8e9f-0a1b2c3d4e5f
-                    transactionId: 6f1d2c8e-3b4a-4c5d-8e9f-0a1b2c3d4e5f
+                  - transactionId: 6f1d2c8e-3b4a-4c5d-8e9f-0a1b2c3d4e5f
                     yearMonth: '2026-10'
                     amount: 1250
                     type: EXPENSE
@@ -519,7 +511,7 @@ paths:
         retry safely; supplying an id that already exists in that month silently replaces that transaction. The
         `categoryId` and `recurringId` are not checked against existing records. `date` is checked by shape only, so
         `2026-13-45` is accepted. `description` may be omitted or null and is stored as an empty string. Unknown fields
-        are ignored. A body that is valid JSON but not an object (for example `null`) returns 500, not 400.
+        are ignored.
       operationId: createTransaction
       x-token-access: write
       requestBody:
@@ -582,8 +574,7 @@ paths:
       tags: [transactions]
       summary: List transactions across several months
       description: >-
-        Returns the raw stored records (with `PK` and `SK`, as in `listTransactions`) whose `yearMonth` falls from
-        `from` to `to` inclusive. The range is at most 24 months. Months are compared as `YYYY-MM` strings.
+        Returns the transactions whose `yearMonth` falls from `from` to `to` inclusive. The range is at most 24 months. Months are compared as `YYYY-MM` strings.
       operationId: listTransactionsRange
       x-token-access: read
       parameters:
@@ -616,12 +607,10 @@ paths:
                   transactions:
                     type: array
                     items:
-                      $ref: '#/components/schemas/StoredTransaction'
+                      $ref: '#/components/schemas/Transaction'
               example:
                 transactions:
-                  - PK: USER#user-1
-                    SK: TXN#2026-10#6f1d2c8e-3b4a-4c5d-8e9f-0a1b2c3d4e5f
-                    transactionId: 6f1d2c8e-3b4a-4c5d-8e9f-0a1b2c3d4e5f
+                  - transactionId: 6f1d2c8e-3b4a-4c5d-8e9f-0a1b2c3d4e5f
                     yearMonth: '2026-10'
                     amount: 1250
                     type: EXPENSE
@@ -841,8 +830,7 @@ paths:
         before `month` is different (the amount is `monthlyAmount` when on, `0` when off). The history may hold at
         most 120 entries. `month` is the first month the change applies to and must be within one month of the
         server's current month (UTC). An existing `archivedAt` is kept, and saving does not unarchive the pot.
-        `categoryId` must be a built-in or custom category of type `POT`. Unknown body fields are ignored. A body of
-        `null` returns 500, not 400 (a string, number or array gives a 400 about `monthlyAmount`).
+        `categoryId` must be a built-in or custom category of type `POT`. Unknown body fields are ignored.
       operationId: putPot
       x-token-access: write
       requestBody:
@@ -890,7 +878,7 @@ paths:
                   updatedAt: '2026-10-30T09:15:00.000Z'
         '400':
           description: >-
-            The body is not valid JSON (`Invalid JSON body`); `monthlyAmount` or `goalAmount` is missing or not null or a
+            The body is not a JSON object (`Invalid JSON body`); `monthlyAmount` or `goalAmount` is missing or not null or a
             positive integer of at most 1,000,000,000 (`monthlyAmount must be null or a positive integer of pence`, and the
             same for `goalAmount`); `autoContribute` is not a boolean (`autoContribute must be a boolean`); `month` is
             missing, malformed or not within one month of now (`month must be a YYYY-MM month within one month of now`);
@@ -1586,7 +1574,7 @@ paths:
                   createdAt: '2026-10-30T09:15:00.000Z'
         '400':
           description: >-
-            The body is not valid JSON (`Invalid JSON body`); `name` is missing, blank or over 50 characters
+            The body is not a JSON object (`Invalid JSON body`); `name` is missing, blank or over 50 characters
             (`name must be a non-empty string of at most 50 characters`); `kind` is not `ASSET` or `LIABILITY`
             (`kind must be ASSET or LIABILITY`); or `type` does not belong to `kind` (`type must match kind: CASH,
             SAVINGS, INVESTMENT` for an asset, `type must match kind: CREDIT_CARD, LOAN` for a liability). The first rule
@@ -1650,7 +1638,7 @@ paths:
                   createdAt: '2026-10-01T08:00:00.000Z'
         '400':
           description: >-
-            The body is not valid JSON (`Invalid JSON body`); `name` is missing, blank or over 50 characters
+            The body is not a JSON object (`Invalid JSON body`); `name` is missing, blank or over 50 characters
             (`name must be a non-empty string of at most 50 characters`); or `type` does not belong to the account's kind
             (`type must match the account's existing kind: CASH, SAVINGS, INVESTMENT` for an asset, `... CREDIT_CARD, LOAN`
             for a liability).
@@ -1744,17 +1732,16 @@ paths:
                   createdAt: '2026-10-01T08:00:00.000Z'
         '400':
           description: >-
-            The body is not valid JSON (`Invalid JSON body`); `date` is not a real `YYYY-MM-DD` date or is more than one
-            day ahead (`date must be a YYYY-MM-DD date, at most one day ahead of today`); `pence` is not an integer of at
-            most 1,000,000,000 in magnitude (the message says `pence must be a positive integer, at most 1000000000`,
-            although zero and negative values are accepted); or the account already has 500 entries on other dates
-            (`an account can have at most 500 balance entries`).
+            The body is not a JSON object (`Invalid JSON body`); `date` is not a real `YYYY-MM-DD` date or is more than one
+            day ahead (`date must be a YYYY-MM-DD date, at most one day ahead of today`); `pence` is not a whole number
+            between -1,000,000,000 and 1,000,000,000 (`pence must be a whole number between -1000000000 and 1000000000`);
+            or the account already has 500 entries on other dates (`an account can have at most 500 balance entries`).
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
               example:
-                error: date must be a YYYY-MM-DD date, at most one day ahead of today
+                error: pence must be a whole number between -1000000000 and 1000000000
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -1969,7 +1956,7 @@ paths:
         Creates a personal API token. Not available to access tokens: a request with an access token is refused with
         403 `Not available to access tokens`. The secret (`token`) is in the 201 response only; it is stored as a hash
         and cannot be shown again, so keep it somewhere safe. The response carries `Cache-Control: no-store`. A read
-        token (`hwr_`) can only make `GET` (and `HEAD`; see the HEAD note in the overview) requests; a read-write token (`hww_`) can use every method. A household can
+        token (`hwr_`) can only make `GET` (and `HEAD`) requests; a read-write token (`hww_`) can use every method. A household can
         have at most 25 tokens (409); revoke one first. `expiryDays` is required: send 90, 180, 365 or 730, or `null`
         for a token that never expires. In local mode (the built-in login), creating a `write` token also needs the
         account `password`: a missing password is a 403 `Password required`, a wrong one a 403 `Incorrect password`,
@@ -2385,27 +2372,6 @@ components:
         updatedAt:
           type: string
           format: date-time
-    StoredTarget:
-      type: object
-      additionalProperties: false
-      description: A target as listed by `listTargets`, including its storage keys.
-      required: [PK, SK, categoryId, targetAmount, period, updatedAt]
-      properties:
-        PK:
-          type: string
-        SK:
-          type: string
-        categoryId:
-          type: string
-        targetAmount:
-          type: integer
-          minimum: 1
-          maximum: 1000000000
-        period:
-          $ref: '#/components/schemas/TargetPeriod'
-        updatedAt:
-          type: string
-          format: date-time
     TargetInput:
       type: object
       required: [targetAmount, period]
@@ -2458,42 +2424,6 @@ components:
         recurringId:
           type: string
           description: The recurring reminder this transaction was made from. Present only when linked.
-    StoredTransaction:
-      type: object
-      additionalProperties: false
-      description: A transaction as listed by `listTransactions` and `listTransactionsRange`, including its storage keys.
-      required: [PK, SK, transactionId, yearMonth, amount, type, categoryId, description, date, createdAt]
-      properties:
-        PK:
-          type: string
-          description: '`USER#<id>`.'
-        SK:
-          type: string
-          description: '`TXN#<yearMonth>#<transactionId>`.'
-        transactionId:
-          type: string
-        yearMonth:
-          type: string
-          pattern: '^\d{4}-\d{2}$'
-        amount:
-          type: integer
-          minimum: 1
-          maximum: 1000000000
-        type:
-          $ref: '#/components/schemas/TransactionType'
-        categoryId:
-          type: string
-        description:
-          type: string
-          maxLength: 200
-        date:
-          type: string
-          pattern: '^\d{4}-\d{2}-\d{2}$'
-        createdAt:
-          type: string
-          format: date-time
-        recurringId:
-          type: string
     TransactionInput:
       type: object
       required: [amount, type, categoryId, date]
@@ -3025,7 +2955,7 @@ components:
         scope:
           type: string
           enum: [read, write]
-          description: '`read` tokens start `hwr_` and may only make `GET` (and `HEAD`; see the HEAD note in the overview) requests; `write` tokens start `hww_`.'
+          description: '`read` tokens start `hwr_` and may only make `GET` (and `HEAD`) requests; `write` tokens start `hww_`.'
         createdAt:
           type: integer
           description: When the token was created, in Unix seconds.

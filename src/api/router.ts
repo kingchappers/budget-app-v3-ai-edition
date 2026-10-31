@@ -38,7 +38,9 @@ export function createRouter(): Router {
   }
 
   async function dispatch(event: APIGatewayProxyEventV2, userId: string): Promise<ApiResponse> {
-    const method = event.requestContext.http.method;
+    const requestMethod = event.requestContext.http.method;
+    const isHead = requestMethod === 'HEAD';
+    const method = isHead ? 'GET' : requestMethod;
     const path = event.rawPath;
 
     for (const route of routes) {
@@ -51,7 +53,8 @@ export function createRouter(): Router {
         params[name] = match[i + 1];
       });
 
-      return route.handler(event, userId, params);
+      const response = await route.handler(event, userId, params);
+      return isHead ? { ...response, body: '' } : response;
     }
 
     return {

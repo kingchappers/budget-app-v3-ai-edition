@@ -5,7 +5,7 @@ import { MAX_AMOUNT_PENCE } from './constants';
 import { DEFAULT_CATEGORIES } from './defaults';
 import { autoAmountFor, computePots } from './potsCalc';
 import type { ApiResponse, Category, PotAutoEntry, PotSettings, Transaction } from './types';
-import { ok, err } from './http';
+import { ok, err, parseJsonObject } from './http';
 
 export const MAX_AUTO_ENTRIES = 120;
 const MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
@@ -102,12 +102,8 @@ export async function putPot(
     return err(400, 'categoryId is required');
   }
 
-  let body: Record<string, unknown>;
-  try {
-    body = JSON.parse(event.body || '{}');
-  } catch {
-    return err(400, 'Invalid JSON body');
-  }
+  const body = parseJsonObject(event);
+  if (!body) return err(400, 'Invalid JSON body');
 
   const { monthlyAmount, goalAmount, autoContribute, month } = body;
   if (!isOptionalAmount(monthlyAmount)) {

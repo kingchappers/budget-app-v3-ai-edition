@@ -4,7 +4,7 @@ import { pk, catSk } from './db';
 import { DEFAULT_CATEGORIES, DEFAULT_CATEGORY_IDS } from './defaults';
 import { SECURITY_HEADERS, VALID_CATEGORY_TYPES, VALID_CATEGORY_GROUPS, POT_GROUPS } from './constants';
 import type { Category, CategoryGroup, CategoryType, ApiResponse } from './types';
-import { ok, err } from './http';
+import { ok, err, parseJsonObject } from './http';
 
 export async function getCategories(
   _event: APIGatewayProxyEventV2,
@@ -59,12 +59,8 @@ export async function createCategory(
   userId: string,
   _params: Record<string, string>,
 ): Promise<ApiResponse> {
-  let body: Record<string, unknown>;
-  try {
-    body = JSON.parse(event.body || '{}');
-  } catch {
-    return err(400, 'Invalid JSON body');
-  }
+  const body = parseJsonObject(event);
+  if (!body) return err(400, 'Invalid JSON body');
 
   const { name, type, icon, group } = body;
 
@@ -140,12 +136,8 @@ export async function updateCategory(
     return err(403, 'Cannot rename a default category');
   }
 
-  let body: Record<string, unknown>;
-  try {
-    body = JSON.parse(event.body || '{}');
-  } catch {
-    return err(400, 'Invalid JSON body');
-  }
+  const body = parseJsonObject(event);
+  if (!body) return err(400, 'Invalid JSON body');
 
   const validName = validateCategoryName(body.name);
   if (!validName.ok) {

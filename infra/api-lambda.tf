@@ -90,6 +90,12 @@ resource "aws_apigatewayv2_route" "api_get" {
   target    = "integrations/${aws_apigatewayv2_integration.api_lambda.id}"
 }
 
+resource "aws_apigatewayv2_route" "api_head" {
+  api_id    = aws_apigatewayv2_api.app.id
+  route_key = "HEAD /api/{proxy+}"
+  target    = "integrations/${aws_apigatewayv2_integration.api_lambda.id}"
+}
+
 resource "aws_apigatewayv2_route" "api_delete" {
   api_id    = aws_apigatewayv2_api.app.id
   route_key = "DELETE /api/{proxy+}"

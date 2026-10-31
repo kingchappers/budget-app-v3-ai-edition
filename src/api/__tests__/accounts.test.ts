@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { applyBalanceEntry, balanceAsOf, getAccounts, createAccount, updateAccount, deleteAccount, addBalance } from '../accounts';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import type { BalanceEntry } from '../types';
+import { MAX_AMOUNT_PENCE } from '../constants';
 import type { SqliteStore } from '../../store/sqlite';
 import { resetTestStore, seedUser, useTestStore } from '../../store/testing';
 
@@ -200,6 +201,16 @@ describe('addBalance', () => {
     const res = await addBalance(event({ date: '2026-09-15', pence: -5000 }), 'user-1', { accountId: 'acc-1' });
     expect(res.statusCode).toBe(200);
     expect(JSON.parse(res.body).account.balances).toEqual([{ date: '2026-09-15', pence: -5000 }]);
+  });
+
+  it.each([
+    ['fractional pence', 1.5],
+    ['a non-number', 'x'],
+  ])('names the amount rule in the 400 for %s', async (_label, pence) => {
+    await seedAccounts([account()]);
+    const res = await addBalance(event({ date: '2026-09-15', pence }), 'user-1', { accountId: 'acc-1' });
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toBe(`pence must be a whole number between -${MAX_AMOUNT_PENCE} and ${MAX_AMOUNT_PENCE}`);
   });
 
   it('returns 404 for a missing account', async () => {

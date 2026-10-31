@@ -1,6 +1,7 @@
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { queryAll } from './pots';
-import type { ApiResponse, Transaction } from './types';
+import type { ApiResponse } from './types';
+import { toTransaction } from './transactions';
 import { ok, err } from './http';
 
 const MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
@@ -29,8 +30,8 @@ export async function getTransactionsRange(
   }
 
   const items = await queryAll(userId, 'TXN#');
-  const transactions = (items as unknown as Transaction[]).filter(
-    t => t.yearMonth >= from && t.yearMonth <= to,
-  );
+  const transactions = items
+    .map(toTransaction)
+    .filter(t => t.yearMonth >= from && t.yearMonth <= to);
   return ok({ transactions });
 }
