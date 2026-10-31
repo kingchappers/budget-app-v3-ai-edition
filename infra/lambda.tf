@@ -108,11 +108,12 @@ resource "aws_apigatewayv2_stage" "default" {
     throttling_burst_limit = 50
   }
 
-  # /mcp is for assistants, not browsers: a tighter throttle bounds a flood (INFRA-01, AUTH-18)
+  # /mcp is for assistants, not browsers: a tighter throttle bounds a flood (INFRA-01, AUTH-18).
+  # It is shared by everyone. Referencing the route makes the stage wait for it to exist.
   route_settings {
-    route_key              = "POST /mcp"
-    throttling_rate_limit  = 5
-    throttling_burst_limit = 10
+    route_key              = aws_apigatewayv2_route.mcp.route_key
+    throttling_rate_limit  = var.mcp_throttle_rate_limit
+    throttling_burst_limit = var.mcp_throttle_burst_limit
   }
 
   access_log_settings {

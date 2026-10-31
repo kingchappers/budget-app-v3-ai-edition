@@ -13,7 +13,7 @@ Not in the image yet, or not part of it:
 - **API docs.** Logged-in users can read the API reference in the app on the Docs page (Settings > API docs). The same description is served at `GET /api/openapi.json` and a guide for AI agents at `GET /api/docs/agents`, both behind login or an access token. The browser demo does not include them.
 - **Agent skill.** A Claude Code plugin, installable from this repository, teaches an agent to review your month through the API in a calm, short way, and to log a spend when you ask.
 - **Weekly image scan.** The published `latest` and `edge` images are scanned for high and critical vulnerabilities every Monday.
-- **MCP endpoint.** `POST /mcp` lets an AI assistant review your month with a personal access token: read tokens call read tools, nothing writes yet, and it is rate limited (on AWS, also throttled at the gateway).
+- **MCP endpoint.** `/mcp` lets an AI assistant review your month with a personal access token: read tokens call read tools, nothing writes yet, and it is rate limited (on AWS, also throttled at the gateway).
 
 ## 0.3.0 - 2026-10-27
 

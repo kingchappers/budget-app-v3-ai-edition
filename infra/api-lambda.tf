@@ -108,10 +108,11 @@ resource "aws_apigatewayv2_route" "api_put" {
   target    = "integrations/${aws_apigatewayv2_integration.api_lambda.id}"
 }
 
-# Route POST /mcp (access tokens only, scope checked per tool) to the API Lambda
+# Route /mcp (access tokens only, scope checked per tool) to the API Lambda. Every method goes
+# there, so GET and DELETE get the handler's 405 rather than the static Lambda's index.html.
 resource "aws_apigatewayv2_route" "mcp" {
   api_id    = aws_apigatewayv2_api.app.id
-  route_key = "POST /mcp"
+  route_key = "ANY /mcp"
   target    = "integrations/${aws_apigatewayv2_integration.api_lambda.id}"
 }
 
