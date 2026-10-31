@@ -1,5 +1,5 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
-import { basename, resolve } from 'node:path';
+import { basename, dirname, resolve } from 'node:path';
 import { describe, it, expect } from 'vitest';
 import { parse } from 'yaml';
 import { loadSpec, operations } from './openapiSpec';
@@ -7,6 +7,23 @@ import { loadSpec, operations } from './openapiSpec';
 const REPO_ROOT = resolve(__dirname, '../../..');
 const PLUGIN_DIR = resolve(REPO_ROOT, 'plugins/hoardwise');
 const SKILL_DIR = resolve(PLUGIN_DIR, 'skills/budget');
+// Wording-sensitive assertions live here so a wording edit is a one-line change.
+const REVIEW_HEADINGS: Record<string, string> = {
+  'review recipe': 'monthly review',
+  income: 'income',
+  'big spends and deviations': 'unusual',
+  tone: 'tone',
+  detail: 'detail',
+  visuals: 'visuals',
+};
+const OFFER_DETAIL_HEADING = "offer more detail, don't show it";
+const LOOKBACK_PHRASE = /last six months/i;
+const RANGE_LIMIT_PHRASE = /at most 24 months/i;
+const CONVERT_PHRASE = /dividing by 100/i;
+const CURRENCY_WORDS = ['currency', 'pounds'];
+const SHOWS_PENCE = /\b(show|display|report|give|print|tell|say|write)\b[^.\n]*\bin pence\b/i;
+const FORBIDS = /\b(never|don't|do not)\b/i;
+
 const PORTABLE_FIELDS = ['name', 'description', 'license', 'compatibility', 'metadata'];
 
 function readSkillFile(name: string): string {
@@ -166,7 +183,7 @@ describe('endpoints and facts', () => {
 
 describe('token safety', () => {
   const lines = skillFiles().flatMap((file) => readSkillFile(file).split('\n').map((text) => ({ file, text })));
-  const forbids = /\b(never|don't|do not)\b/i;
+  const forbids = FORBIDS;
 
   it('never puts a token in a URL', () => {
     expect(lines.filter((l) => /\?token=|access_token=/.test(l.text))).toEqual([]);
@@ -180,5 +197,53 @@ describe('token safety', () => {
   it('only mentions printing the token in a line that forbids it', () => {
     const printing = /echo\s+"?\$\{?HOARDWISE_TOKEN|printenv\s+HOARDWISE_TOKEN|env\s*\|\s*grep\s+HOARDWISE/;
     expect(lines.filter((l) => printing.test(l.text) && !forbids.test(l.text))).toEqual([]);
+  });
+});
+
+describe('review guidance', () => {
+  const files = skillFiles().map((file) => ({ file, text: readSkillFile(file) }));
+  const all = files.map((f) => f.text).join('\n');
+  const headings = all.split('\n').filter((line) => /^#{2,3} /.test(line)).map((line) => line.toLowerCase());
+
+  it.each(Object.entries(REVIEW_HEADINGS))('has a heading for %s', (_name, word) => {
+    expect(headings.some((heading) => heading.includes(word))).toBe(true);
+  });
+
+  it('tells the agent to offer more detail and ask, not show it', () => {
+    expect(headings).toContain(`## ${OFFER_DETAIL_HEADING}`);
+  });
+
+  it('states the six-month lookback and the 24-month range limit', () => {
+    expect(all).toMatch(LOOKBACK_PHRASE);
+    expect(all).toMatch(RANGE_LIMIT_PHRASE);
+  });
+
+  it('names the calls the review makes', () => {
+    const called = files.filter((f) => f.file === 'review.md').flatMap((f) => mentionedEndpoints(f.text)).map((m) => `${m.method} ${m.path}`);
+    for (const call of ['GET /api/categories', 'GET /api/transactions/range', 'GET /api/targets', 'GET /api/pots']) {
+      expect(called).toContain(call);
+    }
+  });
+
+  it('converts pence to the user currency and never shows pence', () => {
+    expect(all).toMatch(CONVERT_PHRASE);
+    for (const word of CURRENCY_WORDS) expect(all).toContain(word);
+    const sentences = all.split(/(?<=[.!?])\s+|\n/);
+    expect(sentences.filter((sentence) => SHOWS_PENCE.test(sentence) && !FORBIDS.test(sentence))).toEqual([]);
+  });
+
+  it('links only to files that exist', () => {
+    const broken = files.flatMap(({ file, text }) =>
+      [...text.matchAll(/\]\(([^)\s]+)\)/g)]
+        .map((match) => match[1].split('#')[0])
+        .filter((target) => target !== '' && !/^[a-z]+:/i.test(target))
+        .filter((target) => !existsSync(resolve(SKILL_DIR, dirname(file), target)))
+        .map((target) => `${file}: ${target}`),
+    );
+    expect(broken).toEqual([]);
+  });
+
+  it('keeps SKILL.md and review.md within 500 lines', () => {
+    for (const { text } of files) expect(text.split('\n').length).toBeLessThanOrEqual(500);
   });
 });
