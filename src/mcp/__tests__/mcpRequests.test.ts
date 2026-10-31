@@ -6,6 +6,7 @@ import { setAuth } from '../../auth';
 import type { AuthResult } from '../../auth';
 import { createToken, listTokens, revokeToken } from '../../auth/tokens';
 import type { TokenScope } from '../../auth/tokens';
+import { MCP_TOOLS } from '../tools';
 import { setStore } from '../../store';
 import { MemoryStore } from '../../store/memory';
 import type { ApiResponse } from '../../api/types';
@@ -82,13 +83,14 @@ describe('POST /mcp authentication', () => {
     const token = await tokenFor('user-a', 'read');
     const res = await invoke(makeEvent({ authorization: `Bearer ${token}` }));
     expect(res.statusCode).toBe(200);
-    expect(JSON.parse(res.body).result.tools).toEqual([]);
+    const names = JSON.parse(res.body).result.tools.map((t: { name: string }) => t.name);
+    expect(names).toEqual(['month_review', 'category_detail']);
   });
 
   it('decodes a base64 body', async () => {
     const token = await tokenFor('user-a', 'read');
     const res = await invoke(makeEvent({ authorization: `Bearer ${token}`, base64: true }));
-    expect(JSON.parse(res.body).result).toEqual({ tools: [] });
+    expect(JSON.parse(res.body).result.tools).toHaveLength(MCP_TOOLS.length);
   });
 
   it('answers 401 to a session cookie alone and never calls the auth provider', async () => {
