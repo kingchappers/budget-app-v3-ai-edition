@@ -3,6 +3,7 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MantineProvider } from '@mantine/core';
 import type { ApiSpec } from '~/lib/apiDocs';
+import realSpec from '../../../src/api/generated/openapi.json';
 
 vi.mock('~/components/layout/DefaultLayout', () => ({
   DefaultLayout: ({ children }: { children: React.ReactNode }) => <>{children}</>,
@@ -283,5 +284,73 @@ describe('Docs page', () => {
     expect(screen.getByRole('button', { name: /Categories/ })).toHaveFocus();
     await user.keyboard('{Enter}');
     expect(screen.getByRole('button', { name: /Categories/ })).toHaveAttribute('aria-expanded', 'true');
+  });
+});
+
+describe('Docs page with the real spec', () => {
+  beforeEach(() => {
+    state.spec = { data: realSpec as unknown as ApiSpec, isLoading: false, error: null, refetch: vi.fn() };
+  });
+
+  async function openOperation(user: ReturnType<typeof userEvent.setup>, tag: RegExp, label: RegExp) {
+    await user.click(screen.getByRole('button', { name: tag }));
+    await user.click(await screen.findByRole('button', { name: label }));
+  }
+
+  it('shows a path-level parameter on an operation that does not declare it', async () => {
+    const user = setupUser();
+    renderDocs();
+    await openOperation(user, /^categories/i, /PUT\s*\/api\/categories\/\{categoryId\}/);
+    const heading = await screen.findByRole('heading', { name: 'Parameters' });
+    expect(within(heading.parentElement as HTMLElement).getByText('categoryId')).toBeVisible();
+  });
+
+  it('shows a named example and a curl with a body for a request that has only examples', async () => {
+    const user = setupUser();
+    renderDocs();
+    await openOperation(user, /^categories/i, /POST\s*\/api\/categories(?!\/)/);
+    expect(await screen.findByText(/Gym membership/)).toBeVisible();
+    expect(screen.getAllByText(/--data @/).length).toBeGreaterThan(0);
+  });
+
+  it('shows no literal backticks in field or response text', async () => {
+    const user = setupUser();
+    const { container } = renderDocs();
+    await openOperation(user, /^categories/i, /POST\s*\/api\/categories(?!\/)/);
+    await screen.findByText(/Gym membership/);
+    const prose = Array.from(container.querySelectorAll('li, p')).map((n) => n.textContent ?? '');
+    expect(prose.filter((t) => t.includes('`'))).toEqual([]);
+  });
+
+  it('shows the overview, collapsed, with its first heading once opened', async () => {
+    const user = setupUser();
+    const { container } = renderDocs();
+    const overview = screen.getByRole('button', { name: /Overview/ });
+    expect(overview).toHaveAttribute('aria-expanded', 'false');
+    await user.click(overview);
+    expect(await screen.findByRole('heading', { name: 'Amounts, dates and months' })).toBeVisible();
+    expectSoundHeadings(container);
+  });
+
+  it('hides the overview while filtering', async () => {
+    const user = setupUser();
+    renderDocs();
+    await user.type(screen.getByRole('textbox', { name: 'Filter' }), 'pot');
+    expect(screen.queryByRole('button', { name: /Overview/ })).not.toBeInTheDocument();
+  });
+});
+
+describe('Docs page markup', () => {
+  it('lists the getting-started steps as an ordered list', () => {
+    renderDocs();
+    const panel = screen.getByRole('region', { name: 'Getting started' });
+    expect(panel.querySelector('ol')).not.toBeNull();
+  });
+
+  it('announces the no-match message as a status', async () => {
+    const user = setupUser();
+    renderDocs();
+    await user.type(screen.getByRole('textbox', { name: 'Filter' }), 'zzzz');
+    expect(screen.getByRole('status')).toHaveTextContent(/Nothing matches/);
   });
 });

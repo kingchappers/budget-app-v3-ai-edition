@@ -1,10 +1,23 @@
 import { Code, Stack, Text, Title } from '@mantine/core';
-import { exampleCurl, resolveRef, schemaFields, type ApiParameter, type ApiSpec, type OperationEntry } from '~/lib/apiDocs';
+import { exampleCurl, resolveRef, schemaFields, type ApiMediaType, type ApiParameter, type ApiSpec, type OperationEntry } from '~/lib/apiDocs';
 import { CopyCurl } from './CopyCurl';
 import { FieldList } from './FieldList';
-import { InlineText } from './InlineText';
+import { InlineSpans, InlineText } from './InlineText';
 
 const codeBoxStyle = { overflowX: 'auto', maxWidth: '100%' } as const;
+const wrappedCodeStyle = { whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', maxWidth: '100%' } as const;
+
+interface NamedExample {
+  summary?: string;
+  value: unknown;
+}
+
+function requestExamples(body: ApiMediaType | undefined): NamedExample[] {
+  if (!body) return [];
+  if (body.example !== undefined) return [{ value: body.example }];
+  return Object.values(body.examples ?? {}).flatMap((e) => (e.value === undefined ? [] : [{ summary: e.summary, value: e.value }]));
+}
+
 
 function ParameterList({ parameters }: { parameters: ApiParameter[] }) {
   return (
@@ -27,22 +40,36 @@ export function OperationView({ spec, entry }: { spec: ApiSpec; entry: Operation
   const body = operation.requestBody?.content?.['application/json'];
   const bodyFields = body?.schema ? schemaFields(spec, body.schema) : [];
   const responses = Object.entries(operation.responses ?? {});
-  const curl = exampleCurl({ method: entry.method, path: entry.path, body: body?.example });
+  const examples = requestExamples(body);
+  const curl = exampleCurl({ method: entry.method, path: entry.path, body: body ? (examples[0]?.value ?? {}) : undefined });
 
   return (
     <Stack gap="md">
       {operation.description && <div><InlineText text={operation.description} /></div>}
-      {operation.parameters && operation.parameters.length > 0 && <ParameterList parameters={operation.parameters} />}
+      {entry.parameters.length > 0 && <ParameterList parameters={entry.parameters} />}
       {bodyFields.length > 0 && (
         <Stack gap="xs">
           <Title order={4} size="h6">Request fields</Title>
           <FieldList fields={bodyFields} />
         </Stack>
       )}
-      {body?.example !== undefined && (
+      {examples.length > 0 && (
         <Stack gap="xs">
           <Title order={4} size="h6">Request example</Title>
-          <Code block style={codeBoxStyle}>{JSON.stringify(body.example, null, 2)}</Code>
+          {examples.map((example, i) => (
+            <Stack key={i} gap={4}>
+              {example.summary && <Text size="sm">{example.summary}</Text>}
+              <Code
+                block
+                style={codeBoxStyle}
+                tabIndex={0}
+                role="group"
+                aria-label={example.summary ? `Request example: ${example.summary}` : 'Request example'}
+              >
+                {JSON.stringify(example.value, null, 2)}
+              </Code>
+            </Stack>
+          ))}
         </Stack>
       )}
       {responses.length > 0 && (
@@ -50,14 +77,15 @@ export function OperationView({ spec, entry }: { spec: ApiSpec; entry: Operation
           <Title order={4} size="h6">Responses</Title>
           {responses.map(([status, response]) => (
             <Text key={status} size="sm">
-              <Code>{status}</Code> {(response.$ref ? resolveResponse(spec, response.$ref) : response.description) ?? ''}
+              <Code>{status}</Code>{' '}
+              <InlineSpans text={(response.$ref ? resolveResponse(spec, response.$ref) : response.description) ?? ''} />
             </Text>
           ))}
         </Stack>
       )}
       <Stack gap="xs">
         <Title order={4} size="h6">Example</Title>
-        <Code block style={codeBoxStyle}>{curl}</Code>
+        <Code block style={wrappedCodeStyle}>{curl}</Code>
         <CopyCurl command={curl} />
       </Stack>
     </Stack>

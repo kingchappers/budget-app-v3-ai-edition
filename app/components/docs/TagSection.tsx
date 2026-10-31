@@ -13,14 +13,14 @@ const ACCESS_WORDS: Record<string, string> = {
 function OperationLabel({ entry }: { entry: OperationEntry }): React.JSX.Element {
   const access = ACCESS_WORDS[entry.operation['x-token-access'] ?? ''];
   return (
-    <div>
+    <span>
       <Group gap="xs" wrap="nowrap" align="baseline">
         <Text span fw={700} size="sm" ff="monospace">{entry.method}</Text>
         <Text span size="sm" ff="monospace" style={{ overflowWrap: 'anywhere', minWidth: 0 }}>{entry.path}</Text>
       </Group>
-      {entry.operation.summary && <Text size="sm">{entry.operation.summary}</Text>}
-      {access && <Text size="xs" c="dimmed">{access}</Text>}
-    </div>
+      {entry.operation.summary && <Text component="span" display="block" size="sm">{entry.operation.summary}</Text>}
+      {access && <Text component="span" display="block" size="xs" c="dimmed">{access}</Text>}
+    </span>
   );
 }
 

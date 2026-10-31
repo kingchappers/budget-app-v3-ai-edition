@@ -3,7 +3,8 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import { MantineProvider } from '@mantine/core';
-import { InlineText } from '../InlineText';
+import { InlineSpans, InlineText } from '../InlineText';
+import { FieldList } from '../FieldList';
 
 function renderText(text: string) {
   return render(<MantineProvider><InlineText text={text} /></MantineProvider>);
@@ -77,5 +78,30 @@ describe('InlineText structure', () => {
     const { container } = renderText('Token rules:\n- a\n- b');
     expect(container.querySelector('p')).toHaveTextContent('Token rules:');
     expect(container.querySelectorAll('li')).toHaveLength(2);
+  });
+});
+
+describe('code spans', () => {
+  it('renders a span in a field description as code with no backtick', () => {
+    const { container } = render(
+      <MantineProvider>
+        <FieldList fields={[{ name: 'pence', type: 'integer', required: true, description: 'Sent as `pence`.' }]} />
+      </MantineProvider>,
+    );
+    expect(Array.from(container.querySelectorAll('code')).map((c) => c.textContent)).toContain('pence');
+    expect(container.textContent).not.toContain('`');
+    expect(container.querySelector('p p')).toBeNull();
+  });
+
+  it('keeps a stray backtick', () => {
+    const { container } = render(<MantineProvider><InlineSpans text="it`s odd" /></MantineProvider>);
+    expect(container).toHaveTextContent('it`s odd');
+    expect(container.querySelector('code')).toBeNull();
+  });
+
+  it('keeps a stray backtick after a complete span', () => {
+    const { container } = render(<MantineProvider><InlineSpans text="`a` and ` b" /></MantineProvider>);
+    expect(container.querySelectorAll('code')).toHaveLength(1);
+    expect(container).toHaveTextContent('a and ` b');
   });
 });

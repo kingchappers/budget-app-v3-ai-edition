@@ -15,6 +15,7 @@ export interface ApiSchema {
 }
 
 export interface ApiParameter {
+  $ref?: string;
   name: string;
   in: string;
   required?: boolean;
@@ -26,6 +27,7 @@ export interface ApiParameter {
 export interface ApiMediaType {
   schema?: ApiSchema;
   example?: unknown;
+  examples?: Record<string, { summary?: string; value?: unknown }>;
 }
 
 export interface ApiResponse {
@@ -45,17 +47,31 @@ export interface ApiOperation {
   responses?: Record<string, ApiResponse>;
 }
 
+export interface PathItem {
+  parameters?: ApiParameter[];
+  get?: ApiOperation;
+  put?: ApiOperation;
+  post?: ApiOperation;
+  delete?: ApiOperation;
+  patch?: ApiOperation;
+}
+
 export interface ApiSpec {
   info?: { title?: string; description?: string; version?: string };
   tags?: { name: string; description?: string }[];
-  paths?: Record<string, Partial<Record<string, ApiOperation>>>;
-  components?: { schemas?: Record<string, ApiSchema>; responses?: Record<string, ApiResponse> };
+  paths?: Record<string, PathItem>;
+  components?: {
+    schemas?: Record<string, ApiSchema>;
+    responses?: Record<string, ApiResponse>;
+    parameters?: Record<string, ApiParameter>;
+  };
 }
 
 export interface OperationEntry {
   method: string;
   path: string;
   operation: ApiOperation;
+  parameters: ApiParameter[];
 }
 
 export interface OperationGroup {
@@ -72,13 +88,15 @@ export interface FieldRow {
   children?: FieldRow[];
 }
 
-const HTTP_METHODS = ['get', 'put', 'post', 'delete', 'patch'];
+const HTTP_METHODS = ['get', 'put', 'post', 'delete', 'patch'] as const;
 
 export function groupOperationsByTag(spec: ApiSpec): OperationGroup[] {
   const entries: OperationEntry[] = Object.entries(spec.paths ?? {}).flatMap(([path, item]) =>
     HTTP_METHODS.flatMap((method) => {
       const operation = item[method];
-      return operation ? [{ method: method.toUpperCase(), path, operation }] : [];
+      if (!operation) return [];
+      const parameters = [...(item.parameters ?? []), ...(operation.parameters ?? [])].map((p) => resolveParameter(spec, p));
+      return [{ method: method.toUpperCase(), path, operation, parameters }];
     }),
   );
   const declared = spec.tags ?? [];
@@ -93,6 +111,16 @@ export function groupOperationsByTag(spec: ApiSpec): OperationGroup[] {
       operations: entries.filter((e) => e.operation.tags?.includes(tag.name)),
     }))
     .filter((group) => group.operations.length > 0);
+}
+
+const PARAMETER_PREFIX = '#/components/parameters/';
+
+function resolveParameter(spec: ApiSpec, parameter: ApiParameter): ApiParameter {
+  if (!parameter.$ref) return parameter;
+  if (!parameter.$ref.startsWith(PARAMETER_PREFIX)) throw new Error(`Unsupported reference ${parameter.$ref}`);
+  const target = spec.components?.parameters?.[parameter.$ref.slice(PARAMETER_PREFIX.length)];
+  if (!target) throw new Error(`Unknown reference ${parameter.$ref}`);
+  return target;
 }
 
 const REF_PREFIX = '#/components/schemas/';

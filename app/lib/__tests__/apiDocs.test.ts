@@ -181,3 +181,24 @@ describe('filterOperations', () => {
     expect(filterOperations(groups, 'nothing-like-this')).toEqual([]);
   });
 });
+
+describe('operation parameters', () => {
+  it('merges path-level and operation-level parameters and resolves refs', () => {
+    const groups = groupOperationsByTag({
+      paths: {
+        '/api/x/{id}': {
+          parameters: [{ $ref: '#/components/parameters/id' } as never],
+          put: { tags: ['x'], parameters: [{ name: 'q', in: 'query' }] },
+        },
+      },
+      components: { parameters: { id: { name: 'id', in: 'path', required: true } } },
+    });
+    expect(groups[0].operations[0].parameters.map((p) => p.name)).toEqual(['id', 'q']);
+  });
+
+  it('finds categoryId on the real PUT /api/categories/{categoryId}', () => {
+    const groups = groupOperationsByTag(realSpec as unknown as ApiSpec);
+    const entry = groups.flatMap((g) => g.operations).find((e) => e.method === 'PUT' && e.path === '/api/categories/{categoryId}');
+    expect(entry?.parameters.map((p) => p.name)).toContain('categoryId');
+  });
+});
