@@ -173,7 +173,7 @@ export async function addBalance(
     return err(400, 'date must be a YYYY-MM-DD date, at most one day ahead of today');
   }
   if (!isValidPence(pence)) {
-    return err(400, `pence must be a positive integer, at most ${MAX_AMOUNT_PENCE}`);
+    return err(400, `pence must be a whole number between -${MAX_AMOUNT_PENCE} and ${MAX_AMOUNT_PENCE}`);
   }
 
   const existingItem = await queryOne(userId, accountSk(accountId));

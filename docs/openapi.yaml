@@ -1733,16 +1733,15 @@ paths:
         '400':
           description: >-
             The body is not a JSON object (`Invalid JSON body`); `date` is not a real `YYYY-MM-DD` date or is more than one
-            day ahead (`date must be a YYYY-MM-DD date, at most one day ahead of today`); `pence` is not an integer of at
-            most 1,000,000,000 in magnitude (the message says `pence must be a positive integer, at most 1000000000`,
-            although zero and negative values are accepted); or the account already has 500 entries on other dates
-            (`an account can have at most 500 balance entries`).
+            day ahead (`date must be a YYYY-MM-DD date, at most one day ahead of today`); `pence` is not a whole number
+            between -1,000,000,000 and 1,000,000,000 (`pence must be a whole number between -1000000000 and 1000000000`);
+            or the account already has 500 entries on other dates (`an account can have at most 500 balance entries`).
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
               example:
-                error: date must be a YYYY-MM-DD date, at most one day ahead of today
+                error: pence must be a whole number between -1000000000 and 1000000000
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
